@@ -109,10 +109,10 @@ store-procedure dofile
 		insert-string "TT = 0~n"
 	!endif
 
-	!if &or &seq %machine "e" &seq %machine "p"
-		insert-string "STPLUS = 1~n"
+	!if &seq %machine "w"
+		insert-string "SPARROW = 1~n"
 	!else
-		insert-string "STPLUS = 0~n"
+		insert-string "SPARROW = 0~n"
 	!endif
 
 	!if &seq %machine "p"

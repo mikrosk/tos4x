@@ -4,16 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/20 12:27:51 $
+* $Date: 91/08/21 11:20:03 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.76  91/08/20  12:27:51  apratt
-* STylus buttons are found at $D00004, not $D00006.  Documentation error.
+* Revision 2.77  91/08/21  11:20:03  apratt
+* STPAD fixes: if both POWER-ON and TOP-CLOSED are down at boot time,
+* then DON'T go through resvector.  This defeats the
+* shutdown/startup code, which is necessary when things go wrong.
+* Also fixed a bug that caused shutdown/startup to initialize
+* wrong after a cold boot.
 *
+* THIS VERSION IS 3.06h RELEASED TO TEST THIS DATE.
+*
+* 
+* THIS VERSION IS 3.06h RELEASED TO TEST THIS DATE.
+* 
 * Revision 2.76  91/08/20  12:27:51  apratt
 * STylus buttons are found at $D00004, not $D00006.  Documentation error.
 * 
@@ -155,7 +164,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.76 $
+* $Revision: 2.77 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -932,6 +941,28 @@ reset2:
 
 *+
 *  [still ROM only]
+.ifne STPAD
+*
+*  This code is skipped by the test above if we determine it's a cold boot.
+*
+*  Check to make sure we have a clean, well-bred
+*  bailout vector.  The high byte must be zero (not on M68030),
+* power and wait for RAM to decay.
+*  not reset3.  Tough luck: this has to be kept for compatibility's
+*  sake.  The workaround is to do this:
+*
+*	At init time, save the old contents of both resvector and resvalid,
+*	then set resvalid to resmagic and resvector to your vector address.
+*
+	and.b	#$0003,d0		; check just top-closed and power.
+*	and resvalid, and then return by "jmp (a6)."  This will re-execute
+*	the code below, starting at resvchk.
+*	If you were the last guy in the chain, resvaild won't be resmagic 
+*	any more, and this code will fall through to reset3.
+*
+*-
+resvchk:
+.endc
 
 * if STPAD, read the switches register to learn the state of top closed &
 * power on.  Clobber resvalid if they are BOTH down, which is a state that
@@ -1037,13 +1068,18 @@ vtend:	move.w	(a0)+,d0
 *  the hardware into 50hz mode.  According to JWT, you
 *  should not do this when in vblank, so we call 'noblank'
 *  which returns when it's sure we are NOT in a vblank.
-* again later when other machines' shiftmds are set.
+*
+*-
+ .if TT
+	move.b	#$01,syncmode		; set external sync mode always
  .else
-	move.b	#2,shiftmd
-	move.b	#$80,$ffff827e		; write LCD and power control
-	move.b	#$80,$889		; $889 is "shadow shadow"
-	tst.w	$d00000			; read the conversion register
-					; to clear its interrupt
+	btst.b	#0,os_conf+1		; check bit: configured for 50hz?
+					; MAS BUG: don't use "os_conf+1(PC)"
+	beq	notpal			; (nope -- we're good ol' NTSC)
+	lea	pal_r(pc),a6		; a6 -> ret addr
+	bra	noblank			; make sure we're NOT in vblank
+pal_r:	move.b	#$02,syncmode		; then twiddle to 50hz
+ .endif
 .endc
 .endif
 
@@ -2063,9 +2099,13 @@ scuberr:
 	addq.l	#6,sp
 
 	move.w	#$0700,d0	; divide by 200, count 256 = 20ms
+	move.w	#15-1,d1	; do this 15 times; 15*20ms = 300ms
+ikbdlp1:
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
 	dbra	d1,ikbdlp1
 .ifne STPAD
+*+
+*  Fire up %%2 cartridges
 *
 *-
 .ifeq TT
@@ -2099,7 +2139,7 @@ scuberr:
 	moveq.l	#2,d1			; STPAD is always mono
 .else
 .if (TT == 0)
-setvb2:	move.l	#reseth,swv_vec.w	; RESET system on monitor change
+	moveq.l	#0,d1			; pre-select low rez
 .else
 	moveq.l	#4,d1			; pre-select TT MED rez
 .endif

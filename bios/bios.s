@@ -4,13 +4,16 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/12 01:32:40 $
+* $Date: 1992/02/28 01:22:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.44  1992/02/28  01:22:04  apratt
+* Change to coldboot, to clear up to 4MB in STPAD.
+*
 * Revision 2.43  1992/02/12  01:32:40  apratt
 * Fixed an RTS/CTS bug in SCC code. See scc_sender.
 *
@@ -123,7 +126,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.43 $
+* $Revision: 2.44 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\RCS\bios.s,v $
@@ -5125,12 +5128,14 @@ mauskey1:
 * I was going to worry about ssp, but if ssp is trashed, you won't
 * get here either, so don't worry about it.
 *
+* STPAD doesn't give a bus error at the end of memory: we have to
 * compile in the limit of 1MB and clear it from ROM.
 *
 * Yes, you can really only clear 1MB.  If you clear 4MB on a 1MB machine
-	move.l	#$8,a0
+* you will clear out the (shadow of the) bus error vector itself. This is
+* also true of SPARROW, which is another machine where if there is one
 * megabyte it shadows.
-	move.l	#$00040000-1,d1
+*
 *************************************************************************
 
 .globl coldboot

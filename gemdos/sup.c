@@ -1,12 +1,15 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.12 $	$Source: e:/tos/gd2\RCS\sup.c,v $
+* $Revision: 2.13 $	$Source: e:/tos/gd2\RCS\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:47:08 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.13  1991/04/30  12:12:38  apratt
+* Folded setup.c into this file.  Setup.c is no more.
+*
 * Revision 2.12  1991/03/28  17:47:08  apratt
 * THIS VERSION WORKS! DESKTOP OPS WORK!
 *
@@ -34,9 +37,44 @@
  * handler, and the media-change and other error handlers.  The dispatcher
  * just dispatches the call, retries on media change, and returns on other
  * disk errors.
+ *
+ * I also put the stuff that used to be in common.c here; it's just
+ * declarations of global things.
  */
 
 #include "fs.h"
+
+/*
+ * mask for getting remainder of powers of two
+ */
+
+uint logmsk[] = {
+	0,	1,	3,	7,	15,	31,	63,	127,
+	255,	511,	1023,	2047,	4095,	8191,	16383,	32767, 65535
+};
+
+long rwerr;		/* hard error number currently in progress */
+uint errdrv;		/* drive on which error occurred */
+uint realtime;		/* current time word */
+uint realdate;		/* current date word */
+PD rootpd;
+OFD *rootuft[OPNFILES];
+PD *pdtab[NUMPDS];
+PD *run;
+DFD *dfd_head;
+OFD *ofd_head;
+
+DMD drvtbl[MAXDEVS];	/* drive media descriptor for each dev */
+
+jmp_buf errbuf;
+
+uint drvsel;
+
+char nday[] = 
+	/*0 J  F  M  A  M  J  J  A  S  O  N  D  */
+	{ 0,31,28,31,30,31,30,31,31,30,31,30,31 } ;
+
+/****************************************************************************/
 
 static long
 endmediach(drv,rc)
@@ -177,7 +215,7 @@ int *pw;
     uint i;
 
 restrt:
-    fn = pw[0];
+    *(&fn) = *(&pw[0]);	/* take addr so these are not put in regs */
 
     if (fn >= (sizeof funcs / sizeof (long (*)())))
 	return(EINVFN);
@@ -213,4 +251,84 @@ restrt:
 
     return (funcs[pw[0]])(pw[1],pw[2],pw[3],pw[4],pw[5],pw[6],pw[7]);
 }
+
+/*
+ * Code to initialize GEMDOS; called from rwa.s
+ */
+
+#define NBUFS 4		/* MUST BE AT LEAST FOUR! See FSCL for why. */
+#define DEFBUFSIZ 8192	/* outrageously large sectors by default */
+char secbuf[NBUFS][DEFBUFSIZ];			/* sector buffers */
+BCB bcbx[NBUFS];				/* bcb for each buffer */
+
+extern void tikhnd(), (*otime)(), ntrap2(), (*obdos)(), enter();
+
+/*
+ * Initialize GEMDOS
+ */
+voidfn
+osi()
+{
+	BCB *b, *e1, *e2;
+	int i;
+	ulong datime;
+
+	datime = gettime();
+	realdate = (datime >> 16);
+	realtime = (datime & 0xffff);
+
+	/*
+	 * Setup sector buffers (NBUFS of 'em)
+	 */
+	e1 = &bcbx[(NBUFS/2)-1];
+	e2 = &bcbx[NBUFS-1];
+	for (i=0, b = &bcbx[0]; i<NBUFS; i++, b++) {
+	    if (b == e1 || b == e2) b->b_link = 0;
+	    else b->b_link = b+1;
+	    b->b_bufdrv = B_INVALID;
+	    b->b_bufr = &secbuf[i][0];
+	}
+
+	/*
+	 * Setup links in buffer-list
+	 * First one caches FATs and root directories,
+	 * second one caches subdirectory and data blocks.
+ 	 */
+	bufl[0] = &bcbx[0];
+	bufl[1] = e1+1;
+
+	/*
+	 * Initialize OS, login boot device:
+	 */
+
+#if !UNREAL
+	otime = setexc(0x100,-1);
+	(void)setexc(0x100,tikhnd);
+
+	obdos = setexc(0x22,ntrap2);
+	(void)setexc(0x21,enter);
+#endif
+
+	/* set rootpd and fill it with important stuff */
+	run = &rootpd;
+	clear(run,run+1);
+	run->p_xdta = (DTA *)run->p_cmdlin; /* default DTA is your cmd line */
+	run->p_uft = rootuft;
+	run->p_uftsize = OPNFILES;
+	clear(&run->p_uft[0],&run->p_uft[run->p_uftsize]);
+	for (i=0; i<NUMSTD; i++) run->p_uft[i] = ofdtty(biosdev[i]);
+
+	run->p_hflags = 7;
+
+	/* clear the PD table, then add rootpd to it */
+	clear(&pdtab[0],&pdtab[NUMPDS]);
+	pdtab[0] = run;
+
+	(void)xsetdrv(bootdev);		/* Dsetdrv(boot dev) */
+
+	poolinit();
+	xminit();
+	coninit();
+}
+
 

@@ -3,16 +3,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/31 12:08:51 $
+* $Date: 89/08/18 13:44:47 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.18  89/08/18  13:44:47  apratt
+* All changes are TT only:  added _FRB cookie pointing to a 64K buffer
+* in slow RAM for ACSI transfers to/from fast RAM.  Only present if there
+* is any fast RAM.
+*
+* Changed bomb handler to get the exception number from the stack frame.
+*
+* Changed Setcolor and Setpalette so, to the caller, the RGB values
+* are like STe (hi-order bit is least significant).
+*
 * Revision 2.17  89/07/31  12:08:51  apratt
 * Added .globl clrcache directive.
-*
+* 
 * Revision 2.16  89/07/29  21:40:50  kbad
 * Put the reset back at reseth.  It was a gratuitous incomprattibility.
 * 
@@ -267,7 +277,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.17 $
+* $Revision: 2.18 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -331,7 +341,7 @@ denmark		=      13 ***DON'T  CHANGE***
 * code is stopgap, such as programming the memory controller for 2Meg
 * and short-circuiting the RTC.  Caveat programmer.
 * The switches TT, STPLUS, systype, and country
-TT		=	0	; @check@
+TT		=	1	; @check@
 * of one of the canned switch settings files.
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
 * the chip actually exists (so clearing the control register will
@@ -349,7 +359,7 @@ DMAINV		=	0	; @check@
 * set STPLUS to 1 for ST PLUS specific things like memory layout
 * and video (four bits per gun, any-word alignment).
 
-STPLUS		=	1	; @check@
+STPLUS		=	0	; @check@
 
 * Set LONGFRAME to 1 for code which runs on 68000 *or* 680[1-3]0.
 * Even if this is zero, the new system variable _longframe at $59e
@@ -743,7 +753,7 @@ osconf		equ	%11001
 
 
 
-DEFCSIZE	equ	8		; default to room for 8 cookies
+*----
 * Default System Parameters.
 * Do not change these much.
 *----
@@ -1819,6 +1829,28 @@ gotem:	move.l	a1,8(a5)
 	move.l	d0,(a0)+		; save configuration value read
 .endc
 * other values are undefined, but will eventually mean stuff like 2.88MB. 
+.ifne TT
+* If there's fast RAM, put the _FRB cookie in the cookie jar.
+* It points to 64K of space available for anybody to do copies
+* when attempting a Rwabs from or to fast RAM.
+* Don't change this size: RAM-loaded drivers use the same buffer.
+	move.l	#nofpu,$2c
+	tst.l	_ramtop			; any fast RAM?
+	beq.s	nodbf			; no - forget it.
+	move.l	#$00020000,(a0)+	; found 6888x: set %10 bit 
+* there is some fast RAM, so must allocate a 64K disk buffer
+* and add its cookie here.  (I don't necessarily like allocating the
+	clr.l	(a0)+			; no 6888x found
+* be before the jsr to the routine pointed by hdv_boot.)
+	move.l	a2,$34
+	move.l	a3,sp
+	move.l	_membot,(a0)+		; write pointer to buffer
+	add.l	#$10000,_membot		; move membot up by 64K
+nodbf:	nop
+.endc
+	bset.b	#0,-3(a0)		; found SFP004: set %01 bit
+	bra	xfpudone
+
 xfpudone:
 	move.l	a1,$8			; clean up
 	move.l	a2,sp
@@ -1856,12 +1888,12 @@ xfpudone:
 	move.l	#DEFCSIZE,(a0)+		; with size for its value
 .endc
 .ifne TT
-* TT: use a table of BSR's to get exception number
-	lea	_termtab(pc),a1
+* TT: point all exceptions to _term, because the ex number is on
+* the stack, in the exception frame type word.
+	lea	_term(pc),a1
 	lea	8,a0
 	move.w	#64-2-1,d0
 sei1:	move.l	a1,(a0)+
-	addq.l	#$2,a1
 	dbra	d0,sei1
 .endc
 *
@@ -2085,7 +2117,7 @@ priv:	movem.l	d0/a0,-(sp)
 .endif
 priv1:	movem.l	(sp)+,d0/a0
 .ifne TT
-	jmp	tpriv			; jmp into _termtab
+	movem.l	8(sp),d0-d2		; get these off the stack now
 .endc
 .ifeq TT
 	move.l	(sp)+,a0		; restore A regs
@@ -2746,7 +2778,14 @@ swmon2:	move.b	d0,sshiftmd(a5)
 	lea	ttcolor0(a5),a1		; a1 -> hardware palette base
 .endc
 	move.w	#16-1,d0		; d0 = count
+.ifeq TT
 vbl2:	move.w	(a0)+,(a1)+		; load a palette
+.endc
+.ifne TT
+vbl2:	move.w	(a0)+,d0
+	bsr	sw2hw
+	move.w	d0,(a1)+
+.endc
 	dbra	d0,vbl2			; ...and repeat
 	clr.l	colorptr(a5)		; zap colorptr
 * This code calls noblank1 to wait until vblank is over before changing
@@ -3355,29 +3394,64 @@ _getrez:
 	rts				; return rez
 
 *
+.ifeq TT
 *-
 _setscreen:
 
-.ifeq TT
 *--- set logical location:
 	lea	color0(a5),a0		; a0 -> base of palette memory
-.endc
-.ifne TT
-	and.w	#$1ff,d1		; force TT color range
-	lea	ttcolor0(a5),a0		; a0 -> base of palette memory
-.endc
 	bmi	f5a
-.ifeq STPLUS+TT
+.ifeq STPLUS
 *--- set physical location:
 .endc
-.ifne STPLUS+TT
+.ifne STPLUS
 	and.w	#$0fff,d0		; STPLUS has different dirty bits 
 .endc
 	tst.w	6(sp)			; if new color is <0, don't set it
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
  	move.b	$b(sp),dbasell		; STPLUS set low 8 bits, too
 					; (harmless on ST)
+.endc
 
+.ifne TT
+_setcolor:
+	move.w	4(sp),d1
+	add.w	d1,d1
+	and.w	#$1ff,d1
+	lea	ttcolor0(a5),a0
+	add.w	d1,a0
+	move.w	(a0),d0
+	bsr	hw2sw
+	tst.w	6(sp)
+	bmi	_setc1
+	move.w	d0,a1
+	move.w	6(sp),d0
+	bsr	sw2hw
+	move.w	d0,(a0)
+	move.w	a1,d0
+_setc1:	rts
+
+* change d0 from RRRrGGGgBBBb to rRRRgGGGbBBB
+hw2sw:
+	move.w	d0,d2
+	lsr.w	#1,d2		; d2=00RRRrGGGgBBB
+	and.w	#$777,d2	; d2=00RRR0GGG0BBB
+	lsl.w	#3,d0		; d0=0rGGGgBBBb000
+	and.w	#$888,d0	; d0=0r000g000b000
+	or.w	d2,d0		; d0=0rRRRgGGGbBBB
+	rts
+
+* change d0 from rRRRgGGGbBBB to RRRrGGGgBBBb
+sw2hw:
+	move.w	d0,d2
+	and.w	#$777,d2	; d2=00RRR0GGG0BBB
+	lsl.w	#1,d2		; d2=0RRR0GGG0BBB0
+	and.w	#$888,d0	; d0=0r000g000b000
+	lsr.w	#3,d0		; d0=0000r000g000b
+	or.w	d2,d0		; d0=0RRRrGGGgBBBb
+	rts
+
+.endc
 
 *--- change screen resolution (clears the screen, clobbers the cursor):
 f5b:	tst.w	$c(sp)			; if(rez < 0) then ignore it
@@ -3419,89 +3493,21 @@ _term:
 savp_2:	clr.l	a5
 	move.l	(sp)+,proc_pc(a5)	; save bogus PC + exception number
 	movem.l	d0-d7/a0-a7,proc_regs(a5) ; common registers
-	move.l	usp,a0			; save USP
 .endc
 	add.w	d1,d1			; turn into word index
 .ifne TT
-* for TT, we determine exception number differently.  There is a 
-* table of 62 short bsr's which all go to the same place (_term).
-* The offset from the symbol _termtab of the PC on the stack is used to 
-* determine which exception happened (and therefore how many bombs to
-* show).
+	and.w	#$1f,d1			; force color range (prevent buserr)
+	lea	color0,a0		; a0 -> base of palette memory
 	move.w	(a0,d1.w),d0		; return old color
-_termtab:
-	bsr.s	_term		; 02: bus error
-	bsr.s	_term		; 03: address error
-	bsr.s	_term		; 04: illegal instruction
-	bsr.s	_term		; 05: divide by zero
-	bsr.s	_term		; 06: CHK
-	bsr.s	_term		; 07: TRAPV
-tpriv:	bsr.s	_term		; 08: privilege violation (see priv above)
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	bsr.s	_term
-	nop				; spacing for dumb as68
-
 	tst.b	_iamanst		; decide what mask to use
-	move.l	(sp)+,d0		; get addr of bsr instruction
-	sub.l	#_termtab,d0		; d0 now offset of bsr
-	asr.w	#1,d0			; d0 now index of bsr
-	addq.l	#2,d0			; d0 now exception number
 	clr.l	a5
-	move.b	d0,proc_pc(a5)		; only this byte is really used
+	move.l	2(sp),proc_pc(a5)	; save the PC
+	and.w	#$0777,d0		; mask dirty bits
+	bra	_setc0
+ffmask:	and.w	#$0fff,d0		; STPLUS/TT have other dirty bits
+	move.b	d0,proc_pc(a5)		; write ex # in hi byte of proc_pc
 .endc
-
+	move.w	6(sp),(a0,d1.w)		; set new color
 	move.l	a0,proc_usp(a5)
 
 	lea	proc_stk(a5),a0		; the stack (enough for

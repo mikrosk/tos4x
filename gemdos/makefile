@@ -1,11 +1,14 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\makefile.,v $
+# $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $     $Locker:  $
+# $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.15  1991/03/13  17:51:44  apratt
+# Don't know.
+#
 # Revision 2.14  1991/03/12  18:25:26  apratt
 # Making gtest.prg works and lets you test functions in this version
 #
@@ -27,7 +30,7 @@ TMPDIR	=	m:
 .SUFFIXES: .o .c .s
 
 # un-comment this whole section to compile with GCC
-CC=c:\gnu\bin\gcc.ttp
+CC=gcc
 CFLAGS=-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem
 .s.o:
 	$(CC) -c $*.s

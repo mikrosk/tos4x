@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.16 $	$Source: e:/tos/gd2\rcs\fs.h,v $
+* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.17  1991/03/13  17:51:44  apratt
+* Don't know.
+*
 * Revision 2.16  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *
@@ -59,6 +62,7 @@
  *	  04	    xrw and clusters
  *	  08	    handles
  *	  10	    pool
+ *	  20	    _dirnext calls
  *	FFFFFFFF    really important, "non-maskable" stuff, like panic.
  */
 
@@ -539,3 +543,4 @@ void *s, *d;
     (((dir)->dir_fcb++), \
      ((dir)->dir_recoffs += sizeof(FCB)), \
      (((dir)->dir_recoffs < (dmd)->m_recsiz) ? E_OK : _dirnext((dir),(dmd))))
+

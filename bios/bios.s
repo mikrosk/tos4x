@@ -4,18 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/06/20 14:06:47 $
+* $Date: 91/08/05 15:26:53 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.35  91/08/05  15:26:53  apratt
+* Modified coldboot code for STPAD
+*
 * Revision 2.34  91/06/20  14:06:47  apratt
 * Removed new keyboard code (was conditional on OLDIKBD)
 * because I found a way to hook in a TSR to fix overrun without
 * changing the keyboard code.
-*
+* 
 * Revision 2.33  91/06/13  16:29:56  apratt
 * Added alt-keypad functionality: hold down ALT, type a decimal number on the
 * keypad, and let go of alt to get that ASCII code into the keyboard buffer. 
@@ -81,7 +84,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.34 $
+* $Revision: 2.35 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -5054,10 +5057,22 @@ mauskey1:
 * The bit of code clears RAM starting from its own end, until it
 * gets a bus error.  On a TT, it then clears all of fast RAM, too.
 * In either case, the bus error vector gets set to point to the
+* reset vector from address 4.
+*
+* I was going to worry about ssp, but if ssp is trashed, you won't
 * get here either, so don't worry about it.
 *
 * compile in the limit of 1MB and clear it from ROM.
 *
+.ifne STPAD
+	move.l	#$8,a0
+* megabyte it shadows.
+	move.l	#$00040000-1,d1
+*************************************************************************
+
+.globl coldboot
+coldboot:
+	move.w	#$2700,sr
 .ifne TT
 .if M68030
 	move.l	#$808,d0		; clobber the cache
@@ -5110,6 +5125,7 @@ tdis:	dc.l	0
 .endc
 coldcode:
 .if TT
+.endc
 	move.l	a0,$8
 .else
 	move.l	$4,$8		; not TT: bus error jumps to reset vector

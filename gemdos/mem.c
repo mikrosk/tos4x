@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\mem.c,v $
+* $Revision: 2.21 $	$Source: d:/tos/gd2\RCS\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/11/20 19:44:04 $    $Locker:  $
+* $Author: unknown $ 	$Date: 1991/12/14 01:14:20 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.21  1991/12/14  01:14:20  unknown
+* Added some debugging
+*
 * Revision 2.20  1991/11/20  19:44:04  apratt
 * Memory protection, first cut (no workee yet)
 *
@@ -287,6 +290,7 @@ int type;
     /* MEMORY PROTECTION VERSION: turn on access to this region */
     mark_region(p,1);
 
+    DBCMD(0x80,"print ffit done.;pmd;_c");
     return(p);
 }
 
@@ -423,6 +427,7 @@ MPB *mp;
 	    freesmall(m);
 	}
     }
+    DBCMD(0x80,"print freeit done.;pmd;_c");
 }
 
 

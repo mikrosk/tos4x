@@ -1,16 +1,25 @@
 .super
 ****************** Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: unknown $
 * =======================================================================
 *
-* $Date: 1992/03/11 01:26:14 $
+* $Date: 1992/05/18 23:08:36 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.95  1992/05/18  23:08:36  unknown
+* Sparrow and TT are M68030.
+* If sparrow, we go to 16MHz really soon to speed up the boot.
+* Sparrow doesn't have microwire any more.
+* Changes to the FPU detection code.
+* Moved privilege violation handler code so it's not in the startup stream.
+* Only branch to dmaboot if systype == rom -- what did we do before?
+* Changed user preference code because TT and SPARROW both have NVM.
+*
 * Revision 2.94  1992/03/11  01:26:14  apratt
 * CHanged version number back to x.06; was commented as changed to x.08,
 * but was really x.07.  Back to .06 for STPAD ROMs of this date.
@@ -335,7 +344,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.94 $
+* $Revision: 2.95 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -382,8 +391,7 @@
 
 * SPARROW and TT are both M68030.
 
-*M68030		equ	(SPARROW | TT)	; normallly, but see below:
-.include "m68030.s"
+M68030		equ	(SPARROW | TT)
 
 * ONLY_LONGFRAME gets set when you're on machine that can never
 * have a short-frame processor (68000).  Currently that's only TT.
@@ -1062,7 +1070,7 @@ reset1:
 
 *+
 *  [ROM or RAM, M68030 only]
-*  Clobber the cache, the VBR, the FPU, the PMMU
+*  Clobber the cache, the VBR, the PMMU
 *-
 .if M68030
 	move.l	#$0808,d0
@@ -1079,6 +1087,14 @@ reset1:
 .data
 tdis:	dc.l	0
 .text
+.endif
+
+.if SPARROW
+*
+* Boot the sparrow up at 16MHz; there is little if any reason not to.
+* Makes the boot, including the CRC and RAM tests, faster.
+*
+	or.b	#1,$ffff8007
 .endif
 
 *+
@@ -1892,10 +1908,14 @@ scuberr:
 * controller address, but it doesn't really have DMA sound, so that part
 * is an assembly-time conditional.
 *
-* The monomon stuff is irrelevant to SPARROW, but the volume/tone
-* initialization isn't.
+* Monomon matters for sparrow, too, because it has the same monitor-detect
+* logic as STe.  Volume/tone used to matter for sparrow, but they took
+* it out, so it's gone from here as well.
 *
 
+.if SPARROW
+	st	_hasdmasnd	; Sparrow always has DMA Sound, never vol/tone
+.else
 	clr.b	_hasdmasnd	; pre-clear the variable
 
 .if (STPAD == 0)
@@ -1926,15 +1946,6 @@ vtpgm:	dc.w	($0600+$01ff)*2		; mask for all cmds
 	dc.w	($0400+$0000+$01)*2+1	; mix GI sound with DMA sound
 	dc.w	$0			; end of this list
 
-* SPARROW NOTE: the prototype has a bug w.r.t. the TT MW interface:
-* the data is a rotate register, not a shift register.  Thus you wait
-* for the mask register to change, then wait for it to be its old
-* self again, to be sure it's shifted out completely.  This works only
-* because we're doing this at boot time at IPL 7; this code is not
-* general-purpose (it breaks if you get an interrupt at the wrong time).
-*
-* The fixed sparrow will be like a TT.
-
 vtloop:	move.w	d0,mwdata		; write data
 vtwait:	tst.w	mwdata			; wait for data == 0
 	bne	vtwait
@@ -1944,6 +1955,7 @@ vtend:	move.w	(a0)+,d0
 nodmasnd:
 	move.l	a6,sp			; restore SP in case of bus error.
 	move.l	a5,$8
+.endif
 .endif
 
 * Set the variable "I am an ST." For STPAD, no.  For TT, no.  For Sparrow,
@@ -2373,10 +2385,6 @@ nofdc:
 
 	move.l	#"_FPU",(a0)+		; always install SOME cookie
 
-* we have to ship STPAD ROMs *now* and I haven't tested this code,
-* so I am taking it out .if STPAD.
-.if STPAD
-
 * Frestore a null state to zap that FPU.  This involves catching all the
 * possible exceptions that can cause:
 *
@@ -2385,55 +2393,39 @@ nofdc:
 *	$c0-$d8	misc. exceptions caused by previous FPU instruction
 
 	moveq.l	#0,d7		; pre-clear d7, which will be the _FPU value
-	sub.w	#9*4,sp		; get some local variable space
-	move.l	$2c,(sp)
-	move.l	$34,4(sp)
-	move.l	#nofpu,$2c
+	movem.l	$2c,a3		; save existing line-f and protocol viol. vecs
+	move.l	$34,a4		; in a3-a4
+	move.l	#nofpu,$2c	; write ours
 	move.l	#nofpu,$34
-	lea.l	8(sp),a1
 	move.l	#$c0,a2
-	move.l	#yesfpu,d0
-	move.l	(a2),(a1)+
-	move.l	d0,(a2)+
-	move.l	(a2),(a1)+
-	move.l	d0,(a2)+
-	move.l	(a2),(a1)+
-	move.l	d0,(a2)+
-	move.l	(a2),(a1)+
-	move.l	d0,(a2)+
-	move.l	(a2),(a1)+
-	move.l	d0,(a2)+
-	move.l	(a2),(a1)+
-	move.l	d0,(a2)+
-	move.l	(a2),(a1)+
-	move.l	d0,(a2)+
+	movem.l	(a2),d0-d6	; save the existing vectors in reggies
+	move.l	#yesfpu,a5
+	move.l	a5,(a2)+	; rewrite with our vector
+	move.l	a5,(a2)+
+	move.l	a5,(a2)+
+	move.l	a5,(a2)+
+	move.l	a5,(a2)+
+	move.l	a5,(a2)+
+	move.l	a5,(a2)+
 
 	clr.l	-(sp)		; get a quick zero to Frestore
 	move.l	sp,a2		; remember the pre-exception stack pointer
 	frestore (sp)
 yesfpu:
-	move.l	#$00020000,d7	; d7 is what we'll stuff in the _FPU cookie
+	move.l	#$00020000,d7	; win: set d7 for writing below
 nofpu:
 	move.l	a2,sp		; clean off exception stack (if any)
 	addq	#4,sp		; get rid of that "quick zero"
-	move.l	(sp)+,$2c	; restore "cp violation exception"
-	move.l	(sp)+,$34	; restore "line-F exception"
-	move.l	(sp)+,$c0	; restore the seven FPU exceptions
-	move.l	(sp)+,$c4
-	move.l	(sp)+,$c8
-	move.l	(sp)+,$cc
-	move.l	(sp)+,$d0
-	move.l	(sp)+,$c4
-	move.l	(sp)+,$c8
+	move.l	a3,$2c		; restore protocol violation, line-F vectors
+	move.l	a4,$34
+	movem.l	d0-d6,$c0	; restore all other vectors
 
 	move.l	d7,(a0)+	; write d7 as _FPU cookie's value
 
-.else
-	clr.l	(a0)+		; STPAD: never an FPU (for now)
-.endif
+* Probe for SFP004 (even in Sparrow); any non-bus-error at the right
+* address wins.  Don't do it on Sparrow because it doesn't bus error there.
 
-* Probe for SFP004 (always)
-
+.if (SPARROW == 0)
 	move.l	$8,a1			; save bus error vector
 	move.l	sp,a2			; and SP for cleaning up later
 	move.l	#sfpdone,$8		; catch bus error
@@ -2443,6 +2435,7 @@ nofpu:
 sfpdone:
 	move.l	a1,$8			; clean up
 	move.l	a2,sp
+.endif
 
 .if TT
 * If there's fast RAM, put the _FRB cookie in the cookie jar. It points to
@@ -2490,7 +2483,7 @@ nofrb:
 * to the reset default condition on powerup. For compatibility, we will not
 * disable the mouse and joystick on powerup.
 *
-* NOTE: Furture systems may require a delay BEFORE we preform the software
+* NOTE: Furture systems may require a delay BEFORE we perform the software
 *	reset. Problems with the ikbd require a 1/200 of a second delay
 *	AFTER the ikbd has received a character from the acia. See bios.s
 *	ikdbwc for details.
@@ -2545,17 +2538,16 @@ ikbdlp1:
 .else
 .if (TT == 0)
 	moveq.l	#0,d1			; pre-select low rez
-.else
-	moveq.l	#4,d1			; pre-select TT MED rez
-.endif
-
 	btst	#7,gpip			; test mono bit
 	bne	nomono			; no mono - d1 is fine
-.if (TT == 0)
 	moveq	#2,d1			; st/mono: choose mode 2 (ST HIGH)
 .else
+	moveq.l	#4,d1			; pre-select TT MED rez
+	btst	#7,gpip			; test mono bit
+	bne	nomono			; no mono - d1 is fine
 	moveq	#6,d1			; tt/mono: choose mode 6 (TT HIGH)
 .endif
+
 .endif
 nomono:
 
@@ -2563,6 +2555,9 @@ nomono:
 * on ST, you'd better not change mode during a vblank; what we do
 * is call noblank1, which returns when it's sure we are NOT in a vblank.
 * THEN we can change modes.  (Note: noblank1 clobbers d0.)
+*
+* This may not be good enough for Sparrow - sometimes it comes up wrong.
+*
 
 	lea.l	nb_r1(PC),a6
 	bra	noblank			; wait until we're NOT in a vblank
@@ -2617,164 +2612,12 @@ kbloop:	cmp.l	_hz_200.w,d0
 	clr.b	kbshift
 .endif
 
-* install a handler for privilege violation which handles move 
-* from sr: it clobbers the offending instruction into a move from CCR. 
-* Works only for moves in RAM.  If the instr is in ROM, this will give
-* bus error, not privilege violation... Slightly harder to debug.  
-* And doesn't work at all if the code actually uses the high byte of sr.
-* It does work on any 68010-68030, though.
-
 *
-* Take 2: copy the dest EA bits and extension words of the instruction into
-* a "move.w (a0),ea" instruction elsewhere in memory, point a0 to the
-* SR from the exception stack, and jsr there.
+* install a handler for privilege violation which handles move 
+* from sr; see the label "priv" later on.
 *
 
 	move.l	#priv,$20		; set priv viol exception vector
-	bra	priv2			; skip past this cruft.
-
-* clrcache: common subroutine to clear both caches; clobbers d0.
-* Called also at the tail end of any Rwabs call with bit 0 clear (reads).
-
-clrcache:
-	move.w	sr,-(sp)		; save IPL
-	or.w	#$0700,sr		; go to IPL 7
-	movec	cacr,d0			; get cacr
-	or.l	#$808,d0		; set "clear" bits of both caches
-	movec	d0,cacr			; put cacr back
-	move.w	(sp)+,sr		; restore IPL and 
-	rts				; return.
-
-.bss
-.even
-pspace:	ds.w	4
-.text
-
-priv:	movem.l	d0-d2,-(sp)		; save D regs
-	move.l	a1,-(sp)		; save A regs
-	move.l	a0,-(sp)
-	move.l	$16(sp),a0		; get PC of offending instr
-	move.w	(a0),d0			; get the instr itself
-	move.w	d0,d1			; copy to d1
-	and.w	#$ffc0,d0		; zero the EA bits
-	cmp.w	#$40c0,d0		; is it move from sr?
-	bne	priv1			; no.
-
-	move.l	#$30004e71,pspace.w	; "move.w d0,<ea> / nop"
-	move.l	#$4e714e75,pspace+4.w	; "nop / rts"
-
-	move.w	d1,d0
-	and.w	#%111,d0		; isolate register bits
-	lsl.w	#8,d0
-	lsl.w	#1,d0
-	or.w	d0,pspace.w		; OR them in
-	move.w	d1,d0
-	and.w	#%111000,d0		; isolate mode bits
-	lsl.w	#3,d0
-	or.w	d0,pspace.w		; OR them in
-
-	moveq	#2,d2			; d2 is size of this instruction
-
-	cmp.w	#%110000000,d0		; look for mode 6
-	beq	priv1			; can't handle mode 6
-	tst.w	d0			; look for mode 0 (a D register)
-	beq	psused0			; yes, use that handler
-	cmp.w	#%101000000,d0		; look for mode 5
-	beq	pmode5			; yes, one extension word
-	cmp.w	#%111000000,d0		; look for mode 7
-	bne	pnot7			; not 7: setup done
-* handle mode 7
-	and.w	#%111,d1		; check for reg 0 or 1
-	beq	p71ext			; reg 0: just one ext word
-	addq	#2,d2			; count the second ext word
-	move.w	4(a0),pspace+4.w	; move second extension word
-p71ext:	addq	#2,d2			; count the first ext word
-	move.w	2(a0),pspace+2.w	; move first extension word
-	bra	psdone
-
-* handle mode 5
-pmode5:	addq	#2,d2			; count the first ext word
-	move.w	2(a0),pspace+2.w	; move the first ext word
-
-* handle all modes 2-5: if reg not 7, we're done, else use a1=usp
-pnot7:	and.w	#%111,d1		; get reg bits
-	cmp.w	#%111,d1		; is reg a7?
-	bne	psdone
-
-* setup done: change source reg from a7 to a1, and put usp in a1, 
-* add to PC on stack, put exception SR in d0, put usp in a1, 
-* jsr to pspace, put (possibly changed) a1 back in usp,
-* restore d0-d1/a0-a1 and finish.
-
-	move.l	usp,a1
-	and.w	#%1111001111111111,pspace.w ; change a7 to a1 in dest of move
-	add.l	d2,$16(sp)		; update PC for RTE
-.if M68030
-	bsr	clrcache
-.endif
-	move.w	$14(sp),d0		; $14(sp) is exception sr
-	jsr	pspace.w
-	move.l	a1,usp			; save possibly changed "usp"
-	move.l	(sp)+,a0		; restore A regs
-	move.l	(sp)+,a1
-	movem.l	(sp)+,d0-d2		; restore D regs
-	rte
-
-* What's below is the same as what's above, except that d0-d2
-* are restored before the call, and (a0) points to the place on
-* the exception stack where the SR is: this is used when the dest
-* of the move is a D register.
-
-* setup done: add to PC on the stack, put addr of exception SR in a0,
-* restore d0-d2 from the stack, change the instruction to a move
-* from (a0), jsr to pspace, restore a0-a1, and finish.
-
-psused0:
-	add.l	d2,$16(sp)		; update PC for RTE
-	or.w	#%010000,pspace.w	; change to move (a0),<ea>
-.if M68030
-	bsr	clrcache
-.endif
-	lea.l	$14(sp),a0		; a0 points to exception SR
-	movem.l	8(sp),d0-d2		; get these off the stack now
-	jsr	pspace.w
-	move.l	(sp)+,a0		; restore A regs
-	move.l	(sp)+,a1
-	add.w	#$c,sp			; "pop" d0-d2 off
-	rte
-
-* What's below is the same as what's above, except that a0/a1 are restored
-* from their saved values before the jsr to pspace: either might be in the 
-* dest ea of the move.
-
-* setup done; add to PC on stack, put exception SR in d0, 
-* restore a0/a1, jsr to pspace, restore d0/d1 and finish.
-
-psdone:	add.l	d2,$16(sp)		; update PC for RTE
-.if M68030
-	bsr	clrcache
-.endif
-	move.l	(sp)+,a0		; restore A regs
-	move.l	(sp)+,a1
-	move.w	$c(sp),d0		; $c(sp) is exception sr
-	jsr	pspace.w
-	movem.l	(sp)+,d0-d2		; restore D regs
-	rte
-
-* jump here for priv violations which are not moves from sr, or mode 6.
-
-priv1:	move.l	(sp)+,a0
-	move.l	(sp)+,a1
-	movem.l	(sp)+,d0-d2
-.if M68030
-	jmp	_term			; jmp to bomb handler
-.else
-* 					; jump to non-TT bomb handler
-	jmp	_term+$08000000		; strange but true!
-.endif
-
-priv2:
-
 
 *+
 *
@@ -3238,7 +3081,9 @@ bloop1:	add.l	d1,a0			; increment exception number (!030)
 *
 
 	bsr	_dskboot		; attempt to boot from disk
+.if systype == rom
 	bsr	dmaboot			; attempt to boot from DMA bus
+.endif
 	bsr	findpackages		; find RAM packages
 	tst.w	_cmdload		; load shell from disk?
 	beq	st_1			; (no -- execute GEM in ROM)
@@ -3347,6 +3192,163 @@ ikbreset:	dc.b	$80,$01		;reset keyboard,disable
 sizeikbd	equ	*-ikbreset-1
 	even
 
+*
+* clrcache: common subroutine to clear both caches; clobbers d0.
+* Called also at the tail end of any Rwabs call with bit 0 clear (reads).
+*
+
+clrcache:
+	move.w	sr,-(sp)		; save IPL
+	or.w	#$0700,sr		; go to IPL 7
+	movec	cacr,d0			; get cacr
+	or.l	#$808,d0		; set "clear" bits of both caches
+	movec	d0,cacr			; put cacr back
+	move.w	(sp)+,sr		; restore IPL and 
+	rts				; return.
+
+*
+* PRIV: handler for privilege violation exception.
+*
+* We copy pieces of the instruction (ea and extension words) into a
+* different instruction and execute that.  This always works and really
+* gives you the SR, unlike other solutions which only give CCR or require
+* that the insn be in RAM.
+*
+* What we do is copy the dest EA bits and extension words of the
+* instruction into a "move.w d0,ea" instruction elsewhere in memory,
+* put the SR from the exception stack into d0, and execute that insn.
+* If the original instruction was going to use d0 then we use d1.  Also
+* if the original dest was (sp) we spoof that.
+*
+
+.bss
+.even
+pspace:	ds.w	4
+.text
+
+priv:	movem.l	d0-d2,-(sp)		; save D regs
+	move.l	a1,-(sp)		; save A regs
+	move.l	a0,-(sp)
+	move.l	$16(sp),a0		; get PC of offending instr
+	move.w	(a0),d0			; get the instr itself
+	move.w	d0,d1			; copy to d1
+	and.w	#$ffc0,d0		; zero the EA bits
+	cmp.w	#$40c0,d0		; is it move from sr?
+	bne	priv1			; no.
+
+	move.l	#$30004e71,pspace.w	; "move.w d0,<ea> / nop"
+	move.l	#$4e714e75,pspace+4.w	; "nop / rts"
+
+	move.w	d1,d0
+	and.w	#%111,d0		; isolate register bits
+	lsl.w	#8,d0
+	lsl.w	#1,d0
+	or.w	d0,pspace.w		; OR them in
+	move.w	d1,d0
+	and.w	#%111000,d0		; isolate mode bits
+	lsl.w	#3,d0
+	or.w	d0,pspace.w		; OR them in
+
+	moveq	#2,d2			; d2 is size of this instruction
+
+	cmp.w	#%110000000,d0		; look for mode 6
+	beq	priv1			; can't handle mode 6
+	tst.w	d0			; look for mode 0 (a D register)
+	beq	psused0			; yes, use that handler
+	cmp.w	#%101000000,d0		; look for mode 5
+	beq	pmode5			; yes, one extension word
+	cmp.w	#%111000000,d0		; look for mode 7
+	bne	pnot7			; not 7: setup done
+* handle mode 7
+	and.w	#%111,d1		; check for reg 0 or 1
+	beq	p71ext			; reg 0: just one ext word
+	addq	#2,d2			; count the second ext word
+	move.w	4(a0),pspace+4.w	; move second extension word
+p71ext:	addq	#2,d2			; count the first ext word
+	move.w	2(a0),pspace+2.w	; move first extension word
+	bra	psdone
+
+* handle mode 5
+pmode5:	addq	#2,d2			; count the first ext word
+	move.w	2(a0),pspace+2.w	; move the first ext word
+
+* handle all modes 2-5: if reg not 7, we're done, else use a1=usp
+pnot7:	and.w	#%111,d1		; get reg bits
+	cmp.w	#%111,d1		; is reg a7?
+	bne	psdone
+
+* setup done: change source reg from a7 to a1, and put usp in a1, 
+* add to PC on stack, put exception SR in d0, put usp in a1, 
+* jsr to pspace, put (possibly changed) a1 back in usp,
+* restore d0-d1/a0-a1 and finish.
+
+	move.l	usp,a1
+	and.w	#%1111001111111111,pspace.w ; change a7 to a1 in dest of move
+	add.l	d2,$16(sp)		; update PC for RTE
+.if M68030
+	bsr	clrcache
+.endif
+	move.w	$14(sp),d0		; $14(sp) is exception sr
+	jsr	pspace.w
+	move.l	a1,usp			; save possibly changed "usp"
+	move.l	(sp)+,a0		; restore A regs
+	move.l	(sp)+,a1
+	movem.l	(sp)+,d0-d2		; restore D regs
+	rte
+
+* What's below is the same as what's above, except that d0-d2
+* are restored before the call, and (a0) points to the place on
+* the exception stack where the SR is: this is used when the dest
+* of the move is a D register.
+
+* setup done: add to PC on the stack, put addr of exception SR in a0,
+* restore d0-d2 from the stack, change the instruction to a move
+* from (a0), jsr to pspace, restore a0-a1, and finish.
+
+psused0:
+	add.l	d2,$16(sp)		; update PC for RTE
+	or.w	#%010000,pspace.w	; change to move (a0),<ea>
+.if M68030
+	bsr	clrcache
+.endif
+	lea.l	$14(sp),a0		; a0 points to exception SR
+	movem.l	8(sp),d0-d2		; get these off the stack now
+	jsr	pspace.w
+	move.l	(sp)+,a0		; restore A regs
+	move.l	(sp)+,a1
+	add.w	#$c,sp			; "pop" d0-d2 off
+	rte
+
+* What's below is the same as what's above, except that a0/a1 are restored
+* from their saved values before the jsr to pspace: either might be in the 
+* dest ea of the move.
+
+* setup done; add to PC on stack, put exception SR in d0, 
+* restore a0/a1, jsr to pspace, restore d0/d1 and finish.
+
+psdone:	add.l	d2,$16(sp)		; update PC for RTE
+.if M68030
+	bsr	clrcache
+.endif
+	move.l	(sp)+,a0		; restore A regs
+	move.l	(sp)+,a1
+	move.w	$c(sp),d0		; $c(sp) is exception sr
+	jsr	pspace.w
+	movem.l	(sp)+,d0-d2		; restore D regs
+	rte
+
+* jump here for priv violations which are not moves from sr, or mode 6.
+
+priv1:	move.l	(sp)+,a0
+	move.l	(sp)+,a1
+	movem.l	(sp)+,d0-d2
+.if M68030
+	jmp	_term			; jmp to bomb handler
+.else
+* 					; jump to non-TT bomb handler
+	jmp	_term+$08000000		; strange but true!
+.endif
+
 *+
 * _dskboot - boot (or return diagnostics)
 * Passed:	nothing
@@ -3414,7 +3416,6 @@ dskb1:	rts				; return status
 *	d7.b: ACSI device number in hi 3 bits, for ACSI devs
 *	d4.w: _dmaread device number
 *	d5.w: user-preference value from NVM or input or something
-*		(zero for now)
 *	others: garbage
 *
 * _dmaread returns zero for success, -1 for timeout (don't retry),
@@ -3670,17 +3671,21 @@ dmab_skip:
 
 	clr.w	the_env			; zero our device sequencer
 
-.if TT
 *
 * move boot preference into _upref: hi 5 bits of ttscu1, or
 * first word of NVM if valid, else zero.
 *
 
+.if TT
+* Only TT has TTSCU1
 	move.b	ttscu1,d0
 	and.w	#$f8,d0
 	move.w	d0,_upref.w	; move ttscu1 to _upref, usually zero.
 	bne	gotpref
+.endif
 
+.if (TT | SPARROW)
+* Both TT and SPARROW have NVMAccess
 	pea	_upref.w
 	move.w	#2,-(sp)
 	clr.l	-(sp)
@@ -3691,7 +3696,10 @@ dmab_skip:
 	clr.w	_upref.w	; NVM was invalid: zero the preference.
 gotpref:
 
-.else
+.endif
+
+.if ((TT + SPARROW) == 0)
+* If you are neither TT nor Sparrow, then there's no boot pref.
 	clr.w	_upref.w	; no way to get pref w/o NVM & SCU.
 .endif
 

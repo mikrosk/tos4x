@@ -3,18 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/06 12:39:45 $
+* $Date: 89/02/06 13:22:23 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.29  89/02/06  13:22:23  apratt
+* Added TT code.  No change if you set TT = 0.  EXCEPT:
+* bombs now cause Pterm(-1) to be called, rather than Pterm0().
+* TT code is prototypical, esp. in memory sizing.
+*
 * Revision 1.28  89/02/06  12:39:45  apratt
 * Split STPLUS conditional assembly into STPLUSVIDEO and DMASND, because
 * DMASND is true for TT as well, but STPLUSVIDEO isn't.  This
 * is in preparation for adding TT conditional assembly.
-*
+* 
 * Revision 1.27  89/01/23  11:43:21  kbad
 * Restored `nop' after jsr in _term, it's required because of dumb AS68.
 * 
@@ -152,7 +157,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.28 $
+* $Revision: 1.29 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -212,6 +217,13 @@ denmark		=      13 ***DON'T  CHANGE***
 * reading RAM address >3fffff).
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
+* set TT to 1 to assemble for Atari TT (68030).  Some of this
+* code is stopgap, such as programming the memory controller for 2Meg
+* and short-circuiting the RTC.  Caveat programmer.
+* The switches TT, STPLUS, systype, and country
+TT		=	0
+* of one of the canned switch settings files.
+
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
 * the chip actually exists (so clearing the control register will
 * not cause a bus error) and that MONOMON is XORed with the sound chip's
@@ -232,11 +244,19 @@ LONGFRAME	=	0		; set to 1 to enable long frames
 
 systype		=	rom		; 'rom' or 'ram'
 country		=	usa      	; 'usa', etc....
+.ifeq TT
 version		=	$0104		; version number *MUST BE EVEN*
 date		=	$12131988	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
 dosdate		=	%0001000110001101 ; Dec 13, 1988
+.endc
 
+.ifne TT
+version		=	$0300		; version number *MUST BE EVEN*
+date		=	$02061989	; date, $MMDDYYYY
+*			 YYYYYYYMMMMDDDDD
+dosdate		=	%0001001001000110 ; Feb 6, 1989
+.endc
 
 ****
 *
@@ -735,6 +755,11 @@ ttudr	equ	ttmfp+$2f		; USART data
 *--- 6850 registers:
 .endc
 midictl	equ	$fffffc06		; MIDI ACIA control
+.ifne TT
+ttvmeintmsk	equ	$ffff8e0d	; "vme" int mask in SCU
+ttsysintmsk	equ	$ffff8e01	; "st" int mask in SCU	
+.endc
+*--- SCU REGISTERS: interrupt mask, interrupt state, and two gp regs
 ttsysistate	equ	$ffff8e03	; "sys" int state in SCU
 
 ttscu1		equ	$ffff8e09	; general-purpose SCU register 1
@@ -1064,11 +1089,16 @@ reset3:	clr.l	a5			; reset handler might have hit a5
 *  and then do it.
 * Note: The floppy side and selects are inverted, so writing 1 disables them.
 * Other outputs are initialized to zero here: *DTR, *RTS, STROBE,
+.ifeq TT
 	btst.b	#0,os_conf+1(pc)	; check bit: configured for 50hz?
 	lea	giselect,a0		; a0 -> giselect, giwrite-2
 	move.b	#7,(a0)			; set porta & portb to output
 	bra	vwait			; wait for vblank start
 pal_r:	move.b	#$02,syncmode(a5)	; then twiddle to 50hz
+.endc
+.ifne TT
+	move.b	#$01,syncmode(a5)	; set external sync mode always
+.endc
  endc
 .endif
 
@@ -1113,6 +1143,7 @@ notpal:	lea	color0(a5),a1		; a1 ->	hardware reg
 sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 	dbra	d0,sysic1		; (loop for more colors)
 * controller, and tells other things besides: the byte at 8006 (or the high
+.ifeq TT
 	move.b	memcntlr(a5),d6		; d6 = memory controller configuration
 	move.l	phystop(a5),d5		; d5 ->	(possible) top of physical mem
 * On Sparrow, detected cold boot.  So determine memory size.
@@ -1199,6 +1230,15 @@ mt_done:
 *
 *  SPARROW also doesn't need this.
 *-
+.endc
+	lea	$8000,sp		; initialize SP just this once
+.ifne TT
+* TT stopgap memory sizing: assume 2Meg in 256Kbit parts.
+	move.l	#$00200000,d5		; set phystop
+	move.w	#5,d6			; set mem cntlr mode
+	move.b	d6,memconf(a5)
+	move.l	#$8000,sp
+.endc
  endc
 *  - screen size and clear from top down. Now leaves screen where it is (at
 
@@ -1402,6 +1442,7 @@ ill_2:	nop				; (dumb as68 can't have endc after
 	beq	sei2			; (it's there -- leave vectors alone)
 .endif
 *--- setup 62 vectors:
+.ifeq TT
 	lea	_term(pc),a1		; a1 -> "terminate process" handler
 	add.l	#$02000000,a1		; a1 += vector number (high byte)
 	lea	8,a0			; a0 -> interrupt RAM
@@ -1409,6 +1450,15 @@ ill_2:	nop				; (dumb as68 can't have endc after
 	clr.l	(a0)+			; last entry is null
 	add.l	#$01000000,a1		; bump vector number in bits 24..31
 	move.l	#DEFCSIZE,(a0)+		; with size for its value
+.endc
+.ifne TT
+* TT: use a table of BSR's to get exception number
+	lea	_termtab(pc),a1
+	move.w	#64-2-1,d0
+sei1:	move.l	a1,(a0)+
+	addq.l	#$2,a1
+	dbra	d0,sei1
+.endc
 *
 *  Exception vectors are pointed to the system critical error handler
 *
@@ -1460,6 +1510,12 @@ sei2:	moveq	#7-1,d0			; d0 = DBRA count
 *   if we ever do a detachable keyboard ....)
 *
 *
+.ifne TT
+* TT: have to enable interrupts in SCU also
+	move.b	#$40,ttvmeintmsk(a5)	; enable int priority 6
+	move.b	#$14,ttsysintmsk(a5)	; enable int priorities 2, 4
+.endc
+
 	moveq	#(4*8)-1,d0		; = #vectors to install
 chdev1:	move.l	(a0)+,(a1)+
 	dbra	d0,chdev1
@@ -1546,7 +1602,34 @@ setvb2:	move.l	#reseth,swv_vec(a5)	; RESET system on monitor change
 * on ST, you'd better not change mode during a vblank; what we do
 * is call noblank1, which returns when it's sure we are NOT in a vblank.
 	clr.w	d0			; magic bit# = 0
+.ifne TT
+* TT: install a handler for privelege violation which handles move from sr:
+* it clobbers the offending instruction into a move from CCR. 
+	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
+* bus error, not privelege violation... Slightly harder to debug.  
+* And doesn't work at all if the code uses the high byte of sr. Tough.
 	bsr	cartscan		; execute cartridge aps
+	lea.l	priv(PC),a0
+	move.l	a0,$20			; set priv viol exception vector
+	bra.s	priv2
+* to allow characters the keyboard controller is trying to send to come
+priv:	movem.l	d0/a0,-(sp)
+	move.l	$a(sp),a0		; get PC of offending instr
+
+* Take 2: copy the dest EA bits and extension words of the instruction into
+* a "move.w (a0),ea" instruction elsewhere in memory, point a0 to the
+	bne.s	priv1			; no.
+	move.b	#$42,(a0)		; clobber the instruction
+	movem.l	(sp)+,d0/a0
+	bsr	clrcache
+.endif
+priv1:	movem.l	(sp)+,d0/a0
+	jmp	tpriv			; jmp into _termtab
+	rte
+priv2:	nop				; continue booting here
+* What's below is the same as what's above, except that a0/a1 are restored
+.endc
+* from their saved values before the jsr to pspace: either might be in the 
 * dest ea of the move.
 
 * setup done; add to PC on stack, put exception SR in d0, 
@@ -1946,7 +2029,12 @@ ca_r:	rts
 
  .ifeq STPLUSVIDEO
 
+.ifeq TT
 colors:	dc.w	$777			; 0 white
+.endc
+.ifne TT
+colors:	dc.w	$000			; 0 black (TT shifter's busted)
+.endc
 	dc.w	$700			; 1 red
 	dc.w	$070			; 2 green
 	dc.w	$770			; 3 yellow
@@ -1961,8 +2049,12 @@ colors:	dc.w	$777			; 0 white
 	dc.w	$337			; 12 light blue
 	dc.w	$737			; 13 light magenta
 	dc.w	$377			; 14 light cyan
+.ifeq TT
 	dc.w	$000			; 15 black
-
+.endc
+.ifne TT
+	dc.w	$777			; 15 white (TT shifter's busted)
+.endc
  .endc
 
  .ifne STPLUSVIDEO
@@ -1997,6 +2089,10 @@ memchkr: jmp	(a4)			; "return" to caller
 
 
 *+
+* val_memval - test memory configuration validation
+*  Passed:	a6 -> return addressd
+*  Returns:	a5 -> 0 (quick zeropage)
+*		EQ: memory setup OK
 *		NE: memory never configured succesfully
 *
 *-
@@ -2253,8 +2349,15 @@ trap_1:	nop				; sorry about this...
 *	<frame word if longframe>
 	lsl.w	#2,d0			; turn d0 into longword index
 	move.l	(a0,d0.w),d0		; get pointer to function handler
+.ifeq TT
 	move.l	d0,a0			; (quick and dirty test-for-negative)
 *		This is to ensure that you can tell old ROMs from new ones:
+.endc
+.ifne TT
+*		to signal the "old ROM" case.
+	bclr.l	#0,d0			; clear & test odd bit
+* Keeps:	C registers
+.endc
 * Notes:	BIOS traps are re-entrant to 'nlevels' (declared near the
 *		the current GEMDOS spec, which states that BIOS traps are
 *		available from supervisor mode only).
@@ -2283,12 +2386,22 @@ b_supr:	move.w	(sp)+,d0		; get function#
 	cmp.w	(a0)+,d0		; out of range?
 	bge	b_exit			; (yes, so punt)
 	move.w	d0,d1
+.ifeq TT
 	dc.l	hdv_rw+$80000000	; 4: [indirect] disk read/write
 	move.l	(a0,d1.w),d1		; get pointer to function handler
 .if (M68030 == 0)
 	dc.l	hdv_bpb+$80000000	; 7: [indirect] get BPB
 	bpl	b_1			; points to code
 	dc.l	hdv_mediach+$80000000	; 9: [indirect] media change inquiry
+.endc
+.ifne TT
+	dc.l	1+hdv_rw		; 4: [indirect] disk read/write
+	dc.l	_setexc			; 5: set exception vector
+	dc.l	_tickcal		; 6: return tick calibration
+	dc.l	1+hdv_bpb		; 7: [indirect] get BPB
+	dc.l	bcostat			; 8: console status (output)
+	dc.l	1+hdv_mediach		; 9: [indirect] media change inquiry
+.endc
 * can't use high byte of address on M68030: use low bit instead.
 	bclr.l	#0,d1			; clear & test odd bit
 	move.l	d1,a0			; doesn't affect ccr!
@@ -2665,6 +2778,8 @@ f5r:	rts
 *-
 _setpalette:
 	move.l	4(sp),colorptr.w	; set software pointer
+	rts				; (updated by vbl handler)
+.ifeq TT
 _term:
 	jsr	savp_2			; stack PC, then zero hi byte of PC
 * _setcolor - set single color, return old color
@@ -2678,6 +2793,19 @@ savp_2:	clr.l	a5
 	move.l	(sp)+,proc_pc(a5)	; save bogus PC + exception number
 	movem.l	d0-d7/a0-a7,proc_regs(a5) ; common registers
 	move.l	usp,a0			; save USP
+.endc
+	add.w	d1,d1			; turn into word index
+.ifne TT
+* for TT, we determine exception number differently
+	tst.b	_iamanst		; decide what mask to use
+	move.l	(sp)+,d0		; get addr of bsr instruction
+	sub.l	_termtab,d0		; d0 now offset of bsr
+	asr.w	#1,d0			; d0 now index of bsr
+	addq.l	#2,d0			; d0 now exception number
+	clr.l	a5
+	move.b	d0,proc_pc(a5)		; only this byte is really used
+.endc
+
 	move.l	a0,proc_usp(a5)
 
 	lea	proc_stk(a5),a0		; the stack (enough for
@@ -2694,7 +2822,7 @@ puntaes:
 
 	move.l	#savend,savptr(a5)	; clobber BIOS top level
 	move.w	#1,-(sp)		; "error" return condition
-	clr.l	-(sp)			; GEMDOS function #0
+	clr.l	(a0)			; clobber AES!
 	bra	reseth			; restart the system
 
 paes1:	rts

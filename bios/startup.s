@@ -1,18 +1,24 @@
 ******************* Revision Control System *****************************
 *
-* $Author: lozben $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/30 15:18:42 $
+* $Date: 89/08/30 16:02:43 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.27  89/08/30  16:02:43  apratt
+* Added def_frb variable, set to the value that the _FRB cookie gets.
+* Zero if no fast RAM.  Added moving end_os up by 64K as well as _membot.
+* Added code to match the boot spec: scan of bootable devices stops
+* when hdv_rw changes.  Cut bomb-handler delay from 1 sec to 0.5 sec.
+*
 * Revision 2.26  89/08/30  15:18:42  lozben
 * Fixed a bug in _EsetShift().
-*
+* 
 * Revision 2.25  89/08/29  17:36:45  apratt
 * Added code (two lines) to set GEMDOS date/time when XBIOS Settime()
 * call is made.
@@ -306,7 +312,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.26 $
+* $Revision: 2.27 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -396,7 +402,7 @@ STPLUS		=	0	; @check@
 
 LONGFRAME	=	1	; @check@
 
-systype		=	rom	; 'rom' or 'ram' @check@
+systype		=	ram	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
@@ -688,6 +694,7 @@ osconf		equ	%11001
 	.globl	seekrate		; default floppy seek rate
 	.globl _fverify			; nonzero: verify on floppy write
 	.globl _drvbits			; long bitmap of block devices
+	.globl	def_frb			; default _FRB value for flop.s
 
 	.globl	kcl_hook		; hook for keyclick sound
 .if TT
@@ -1099,6 +1106,7 @@ savend:					* end of register sav area
 .if STPAD
 padmagic:	ds.l	1		; $01241960 for STPAD touch driver
 padstuff:	ds.l	10*4		; other pad variables (total 40 bytes)
+def_frb:	ds.l	1		; copy of value of _FRB cookie
 endosbss:				* end of "base" BSS
 .if TT
 ttmd:		ds.l	4		; the TT MD for fast RAM (see getmpb)
@@ -1864,8 +1872,9 @@ gotem:	move.l	a1,8(a5)
 * when attempting a Rwabs from or to fast RAM.
 * Don't change this size: RAM-loaded drivers use the same buffer.
 	move.l	#nofpu,$2c
-	tst.l	_ramtop			; any fast RAM?
-	beq.s	nodbf			; no - forget it.
+	clr.l	def_frb			; default to zero
+	tst.l	_ramtop(a5)		; any fast RAM?
+	beq.s	nofrb			; no - forget it.
 	move.l	#$00020000,(a0)+	; found 6888x: set %10 bit 
 * there is some fast RAM, so must allocate a 64K disk buffer
 * and add its cookie here.  (I don't necessarily like allocating the
@@ -1873,9 +1882,13 @@ gotem:	move.l	a1,8(a5)
 * be before the jsr to the routine pointed by hdv_boot.)
 	move.l	a2,$34
 	move.l	a3,sp
-	move.l	_membot,(a0)+		; write pointer to buffer
-	add.l	#$10000,_membot		; move membot up by 64K
-nodbf:	nop
+	move.l	_membot(a5),d0
+* What the heck - probe for SFP004 whether or not you're a TT.
+	move.l	d0,def_frb(a5)		; write so flop.s can find it
+
+	move.l	d0,_membot(a5)		; write new _membot
+	move.l	d0,end_os(a5)		; write new end_os
+nofrb:	nop
 .endc
 	bset.b	#0,-3(a0)		; found SFP004: set %01 bit
 	bra	xfpudone
@@ -2348,9 +2361,9 @@ st_3:	move.b	(a0)+,(a1)+		; copy a byte
 *		It waits until at least 40 sec after power-up for the
 *		data once the device accepts the command.
 nullenv: dc.b	0,0			; null string (and enviroment)
-*		The old code is included here as comments; the new code,
-*		which calls _dmaread, is from Minna Lai (thanks!).
-*		_dmaread is also an XBIOS call.
+*		The old code is included here as comments; 
+*		_dmaread is from Minna Lai (thanks!).
+*		_dmaread is also available as an XBIOS call ($2a).
 sizeikbd	equ	*-ikbreset-1
 *		The register set-up when jmp'ing to the root sector
 *		is deliberate and should not change.
@@ -2551,7 +2564,7 @@ dmab_todone:
 dmab_skip:
 	bne	dmarfail
 	jsr	_resetscsi		; reset the SCSI bus
-* ; read won; checksum the sector, look for $1234 (bootmagic)
+.endif
 	move.l	_dskbufp,a0
 	clr.w	the_env			; zero our device sequencer
 
@@ -2561,7 +2574,7 @@ dmab_skip:
 	beq.s	dmafound		; success!
 *
 	move.w	#DMAB_RETRIES-1,d1	; retry count (usually 2 total)
-	addq.w	#1,d4			; read failed or no exec...
+	addq.w	#1,d4			; read failed or no exec or no boot
 	move.w	d4,d0			; try next dev
 	and.w	#7,d0			; if d4 hasn't wrapped to 8 or $10...
 	bne	dmaloop			; carry on
@@ -2584,7 +2597,14 @@ dmab_skip:
 * dmarfail:  DMAread failed or sector isn't bootable ($1234) or didn't
 * change hdv_rw; try the next device.
 	moveq.l	#0,d5			; zero user-preference value
-	jmp	(a0)			; when it returns, we return
+	move.l	d4,-(sp)		; save d4
+* The device sequence (in hex) is:
+*  STPLUS:	10-17, 0-7	(IDE first, then ACSI)
+*  TT:		8-f, 0-7	(SCSI first, then ACSI)
+	move.l	(sp)+,d4		; restore d4
+	cmp.l	hdv_rw,d0		; hdv_rw still the same?
+*
+* STPAD and STe-PLUS have IDE busses.  On other STPLUSes (Mega STe and
 .endc
 * Note 9/91: since ST and STPLUS are now the same ROM, we start at IDE in
 * all non-TT systems.  It will fail fast for all machines with no IDEbus.
@@ -3676,7 +3696,7 @@ savp_1:	move.w	(a1)+,(a0)+		; save a word
 	subq	#1,d1			; 2 for bus error, 3 for address, etc.
 	bsr	do_shroom
 
-	moveq	#59,d7			; wait a 60 Hz second
+	moveq	#29,d7			; wait half a (60 Hz) second
 	move.w	#$ffff,-(sp)		; -1 ("error") return condition
 	move.w	#$4c,-(sp)		; GEMDOS function #$4c: Pterm(code)
 	trap	#1			; "terminate process"
@@ -4526,6 +4546,7 @@ eget_ok:
 
 eget_loop:
 .endc
+
 
 eget_dec:
 	dbra	d1,eget_loop		; do untill count = -1

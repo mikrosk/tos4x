@@ -1,19 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 88/05/06 16:06:38 $
+* $Date: 88/09/06 11:39:52 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.13  88/09/06  11:39:52  kbad
+* Added osconf word for denmark.
+*
 * Revision 1.12  88/05/06  16:06:38  apratt
 * In dmaread: removed "retry on no error/no data" and replaced it
 * with "retry on any error" (except timeout).
-*
+* 
 * Revision 1.11  88/05/05  13:41:04  apratt
 * Added clr.w _bootdev to startup sequence, to fix bootable hard disk
 * bug (when using ALT to avoid HD boot, A:\auto doesn't get executed).
@@ -64,7 +67,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.12 $
+* $Revision: 1.13 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -91,6 +94,7 @@ swissger 	=	9 ***DON'T  CHANGE***
 turkey		=      10 ***DON'T  CHANGE***
 finland		=      11 ***DON'T  CHANGE***
 norway		=      12 ***DON'T  CHANGE***
+denmark		=      13 ***DON'T  CHANGE***
 *+
 *		         ***CHANGE THESE (DOWN HERE)***
 *************************************************************************
@@ -123,22 +127,22 @@ norway		=      12 ***DON'T  CHANGE***
 * reading RAM address >3fffff).
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
-systype		=	ram		; 'rom' or 'ram'
+systype		=	rom		; 'rom' or 'ram'
 country		=	usa      	; 'usa', etc....
 version		=	$0104		; version number *MUST BE EVEN*
-date		=	$11241987	; date, $MMDDYYYY
+date		=	$08261988	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		=	%0000111101111000	;nov 24 '87
+dosdate		=	%0001000100011010 ; Aug 8, 1988
 
 *--- for RAM:
  ifeq systype-ram
-endos		equ	$1e40c		; end of OS memory usage
+endos		equ	$2140c		; end of OS memory usage
 the_magic	equ	endos-$c	; -> magic stuff (at the top of the OS)
  endc
 
 *--- for ROM:
  ifeq systype-rom
-endos		equ	$8900		; end of OS memory usage
+endos		equ	$ad00		; end of OS memory usage
 the_magic	equ	$fefff4		; -> magic stuff (top of the ROM)
  endc
 
@@ -203,6 +207,10 @@ osconf		equ	%10101
 
  ifeq country-norway
 osconf		equ	%10111
+ endc
+
+ ifeq country-denmark
+osconf		equ	%11001
  endc
 
 

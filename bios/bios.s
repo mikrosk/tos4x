@@ -3,16 +3,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/05/12 11:33:07 $
+* $Date: 88/06/28 16:35:29 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.10  88/06/28  16:35:29  apratt
+* Inexplicably, no revision actually had the rsconf(-2) code in it.
+* Now it's there.
+*
 * Revision 1.9  88/05/12  11:33:07  apratt
 * Fixed reboot sequences to ignore caps-lock state.
-*
+* 
 * Revision 1.8  88/05/05  13:42:55  apratt
 * Added ctl-alt-rshft-delete cold boot code.
 * 
@@ -46,7 +50,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.9 $
+* $Revision: 1.10 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2229,6 +2233,12 @@ devtab:
 * the function pointer in maprsconf.  For the STMFP port (default),
 * is called rsconf.
 *
+* RETURNS: see above for rsconf return values
+	bne.s	auxnorm		;no: act normally
+	move.w	baudrate,d0
+rscommon:
+	moveq.l	#0,d0		;pre-clear hi word of return value
+	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
 	bne	auxnorm		;no: act normally
 	move.b	brate(a0),d0
 	lea	ribufptr,a0
@@ -2269,6 +2279,7 @@ auxc1:
 	move.b	d0,tsr(a1)	;disable the transmitter
 *
 *	next, we disable the receiver and transmitter enable bits
+	move.w	d1,baudrate	;shadow baud rate value now
 	lea	baudctrl,a2	;point to baudrate control register settings
 	move.b	0(a2,d1.w),d0	;get control mask
 	lea	bauddata,a2	;point to baudrate data register settings

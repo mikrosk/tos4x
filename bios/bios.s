@@ -1,26 +1,29 @@
 ******************* Revision Control System *****************************
 *
-* $Author: lozben $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 87/11/25 18:19:12 $
+* $Date: 88/02/25 17:25:33 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.3  88/02/25  17:25:33  apratt
+* Added keyboard reset on CONTROL-ALT-DELETE
+*
 * Revision 1.2  87/11/25  18:19:12  lozben
 * Added flags for new countries: Turkey, Finland, and Norway. Also added
 * new keyboard scan codes for Turkey and Norway
-*
+* 
 * Revision 1.1  87/11/20  14:22:53  lozben
 * Initial revision
 * 
 *
 * =======================================================================
 *
-* $Revision: 1.2 $
+* $Revision: 1.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -83,6 +86,7 @@ COUNTRY	equ	SPAIN	;set country of origin
 .if country == denmark
 osconf		equ	%11001
 .endif
+*+ (lmd)
 * Imports:
 *
 *-
@@ -3088,6 +3092,17 @@ ari13	cmp.w	bufhead(a0),d1 ;head=tail?
 	move.l	bufptr(a0),a2	;get buffer pointer
 
 	swap	d0		;put scan/ascii in high word
+	clr.w	d0		;clear out low word
+	move.b	kbshift.w,d0	;bring in the kbshift data (ctrl/alt/shift)
+*	now test for the warm-boot combination ALT-CTRL-DELETE (AKP 2/88)
+	lsl.l	#$8,d0		;now do the shuffling to generate the new
+	lsr.w	#$8,d0		;improved conin format ($kkss00aa)
+	cmp.l	#$0c53007f,d0	;ctl-alt-delete value
+	bne.s	nowarmboot
+	bra	reseth		;jump to reset the system (warm boot)
+	swap	d2		;get high word
+nowarmboot:
+
 	cmp.w	#$0c53,d2	;ctl-alt plus delete's scan-code
 	beq	reseth
 	cmp.w	#$0d53,d2	;ctl-alt-rshft plus delete's scan-code

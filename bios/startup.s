@@ -4,21 +4,29 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/06/13 16:27:51 $
+* $Date: 91/08/05 14:22:34 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.72  91/08/05  14:22:34  apratt
+* Changed version system: now version.s exports date and dosdate,
+* and it's maintained by biosvers.prg.  startup.s imports these,
+* and the high byte of the version number comes from the system type,
+* and the low byte from a constant in startup.s.  Also, moved STPAD screen
+* init higher, changed spindelay (see flop.s), enabled cache on TT more,
+* and added a memory test.
+*
+* init higher, changed spindelay (see flop.s), enabled cache on TT more,
+* and added a memory test.
+* 
 * Revision 2.71  91/06/13  16:27:51  apratt
 * changed date to 6/16/91; this is 3.06d.  Also backed out the check that
 * said, "If you have a diagnostic cartridge, don't install the bomb vectors."
 * Also enabled the cache during CRC checks on TT so they're faster.  Also
 * changed the comment for XBIOS call 11 to the effect that it's used by AKP's
-* debugger, and XBIOS call 40 as the one KBAD and John Towns will use for a
-* cookie call.
-*
 * debugger, and XBIOS call 40 as the one KBAD and John Townsend will use for a
 * cookie call.
 * 
@@ -124,7 +132,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.71 $
+* $Revision: 2.72 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -189,25 +197,29 @@ DMASND		equ	0
 DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
+
 ONLY_LONGFRAME	equ	TT
 .ifne STPLUS
-version		equ	$0206		; version number
-date		equ	$06161991	; date MMDDYYYY
-*			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011011010000 ; Jun 16, 1991
+vershi		equ	$02
 .else
 .ifne TT
-version		equ	$0306		; version number (need not be even)
-date		equ	$06161991	; date MMDDYYYY
-*			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011011010000 ; Jun 16, 1991
+* DMASND used to be a compile-time constant, but now it's not. It's a
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
-version		equ	$0146
-date		equ	$06161991	; date MMDDYYYY
-*			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011011010000 ; Jun 16, 1991
+vershi		equ	$01
 .endc
 .endc
+
+* set the high byte of the version number based on the machine type
+verslo		equ	$06
+.if TT
+* The date is now in another file, which is updated automatically 
+.else
+vershi		equ	$02
+.endif
+
+* set the low byte of the version number each release.
+verslo		equ	$07
+
 
 * The date is now in another file, which is updated automatically
 * in the makefile.  date and dosdate are imported here for use in
@@ -266,6 +278,10 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	conterm			; console/vt52 bits
 
 	.globl	_hinit			; go through hdv_init
+	.globl _dskboot			; boot from somewhere
+	.globl	_fastcpy		; fast copy (for unaligned DMA)
+	.globl	_longframe		; when nonzero, we're on 68010 and up.
+	.globl	bell_hook		; hook for bell sound
 	.globl	kcl_hook		; hook for keyclick sound
 .ifeq systype-rom
 	.globl	_p_cookie		; pointer to cookie jar
@@ -980,9 +996,24 @@ vtend:	move.w	(a0)+,d0
 	move.b	#7,(a0)			; set porta & portb to output
 	move.b	#$c0,2(a0)
 	move.b	#$e,(a0)		; select port A
+	move.b	#7,2(a0)		; write %00000111
+.ifne STPAD
+*  The hardware RESETs to 60hz.  Check a bit in the
+*  ROM configuration byte to see if we have to twiddle
+*  the hardware into 50hz mode.  According to JWT, you
+*  should not do this when in vblank, so we call 'noblank'
+* machines.
+ .else
+	moveq.l	#2,d1
+	move.b	d1,shiftmd
+	move.b	d1,sshiftmd
+	move.b	#$80,$ffff827e		; write LCD and power control
+* end of STPAD
+.endc
+* else we're a TT
 .else
 	move.b	#$01,syncmode		; set external sync mode always
-* end of TT
+* end of not TT/TT
 .endc
 * end of rom/ram
 .endc
@@ -1647,11 +1678,11 @@ gotsnd:	move.l	d1,(a0)+		; write sound cookie value
 	btst.l	#$6,d0			; second switch thrown (read as 0)?
 * d0.b still holds the configuration switches as computed above.
 
-.globl nospindelay
-	move.w	#1,nospindelay		; set this, see flop.s
+*
+* Set up an _FDC cookie based on the switch settings.  Bit 6 in the
 * switches, when zero, means you have high-density capability.  This is
 * defined as "Flopfmt of 18 sectors gives you high-density at 18 sectors"
-	move.l	#$01000000+"ATC",(a0)+	; $01 means 1.44MB
+* and "Protobt type 4 gives you 80 tracks / double sided / 18 spt" and
 * Floprd/Flopwr/Flopver work on high-density disks (and auto-detect them)."
 * One day we'll have a switch which tells us to install the quad-density
 * version of this cookie, meaning all of the above at 36 spt, plus "Protobt
@@ -1960,13 +1991,10 @@ scuberr:
 	move.w	#sizeikbd,-(sp)	; string length
 	jsr	ikbdws		; reset keyboard
 	addq.l	#6,sp
+
+	move.w	#$0700,d0	; divide by 200, count 256 = 20ms
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
 	dbra	d1,ikbdlp1
-.ifne STPAD
-* Pad is always mono
-	move.b	#2,d1
-	move.b	#$80,$ffff827e		; write LCD and power control
-.else
 .ifeq TT
 	bsr	cartscan		; execute cartridge aps
 .if STPAD
@@ -1990,8 +2018,6 @@ scuberr:
 * The STPAD part of this moved to the place where the sync mode and
 	bsr	noblank1		; wait until we're NOT in a vblank
 * this is endc for bsr to noblank1
-.endc
-* this is endc for STPAD
 .endc
 
 .if STPAD
@@ -2224,10 +2250,27 @@ priv2:
 *
 *-
 
+	jsr	_osi			; initialize DOS
+
+	move.w	os_dosdate,_date	; set file system date
+	jsr	_iclock			; initialize clock chip
+
+* new code to read IKBD and set boot-up from there if it's reasonable
+* by AKP and KBAD 11/2/88.  Note that _iclock returns -1 on error.
+.ifne TT
+	beq	noikbdclk		; if no error, don't bother with ikbd
+	bsr	gettime			; but if no clock chip, get IKBD time
+.endc
+	tst.b	d0			; ikbd clock hasn't ever been set.
+	beq	noikbdclk		; whoops! that's invalid, too!
+	move.w	d0,_date		; it's good: set GEMDOS time & date
 	swap	d0			; from ikbd time & continue.
 	move.w	d0,_time
 
 noikbdclk:
+
+**********************************************************************
+*
 * At this point, everything is up.  It's no longer OK to use Timer A
 * to time short events, and for compatiblity we actually shut it
 * down and disable its interrupt.
@@ -2394,8 +2437,7 @@ icon_start:
 	.dc.l	$01E001E3,$C78007B8,$0F1E0000
 
 
-* one-megabit (128K) chips, and TT has four one-megabit chips. If STPAD
-* then you don't have any checksum (because we haven't got one yet).
+    .text
 icondone:
 	moveq	#7+' ',d7	; code to addr cursor to line 7 (not STLOW)
 	tst.b	sshiftmd.w
@@ -2410,7 +2452,11 @@ icondone:
 .ifne TT
 	trap	#$d		; Bconout(2,' ');
 	addq	#6,sp
-.ifne STPLUS * STPAD
+
+; only possible combinations of STPLUS and STPAD are 0,0, 1,0 and 1,1;
+; thus, this clause is only true if STPLUS and not STPAD (1,0).
+* end of icon code
+.ifne STPLUS - STPAD
 **********************************************************************
 .else
 crcstride	equ	0
@@ -2421,11 +2467,6 @@ crcstride	equ	0
 * This happens for ROM systems only.  You will find toscrc later in 
 * this file. It's also conditional on crcstride.
 *
-
-.ifne TT
-	move.l	#$3111,d0
-	movec	d0,cacr
-.endc
 	move.l	#(128*1024)-2,d7	; checksum this many bytes
 .if systype == ram
 crcstride	equ	0	; no CRC computation if you're in RAM
@@ -2435,6 +2476,7 @@ crcstride	equ	4
 	move.l	d7,-(sp)		; push count -- 128K - 2 bytes.
 ;
 ; STPAD is all one chip, so we test it all; all other machines are
+; two chips.  It is now officially obsolete to have 6 chips for TOS.
 ;
 
 
@@ -2485,13 +2527,8 @@ badcrc:	move.l	a5,d5			; put addr in d5 for chip identification
 	move.w	#$9,-(sp)
 	trap	#1			; Cconws (God help you if you hit ^C!)
 	move.b	#'E',d0
-.ifne TT
-	move.l	#$0808,d0
-	movec	d0,cacr
 .endc
 	beq	eok1
-.endc
-
 	move.b	#'O',d0			; low bit odd, say 'O'
 eok1:
 	move.w	d0,2(sp)
@@ -2509,6 +2546,8 @@ eok2:
 	move.w	#2,(sp)
 	trap	#1			; Cconout((d5 & 2) ? 'O' : 'E');
 .endif
+
+	move.l	#crcmsg1,2(sp)
 	trap	#1			; Cconws(".\r\n");
 
 .ifne TT
@@ -2526,12 +2565,19 @@ crcdone:
 *+
 *  Attempt to load a boot sector
 *    o  from floppy disk 0 (A:),
+*    o  from a device on the ACSI bus
+*
 *  Then find packages and execute 'em.
 .endc
 * But first... If you're on TT and the ALT key is down, go into ST LOW rez.
 .endif
 .ifeq systype-rom
 
+.else
+.globl mem_test_next
+.globl mem_abort
+mtl0:	bsr	mem_test_next		; test memory
+	beq	mtl0
 .endc
 	move.l	#$0808,d0
 	movec	d0,cacr
@@ -2563,6 +2609,8 @@ norezchg:
 .else
 	clr.l	d1		; don't add anything if M68030
 .endif
+
+	lea.l	_term(PC),a0		; dest vector
 	add.l	d1,a0			; add the exception number (or 0)
 	add.l	d1,a0			; (twice: first ex number is 02)
 .ifeq systype-rom
@@ -2656,6 +2704,7 @@ st_3:	move.b	(a0)+,(a1)+		; copy a byte
 	jmp	reseth			; back to the beginning...
 
 .ifeq systype-rom
+*+
 * Default enviroment string
 * Cannot be more than 20 chars long without modifying
 * the declaration for the_env;
@@ -2708,9 +2757,10 @@ dskb1:	rts				; return status
 .if systype == rom
 
 * Before doing anything, dmaboot waits until 90 seconds after 200Hz 
-* started ticking. If you hit a key, it falls into the dmaboot code,
-* but writes "90 seconds" into 200Hz so a quick warm boot won't
-* wait again.
+* started ticking.  If you hit a key, it falls into the dmaboot code, and
+* writes "90 seconds" into 200Hz so a quick warm boot won't wait again. 
+* During the delay, dmaboot calls mem_test_next repeatedly to test memory. 
+* See memtest.s.
 *
 *+
 *  dmaboot - attempt to boot from a device on the DMA bus
@@ -2730,17 +2780,34 @@ dskb1:	rts				; return status
 NINETY_SECONDS	equ	200*90		; ninety seconds at 200Hz
 * 		place the cursor on the last char of this line;
 * 		fall through to continuation of bar shrinking;
-.ifne STPAD				; don't wait on the pad
-	moveq.l	#0,d7
-.else
-	move.l	#NINETY_SECONDS,d7	; do this for 90 sec
+	move.l	#NINETY_SECONDS,d7
+	cmp.l	_hz_200,d7		; Have we already been up >= 90 sec?
+	blo	dmab_todone		; yes -- boot this popsicle stand!
+* 	if (now >= next_bar_time) {
+* Memory test here.  The memory test is done in pieces, by repeatedly
+* calling mem_test_next until it returns NE in the ccr (and -1 in d0). This
+* is so it can be interrupted.  However, at this point it's so fast (read
+* "wimpy") I don't see the point in making it interruptable, so we just run
+* through it until it's done.
+
+.globl	mem_test_next
+.globl	mem_abort
+
+dmab_mt:
+	bsr	mem_test_next		; test next block of memory
+	beq	dmab_mt
+*		goto dmab_abort;
+.ifne STPAD
+	move.l	d7,_hz_200		; write 90 sec to _hz_200 so we don't
+					; wait at all (but do it here so we
+					; do get the memory test)
 .endc
 *             (else fall through to dmab_todone to erase the bar)
 dmab_to:
 * A simple backspace after the Nth one doesn't work because you may or may
 * not be on an N-column display, where the cursor is ALREADY on the
 * Nth one.  Sigh.
-* color cycling code goes here if you want any.
+	subq.l	#1,d3
 
 	move.l	#$00010002,-(sp)
 	trap	#$d			; poll for char: Bconstat(2)
@@ -2753,7 +2820,6 @@ nomt:
 	move.l	d7,_hz_200		; you broke out: write 90 sec
 * if (mt_done && _hz_200 >= d6)
 	trap	#$d
-*	move.w	#bootcolor,color0	; end color cycling
 * this is the end of the memory-test/shrinking bar sequence.  We check
 .ifne TT
 * Check the keyboard for a user aborting the timeout

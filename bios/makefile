@@ -1,14 +1,18 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.10 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.11 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 91/04/11 12:13:43 $     $Locker:  $
+#  $Author: apratt $	$Date: 91/05/21 16:54:35 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.10  91/04/11  12:13:43  apratt
-#  Removed pushd and popd -- they're not reliable.
+#  Revision 2.11  91/05/21  16:54:35  apratt
+#  Fixed so 'rm' doesn't rely on wildcards or globbing, and
+#  no pushd/popd, and no temp directories.
 #
+# Revision 2.10  91/04/11  12:13:43  apratt
+# Removed pushd and popd -- they're not reliable.
+# 
 # Revision 2.9  91/03/27  14:00:26  apratt
 # Changed so switches files are in a subdirectory.
 # 
@@ -88,7 +92,7 @@
 # letters free:     e  h j lm opqr   v xyz0123456789
 
 CCODE=u
-MACHINE=e
+MACHINE=t
 
 # that's all you need to set for different machines or countries.
 ############
@@ -105,7 +109,7 @@ ASM = mas -3 -8 -S $*.s -O=$@
 	oc168 $*.1 $*.2 $*.s
 	optimize $*.s
 	oas68 -l -u -s c:\alcyon\lib\oas68sym.dat $*.s
-	rm $*.[ci123s]
+	rm $*.i $*.1 $*.2 $*.s
 
 #
 ################################################################

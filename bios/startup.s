@@ -4,13 +4,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/01 17:10:51 $
+* $Date: 90/03/02 10:39:08 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.43  90/03/02  10:39:08  apratt
+* Added a comment to the effect that anybody who programs Timer B
+* to a value of 1 (that is, interrupt every time) will defeat
+* noblank/noblank1 processing.  I don't want to actually WRITE
+* to Timer B's data register in noblank, since it would kill
+* somebody's real programming, but there is this danger.
+*
+* initmfp in bios.s now writes 0 (meaning 256) to Timer B's data
+* register, so if NOBODY uses it, it will have a legal value (not 1).
+*
 * Revision 2.42  90/03/01  17:10:51  apratt
 * Added equates for TTMFP: ttgpip, ttiera, etc.
 * Fixed ttwait, stwait for new equates.
@@ -18,7 +28,7 @@
 * Noblank1 is similar, but returns via rts.
 * Fixed a some things causing STe not to work.
 * Removed restriction (in findpackages) that phystop be on a 1K boundary.
-*
+* 
 * Revision 2.41  90/02/26  17:27:28  apratt
 * Fixed up conditionals, using else rather than endc/if. Added stwait,
 * using STMFP timer A for delays, suitable for delays during boot
@@ -412,7 +422,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.42 $
+* $Revision: 2.43 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -4109,6 +4119,9 @@ ptype:
 *  Uses:	d0
 	dc.b	-1			; [epson color dot]
 * Noblank1 is the same thing, but returns via RTS.
+*
+* Serious flaw! If somebody has programmed Timer B with a value of '1'
+* the data register will never change!
 *-
 
 *

@@ -3,22 +3,29 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/12/06 16:24:23 $
+* $Date: 88/12/06 17:02:06 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.21  88/12/06  17:02:06  apratt
+* Added a system variable at $59e: _longframe.  It's zero if you're
+* on a 68000, nonzero otherwise.  This is used on entry and exit
+* for BIOS/XBIOS (at "traph") so we can deal with the extra word
+* on the stack for 680[1-3]0 exception frames.  MASSIVELY UNTESTED,
+* and almost no change if you leave LONGFRAME equ 0.
+*
 * Revision 1.20  88/12/06  16:24:23  apratt
 * Added code for STPLUS to fix the check for MONOMON in the Vblank
 * handler: it gets inverted when the DMA sound is active, so this code
 * has to un-invert it.  It's not quite bulletproof, but it should be
 * pretty damn rare that a spurious reset sneaks through.  Well-nigh
 * impossible, I hope.
-*
+* 
 * Only a tiny code change if not STPLUS.
-*
+* 
 * Revision 1.19  88/11/28  11:16:44  kbad
 * Put the magic back in.  Dungeon Master was depending on the AES magic
 * to reclaim the AES BSS after the boot sequence takes it away.  This
@@ -110,7 +117,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.20 $
+* $Revision: 1.21 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -171,6 +178,12 @@ denmark		=      13 ***DON'T  CHANGE***
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
 STPLUS		=	0		; set to 1 for ST PLUS video & palette
+
+* Set LONGFRAME to 1 for code which runs on 68000 *or* 680[1-3]0.
+* Even if this is zero, the new system variable _longframe at $59e
+* is initialized.
+
+LONGFRAME	=	0		; set to 1 to enable long frames
 
 systype		=	ram		; 'rom' or 'ram'
 country		=	usa      	; 'usa', etc....
@@ -449,8 +462,7 @@ osconf		equ	%11001
 	.globl	_nflops			; "Hey!  Clams got floppies!"
 	.globl	_critic			; critical error handler binding for C
 	.globl	_hz_200			; 200hz raw system timer tick
-
-
+	.globl	_dskbufp		; pointer to some space for disk I/O
 
 	.globl	kcl_hook		; hook for keyclick sound
 .if TT
@@ -778,15 +790,16 @@ prv_auxo:	ds.l	1	; (50e) -> _auxostat()
 prv_aux:	ds.l	1	; (512) -> _auxout()
 
 pun_ptr:	ds.l	1	; (516)  -> hard disk driver phys unit table
-*				; (59e)
+memval3:	ds.l	1	; (51a)  memory validation (memval3)
 
-		.globl	more_os_vars
-more_os_vars:	ds.b	$580-$59e	; space for more OS variables
+*				; (5a0)
 
+_longframe:	ds.w	1	; (59e)  if nonzero, we're on 680[1-3]0.
+_p_cookie:	ds.l	1	; (5a0)  pointer to the Cookie Jar
 _ramtop:	ds.l	1	; (5a4)  top of ram starting at $01000000
 _ramvalid:	ds.l	1	; (5a8)  ramtop valid if rammagic ($1357bd13)
 bell_hook:	ds.l	1	; (5ac)  handler for bell
-*	PATCH AREA, $580..$7FF		:
+kcl_hook:	ds.l	1	; (5b0)  handler for keyclick
 *				; (5b4)
 
 * more_os_vars used to go here, but it took up NEGATIVE space, so I
@@ -795,9 +808,8 @@ bell_hook:	ds.l	1	; (5ac)  handler for bell
 *	This space reserved for		:
 *	future RAM-loaded fixes		:
 		.globl	fix_it_up
-fix_it_up:	ds.b	$800-$580
+fix_it_up:	ds.b	$800-$5a0
 levelA:		ds.b	$40
-
 levelB1:	ds.b	$40
 levelB2:	ds.b	$40
 levelC:		ds.b	$40
@@ -1267,6 +1279,25 @@ usem:	move.l	4(a0),end_os		; init end-of-OS pointer
 *--- Disk vectors:
 	move.l	#_dskinit,hdv_init.w	; initialization
 *--- Prtblk vectors:
+.ifeq LONGFRAME
+	clr.w	_longframe		; clear this (NEW 12/6/88)
+.endc
+
+.ifeq LONGFRAME-1
+* Initialize the cookie jar.
+* set _longframe flag to 0 if running on 68000, else nonzero.
+*-
+	move.l	#ill_1,$10(a5)		; set illegal instruction vector
+	dc.w	$42c0			; move.w ccr,d0: illegal on 68000.
+	st	_longframe+1		; hey! no exception!
+	bra	ill_2
+
+ill_1:	addq.l	#6,sp			; illegal instruction: must be 68000.
+	clr.w	_longframe		; clear longframe: definitely 68000.
+ill_2:	nop				; (dumb as68 can't have endc after
+*					; a label, so here's 2 wasted bytes.)
+.endc
+*		00030000 is Sparrow
     ifeq systype-rom
 	bsr	copy_header		; kludge OS ROM header
     endc
@@ -2045,13 +2076,14 @@ vbl12:	tst.w	_prtcnt.w		; printscreen active?
 no_print:
 
 
-*	From super-		From user
-*	visor mode:		mode:
-*	-----------		------------
-*	N(sp) args		N(usp) args
-*	6(sp) func#		6(usp) func#
-*	2(sp) ret		2(ssp) ret
-*	 (sp) SR		 (ssp) SR
+*--- restore registers & return (and a handy RTE)
+	movem.l	(sp)+,d0-d7/a0-a6
+vblret:	addq.w	#1,vblsem		; V(vblsem) [release vblank]
+_rte:	rte
+
+
+
+*+
 * wvbl - wait for next vblank
 * Passed:	nothing
 * Returns:	at beginning of next vblank
@@ -2070,6 +2102,10 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 
 
 
+* If LONGFRAME is 1, there is code to check _longframe and handle
+* long frames.  I hope it's true that RTE doesn't care what the offset
+* Falls-into:	_critich
+* (screwy way to save two bytes...)
 *
 *-
 	bra.s	traph
@@ -2080,6 +2116,12 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 * Loads -1 into D0 and returns.
 *
 *-
+.ifeq LONGFRAME-1
+	tst.w	_longframe		; long frames?
+	beq.s	trap_1			; nope.
+*+
+trap_1:	nop				; sorry about this...
+.endc
 * trp14h - Atari BIOS extensions (trap 14)
 * traph  - trap handler
 *
@@ -2103,6 +2145,12 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 * part of the format/offset word is, because I just push a zero.
 * 
 *-
+.ifeq LONGFRAME-1
+	tst.w	_longframe
+	beq.s	b_exit1
+traph:	move.l	savptr,a1		; a1 -> register save area
+b_exit1: nop				; sorry about this...
+.endc
 	move.w	d0,-(a1)		; (need in D0 for user-mode test)
 	move.l	(sp)+,-(a1)		; save return addr
 

@@ -576,7 +576,8 @@ fm_error(n)
 		string = ALRTXXER;
 	}
 
-	ret = fm_show(string, (string == ALRTXXER) ? &n : NULLPTR, 1 );
+	ret = fm_show(string, (string == ALRTXXER) ? (UWORD *)&n : (UWORD *)0,
+				 1 );
 
 	return( ret != 1 );
 }

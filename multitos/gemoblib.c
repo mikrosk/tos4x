@@ -9,6 +9,7 @@
 /*	Added 3D and color icon			7/7/92	D.Mui		*/
 /*	Convert to Lattice C 5.51	        02/16/93	C.Gee   */
 /*	Force to use prototypes			02/23/93	C.Gee	*/
+/*	Fix ob_format to not right justify	2/25/93 H.Krober	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -243,6 +244,14 @@ ob_format(just, raw_str, tmpl_str, fmt_str)
 
 	inc = 1;
 	pfbeg[ptlen] = NULL;
+
+#if 0	/* ++HMK 02/25/93, why is this here??? */
+	/* For buildig the format string, it doesn't matter if the obj is */
+	/* left or right aligned. In the current relase of TTOS, FTOS     */
+	/* and MTOS there is a bug when a ted object is right aligned.    */ 
+	/* When you do backspace or 'Esc' the edit field gets messed up.  */
+	/* So if we take out the following lines, it works fine!	  */
+
 	if (just == TE_RIGHT)
 	{
 	  inc = -1;
@@ -250,7 +259,7 @@ ob_format(just, raw_str, tmpl_str, fmt_str)
 	  ptbeg = ptbeg + ptlen - 1;
 	  prbeg = prbeg + prlen - 1;
 	}
-
+#endif
 	pfend = pfbeg + (inc * ptlen);
 	ptend = ptbeg + (inc * ptlen);
 	prend = prbeg + (inc * prlen);

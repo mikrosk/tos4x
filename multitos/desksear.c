@@ -105,8 +105,6 @@ sea_file( filename )
 	WORD		status,type,change,newi;
 	BYTE		buffer[16];
 
-/*	desk_mice( HOURGLASS );	*/
-
 	strcpy( filename, buffer );
 	mass_string( filename );
 
@@ -180,7 +178,7 @@ s_ex2:
 	clr_dicons();
 
 s_ex3:
-/*	desk_mice( ARROW );	*/
+	;
 }
 
 

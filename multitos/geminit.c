@@ -46,6 +46,7 @@
 /*	Copied over scan_2() and save_2() from deskinf.c and		*/
 /*	renamed them scan2_2() and save2_2().				*/
 /*	Copied over hex_dig() and uhex_dig() also.			*/
+/*	Load rsc file from disk			2/11/92		H.Krober*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -72,6 +73,42 @@
 #include "rslib.h"
 #include "signal.h"
 #include "gemusa.h"
+#include "gemdos.h"
+/*
+ *	Set the SOFTLOAD flag to implement softloaded GEM AES resources.
+ *	The AES will then try to read its resource file from
+ *	[A|C]:\MULTITOS\GEM.RSC. 
+ *	NOTE: You have to define SOFTLO4AD in gemrom.c, too, because there
+ *	      are the actual functions.
+ */
+#define SOFTLOAD	1	
+/*
+ *	Set the LOADKBT flag to implement softloaded keyboard tables. The
+ *	system will try to load the keyboad table from 
+ *	[A|C]:\MULTITOS\KEYBD.TBL
+ *
+ *	THE FORMAT OF KEYBD.TBL IS:
+ *
+ *	[ unshifted keyboard table (128 Bytes)     ]
+ *	[ shifted keyboard table (128 Bytes)       ]
+ *	[ caps lock keyboard table (128 Bytes)     ]
+ *	{ alternate unshifted keyboard table **    }
+ *	{ alternate shifted keyboard table **      }
+ *	{ alternate caps lock keyboard table **    }
+ *
+ *	**: An alternate keyboard table is a list of two bytes pairs.
+ *	    The list is NUL terminated.
+ *
+ *	Use an assembler (madmac), aln and fixrom to create the tables. You
+ *	can get the data for the tables from bios.s.
+ * 
+ *	This works only a 100% on machines with the AKP code (since 5/92)
+ *	in the bios. Older versions have the alternate key handling hard
+ *	coded while the bios with AKP uses tables for the alternate key
+ *	handling.
+ *	
+ */
+#define LOADKBT		1
 
 
 BYTE	*scan2_2( REG BYTE *pcurr, REG UWORD *pwd );
@@ -213,6 +250,29 @@ BYTE	AE_PORT[] = "AE_PORT=\\";
 BYTE	AE_PNTSIZE[] = "AE_PNTSIZE=\\";
 BYTE	AE_FONTID[] = "AE_FONTID=\\";
 BYTE	AE_LANG[] = "AE_LANG=\\";
+
+#ifdef LOADKBT
+
+EXTERN LONG dos_lseek();
+
+#define KBTMAGIC	0x2771
+
+#define KBTSTDLEN	386
+
+MLOCAL BYTE 	*kbt_buf;
+MLOCAL BYTE	*KBTFNAME = "C:\\MULTITOS\\KEYBD.TBL";
+MLOCAL WORD	set_kbdtbl();
+
+typedef struct {
+	BYTE	*unshift;
+	BYTE	*shift;
+	BYTE	*capslock;
+	BYTE	*altunsh;
+	BYTE	*altsh;
+	BYTE	*altcl;
+} KEYTAB;
+
+#endif
 
 
 /*	Get AES cookies		*/
@@ -554,6 +614,9 @@ main( VOID )
 	  st_lang = ( WORD )(( aesAKP >> 8 ) & 0x00ff );
 	  if ( ( st_lang > 6 ) || ( st_lang < 0 ) || ( st_lang == 3 ) )
 	    st_lang = 0;
+#ifdef LOADKBT
+	set_kbdtbl();
+#endif
 	}
 
 	aesDDD = 0;
@@ -978,7 +1041,11 @@ pred_dinf( VOID )
 #endif
 	sh_get( pbuf, bsize );
 
+#if 0
         rom_ram( 3, ( LONG )pbuf );		/* res is default from ROM	*/
+#else
+	fh = -1;		/* no .inf file read in yet */
+#endif
 
 /* set up defaults */
  	adeskp[0] = 0x41;	/* 4 = dithered, 1 = black */
@@ -1024,6 +1091,11 @@ pred_dinf( VOID )
 					/* if we read it from disk, 	*/
 					/* reschange may have changed.	*/
 p_1:
+	if (fh < 0)
+		rom_ram( 3, pbuf );	/* res is default from ROM	*/
+					/* we only need to do this if   */
+					/* there was no .inf file 	*/
+					/* added 2/9/93 hmk		*/
 	if ( change )
 	{
 	  temp = pbuf;
@@ -1147,6 +1219,57 @@ bailout( ptr )
 	trap( 9, "Please reboot the machine!" );
 	while( !trap13( 1,2 ) );
 }
+
+#ifdef LOADKBT
+
+/*
+ *	Try to read keyboard table from disk
+ */
+
+set_kbdtbl()
+{
+	WORD	fd;
+	KEYTAB	*kbtp;
+	BYTE	*p;
+	LONG	len;
+	WORD	hdr;	/* header containig magic word */
+
+	*KBTFNAME = ( isdrive() & 0x4 ) ? 'C' : 'A';
+	if ( ( fd = dos_open(KBTFNAME, RMODE_RD) ) >= 0 )
+	{
+	  len = dos_lseek(fd, 2, 0L);
+	  if (len <= 0L)
+		goto sl_end;
+	  dos_lseek(fd, 0, 0L);
+	  if ( dos_read( fd, sizeof(WORD), &hdr ) <= 0 )
+		goto sl_end;
+	  if (hdr != KBTMAGIC)	/* check magic word to see if it's a kbt */
+		goto sl_end;  
+	  if ((kbt_buf = dos_xalloc(len, 0)) == NULL)
+		goto sl_end;
+	  if ( dos_read( fd, (UWORD) len, kbt_buf ) > 0 )
+	  {
+		kbtp = (KEYTAB * ) trap14(16, -1L, -1L, -1L);
+		kbtp->unshift = kbt_buf;	/* normal key table */
+		kbtp->shift = (BYTE *) (kbt_buf + 128L); /* shifted */
+		kbtp->capslock = (BYTE *) (kbt_buf + 256L); /* caps lock */
+		/*
+ 		 * are there tables for the alternate key?
+		 */
+		if (len > KBTSTDLEN) {
+			kbtp->altunsh = (BYTE *) (kbt_buf + 384L);
+			/* the tables are nul terminated */
+			for (p = kbtp->altunsh; *p; p++);
+			kbtp->altsh = ++p;
+			for (p = kbtp->altsh; *p; p++);
+			kbtp->altcl = ++p;
+		}
+	  }
+sl_end:
+	  dos_close( fd );
+	}
+}
+#endif
 
 
 

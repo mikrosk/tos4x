@@ -174,7 +174,6 @@ sh_sitems( )
 	LONG		ndir,nfile,nsize;	
 	BYTE		buffer[20];
 	BYTE		newname[14];
-	LONG		sizes[4];
 	BYTE		*newstr;
 	BYTE		*oldstr;
 	UWORD		len,pos;
@@ -432,7 +431,7 @@ ss_8:	      ((TEDINFO*)(obj[FIFILE].ob_spec))->te_ptext = (LONG) &oldstr[pos];
 	      changed = TRUE;	
 	      dr[*oldstr - 'A'] = 1;
 	    }
-sf_2:
+sf_2: ;
 	  }				/* OK is selected	*/
 
 ss_6:
@@ -530,7 +529,6 @@ sh_disk( buffer )
 close_path( win )
 	REG WINDOW	*win;
 {
-	BYTE	*ptr;
 	WORD	item;
 	BYTE	buffer[14];
 

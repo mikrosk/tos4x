@@ -9,11 +9,16 @@
 *	Rename to traps.s		9/5/90		D.Mui	
 *	Fix at mediach at dooldr 	12/11/90	D.Mui
 *	Fix at mediach at remove extra slash at the beginning 4/5/91 D.Mui
+*	Add the new names (gemdos, bios, xbios) for trap functions
+*	so that we cam get rid of osbind.o 3/10/93	Eric Smith
 
 	.globl	_trap
+	.globl	_gemdos
 	.globl	_DOS_AX
 	.globl 	_trap14
+	.globl	_xbios
 	.globl 	_trap13
+	.globl	_bios
 	.globl 	_gr_mouse
 	.globl 	_getmouse
 	.globl 	_putmouse
@@ -40,6 +45,7 @@ _kickit:
 *
 * The safe way to do this is as follows:
 
+_gemdos:
 _trap:
 	movem.l	d2/a2,-(sp)
 	clr.w	_DOS_AX
@@ -56,6 +62,7 @@ _trap:
 *	Trap13 and Trap14 	*
 *********************************
 
+_bios:
 _trap13:
 	movem.l	d2/a2,-(sp)
 	movem.l	12(sp),d0-d2/a0-a2
@@ -65,6 +72,7 @@ _trap13:
 	movem.l	(sp)+,d2/a2
 	rts
 
+_xbios:
 _trap14:
 	movem.l	d2/a2,-(sp)
 	movem.l	12(sp),d0-d2/a0-a2

@@ -48,14 +48,14 @@
  *	NOTE: You have to define SOFTLOAD in gemrom.c, too, because there
  *	      are the actual functions.
  */
-#undef SOFTLOAD
+#define SOFTLOAD 1
 /*
  *	Version number of the DESKTOP.RSC file. Use "rscvers versnr DESKTOP.RSC"
  *	to create a DESKTOP.RSC with a version number in the first byte of the
  *	resource header. This is to prevent user from using the wrong
  *	resource file.
  */
-#undef DSKRSVER
+#define DSKRSVER 1
 /* 
  * 	Set the ONERSC flag to indicate that the system just has the
  *	U.S. desktop resource in ROMs. If the system cannot load the
@@ -153,10 +153,10 @@ desk_term()
 {
 	d_exit = L_EXIT;
 	return;			/* DOES THIS BELONG HERE ??? (hmk 2/16/93) */
+#if 0
 	Debug1( "Desktop catches terminate signal\r\n" );
 
 	ciconaddr = (CICONBLK*) 0;
-#if 0
 	if ( iconmem )
 	{
 	  LBCOPY( (BYTE *)temp, (BYTE *)c.cb_pglobal, 30 );
@@ -165,11 +165,11 @@ desk_term()
 	  iconmem = (BYTE*) 0;
 	  LBCOPY( c.cb_pglobal, temp, 30 );	
 	}
-#endif
 	iconaddr = (OBJECT*) 0;
 	iconmem = (BYTE*) 0;
 	inf_path[0] = 0;		
 	Pterm(1);
+#endif
 }
 
 
@@ -936,7 +936,7 @@ ch_cache( set )
 	else
 	{				/* turn the blt on	*/
 					/* blt is there		*/
-ch_1:	  if ( ( temp = trap14( 64, -1 ) ) & 0x2 )	
+ch_1:	  if ( ( temp = (WORD)trap14( 64, -1 ) ) & 0x2 )	
 	  {
 	    if ( set )
 	    {

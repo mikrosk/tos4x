@@ -87,7 +87,6 @@ kballoc.c
 large.s
 machine.h
 makefile
-makeci.csh
 mediach.s
 message.h
 mintbind.h
@@ -100,9 +99,9 @@ mn_popup.c
 mn_submn.c
 mn_tools.c
 mn_tools.h
+mnstuf.h
 obdefs.h
 objaddr.h
-olddesk.h
 osbind.h
 pboth.h
 pdesk.h

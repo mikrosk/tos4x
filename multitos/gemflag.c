@@ -2,14 +2,17 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemflag.c,v $
+*  $Revision: 1.4 $	$Source: f:\multitos/RCS/gemflag.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/12 19:51:12 $	$Locker:  $
 * =======================================================================
 *  $Log: gemflag.c,v $
-*  Revision 1.3  1993/03/10  20:12:42  ersmith
-*  Lattice port
+*  Revision 1.4  1993/03/12  19:51:12  ersmith
+*  Merged HMK's loadable resource stuff
 *
+ * Revision 1.3  1993/03/10  20:12:42  ersmith
+ * Lattice port
+ *
 * Revision 1.1  1993/02/24  23:52:46  ersmith
 * 1 meg floppy MultiTOS
 *

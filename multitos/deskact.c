@@ -24,7 +24,6 @@
 #include "obdefs.h"
 #include "deskdefi.h"
 #include "deskwin.h"
-#include "gemdefs.h"
 #include "deskusa.h"
 #include "osbind.h"
 #include "extern.h"

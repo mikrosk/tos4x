@@ -401,7 +401,7 @@ exec_file( infile, win, item, intail )
 	    code = 3;
 	    break;
 /*	    shel_write( 3, 0, 0, file, Nostr ); 	*/
-	    return;
+/*	    return;					*/
 		
 	  case TTP:		/* TOS takes parameter	*/
 	    graphic = FALSE;

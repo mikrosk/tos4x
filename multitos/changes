@@ -1,5 +1,20 @@
 Changes made 3/10/93:
 
+deskopen.c:
+	Clean ups to make Lattice stop giving warnings.
+deskvdi.c:
+	Added some kludges to get around Lattice's "redefinition
+	of TEXT" warning (this could really be a problem, except
+	that TEXT isn't actually used in deskvdi.c).
+desksear.c:
+	Removed the commented out "desk_mice" calls.
+trap.s,makefile:
+	The functions in osbind.o already existed in trap.o, but with
+	different names. Merged those into trap.s and got rid of
+	osbind.o in the makefile.
+desktop.c,geminit.c,gemobed.c,gemoblib.c,gemrom.c:
+	Merged in Hans-Martin's loadable resource code, and his
+	bug fixes for objc_edit.
 EVERYWHERE:
 	Merged in Lattice port. Here are the notes from that:
 

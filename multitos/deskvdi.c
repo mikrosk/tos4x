@@ -9,8 +9,19 @@
 
 #include "portab.h"
 #include "vdidefs.h"
+#ifdef TEXT
+/* vdidefs.h uses "TEXT" in a different way than deskdefi.h does */ 
+#undef TEXT
+#endif
 #include "pdesk.h"
 #include "pmisc.h"
+
+#ifdef TEXT
+/* we avoid confusion between deskdefi.h and vdidefs.h by not using
+ * TEXT anywhere in this file
+ */
+#undef TEXT
+#endif
 
 MLOCAL WORD	control[12];
 MLOCAL WORD	intin[256];

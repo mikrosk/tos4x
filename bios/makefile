@@ -1,14 +1,17 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.1 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.2 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: kbad $	$Date: 89/02/22 20:45:37 $     $Locker:  $
+#  $Author: kbad $	$Date: 89/06/19 15:46:12 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.1  89/02/22  20:45:37  kbad
-#  *** TOS 1.4  FINAL RELEASE VERSION ***
+#  Revision 2.2  89/06/19  15:46:12  kbad
+#  Fixed pushd/popd lines.
 #
+# Revision 2.1  89/02/22  20:45:37  kbad
+# *** TOS 1.4  FINAL RELEASE VERSION ***
+# 
 #
 #########################################################################
 # Author Slavik Lozben
@@ -23,8 +26,7 @@ TMPDIR	=	m:
 .SUFFIXES: .o .c .s
 .s.o:
 	cp $*.s $(TMPDIR)\$*.s
-	pushd .
-	cd $(TMPDIR)
+	pushd $(TMPDIR)
 	as68 -l -u $*.s
 	popd
 	mv $(TMPDIR)\$*.o .
@@ -32,8 +34,7 @@ TMPDIR	=	m:
 
 .c.o:
 	cp $*.c $(TMPDIR)
-	pushd .
-	cd $(TMPDIR)
+	pushd $(TMPDIR)
 	cp68 $*.c $*.i
 	c068 $*.i $*.1 $*.2 $*.3 -f
 	c168 $*.1 $*.2 $*.s

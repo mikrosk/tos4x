@@ -1,20 +1,27 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/11/08 15:58:27 $
+* $Date: 88/11/18 11:04:15 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.17  88/11/18  11:04:15  apratt
+* Documented with comments the fact that kstate is now officially
+* fixed just after ikbdsys (which is to say, after the end of
+* the vector list returned by Kbdvbase).  This has always been
+* true; now it's official.  See the comment with "11/18/88" in it
+* for details.
+*
 * Revision 1.16  88/11/08  15:58:27  kbad
 * Modified keyboard driver so that ISO keyboards can produce correct
 * control keystrokes (previously, control was handled before alt, thus
 * rendering the alt-control keystrokes useless).
-*
+* 
 * Revision 1.15  88/11/02  15:22:35  apratt
 * Raised IPL to 7 for the duration of the centronics strobe, so
 * another interrupt can't cause the strobe to be active too long.
@@ -74,7 +81,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.16 $
+* $Revision: 1.17 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -540,6 +547,10 @@ mibufhigh:	ds.w	1
 mbufrec		equ	mibufptr
 
 mibuffer:	ds.b	minsize		;midi input buffer
+
+
+*	Acia error handler vectors -- init'ed to point to 'rte' unless
+*
 midivec		ds.l	1	;midi interrupt handler vector
 vkbderr		ds.l	1	;keyboard error handler address
 vmiderr		ds.l	1	;midi error handler address
@@ -549,7 +560,24 @@ clkintvec	ds.l	1	;ikbd real-time clock interrupt vector
 joyintvec	ds.l	1	;general joystick interrupt vector
 midisys		ds.l	1	;midi system interrupt handler
 ikbdsys		ds.l	1	;ikbd system interrupt handler
+kstate		ds.b	1	;present state of ikbd reception routine
+kindex		ds.b	1	;index used to count down bytes left to
+joyintvec:	ds.l	1	;general joystick interrupt vector
 
+kstate:		ds.b	1	;present state of ikbd reception routine
+kindex:		ds.b	1	;index used to count down bytes left to
+*				;receive for current state's record
+altkp:		ds.w	1	;accumulator for alt-keypad key; <0 is invalid
+***
+*** Kstate is LOCKED IN at ikbdsys+4 as of 11/18/88.  This has been
+*** true by chance since Day 1, but now I'm declaring it official.
+*** The only legal operation on this variable is reading, and the
+*** only information it's guaranteed to carry is zero for "not processing
+*** a packet" and nonzero for "processing a packet."
+***
+*** The reason:  if you want to replace the BIOS handler with your
+*** own, you have to know that the BIOS isn't in the midst of processing
+*** a packet from the IKBD.  So you wait for kstate to be zero.
 *** If you take over the vector arbitrarily, you might see half of a packet
 *** and not understand it, and when you return the vector to its old
 *** value the BIOS will be confused because it thinks it's still processing
@@ -580,9 +608,6 @@ joy1	equ	7
 
 statdex	equ	7
 amdex	equ	5
-kstate		ds.b	1	;present state of ikbd reception routine
-kindex		ds.b	1	;index used to count down bytes left to
-*				;receive for current state's record
 statrec		ds.b	statdex
 amrec		ds.b	amdex
 mousebuf	ds.b	rmdex

@@ -459,7 +459,11 @@ read_files( win, attr )
 	  if ( dtabuf.dirfile.d_att & 0x10 )
 	  {
 	    if ( dtabuf.dirfile.d_name[0] == '.' )
-	      goto r_3;
+	    {
+	      if ( ( dtabuf.dirfile.d_name[1] == '.' ) || 
+		   ( !dtabuf.dirfile.d_name[1] ) ) 		
+		goto r_3;
+	    } 	
 	  }
 	  else
 	  {				/* file match ?		*/

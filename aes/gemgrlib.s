@@ -47,7 +47,7 @@
 	.globl	_yrat
 	.globl	_button
 	.globl	_kstate
-	.globl	_gr_still
+*	.globl	_gr_still
 *
 *
 *
@@ -648,7 +648,7 @@ lab50:
 *
 *	exit:	d0.w	= 1 (true)	=0 (false)
 *
-_gr_still:
+*_gr_still:
 	suba.w	#12,sp		;+12 make room on stack for 6 words: &rets[6]
 	move.l	sp,-(sp)	;+16 parm 7 &rets[0]
 	clr.l	-(sp)		;+20 parm 6 0x0L

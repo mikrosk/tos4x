@@ -181,6 +181,7 @@ menu_down( tree, ititle, itree )
 	REG OBJECT	*newtree;
 	REG WORD	newimenu, i;
 	WORD		imenu;
+	GRECT		clip;
 
 						
 			/* correlate title # to menu subtree #	*/

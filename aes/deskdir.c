@@ -794,6 +794,7 @@ create:
 	  if ((wrsiz = Fwrite(outhand, tmpsiz, buffer)) < 0)	
 	  {
 	     retmsg = SKIP;
+	     Fclose(outhand);	
 	     Fdelete(fixdst);
 
 	    if (do1_alert( WRERROR ) == 2)	
@@ -802,18 +803,19 @@ create:
 	      retmsg = FALSE;
 	    }
 
-	    goto y0;
+	    goto y1;
 	  }
 				/* check if there are sufficent memory */
 	  if (wrsiz != tmpsiz)		
 	  { 			/* not sufficent memory ??*/
 	      f_abort = 1;
 	      retmsg = FALSE;
+	      Fclose(outhand);	
 	      Fdelete(fixdst);
 	      buf[0] = *fixdst;
 	      buf[1] = 0;
 	      fill_string( buf, STDISKFU );
-	      goto y0;
+	      goto y1;
 	  }
 
 	   copysiz -= tmpsiz;

@@ -104,7 +104,7 @@ endif
 
 ifeq '$M' 'w'	    # Sparrow
 MSP = 1
-DCHANGE = 1
+#DCHANGE = 1	    # testing
 endif
 
 
@@ -157,7 +157,7 @@ CFLAGS = $(CDEF) #$(CERR) $(COPT) $(CMOD)
 # =======================================================================
 
 default:
-	@echo	'use: make [C=[abcdfgiknstuw]] [M=[efptw]] [RAM=[01]] allbios"
+	@echo	'use: make [C=[abcdfgiknstuw]] [M=[efptw]] [RAM=[01]] allbios'
 	@echo	'C sets "country" (default $C):'
 	@echo	'	a swf	f fra	k uk	t tur'
 	@echo	'	b swg	g ger	n nor	u usa'

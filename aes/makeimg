@@ -168,15 +168,6 @@ geminit.oo:  $(STDGEM.H) $(GEMPD.H) $(GEMOLIB.H) taddr.h
 geminput.oo: $(STDGEM.H) $(GEMPD.H) $(GEMOLIB.H) funcdef.h
 gemmnlib.oo: $(STDGEM.H) $(GEMPD.H) $(GEMOLIB.H) taddr.h
 gemobed.oo:  $(STDGEM.H) $(GEMPD.H) $(GEMOLIB.H) taddr.h 
-gemoblib.oo: $(STDGEM.H) $(GEMPD.H) $(GEMOLIB.H) taddr.h
-	cp68 $*.c m:\$*.i
-	c068 m:\$*.i m:\$*.1 m:\$*.2 m:\$*.3 -f
-	c168 m:\$*.1 m:\$*.2 m:\$*.s
-	optimize m:\$*.s
-	pasm -U -B m:\$*.s
-	del m:\$*.s m:\$*.i m:\$*.1 m:\$*.2 m:\$*.3 $*.oo
-	copy m:\$*.o $*.oo
-	del m:\$*.o
 gemobjop.oo: $(STDGEM.H) obdefs.h taddr.h
 gempd.oo:    $(STDGEM.H) $(GEMPD.H) $(GEMOLIB.H)
 gemqueue.oo: $(STDGEM.H) $(GEMPD.H) $(GEMOLIB.H)

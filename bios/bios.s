@@ -4,20 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/05/09 16:46:58 $
+* $Date: 90/06/18 16:36:05 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.21  90/06/18  16:36:05  apratt
+* Fixed keyclicks so caps-lock keyclick goes through kcl_hook, not the
+* built-in keyclick.
+*
 * Revision 2.20  90/05/09  16:46:58  apratt
 * Fixed scc tx int code so it works (oops).
-*
+* 
 * Documented a feature of dosound that's always been true: it returns
 * the current sound-routine pointer, or zero if none.
 * If the new pointer you pass in is negative, it doesn't change it.
-*
+* 
 * Revision 2.19  90/05/02  16:29:03  apratt
 * Fixed rsconf so when changing rsmode (flow-control mode): if txoff,
 * causes a bsr to sender (to wake up the transmission if anything's
@@ -220,7 +224,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.20 $
+* $Revision: 2.21 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -4267,8 +4271,15 @@ ari9:	cmpi.b	#$3A,d0		;CAPS LOCK
 	move.b	altkp+1,d0	; get the accumulated value,
 	move.w	#-1,altkp	; mark as invalid for next time
 	bra	conin25		; and put it on the keyboard queue.
-	move.l	#keyclk,cursnd.w
-	move.b	#0,timer.w
+
+ari9:	cmpi.b	#$3A,d0		;CAPS LOCK
+	bne.b	ari11
+	btst.b	#0,conterm.w
+	beq.b	ari9a		;no click please!
+
+* go through kcl_hook to accomplish keyclick; this was an oops until 6/90
+* before that, normal keys clicked through kcl_hook but caps-lock didn't.
+
 	movem.l	d0-d2/a0-a2,-(sp)
 	move.l	kcl_hook.w,a0
 	jsr	(a0)

@@ -3,18 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/03/18 16:16:59 $
+* $Date: 88/03/28 11:46:47 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.4  88/03/28  11:46:47  apratt
+* Added Flopwp call (Xbios call $28).  Actual code is in flop.s
+*
 * Revision 1.3  88/03/18  16:16:59  apratt
 * Added code to dmaread: retry the read if the first one succeeds (status
 * code 0 (no error)) but the DMA counter hasn't changed.
 * The removable-media drives we have use this to signal media change.
-*
+* 
 * Revision 1.2  87/11/25  18:17:00  lozben
 * Added new flags for finland, norway, and turkey.
 * 
@@ -24,7 +27,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.3 $
+* $Revision: 1.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -360,6 +363,7 @@ osconf		equ	%10111
 	.globl	pconfig			; printer configuration word
 	.globl	_prtblk			; _prtblk primitive
 	.globl	_osi			; initialize OS
+	.globl	_flopwp			; check wp state of floppies
 	.globl	esc_init		; init glass tty
 	.globl	initmous		; mouse vector init
 	.globl	_mediach		; media change inquiry
@@ -2016,7 +2020,7 @@ trp13tab:
 	dc.l	_drvmap			; 10: get active-drive bit vector
 	dc.l	_shift			; 11: get/set keyboard shift bits
 
-	dc.l	unimpl			; 40: unused
+	dc.l	_flopwp			; 40: new: check floppy wp state
 	dc.l	unimpl			; 41: unused
 	dc.l	unimpl			; 42: unused
 	dc.l	unimpl			; 43: unused

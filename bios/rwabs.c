@@ -4,18 +4,21 @@
 * $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/02/06 23:10:32 $
+* $Date: 89/02/21 17:22:52 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.1  89/02/21  17:22:52  kbad
+* *** TOS 1.4  FINAL RELEASE VERSION ***
+*
 * Revision 1.6  89/02/06  23:10:32  kbad
 * mediach() used to use the 200Hz timer for the grace period, now uses
 * the video frame counter (frclock).  This way, mediach() will work even
 * if the 200Hz timer is disabled.
-*
+* 
 * Revision 1.5  88/04/22  15:30:11  apratt
 * Went back to 5-sector FATs thanks to a bug in the dual-drive code
 * (that is, the logical A/B code for single-drive systems).  I don't
@@ -40,7 +43,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 1.6 $
+* $Revision: 2.1 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $

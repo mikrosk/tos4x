@@ -1,20 +1,23 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/02/17 12:09:32 $
+* $Date: 89/02/21 17:23:11 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.1  89/02/21  17:23:11  kbad
+* *** TOS 1.4  FINAL RELEASE VERSION ***
+*
 * Revision 1.35  89/02/17  12:09:32  apratt
 * Fixed byte-count for clearing screen at clrm_2, and
 * fixed priv handler: must clear & disable caches after clobbering
 * the instruction, then restore cacr to its previous value.
-*
+* 
 * Revision 1.34  89/02/12  20:23:32  kbad
 * changed version, date, and dosdate equates from `=' to `equ'.  It seems
 * that as68 doesn't like `=' assignments inside conditional statements.  Urk.
@@ -178,7 +181,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.35 $
+* $Revision: 2.1 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -270,9 +273,9 @@ country		=	usa     ; 'usa', etc.... @check@
 
 .ifeq TT
 version		equ	$0104		; version number *MUST BE EVEN*
-date		equ	$02121989	; date, $MMDDYYYY
+date		equ	$02221989	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001001001100 ; Feb 12, 1989
+dosdate		equ	%0001001001010110 ; Feb 22, 1989
 .endc
 
 .ifne TT

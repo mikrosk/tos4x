@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.18 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.19 $	$Source: d:/tos/dos\rcs\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/26 23:41:50 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/08/11 00:37:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.19  1992/08/11  00:37:02  kbad
+* TOS 4.00 Falcon030 first production version
+*
 * Revision 1.18  1991/06/26  23:41:50  apratt
 * Added a line to fail if a slash is at the end of a string and
 * this isn't a DIR scan.

@@ -47,12 +47,14 @@ test		equ	0
 * exports
 	.globl	mem_test_next
 	.globl	mem_abort
+	.globl	mtestmsg
 
 * imports
 	.globl	phystop
 	.globl	_ramtop
 	.globl	_memtop
 	.globl	_membot
+	.globl	_v_bas_ad
 
 *phystop	equ	$42e
 *_ramtop	equ	$5a4
@@ -128,7 +130,7 @@ mstate0:
 	not.l	d1
 	and.l	d1,d0			; (stupid mas has no ~ operator)
 	move.l	d0,mt_beg		; that is the first address to test
-	move.l	_memtop,d0		; get start of screen RAM
+	move.l	_v_bas_ad,d0		; get start of screen RAM
 	and.l	d1,d0			; round down to 128KB boundary
 	move.l	d0,mt_end		; this is end address to test
 	clr.w	mt_badflag
@@ -333,9 +335,6 @@ bsloop:	putchar	#8			; until d2 expires
 	move.l	(sp)+,d7		; restore d7
 	clr.l	d0			; return EQ when not done
 	rts
-
-mtestmsg:	dc.b	"Memory Test:",13,10
-		dc.b	"ST RAM ",0
 
 mttmsg:		dc.b	13,10,"TT RAM ",0
 mdonemsg:	dc.b	13,10,"Memory Test Complete.",13,10,0

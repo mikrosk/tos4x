@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.23 $	$Source: d:/tos/dos\rcs\fscl.c,v $
+* $Revision: 2.24 $	$Source: d:/tos/dos\rcs\fscl.c,v $
 * =======================================================================
-* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/08/11 00:37:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.24  1992/08/11  00:37:02  kbad
+* TOS 4.00 Falcon030 first production version
+*
 * Revision 2.23  1992/07/27  20:09:24  kbad
 * Lattice compiled Sparrow GEMDOS
 *

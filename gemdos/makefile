@@ -1,6 +1,6 @@
 # Makefile for GEMDOS - requires Lattice or GNU make
 # =======================================================================
-# $Id: makefile.,v 2.23 1992/07/27 20:09:24 kbad Exp $
+# $Id: makefile.,v 2.24 1992/08/11 00:37:02 kbad Exp $
 # History is in the above file in the RCS directory (use rlog to see it).
 
 ifdef NODB

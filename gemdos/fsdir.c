@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.22 $	$Source: d:/tos/dos\rcs\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/26 15:04:00 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/08/11 00:37:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.22  1992/08/11  00:37:02  kbad
+* TOS 4.00 Falcon030 first production version
+*
 * Revision 2.21  1991/06/26  15:04:00  apratt
 * Added code to set and check DTAs as invalid when
 * a search fails or is exhausted.  Fixed so a trailing

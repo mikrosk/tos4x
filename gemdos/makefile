@@ -1,11 +1,14 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\makefile.,v $
+# $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/11/20 19:44:04 $     $Locker:  $
+# $Author: unknown $ 	$Date: 1991/12/12 23:46:10 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.21  1991/12/12  23:46:10  unknown
+# Changed some flags
+#
 # Revision 2.20  1991/11/20  19:44:04  apratt
 # Memory protection, first cut (no workee yet)
 #
@@ -46,7 +49,7 @@ TMPDIR	=	m:
 .SUFFIXES: .o .oo .c .s .mac .gas
 
 # un-comment this whole section to compile with GCC
-MEMPROT=-DNO_MEMPROT=1
+MEMPROT=-DNO_MEMPROT=0 -m68020
 CC=gcc
 CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
 	-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem $(MEMPROT)
@@ -57,7 +60,7 @@ CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
 .c.o:
 	$(CC) $(CFLAGS) -S -o temp.s $*.c
 	emacs @gas2mac.rc temp.s 
-	mas -u temp.s
+	mas -u -3 temp.s
 	mv temp.o $*.o
 	rm temp.s
 

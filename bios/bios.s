@@ -3,17 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/06/28 16:35:29 $
+* $Date: 88/07/21 12:17:34 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.11  88/07/21  12:17:34  apratt
+* Fixed fatfinger in reboot code: adding wrong offset to KBCL
+* (was adding 16 bits, but 24 bits is right) meant you could
+* never reboot.
+*
 * Revision 1.10  88/06/28  16:35:29  apratt
 * Inexplicably, no revision actually had the rsconf(-2) code in it.
 * Now it's there.
-*
+* 
 * Revision 1.9  88/05/12  11:33:07  apratt
 * Fixed reboot sequences to ignore caps-lock state.
 * 
@@ -50,7 +55,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.10 $
+* $Revision: 1.11 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3153,7 +3158,7 @@ ari13	cmp.w	bufhead(a0),d1 ;head=tail?
 	lsl.l	#$8,d0		;now do the shuffling to generate the new
 	lsr.w	#$8,d0		;improved conin format ($kkss00aa)
 
-	bclr.l	#KBCL+16,d2	;mask off caps-lock state
+*
 	cmp.l	#$0c53001f,d2	;ctl-alt-delete value
 
 	cmp.l	#$0d53001f,d2	;ctl-alt-rshft-delete value

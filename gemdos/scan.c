@@ -1,12 +1,17 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.10 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.11 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/03 00:14:20 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.11  1991/05/03  00:14:20  apratt
+* Added acceptance of trailing backslash when dotsok; dotsok is
+* assumed to be a flag saying "I came from Dsetpath" and we must
+* accept a trailing SLASH in Dsetpath because old Gemdos does.
+*
 * Revision 1.10  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -344,8 +349,12 @@ dotmatch:
         }
     } while (*name);
 
-    /* end still points to end of last component; check for trailing SLASH */
-    if (*end == SLASH) return EBADRQ;
+    /*
+     * End still points to end of last component; check for trailing SLASH.
+     * Dsetpath("\foo\bar\") is legal, so this is no error if dotsok
+     * (on the assumption that only Dsetpath uses FN_DOTSOK).
+     */
+    if (*end == SLASH && !dotsok) return EBADRQ;
 
     DBCMD(0x20,"print fn2dir returns, dir:;dirf (lpeek (`a6 + c));_c");
     *pname = oname;

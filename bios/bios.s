@@ -4,13 +4,16 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/11/14 23:51:46 $
+* $Date: 1992/02/12 01:32:40 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.43  1992/02/12  01:32:40  apratt
+* Fixed an RTS/CTS bug in SCC code. See scc_sender.
+*
 * Revision 2.42  1991/11/14  23:51:46  apratt
 * Added a comment about hidden interaction between ikbdws and ikbdput.
 *
@@ -120,10 +123,10 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.42 $
+* $Revision: 2.43 $
 * =======================================================================
 *
-* $Source: e:/tos/bios\RCS\bios.s,v $
+* $Source: d:/tos/bios\RCS\bios.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -3518,16 +3521,35 @@ sccrxerr:
 * Addendum: if sendnow != 0, sends even if txoff flag is set, so you 
 * can say XOFF even when host has said XOFF to you.
 *
+* INPUTS:	a0 -> iorec base pointer
+*		a2 -> SCC base (for SCCr, SCCw macros)
+*
+* USES:		d0, d1, a1
+*
+* There was a bug here, in 2.06/3.06 and older: since the "transmitter
+* empty" interrupt is higher priority than the "external status" interrupt
+* (i.e. cts), a series of TE interlupts could come in to fill the tx fifo
+* before getting the CTS interrupt.  Since scc_sender tested the software
+* flag txoff, rather than the hardware state of the pin, this was a lose.
 * Fix: check the hardware state of CTS.
 *
 * The txoff software flag is not actually checked if your flow mode is
 * rts/cts.  It's still set & cleared by the cts interrupt handler, though.
 *
 
-	move.b	rsmode(a0),d0
-	and.b	txoff(a0),d0
-	bne	scc_nodata	; abort if txoff and rsmode set
 scc_sender:
+	LOG	"sndr"
+	move.l	a0,-(sp)
+	tst.b	sendnow(a0)
+	bne	scc_notesttxoff
+
+	btst.b	#0,rsmode(a0)	; xon/xoff?
+	beq	scc_ckcts	; no - check for rts/cts mode
+	tst.b	txoff(a0)	; yes - check txoff flag
+	bne	scc_nodata	; txoff is set - don't send.
+
+scc_ckcts:
+	btst.b	#1,rsmode(a0)	; rts/cts flow control mode?
 	beq	scc_notesttxoff	; no - don't test the txoff flag at all
 	SCCr	#0,d0		; yes - get status register
 	btst	#5,d0		; test CTS bit

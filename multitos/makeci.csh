@@ -2,7 +2,8 @@
 # script to check in a new version
 # NOTE: this script works only under MultiTOS
 #
-echo "Last RCS version number was:" `cat lastvers`
+set lastvers=`cat lastvers`
+echo "Last RCS version number was:" $lastvers
 echo -n "Enter version number: "
 set vers=$<
 echo -n "Enter version message: "
@@ -15,9 +16,16 @@ ci "-l$vers" -f "-m$descr" $files
 echo "Copying binary files..."
 mkdir rcs.bin\$vers
 set files=`cat cp.lis`
-cp $files rcs.bin\$vers
+foreach i ($files)
+	cmp $i rcs.bin\$lastvers\$i
+	if ($status) then
+		cp $i rcs.bin\$vers\$i
+	else
+		echo $i is unchanged since version $lastvers
+	endif
+end
 #
 # all done
 #
 echo $vers >lastvers
-unset vers descr files
+unset i lastvers vers descr files

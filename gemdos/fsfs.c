@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
+* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/30 16:06:06 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.18  1991/06/18  17:52:02  apratt
+* Updated to DB release 3 (new print)
+*
 * Revision 2.17  1991/05/30  16:06:06  apratt
 * Changed use of FN_TRAILOK to FN_DOTSOK, which is what
 * was really meant here (in chmod).
@@ -186,7 +189,7 @@ int attr;			/* attribute byte */
     DFD *dfd;
 
     DBCMD(1,"print xchmod -s (lpeek (`a6 + 8)) -x (wpeek (`a6 + c)) "
-	    "(wpeek (`a6 + e));_c");
+	    "-x (wpeek (`a6 + e));_c");
 
     attr &= 0xff;
 
@@ -371,8 +374,8 @@ char *p2;			/* new name */
     FCB fcbhold;
     uint cl;
 
-    DBCMD(1,"print xrename (wpeek (`a6 + 8)) "
-	    "-s (lpeek (`a6 + a)) (lpeek (`a6 + e));_c");
+    DBCMD(1,"print xrename -x (wpeek (`a6 + 8)) "
+	    "-s (lpeek (`a6 + a)) -s (lpeek (`a6 + e));_c");
 
     /* try to find the old file, return any error. */
 

@@ -1,12 +1,15 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
+* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/03 00:17:02 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.19  1991/06/18  17:52:02  apratt
+* Updated to DB release 3 (new print)
+*
 * Revision 2.18  1991/05/03  00:17:02  apratt
 * Took out xmfree calls on the env and basepage of a process: if the
 * terminating process doesn't own its env or basepage then they should
@@ -57,7 +60,7 @@ xtermres(blkln, rc)
      int rc;			/* return code */
      long blkln;		/* amount to keep */
 {
-    DBCMD(1,"print xtermres len: (lpeek (`a6 + 8)) rc: (wpeek (`a6 + c));_c");
+    DBCMD(1,"print xtermres len: -x (lpeek (`a6 + 8)) rc: -x (wpeek (`a6 + c));_c");
 
     xmshrink(0, run, blkln);	/* shrink main block */
 
@@ -79,7 +82,7 @@ unsigned int rc;
 {
     REG	PD *r;
 
-    DBCMD(1,"print xterm rc: (wpeek (`a6 + 8));_c");
+    DBCMD(1,"print xterm rc: -x (wpeek (`a6 + 8));_c");
 
     dojmp(trap13(5,0x102,-1L));		/* call terminate vector */
 
@@ -115,7 +118,7 @@ PD *r;			/* -> basepage */
 {
     REG	int i;
   
-    DBCMD(0x40,"print ixterm pd: (lpeek (`a6 + 8));_c");
+    DBCMD(0x40,"print ixterm pd: -x (lpeek (`a6 + 8));_c");
 
     /*
      *  Close all handles (but only bother with open ones)
@@ -247,8 +250,8 @@ char *v;		/* enviroment string (0, 3, 5, 7) */
 	long fastmax, slowmax, minfast;
 	OFD **uftstart;
 
-	DBCMD(1,"_dopexec (wpeek (`a6 + 8)) (lpeek (`a6 + a)) "
-		   "(lpeek (`a6 + e)) (lpeek (`a6 + 12)) ;_c");
+	DBCMD(1,"_dopexec -x (wpeek (`a6 + 8)) -x (lpeek (`a6 + a)) "
+		   "-x (lpeek (`a6 + e)) -x (lpeek (`a6 + 12)) ;_c");
 
 	v_pdp = NULPTR;
 	v_env = NULPTR;
@@ -502,8 +505,8 @@ PD *lp;				/* -> basepage */
   char *codbas;		/* start of text segment */
   ulong flen,n0,bsslen,tpasiz;
 
-  DBCMD(0x40,"print xpgmld prg: (lpeek (`a6 + 8)) (wpeek (`a6 + c)) "
-	     "(lpeek (`a6 + e)) PRG:;prg (lpeek (`a6 + 8));_c");
+  DBCMD(0x40,"print xpgmld prg: -x (lpeek (`a6 + 8)) -x (wpeek (`a6 + c)) "
+	     "-x (lpeek (`a6 + e)) PRG:;prg (lpeek (`a6 + 8));_c");
 
   flen = prg->g_tsize + prg->g_dsize;
 

@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
+* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/30 16:06:06 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.17  1991/06/18  17:52:02  apratt
+* Updated to DB release 3 (new print)
+*
 * Revision 2.16  1991/05/30  16:06:06  apratt
 * Cash uftsize to signed when comparing against a handle
 * coming from the user, which could be a (negative) character
@@ -102,15 +105,15 @@ int h;
 {
 	/* we cast uftsize to signed because h is signed */
 	if (h <= -NUMBIOS || h >= (signed)run->p_uftsize) {
-	    DBCMD(8,"print syshnd (wpeek (`a6 + 8)) >> NULL;_c");
+	    DBCMD(8,"print syshnd -x (wpeek (`a6 + 8)) >> NULL;_c");
 	    return NULL;			/* too small/big */
 	}
 	if (h < 0) {
-	    DBCMD(8,"print syshnd (wpeek (`a6 + 8)) >> BIOS dev;_c");
+	    DBCMD(8,"print syshnd -x (wpeek (`a6 + 8)) >> BIOS dev;_c");
 	    return ofdtty(h+3);		/* old-style BIOS dev */
         }
-	DBCMD(8,"print syshnd (wpeek (`a6 + 8)) >> "
-		"lpeek(lpeek(lpeek(.run)+3c) + (4 * wpeek(a6+8)));_c");
+	DBCMD(8,"print syshnd -x (wpeek (`a6 + 8)) >> "
+		"-x lpeek(lpeek(lpeek(.run)+3c) + (4 * wpeek(a6+8)));_c");
 	return run->p_uft[h];
 }
 
@@ -145,7 +148,7 @@ int h;
 	OFD *ofd;
 	PD *_run = run;
 
-	DBCMD(1,"print xdup (wpeek (`a6 + 8));_c");
+	DBCMD(1,"print xdup -x (wpeek (`a6 + 8));_c");
 	if ((h<0) ||
 	    (h >= _run->p_uftsize) ||
 	    ((ofd = _run->p_uft[h]) == NULL))
@@ -171,7 +174,7 @@ long
 xforce(std,h)
 int std,h;
 {
-	DBCMD(1,"print xforce (wpeek (`a6 + 8)) (wpeek (`a6 + a));_c");
+	DBCMD(1,"print xforce -x (wpeek (`a6 + 8)) to -x (wpeek (`a6 + a));_c");
 	return(ixforce(std,h,run));
 }
 
@@ -263,7 +266,7 @@ PD *pd;
     OFD *ofd;
     DFD *dfd;
 
-    DBCMD(1,"print ixclose (wpeek (`a6 + 8)) (lpeek (`a6 + a));_c");
+    DBCMD(1,"print ixclose -x (wpeek (`a6 + 8)) -x (lpeek (`a6 + a));_c");
 
     /*
      * A while ago, I "guaranteed" that any close would flush all dirty
@@ -437,8 +440,8 @@ void *ubufr;
 {
 	OFD *ofd;
 
-	DBCMD(1,"print xread (wpeek (`a6 + 8)) (lpeek (`a6 + a)) "
-		"(lpeek (`a6 + e));_c");
+	DBCMD(1,"print xread -x (wpeek (`a6 + 8)) -x (lpeek (`a6 + a)) "
+		"-x (lpeek (`a6 + e));_c");
 
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
@@ -481,8 +484,8 @@ void *ubufr;
 {
 	OFD *ofd;
 
-	DBCMD(1,"print xwrite (wpeek (`a6 + 8)) (lpeek (`a6 + a)) "
-		"(lpeek (`a6 + e));_c");
+	DBCMD(1,"print xwrite -x (wpeek (`a6 + 8)) -x (lpeek (`a6 + a)) "
+		"-x (lpeek (`a6 + e));_c");
 
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
@@ -656,7 +659,7 @@ uint mod;
     DFD *dfd;
     OFD *ofd;
 
-    DBCMD(8,"print ixopen dir: (lpeek (`a6 + 8)) mode (wpeek (`a6 + c));"
+    DBCMD(8,"print ixopen dir: -x (lpeek (`a6 + 8)) mode -x (wpeek (`a6 + c));"
 	    "dirf (lpeek (`a6 + 8));_c");
 
     /* fail if opening for mode other than zero and file is RO */
@@ -738,8 +741,8 @@ int flg;
 {
     OFD *ofd;
 
-    DBCMD(1,"print xlseek (lpeek (`a6 + 8)) (wpeek (`a6 + c)) "
-	    "(wpeek (`a6 + e));_c");
+    DBCMD(1,"print xlseek -x (lpeek (`a6 + 8)) -x (wpeek (`a6 + c)) "
+	    "-x (wpeek (`a6 + e));_c");
 
     if ((ofd = syshnd(h)) == NULL) return EIHNDL;
     if (ofdisatty(ofd)) return 0;
@@ -830,8 +833,8 @@ int flg;
 		eof_flag = 1;
 		DBCMD(8,(&dfd,&new,&old,&n,  /* force these to be on stack */
 			"print seek to eof at cluster boundary.;"
-			"print n: (lpeek(a6+8)) new: (lpeek(a6-8)) "
-			"old: (lpeek(a6-0c));_c"));
+			"print n: -x (lpeek(a6+8)) new: -x (lpeek(a6-8)) "
+			"old: -x (lpeek(a6-0c));_c"));
 	    }
 	    clcount = (new-old);
 	}
@@ -889,8 +892,8 @@ int wrt;			/* 0:get, 1:set */
     DFD *dfd;
     int t[2];			/* buffer to hold user input for swapping */
 
-    DBCMD(1,"print xdatime -x08 (lpeek (lpeek (`a6 + 8))) (wpeek (`a6 + c)) "
-	    "(wpeek (`a6 + e));_c");
+    DBCMD(1,"print xdatime -x08 (lpeek (lpeek (`a6 + 8))) -x (wpeek (`a6 + c)) "
+	    "-x (wpeek (`a6 + e));_c");
 
     ofd = syshnd(h);
     if (ofd == NULL || ofdisatty(ofd)) return EIHNDL;
@@ -943,7 +946,7 @@ long
 xsetdta(addr)
 DTA *addr;
 {
-	DBCMD(1,"print xsetdta (lpeek (`a6 + 8));_c");
+	DBCMD(1,"print xsetdta -x (lpeek (`a6 + 8));_c");
 	run->p_xdta = addr;
 	return 0;		/* Return success! AKP 1/91 */
 }
@@ -957,7 +960,7 @@ long
 xsetdrv(drv)
 uint drv;
 {
-	DBCMD(1,"print xsetdrv (wpeek (`a6 + 8));_c");
+	DBCMD(1,"print xsetdrv -x (wpeek (`a6 + 8));_c");
 	if (drv > MAXDEVS) return EDRIVE;
 	run->p_curdrv = drv;
 	return( trap13(0x0A) );	/* return Drvmap() */

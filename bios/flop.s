@@ -1,19 +1,24 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 88/12/22 12:56:27 $
+* $Date: 89/02/06 23:07:08 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.11  89/02/06  23:07:08  kbad
+* Changed _acctim (last floppy access time) to use video frame counter
+* instead of 200Hz clock.  Safer that way, since floppy WP is checked
+* at vblank time -- this way mediach() will work even if 200Hz is disabled.
+*
 * Revision 1.10  88/12/22  12:56:27  apratt
 * Added (a5)'s to save some words & some time (as if it mattered in 
 * floppy code...)
-*
+* 
 * Revision 1.9  88/10/12  17:23:15  apratt
 * Added the Floprate call: oldrate = Floprate(devno,newrate) where
 * newrate == -1 if you don't want to change it.
@@ -56,7 +61,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.10 $
+* $Revision: 1.11 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -137,7 +142,7 @@ tcdr		equ	$fffffa00+$23
 	.globl _flopwr			; write sector			func
 	.globl _flopfmt			; format drive/track		func
 	.globl _flopver			; verify sectors		func
-	.globl	_acctim			; time (200 hz tick) of last access
+	.globl _floprate		; change seek rate for a drive	func
 	.globl	_wpstatus		; write-protect state (2 drives)
 
 	.globl	_wplatch		; write-protect latch (2 drives)
@@ -889,13 +894,21 @@ flock1	move.w	#recal,dcurtrack(a1)	; complete failure (what can we do?)
 	move.w	#retries,retrycnt.w	; setup retry count
 	bsr	flopcmds		; do it
 *--- pick a DSB:
+	lea	dsb0.w,a1
+* _acctim (last floppy access time) is used by rwabs:mediach() for a
+* grace period for media change.  Previously the 200Hz timer was used,
+* but this could cause problems (esp. in game s/w) if the 200Hz timer
+* is disabled.  Since floppy write protect status (used to set media state)
+* is checked by the floppy vblank handler, we now use the frame clock
+* (updated EVERY vblank) for _acctim.  890206 kbad
+* 
 	move.w	cdev(a5),d0		; set last-access time for 'cdev'
 
 	lea	_acctim(a5),a0
-	move.l	_hz_200(a5),(a0,d0.w)
+	move.l	_frclock(a5),(a0,d0.w)
 	cmp.w	#1,_nflops(a5)		; if (nflops == 1) set other time, too
 *
-	move.l	_hz_200(a5),4(a0)	; set last-accessed time for floppy 1
+	move.l	_frclock(a5),4(a0)	; set last-accessed time for floppy 1
 flopfail:
 	moveq	#m_unsure,d0		; disk change mode = UNSURE
 	movem.l	regsave(a5),d3-d7/a3-a6	; restore C registers

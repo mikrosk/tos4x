@@ -4,23 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/04/30 18:43:55 $
+* $Date: 90/05/21 12:21:15 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.14  90/05/21  12:21:15  apratt
+* Lengthened timeouts; they were so short they timed out before the
+* 1772 could return record-not-found errors.
+*
 * Revision 2.13  90/04/30  18:43:55  apratt
 * Added code to check the cookie jar for _FRB the first time alternative
 * RAM is used, rather than counting on the BIOS having found the alt. RAM
 * at boot time.  This lets people call "Maddalt()" and add an _FRB cookie
 * to install new memory (e.g. on the VME bus).
-*
+* 
 * Also removed the first toggle of the direction bit, so it changes
 * either once or twice, not twice or three times.  Makes the ACSI DMA
 * chip happier, and might even allow removal of SLOWACSI code.
-*
+* 
 * Revision 2.12  90/03/01  17:11:39  apratt
 * Oops - end of track is 1400 bytes regular, 2800 high density. Fixed.
 * 
@@ -123,7 +127,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.13 $
+* $Revision: 2.14 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -208,8 +212,20 @@ denselect	equ	$ffff860e	; density bits (in TT only)
 HI_DEN		equ	1		; always enable this code
 
 denselect	equ	$ffff860e	; density bits (WRITE ONLY)
-timeout		equ	200	; short	timeout (motor already on) (1 sec)
-ltimeout	equ	400	; long timeout (to startup motor) (2 sec)
+					; (and don't touch at all if _iamanst)
+* timeouts:
+* The 1772 returns record-not-found after 5 index pulses; we need
+* need to have a longer timeout than that to differentiate it from
+* the "no-index-pulses" error.  5 index pulses is one second,
+* plus latency to the first pulse, plus ~1.5 second motor startup
+* if motor was off -- call it 1.5 sec for motor on, 3 sec for
+* motor off.  (This was broken in TOS 1.6: it was too short, so
+* you got timeout errors (meaning no index pulses, ergo no disk)
+* rather than sector-not-found errors, which might be deliberate
+* for copy protection.
+
+
+*------ Tunable values (subject to tweaking):
 retries		equ	2	; default # of retries - 1
 midretry	equ	1	; "middle" retry (when to reseek)
 

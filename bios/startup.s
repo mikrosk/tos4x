@@ -3,18 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/06 13:22:23 $
+* $Date: 89/02/06 15:17:41 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.30  89/02/06  15:17:41  apratt
+* Oops - left out _termtab.
+*
 * Revision 1.29  89/02/06  13:22:23  apratt
 * Added TT code.  No change if you set TT = 0.  EXCEPT:
 * bombs now cause Pterm(-1) to be called, rather than Pterm0().
 * TT code is prototypical, esp. in memory sizing.
-*
+* 
 * Revision 1.28  89/02/06  12:39:45  apratt
 * Split STPLUS conditional assembly into STPLUSVIDEO and DMASND, because
 * DMASND is true for TT as well, but STPLUSVIDEO isn't.  This
@@ -157,7 +160,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.29 $
+* $Revision: 1.30 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2796,7 +2799,76 @@ savp_2:	clr.l	a5
 .endc
 	add.w	d1,d1			; turn into word index
 .ifne TT
-* for TT, we determine exception number differently
+* for TT, we determine exception number differently.  There is a 
+* table of 62 short bsr's which all go to the same place (_term).
+* The offset from the symbol _termtab of the PC on the stack is used to 
+* determine which exception happened (and therefore how many bombs to
+* show).
+	move.w	(a0,d1.w),d0		; return old color
+_termtab:
+	bsr.s	_term		; 02: bus error
+	bsr.s	_term		; 03: address error
+	bsr.s	_term		; 04: illegal instruction
+	bsr.s	_term		; 05: divide by zero
+	bsr.s	_term		; 06: CHK
+	bsr.s	_term		; 07: TRAPV
+tpriv:	bsr.s	_term		; 08: privilege violation (see movesr)
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	bsr.s	_term
+	nop				; spacing for dumb as68
+
 	tst.b	_iamanst		; decide what mask to use
 	move.l	(sp)+,d0		; get addr of bsr instruction
 	sub.l	_termtab,d0		; d0 now offset of bsr

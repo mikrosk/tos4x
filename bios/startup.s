@@ -3,18 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/03/08 15:59:37 $
+* $Date: 89/03/09 08:32:06 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.3  89/03/09  08:32:06  apratt
+* Fixed priv handler -- correct one got lost in folding-in process. (TT only)
+*
 * Revision 2.2  89/03/08  15:59:37  apratt
 * Contains Slavik's Xbios calls & other changes for TT.  Insignificant
 * changes if not TT.  Some things are conditional on STPLUSVIDEO+TT,
 * which is meant to be an OR of those two assembly-time conditions.
-*
+* 
 * Revision 2.1  89/02/21  17:23:11  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
 * 
@@ -186,7 +189,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.2 $
+* $Revision: 2.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1680,8 +1683,7 @@ setvb2:	move.l	#reseth,swv_vec(a5)	; RESET system on monitor change
 * bus error, not privelege violation... Slightly harder to debug.  
 * And doesn't work at all if the code uses the high byte of sr. Tough.
 	bsr	cartscan		; execute cartridge aps
-	lea.l	priv(PC),a0
-	move.l	a0,$20			; set priv viol exception vector
+	move.l	#priv,$20(a5)		; set priv viol exception vector
 	bra.s	priv2
 * to allow characters the keyboard controller is trying to send to come
 priv:	movem.l	d0/a0,-(sp)
@@ -1690,16 +1692,12 @@ priv:	movem.l	d0/a0,-(sp)
 * Take 2: copy the dest EA bits and extension words of the instruction into
 * a "move.w (a0),ea" instruction elsewhere in memory, point a0 to the
 	bne.s	priv1			; no.
+	move.b	#$42,(a0)		; clobber the instruction
 .ifne TT
 * if TT, need to clear caches after this instruction
-	dc.w	$4e7a, $8002		; (movec cacr,a0) save cacr
-	move.b	#$42,(a0)		; clobber the instruction
-	move.l	#$808,d0		; clear & disable both caches
+	dc.w	$4e7a, $0002		; (movec cacr,d0) get cacr
+	or.l	#$808,d0		; set "clear" bits of both caches
 	dc.w	$4e7b, $0002		; (movec d0,cacr)
-	dc.w	$4e7b, $8002		; (movec a0,cacr) restore cacr
-.endc
-.ifeq TT
-	move.b	#$42,(a0)		; clobber the instruction
 .endc
 	movem.l	(sp)+,d0/a0
 	bsr	clrcache

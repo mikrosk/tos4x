@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.19 $	$Source: d:/tos/dos\rcs\scan.c,v $
+* $Revision: 1.20 $	$Source: d:/tos/dos\RCS\scan.c,v $
 * =======================================================================
-* $Author: kbad $ 	$Date: 1992/08/11 00:37:02 $    $Locker:  $
+* $Author: ersmith $ 	$Date: 1992/11/19 01:41:02 $    $Locker: ersmith $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.20  1992/11/19  01:41:02  ersmith
+* Fixed renaming bug (don't allow empty strings in rename).
+*
 * Revision 1.19  1992/08/11  00:37:02  kbad
 * TOS 4.00 Falcon030 first production version
 *
@@ -688,6 +691,15 @@ FCB *fcb;
 			goto gotdot;
 		}
 	}
+
+	/* another special case: look out for an empty name, or
+	 * a drive letter+':' combination (somewhere in the depths
+	 * of the code for rename such monstrosities can be
+	 * generated -- ERS
+	 */
+	if (!*name) return EBADRQ;
+	if (name[1] == ':' && (name[2] == '\\' || !name[2]))
+		return EBADRQ;
 
 	/* fill *f with at most 8 chars, but stop at end or dot */
 	while (name < end && *name != '.') {

@@ -3,17 +3,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/19 14:22:09 $
+* $Date: 89/08/18 14:31:51 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.3  89/08/18  14:31:51  apratt
+* Added some calls to clrcache -- putting it at RWABS isn't good enough.
+*
 * Revision 2.2  89/07/19  14:22:09  apratt
 * Changed all timeouts to use 200Hz, added TT flag, when set,
 * short delays use ttwait rather than instruction loops.
-*
+* 
 * Revision 2.1  89/02/21  17:21:05  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
 * 
@@ -68,7 +71,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.2 $
+* $Revision: 2.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -129,7 +132,7 @@
 *------------------------------------------------------------------------
 	text
 
-TT	equ	0		; set to 1 for TT, 0 for ST & STE @check@
+TT	equ	1		; set to 1 for TT, 0 for ST & STE @check@
 
 HI_DEN		equ	1		; always enable this code
 
@@ -162,6 +165,9 @@ tcdr		equ	$fffffa00+$23
 	.globl	flock			; floppy/FIFO lock variable
 	.globl	_frclock		; vbl-frame-counter
 	.globl	_nflops			; number of floppy drives attached
+.ifne TT
+	.globl	seekrate		; default floppy seek rate
+.endc
 	.globl	_iamanst		; byte: true if we're on an ST
 	.globl	clrcache		; clear i & d caches on TT
 .if TT
@@ -901,6 +907,9 @@ flock1	move.w	#recal,dcurtrack(a1)	; complete failure (what can we do?)
 	move.w	d0,def_error.w		; set default error number
 	move.w	d0,curr_err.w		; set current error number
 	move.w	#1,flock.w		; tell vbl not to touch floppies
+.ifne TT
+	move.w	$10(sp),cdev.w		; save device# (0 .. 1)
+.endc
 	move.w	$14(sp),ctrack.w	; save track# (0 .. 39 .. 79 ..)
 	move.w	$16(sp),cside.w		; save side# (0	.. 1)
 	move.w	$18(sp),ccount.w	; save sector count (1..spt)
@@ -1072,8 +1081,10 @@ flopc1:	cmp.l	_hz_200.w,d7
 r1770:	dbra	d7,r1770		; (short delay loop)
 .endc
 .ifne TT
+	bsr	rdiskct7		; return EQ + 1770 status in d7
 	clr.w	d6
 	rts
+flopcto:
 .endc
 	clr.b	d0			; clear the bit
 	bra	padden1

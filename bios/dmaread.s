@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/30 18:04:38 $
+* $Date: 1991/10/11 17:27:30 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.25  1991/10/11  17:27:30  apratt
+* Special case for Conner's IDE drives.  Turned out to be a big drag
+* getting them to change their firmware.  Sigh.
+*
 * Revision 1.24  1991/09/30  18:04:38  apratt
 * Previous version worked very badly.  One theory: Conner says that
 * you need a delay between Identify and Init Parameters.  When Minna
@@ -122,7 +126,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.24 $
+* $Revision: 1.25 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\dmaread.s,v $
@@ -215,7 +219,7 @@ IDE_AT		=	1	; Always! (AKP 9/91)
 ;			of the slave drive (IDE unit 1.)
 ;
 ; Sep-12-1991	ml.	Added in yet another delay for IDE drive.  Conner
-;			requires a 500ms delay before calling identify()
+;			requires a 500us delay before calling identify()
 ;			after power on.
 ;
 ; Sep-24-1991	ml.	In order to accomodate the Conner CP-2024 (2.5"
@@ -265,6 +269,15 @@ IDE_AT		=	1	; Always! (AKP 9/91)
 ;			slow ACSI devices, for example the laser printer, to
 ;			guard against applications which call dmaread() or
 ;			dmawrite() on such devices.
+;
+;			Delay that was taken out with the _initparm() is
+;			put back.  Conner drives probably needs that delay
+;			between _identify() and any command!
+;
+; Oct-11-1991	ml.	Special-cased Conner CP2024 when getting current 
+;			drive parameters.  Conner CP2024's current drive
+;			parameters are not stored in the _identify() data.
+;			
 ;-
 
 .globl	_dmaread
@@ -425,13 +438,16 @@ ide1:	cmp.l	_hz_200,d0
 ide4:	cmp.l	_hz_200,d0
 	bcc.b	ide4
 
-	lea	sbuf,a0			; a0 -> drive parameters
+	pea	sbuf			; beginning of _identify() data
+	bsr	_gcparm			; get drive current parameters
+	addq	#4,sp			; clean up stack
+
 	move.w	$e(sp),-(sp)		; physical unit #
 	move.l	$c(sp),-(sp)		; buffer
 	move.w	$e(sp),-(sp)		; count
 	move.l	$c(sp),-(sp)		; logical block address
-	move.w	NSPT(a0),-(sp)		; # sectors per track
-	move.w	NHEAD(a0),-(sp)		; # data heads
+	move.w	d2,-(sp)		; # sectors per track
+	move.w	d1,-(sp)		; # data heads
 	tst.b	rwflag			; read or write?
 	bne.b	ide2			; (write)
 	bsr	_ideread		; read sectors
@@ -1179,8 +1195,17 @@ IDEDOR	equ	bIDE+($0E*REGLSTEP)	; Digital Output Register
 
 ; Byte indices into buffer return by the Identify command
 
-NHEAD	equ	6		; Number of heads
-NSPT	equ	12		; Number of sectors/track
+NCYL	equ	2		; offset to # of fixed cylinders
+NHEAD	equ	6		; offset to number of heads
+NSPT	equ	12		; offset to number of sectors/track
+MDLNUM	equ	54		; offset to model number of drive
+CONMDL	equ	MDLNUM+26	; offset to Conner's model number
+
+
+; Default drive parameters of Conner Peripherals - CP2024
+CP20NCYL	equ	615	; # of cylinders
+CP20NHEAD	equ	4	; # of heads
+CP20NSPT	equ	17	; # of sectors/track
 
 
 ;+
@@ -1412,6 +1437,73 @@ ir0:	cmp.b	IDEASR,d1	; is drive ready and not busy?
 	rts
 ir1:	moveq	#1,d0		; else, drive is ready
 	rts
+
+;+
+; gcparm() - get current drive parameters
+;
+; gcparm(buf)
+; char	*buf;	$4(sp).l    /* -> data returned by identify() */
+;
+; Returns:
+;	d0.w = # of default cylinders
+;	d1.w = # of default heads
+;	d2.w = # of default sectors per track
+;-
+	.globl	_gcparm
+_gcparm:
+	move.l	4(sp),a0	; a0 -> data buffer
+	add.l	#CONMDL,a0	; a0 -> where Conner model number is
+	move.l	a0,-(sp)
+	pea	cp2024
+	move.w	#6,-(sp)
+	bsr	strcmp		; compare model# with "CP2024"
+	adda	#10,sp		; clean up stack
+	tst.w	d0		; is unit the CP2024 (Kato 20Mb)?
+	bne.b	gcp0		; if not, handle the normal way
+				; else return default values of CP2024
+	move.w	#CP20NCYL,d0	; d0.w = # of cylinders
+	move.w	#CP20NHEAD,d1	; d1.w = # of heads
+	move.w	#CP20NSPT,d2	; d2.w = # of spt
+	bra.b	gcpend
+
+gcp0:	move.l	4(sp),a0
+	move.w	NCYL(a0),d0	; d0.w = # of cylinders
+	move.w	NHEAD(a0),d1	; d1.w = # of heads
+	move.w	NSPT(a0),d2	; d2.w = # of sectors per track
+
+gcpend:	rts
+
+
+
+conner:	dc.b	"Conner",0
+.even
+cp2024:	dc.b	"CP2024",0
+.even
+
+
+;+
+; strcmp() - compare two strings
+;
+; Passed:
+;	4(sp).w  = n (# of bytes to compare)
+;	6(sp).l  = address of first string
+;	10(sp).l = address of second string
+;
+; Returns:
+;	d0.w = 0	if first n bytes of the 2 strings are the same
+;	     = non-0    otherwise
+;-
+strcmp:	movem.l	d1/a0-a1,-(sp)	; save registers d1, a0 and a1
+	move.w	16(sp),d1	; d1 = byte count
+	subq.w	#1,d1		; dbra likes one less
+	move.l	18(sp),a0	; a0 -> string 1
+	move.l	22(sp),a1	; a1 -> string 2
+	moveq	#1,d0		; assume strings are not the same
+str0:	cmpm.b	(a0)+,(a1)+	; characters the same?
+	bne.b	str1		; if not, return
+	dbra	d1,str0		; else compare next character
+	moveq	#0,d0		; the strings are the same
+str1:	movem.l	(sp)+,d1/a0-a1	; restore registers d1, a0 and a1
 	rts
 
 

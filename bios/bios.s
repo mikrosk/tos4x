@@ -4,16 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/11 12:13:54 $
+* $Date: 91/04/26 17:44:39 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.31  91/04/26  17:44:39  apratt
+* Removed the STPAD conditional around MIDI code.  Bconmap probably isn't as
+* unconditional as it's cracked up to be: it's not been tested when neither
+* STPLUS nor TT is true.
+*
 * Revision 2.30  91/04/11  12:13:54  apratt
 * Removed PAL condition from spain -- now it's always PAL.
-*
+* 
 * Revision 2.29  91/04/02  12:34:47  apratt
 * Folded in some more things from SERPTCH. This is the version for 3.06.
 * 
@@ -55,7 +60,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.30 $
+* $Revision: 2.31 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -4018,12 +4023,8 @@ chbirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 *	this code handles the midi/keyboard interrupt exception		*
 *************************************************************************
 
-.ifeq STPAD
-* This code is IFEQ STPAD because PAD has no MIDI, and worse, if you
-* read from there, it'll look like it's interrupting! So don't touch it.
 	.globl	midikey
 
-.endc
 midikey:
 	movem.l d0-d3/a0-a3,-(sp)	;save all registers (8/16/85 dbg)
 keymidi:

@@ -4,13 +4,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/12 01:32:28 $
+* $Date: 1992/02/28 08:25:02 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.38  1992/02/28  08:25:02  apratt
+* Changed TT to M68030 in some places, where it's really CPU dependency we're
+* talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
+* in any other way.
+*
+* Changed TT to (TT | SPARROW) for unconditional access to the denselect
+* register.
+*
+* Added MAXACSI of 14MB for SPARROW.
+*
 * Revision 2.37  1992/02/12  01:32:28  apratt
 * Added loops .if SPARROW to check the SDMA status bit.
 *
@@ -123,7 +133,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.37 $
+* $Revision: 2.38 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $

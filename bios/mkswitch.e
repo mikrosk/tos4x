@@ -1,13 +1,13 @@
 ; Switches files are...
 ; 
-; [epst] [ao] [ugfksiwabtcnd]
+; [eptw] [ao] [ugfksiwabtcnd]
 ; 
 ; They have a common header, then ...
 ; 
-; 	TT = [01]
-;	STPLUS = [01]
-;	STPAD = [01]
-;	systype = [ram/rom]
+; 	TT = t
+;	STPAD = p
+;	SPARROW = w
+;	systype = ram/rom
 ;	country = [country]
 
 store-procedure make-switches
@@ -19,11 +19,11 @@ store-procedure make-switches
   set %systype a
   run do-countries
 
-  set %machine s
+  set %machine t
   set %systype a
   run do-countries
 
-  set %machine t
+  set %machine w
   set %systype a
   run do-countries
 
@@ -35,11 +35,11 @@ store-procedure make-switches
   set %systype o
   run do-countries
 
-  set %machine s
+  set %machine t
   set %systype o
   run do-countries
 
-  set %machine t
+  set %machine w
   set %systype o
   run do-countries
 !endm

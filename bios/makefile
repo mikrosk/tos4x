@@ -1,13 +1,16 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.13 $	$Source: e:/tos/bios\RCS\makefile.,v $
+#  $Revision: 2.14 $	$Source: e:/tos/bios\RCS\makefile.,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 1991/09/25 19:35:36 $     $Locker:  $
+#  $Author: apratt $	$Date: 1991/12/05 00:43:20 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.13  1991/09/25  19:35:36  apratt
-#  Removed clear.o -- absorbed into startup.s or something.
+#  Revision 2.14  1991/12/05  00:43:20  apratt
+#  Added machine type 'w' for Sparrow.
+#
+# Revision 2.13  1991/09/25  19:35:36  apratt
+# Removed clear.o -- absorbed into startup.s or something.
 #
 # Revision 2.12  91/08/05  15:29:10  apratt
 # Added calls to biosvers to create version.s which exports date and dosdate
@@ -67,7 +70,9 @@
 
 #
 # The switches files have names based on the switches they set:
-# machine switches: first letter t for TT, e for STe, s for ST, p for pad.
+# machine switches: first letter t for TT, e for STe, p for pad (STbook)
+# New machine 12/91: w for Sparrow.  Probably f for Falcon one day.
+#
 # Systype is the middle letter: a for RAM, o for ROM.
 # Country is the third letter: u=usa, g=germany, ... (see below)
 #
@@ -99,7 +104,7 @@
 # letters free:     e  h j lm opqr   v xyz0123456789
 
 CCODE=u
-MACHINE=e
+MACHINE=w
 
 # that's all you need to set for different machines or countries.
 ############

@@ -4,17 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/26 17:44:01 $
+* $Date: 91/05/21 16:56:53 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.26  91/05/21  16:56:53  apratt
+* Changed so the motor spin-up delay is disabled if the BIOS sets the
+* nospindelay flag.  Startup.s sets this flag if the switch is thrown. Also
+* increased the "absurd" sector count because 36 is not absurd for quad
+* density.  QD is slightly implemented here, based on the assembly-time
+* switch QD.
+*
 * Revision 2.25  91/04/26  17:44:01  apratt
 * Added a drop-dead deselect timeout in Vblank after 5 seconds, motor-on or
 * not.  This way empty drives do get turned off.
-*
+* 
+* 
 * Revision 2.24  91/04/24  17:23:15  apratt
 * Added a new type of return from flopcmds, used only by go2track
 * and hence by its callers:  if you return with carry set, it means
@@ -182,7 +190,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.25 $
+* $Revision: 2.26 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -247,6 +255,10 @@
 
 .include "switches.s"
 
+* QD switch enables some quad-density test code
+
+QD	equ	1
+* write precomp on HD and QD writes, and remaps the step rate to 12ms
 * nominal in HD and QD mode (resulting in 6 or 3).  It's really just for
 * test and shouldn't be used in general.
 
@@ -268,6 +280,21 @@ QD	equ	0
 * pulses is one second, plus latency to the first pulse, plus ~1.5	*
 * second motor startup if motor was off -- call it 1.5 sec for motor	*
 * on, 3 sec for motor off.  (This was broken in TOS 1.6: it was too	*
+* short, so you got timeout errors (meaning no index pulses, ergo no	*
+* disk) rather than sector-not-found errors, which might be		*
+* deliberate for copy protection.					*
+*									*
+*************************************************************************
+*									*
+* The 1772 can do a motor-spin-up delay if a command causes the motor	*
+* to go from "off" to "on."  We normally do this, but our new		*
+* standard HD drive, the Epson SMD-340 high-density drive, masks	*
+* index pulses and the read line for .5 sec on its own: the 1772	*
+* delay (which is index-pulse based) is not necessary and actually	*
+* hurts disk performance (you wait 1.5 sec instead of .5 sec).  So we	*
+* expect a flag (nospindelay) to have been set based on something	*
+* (the "high-density" configuration switch) and test the flag at	*
+* flopcmds: if nonzero, then inhibit the delay.	Since we seek with	*
 * verify, the fact that the read-data line is masked means you can't	*
 * Set SLOWACSI to 1 to introduce delays after (possibly) changing
 * the direction bit in the DMA chip; changing the bit resets the
@@ -303,8 +330,8 @@ tcdr		equ	$fffffa00+$23
 	.globl _flopfmt			; format drive/track		func
 	.globl _flopver			; verify sectors		func
 	.globl _floprate		; change seek rate for a drive	func
+	.globl	nospindelay		; somebody has to set this; see above
 	.globl	_wpstatus		; write-protect state (2 drives)
-
 	.globl	_wplatch		; write-protect latch (2 drives)
 	.globl	_motoron		; motor-on status (1 byte, both drives)
 	.globl	_acctim			; time (in video frames) of last access
@@ -688,6 +715,19 @@ _flopwr:
 	beq	noflop1			; no floppies!
 .endif
 
+* set the media change mode to "unsure".
+.ifne QD
+	bsr	wrfast
+	bsr	floplock		; lock floppies
+
+*+
+* If the boot sector is written to,
+* set the media change mode to "changed".
+* (Kludge, kludge, kludge....)
+*-
+	move.w	csect.w,d0		; sector 1
+.endc
+	or.w	ctrack.w,d0		; track 0
 	or.w	cside.w,d0		; side 0
 	bne	fwr1			; if not boot sector, then OK
 	moveq	#m_changed,d0		; set media change mode to unsure
@@ -834,6 +874,12 @@ noden1:
 	move.w	spt.w,ccount.w		; set number of sectors to verify
 	move.w	#1,csect.w		; starting sector# = 1
 	bsr	verify1			; verify sectors
+.ifne QD
+*--- if there are any bad sectors, return /that/ error...
+	move.l	cdma.w,a2		; a2 -> bad sector list
+	tst.w	(a2)			; any bad sectors?
+.endc
+	move.w	#e_badsects,curr_err.w	; set error number
 	bra	flopfail		; return error
 
 
@@ -900,6 +946,12 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	bsr	wmult
 	move.b	#$fe,(a2)+		; $fe -- address mark intro
 	move.b	ctrack+1.w,(a2)+	; track#
+.ifne QD
+	move.b	d4,(a2)+		; sector#
+	move.b	#$02,(a2)+		; sector size (512)
+	move.b	#$f7,(a2)+		; write	checksum
+.endc
+*--- gap between AM and data:
 	moveq	#22-1,d1		; 22 x $4e
 	moveq	#$4e,d0
 	bsr	wmult
@@ -934,10 +986,24 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	tst.w	interlv.w		; if interlv is NEG use skew table
 	bmi	use_skewtbl		; 
 .endc
-	moveq	#$30,d7			; (absurd sector count)
+	add.w	interlv.w,d4		; bump sector#
 	cmp.w	spt.w,d4		; if(d4	<= spt)	then_continue;
 	ble	ot1			; proto	more sectors this pass
+	add.w	#1,d3			; bump pass start count
 	cmp.w	interlv.w,d3		; if(d3	<= interlv) then_continue;
+	ble	ot3
+.ifne QD
+* end-of-track: write 4e into the buffer a lot (1400 in regular density,
+* 2800 in high density.
+
+end_track:
+.if QD
+	move.w	#5600,d1		; quad-density value
+	cmp.w	#26,spt.w
+	bhs	etok
+.endif
+.endc
+	move.w	#2800,d1		; high-density value
 	cmp.w	#13,spt.w
 	bhs	etok
 	move.w	#1400,d1		; low-density value
@@ -1433,12 +1499,16 @@ go2bad:
 	move.w	d0,denselect
 .else
 .ifne HI_DEN
+.ifeq QD
 	move.w	d0,denselect
+noden2:
+.endif
+.endc
 .endc
 	bne	go2trr			; really failed! (return NE)
 	bsr	restore			; try again, but restore first.
 	bra	go2retry
-	and.b	#3,d0			; OR into command
+
 go2ok:
 .ifne HI_DEN
 
@@ -1448,8 +1518,17 @@ go2trr:	rts				; return EQ/NE on succes/failure
 
 
 .endc
-	or.b	d0,d6
 * restore - home head
+	or.b	d0,d6			; OR into command
+* high-density note: the 1772 restore command returns when TRK00
+* See the discussion of motor-spin-up delay at the top of the file
+
+	tst.w	nospindelay		; spin delay?
+	beq	nomap1
+	or.b	#$08,d6			; set 'h' = 1 (no spin-up delay)
+
+nomap1:
+
 * bit is 1.  It doesn't actually read anything.
 *-
 restore:
@@ -1704,11 +1783,11 @@ change:
 *--- ask the user to stick in the other floppy (via critical error handler)
 	move.w	d0,-(sp)		; push disk# we want inserted
 	move.w	#e_insert,-(sp)		; push "INSERT_A_DISK" error number
-*     VALUE    LOW-DEN	      HIGH-DEN
-*	00	 6 ms		3 ms
-*	01	12 ms		6 ms
-*	02	 2 ms		1 ms
-*	03	 3 ms	      1.5 ms
+	bsr	_critic			; use critical error handler and
+	add.w	#4,sp			;	hope somebody handles it
+	move.w	#$ffff,_wplatch		; set "might have changed" on both drvs
+
+*	; code added 4/27/88 AKP
 	lea.l	_acctim,a0		; set last-access time to "long ago"
 	clr.l	(a0)+			; so the grace period in mediach
 	clr.l	(a0)			; is always expired.
@@ -1717,6 +1796,9 @@ change:
 * be a LOW-DEN seek rate; when there is a HIGH-DEN disk in the drive,
 * we map the input value to the appropriate 1772 value, with errors
 * on the slow side: 3->0, 2->0, 1->1 (what can you do?), and 0->1.
+* This is done in rtmap in flopcmds.
+*+
+* setdmode - set drive-change mode
 setdmode:
 	lea	_diskmode.w,a0		; a0 -> disk mode table
 	move.b	d0,-(sp)		; (save mode)
@@ -1929,6 +2011,7 @@ tmpdma:		ds.l	1		; temp for hardware DMA image
 .ifne HI_DEN
 	tst.l	_frb			; already done this?
 .endc
+nospindelay:	ds.w	1		; flag saying "do set 'h' bit"
 	move.l	_p_cookie,a0		; no; get base of cookie jar
 	cmp.w	#0,a0			; no cookie jar?
 	beq	getf2			; yow! no cookie jar! bail out.

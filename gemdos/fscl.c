@@ -1,12 +1,17 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\fscl.c,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.14  1991/03/13  17:51:44  apratt
+* Fixed a bug: extended was used in xrw without being set.
+* Also, the comment about a bug concerning reads which end at
+* sector boundaries was out of date.
+*
 * Revision 2.13  1991/02/22  15:29:28  apratt
 * generic checkin
 *
@@ -785,10 +790,6 @@ on a record boundary, the op can't have a head, only a middle and a tail.
  * It seems like this code handles falling off a cluster a lot: in three
  * different places.  If you can think of a better way, let me know.
  * 
- * There is a BUG in this code: if you do a transfer that ends on a record
- * boundary, the curcl/currec fields are wrong.  It's worse if you end on a
- * cluster boundary.
- * 
  */
 
 long
@@ -804,7 +805,7 @@ void (*bufxfr) _P((uint, void *, void *));
     uint lenhead, lenmid, lentail;
     uint run_start, run_len;
     uint xcl;
-    int extended;
+    int extended = FALSE;
     ulong rc;
     ulong runlen;
     DFD *dfd;
@@ -863,8 +864,10 @@ void (*bufxfr) _P((uint, void *, void *));
 	}
     }
 
-    DBCMD(4,(ofd->o_curcl = curcl, ofd->o_currec = currec,
-	  "print OFD at top of xrw call:;do_ofd (lpeek (+ `a6 a));_c"));
+    ofd->o_curcl = curcl;
+    ofd->o_currec = currec;
+
+    DBCMD(4,"print OFD at top of xrw call:;do_ofd (lpeek (+ `a6 a));_c");
 
     recoffs = bytnum & dmd->m_rbm;
 

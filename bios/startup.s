@@ -4,17 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/05/16 11:54:21 $
+* $Date: 90/05/21 12:16:46 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.49  90/05/21  12:16:46  apratt
+* Moved some conditionals around, changed boot color to green.
+* This rev (cross your fingers) could be sent to developers, etc.
+*
 * Revision 2.48  90/05/16  11:54:21  apratt
 * Added some ifne TT conditionals, so it compiles for not-TT.
 * Also changed boot color to dark blue, because light blue was taken.
-*
+* 
 * Revision 2.47  90/05/09  16:45:37  apratt
 * Added _FPU cookie; see the comments there for details.
 * Boot color: sky blue.
@@ -450,7 +454,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.48 $
+* $Revision: 2.49 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -801,9 +805,11 @@ osconf		equ	%11001
 	.globl	_p_cookie		; pointer to cookie jar
 .ifne TT
 
+.endc
+.endc
+.ifne TT
 .if TT
 .endif
-.endc
 .endc
 .if (TT == 0)
 	.globl	_waketime		; alarm maintenance for STPAD
@@ -2988,7 +2994,7 @@ _rts:	rts
 .ifeq TT
 	dc.w	$fff			; 0 white
 .else
-	dc.w	$0cf			; 0 blue - 5/16/90 version
+	dc.w	$0f0			; 0 green - 5/21/90 version
 .endc
 *	Passed:		d1.l = offset
 *			a0 = base of pattern ($1f8 bytes long)

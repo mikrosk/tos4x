@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/17 11:55:46 $
+* $Date: 89/02/27 12:35:02 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 1.4  89/02/27  12:35:02  apratt
+* Blasted fatfinger again, in the no-bus-error case in clktest. Fixed.
+*
 * Revision 1.3  89/02/17  11:55:46  apratt
 * Fixed my fat fingers in clktest.  Also shortened by a few bytes.
-*
+* 
 * Revision 1.2  89/02/06  13:45:40  apratt
 * Added handling for bus error when accessing RTC (because TT has none).
 * The handling is harmless for non-TT, so it's not conditional.
@@ -23,7 +26,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.3 $
+* $Revision: 1.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -154,7 +157,7 @@ clktest:
 	move.l	sp,a2			; save stack pointer for cleaning up
 	move.l	#clkerr,8(a1)		; write bus error vector
 	move.b	#%1001,RTMODE(a0)	; set "alarm" bank
-	move.l	a1,8(a1)		; no bus error - restore vector
+	move.l	d2,8(a1)		; no bus error - restore vector
 	move.w	#$0a05,d0		; d0 = test pattern
 	movep.w	d0,RT01MIN(a0)		; write two registers
 	movep.w	RT01MIN(a0),d1		;   and read them back

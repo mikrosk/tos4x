@@ -1,0 +1,5 @@
+-u -s -o desk.sys large, utility, traps,
+deskstart,deskact,deskapp,deskvdi,deskbutt,deskdir,deskdisk,deskfile,
+deskinf,deskins,deskmem,deskmenu,deskmisc,deskopen,deskpref,desksele,deskshel,
+deskshow,deskvari,desktop,deskupda,deskwin,desksear,aesbind5,
+nosbind -i tos30.rsc _tosrsc 

@@ -1,0 +1,11 @@
+-u -s -o gem.sys gemjstrt,gemaints,gemaplib,gemasync,gembase,gemcli,
+ab,gemdisp,gemevlib,gemflag,gemfmalt,gemfmlib,gemfslib,
+geminit,gemsignal,gemmnlib,gemobed,gemobjop,gempd,gemqueue,gemrlist,
+gemrom,gemrslib,gemsclib,gemshlib,gemwmlib,romcart,apgrlib,apgsxif,
+gembind,gemgrlib,gemgsxif,gemoblib,gsx2,jbind,jdispa,dosbind,large,
+utility,interrup,traps,
+deskstart,deskact,deskapp,deskvdi,deskbutt,deskdir,deskdisk,deskfile,
+deskinf,deskins,deskmem,deskmenu,deskmisc,deskmn,deskopen,deskpref,desksele,
+deskshel,deskshow,deskvari,desktop,deskupda,deskwin,desksear,aesbin72,
+nosbind -i glue.usa _USARSC -i glue.grm _GRMRSC -i glue.fre _FRERSC 
+-i glue.ita _ITARSC -i glue.swe _SWERSC -i glue.spa _SPARSC 

@@ -1,0 +1,260 @@
+Changes made 1/25/93:
+
+gemgrm.rsc,deskgrm.rsc:
+	Corrected some typos in the German resource.
+
+Changes made 1/21/93:
+
+gemoblib.c:
+	In monochrome mode, add an extra black line to 3D background
+	outlines.
+
+Changes made 1/20/93:
+
+gemfslib.c:
+	Fixed a bug where holding the mouse button down on the part of
+	the slider above the elevator bar would eventually cause the
+	elevator to wobble back and forth.
+	Also: prettied up the 3D effects in the scroll bar and title.
+
+Changes made 1/19/93:
+
+gemfslib.c:
+	The file selector box was grabbing the biggest available chunk
+	of memory in the system. This is really silly; we use 16 bytes
+	per file, so 256K will be enough for 16,000 files, more than
+	we're likely to see in any given directory.
+gemoblib.c, gemfslib.c, desktop.c,*.rsc:
+	Hollow, white, 3D objects now get set to the appropriate
+	3D color (depending on which 3D bits are set) as set by
+	objc_sysvar. This should make programming 3D objects much
+	easier, and eliminates the need for changing the colors
+	of boxed characters in the desktop and form_alert startups.
+gemobed.c:
+	Added 1 pixel to the size of the redraw rectangle when the
+	cursor is moved; otherwise, "splotches" get left behind
+	if the character extends past the cursor. This bug is
+	also in Falcon TOS, but not in earlier TOSes.
+
+Changes made 1/18/93:
+
+gemfmalt.c:
+	Made more parts of the alert box touchexits, so that
+	users can grab pretty much anywhere in the box
+	to move it around.
+gemoblib.c:
+	Changed the way outlining is done for 3D background objects
+	(now they have a 3D "look").
+gemfslib.c:
+	Fixed the up arrow object so that it is deselected when
+	it is pressed and the scroll bar is already at the top
+	of the box.
+*.rsc:
+	Updated all desktop objects to use the new 3D background
+	flag.
+
+Changes made 1/14/93:
+
+deskmenu.c:
+	If not on a Falcon, there's no reason to display the Falcon
+	video stuff (the user will have to click on "Compatibility
+	Modes" anyway). So now we go directly to Compatibility Modes
+	on old machines.
+geminit.c:
+	The AES reads the desktop.inf file to find the resolution; so
+	I also made it check for the desktop pattern and color to use
+	when launching applications.
+deskinf.c:
+	Made the default color light cyan instead of green if there are >= 16
+	colors.
+gemoblib.c:
+	Made objects which have ob_flags bit 9 clear and bit 10
+	set get the same background color as alert boxes (settable by
+	objc_sysvar). This can be considered a new type of 3D
+	object, "3D background".
+deskmenu.c:
+	Added a new message, SH_WDRAW, for external programs to tell
+	the desktop that windows have been updated. Especially
+	useful for copiers and/or formatters.
+mn_*.c:
+	Cary updated his hierarchical menu code to use the extended
+	object field only if a bit in ob_flags is set.
+gemob*.c,obdefs.h,gemwmlib.c,*.rsc:
+	Changed the way 3D objects are implemented. Now they're
+	done with 2 bits in ob_flags, instead of using the
+	extended object type. The Germans will be happy.
+
+Changes made 1/11/93:
+
+gemwmlib.c:
+	Fixed the slider initialisation bug. The problem was that
+	the size of a slider was being calculated by multiplying
+	16 bit quantities, and this was overflowing (sliders
+	are scaled by 1000, so any window more than 65 pixels
+	high would get messed up when the multiply overflowed).
+desksele.c:
+	Added a check in i_find() to make sure that the mouse
+	really is over a desktop window, so that for example
+	when dragging & dropping to an application window the
+	desktop doesn't highlight icons in one of its windows.
+
+
+Changes made 1/8/93:
+
+deskact.c:
+	Added a wind_delete() call after the wind_close()
+	of the copy dialog window.
+*.rsc:
+	Updated the copyright notices to include 1993.
+
+
+Changes made 1/7/93:
+
+deskinf.c:
+	Changed the default patterns to be solid colors
+	in all color resolutions (as in older TOSes).
+deskmenu.c,gembind.c,gemctrl.c,gemdisp.c,gemmnlib.c:
+	Merged in Derek's changes.
+
+Changes made 12/21/92:
+
+deskdisk.c:
+	Fixed the disk copy bar: the problem was that Alcyon was
+	incorrectly compiling the statement
+		if (j = foo % bar )
+	Made the disk copy/format dialog a real dialog again,
+	instead of a window.
+	Also: changed the memory allocation code so that no more
+	than the amount of memory required for the disk will be
+	allocated (before, it was allocating the largest free block
+	of memory, which could be quite wasteful).
+apgsxif.c:
+	Changed the font sizing code so that it did does the Speedo
+	kludge if Speedo is installed and an FSM font (not the
+	system font) is in use.
+gemstart.s:
+	Changed a message from "No MiNt kernel..." to "No MiNT kernel...".
+gemshlib.c:
+	In sh_exec, after executing the program change the current
+	directory back to the root of the current drive. Otherwise, the
+	MiNT/GEMDOS kernel will think that the directory is in use
+	(since it is the current directory of AESSYS) and will refuse
+	to allow anyone to delete that directory.
+
+Changes made 12/18/92:
+
+apgsxif.c:
+	Assume a default font of 1 if no other font is
+	loaded (1 is the system font, which in fact is
+	the font used; but applications which used
+	ap_getinfo() to get font info were being told to
+	use font -1).
+geminit.c:
+	Look for C:\MULTITOS\GEM.CNF if C:\GEM.CNF is not
+	found.
+
+Changes made to the AES & Desktop 12/16/92 and 12/17/92:
+
+geminit.c:
+	Made the default for st_lang come from the OS header
+	in ROM; that way MultiTOS will get the right language
+	on machines with no _AKP cookie.
+deskmenu.c:
+	Changed av_mem() to use the "nice" way of finding the
+	amount of free memory (i.e. Dfree on U:\PROC) rather
+	than the nasty way of allocating all memory and counting
+	how much there was.
+machine.h:
+	Removed debugging messages for the "production" (hah!)
+	release.
+gemaplib.c:
+	Added a new appl_getinfo() option, to get the current
+	language preference; that way applications
+	can be made to adapt themselves to the current environment.
+deskact.c:
+	Implemented the new version of drag & drop, which uses a
+	MiNT pipe to communicate data; this protocol is much
+	safer (and more extensible) than the one implemented last week.
+	(It's documented elsewhere.)
+*.rsc:
+	See below.
+gemctrl.c,deskmenu.c,deskpref.c,desktop.c:
+	Changed form_alert() calls into do1_alert() calls,
+	and put the corresponding strings into the resource(s)
+	(so that they can be translated). Translations are in
+	progress for these new strings.
+
+
+
+Changes made to the AES & Desktop 12/8/92:
+
+apgsxif.c:
+	Took out Derek's "kludge" that munged the small
+	font's size when Speedo was installed. I don't
+	know why this kludge was in there; I'm guessing
+	it was because AE_PNTSIZE and AE_FONT weren't
+	working properly, but we've already admitted to
+	everyone that those don't work. Moreover, the
+	kludge DID break the one font that *must* work,
+	namely the default system font (which isn't even
+	a speedo font).
+
+deskact.c:
+	Added a drag & drop message. Derek already had most
+	of the work in there; the desktop was creating
+	SCRAP.ARG, but not sending any message. Here's what
+	the message I designed looks like:
+
+	    mbuf[0]	AP_DRAGNDROP (66)
+	    mbuf[1]	sender's id	
+	    mbuf[2]	0
+	    mbuf[3]	handle of window that was dropped on
+	    mbuf[4]	see below
+	    mbuf[5]	see below
+	    mbuf[6]	x position of mouse when released
+	    mbuf[7]	y position of mouse when released
+
+	mbuf[4] and mbuf[5] together identify the "type" of
+	operation, in 4 bytes: the first 4 bytes are an extension
+	(e.g. "ARG" or "TXT") and the last  byte is the keyboard
+	shift key state at the time of the "drop". The extension
+	indicates the primary scrap file type; an application
+	receiving an AP_DRAGNDROP message should treat it as a
+	request to paste data, and should use the extension provided
+	to recover the data from the clipboard. Currently the
+	desktop only does one kind of drag and drop, namely
+	of a set of file or directory names; the resulting
+	file is called SCRAP.ARG, and contains the file and
+	directory names separated by spaces and terminated with
+	a 0.
+
+deskshel.c:
+	When opening an application, check to see if any sort
+	of path was given; if none was, then look for the file
+	in the top window and if it's there, pass the window's
+	path to the AES. This corrects a misfeature: now that
+	the AES and desktop are different applications, they
+	can have different current directories, and so users
+	who tried to "open" a file in the current directory
+	would sometimes be told that the file couldn't be
+	opened.
+
+geminit.c,gemrom.c:
+	Made the AE_LANG variable in gem.cnf override the _AKP
+	cookie setting.
+	Also: created a semaphore (_SCP) which can be used to
+	control access to the clipboard.
+
+gemaplib.c:
+	Added a cast to (long) to some code that did bit twiddling
+	on a pointer; my version of alcyon barfed on doing such
+	things to pointers.
+
+deskusa.rsc:
+	Added "..." after "Set Video" (the other languages' resource
+	files already had this).
+
+gemshlib.c:
+	Corrected the code for launching TOS/TTP applications via the
+	TOSRUN environment variable; the TOSRUN program should have
+	been getting the name of the TOS/TTP app. in its first argument.

@@ -1,18 +1,24 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/27 18:13:55 $
+* $Date: 89/07/11 11:27:27 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.2  89/07/11  11:27:27  apratt
+* I broke Rsconf in rev 2.1 (or possibly before).  Now it's fixed.
+* Previously you couldn't ever set RTS/CTS flow control, now you can.
+* Both RTS/CTS and XON/XOFF is documented, but not useful, and Mega ROMs
+* (and possibly earlier) didn't allow it.  See the comments near auxc0.
+*
 * Revision 2.1  89/02/27  18:13:55  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
-*
+* 
 * Revision 1.22  89/02/27  18:09:50  kbad
 * Added ITALY keyboard code for new Italian keyboard
 * 
@@ -104,7 +110,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.1 $
+* $Revision: 2.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2340,18 +2346,20 @@ auxnorm:
 *	first, we grab the old ucr,rsr,tsr,scr contents
 *
 
+	movep.l	ucr(a2),d7
+
+*
+*	set flow control mode(s)
+*
+* I broke this code in TOS 1.4 such that you could never set CTS/RTS
+* flow control.  The behavior of this code now is that 0 sets no flow
 * guaranteed no-op, though.
 *
-	cmp.w	#$-1,d0
-	beq.b	auxc1
+* Enabling tx and rx now means setting only the enable bit, not the whole
+	bhi.s	auxc1		; if d0 unsigned greater than 3 then no-op.
+	bne.s	auxc0		; if d0 not equal to 3 then set mode to d0.
 
-	move.b	d0,rsmode(a0)
-	beq	auxc0
-	and.b	#$0fd,d0
-	beq	auxc0		* IF (Anything but Pure RTS/CTS)
-	move.b	#1,d0
-
-auxc0:	move.b	d0,rsmode(a0)	* THEN Must be XON/XOFF Protocol
+auxc0:	move.b	d0,rsmode(a0)
 	bhi	auxc1		; if d0 unsigned greater than 3 then no-op.
 	bsr	aux_rxok
 auxc0b:

@@ -3,20 +3,24 @@
 * $Author: lozben $
 * =======================================================================
 *
-* $Date: 87/11/20 14:22:53 $
+* $Date: 87/11/25 18:19:12 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.2  87/11/25  18:19:12  lozben
+* Added flags for new countries: Turkey, Finland, and Norway. Also added
+* new keyboard scan codes for Turkey and Norway
+*
 * Revision 1.1  87/11/20  14:22:53  lozben
 * Initial revision
-*
+* 
 *
 * =======================================================================
 *
-* $Revision: 1.1 $
+* $Revision: 1.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -42,7 +46,7 @@
 *	01/17/87 Moved software ikbd reset to startup.s RMS		*
 *	12/18/86 Bug in binbcd repaired RMS				*
 *	08/14/87 Changed some keyboard translations for swissger & fra  *
-*       09/23/87 Added keyboard translation tables for TURKEY.          *
+*	09/23/87 Added keyboard translation tables for TURKEY.          * 
 *									*
 *************************************************************************
 *									*
@@ -59,8 +63,10 @@ SWEDEN		equ	5 ***DON'T  CHANGE***
 SWISSFRA	equ	7 ***DON'T  CHANGE*** French text swiss/fra keyboard
 SWISSGER	equ	8 ***DON'T  CHANGE*** german text swis/ger keyboard
 TURKEY		equ     9 ***DON'T  CHANGE***
+FINLAND		equ     5 ***DON'T  CHANGE*** same as swedish keyboard
+NORWAY		equ    11 ***DON'T  CHANGE***
 
-COUNTRY	equ	TURKEY	;set country of origin
+COUNTRY	equ	SPAIN	;set country of origin
 
 
 
@@ -120,7 +126,7 @@ rtsld		equ	%00000000	;rts=low, interrupt disabled
 intron		equ	%10000000	;interrupts enabled
 
 
-
+*************************************************************************
 *		acia status definitions
 *************************************************************************
 
@@ -2778,6 +2784,45 @@ altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
 	endc
 	beq	conin25a		;process it as unshifted
 	move.b	#$40,d0		;put in '@', instead...it's a alt-shift #
+	ifeq	COUNTRY-NORWAY
+
+.endif
+
+
+	move.b	kbshift(a5),d2	;grab current setting
+
+	beq	conin25		;process it as unshifted
+	bne.b	altsw1		;no...
+	bra	conin25		;process it
+altsw1	cmpi.b	#$1b,d1		;is it a ALT-$?
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
+	beq	conin25a		;process it as unshifted
+	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
+	beq	conin25		;process it as unshifted
+	bne.b	altsw2		;no...
+	bra	conin25		;process it
+altsw2	cmpi.b	#$28,d1		;is it a ALT-
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
+	beq	conin25a		;process it as unshifted
+	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
+	beq	conin25		;process it as unshifted
+	bne.b	altsw3		;no...
+	bra	conin25		;process it
+altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
+	beq	conin25a		;process it as unshifted
+	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
+	beq	conin25		;process it as unshifted
+	bne.b	outside		;no...
+	bra	conin25		;process it
+	move.b	kbshift.w,d2	;grab current setting
+	endc
+	beq	conin25a		;process it as unshifted
+	move.b	#$40,d0		;put in '@', instead...it's a alt-shift #
+	bra	conin25a		;process it
 	ifeq	COUNTRY-ITALY
 .endif
 	cmpi.b	#$1a,d1		;is it a ALT-^?
@@ -4149,6 +4194,38 @@ keytran:
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
 	ifeq	COUNTRY-NORWAY
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+
+keyshif:
+	.dc.b	0,esc,'!"#$%&/()=?',$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
+	.dc.b	'ASDFGHJKL',$99,$8e,'*',0,'|ZXCVBNM;:_',0,0,0,space,0
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,$37,$38,0
+	.dc.b	'-',$34,0,$36,'+',0,$32,0,$30,del
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'>',0,0,'()/*7894561230.',cr
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+
+keycl:
+	.dc.b	0,esc,"1234567890+",$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'<',0,0,'()/*7894561230.',cr
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+
+.endif
+	.dc.b	"ASDFGHJKL",$b2,$92,"'",0,'|ZXCVBNM,.-',0,0,0,space,0
+
+.if country == norway
+
+keytran:
+	.dc.b   0,esc,"1234567890+",$82,bs,tab,'qwertyuiop',$86,$81,cr,0
+	.dc.b	"asdfghjkl",$b3,$91,"'",0,$5c,'zxcvbnm,.-',0,0,0,space,0
+	.endc
+	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
+	ifeq	COUNTRY-ITALY
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 keyshif:
 	.dc.b   0,esc,"1234567890+",$82,bs,tab,'qwertyuiop',$86,$81,cr,0
 	.dc.b	"asdfghjkl",$94,$84,"'",0,$5c,'zxcvbnm,.-',0,0,0,space,0
@@ -4322,6 +4399,7 @@ bellsnd:
 	.end
 	.dc.b	9,0
 	.dc.b	10,0
+
 	.dc.b	11,0
 	.dc.b	12,$10
 	.dc.b	13,9		;envelope single attack

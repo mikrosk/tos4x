@@ -1,12 +1,18 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.13 $	$Source: e:/tos/gd2\RCS\sup.c,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/03 00:14:20 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.14  1991/05/03  00:14:20  apratt
+* Folded setup.c into this file.  Added an array telling how many
+* words of arguments each call has, so we don't copy too many.  Turns
+* out that with TT RAM, you often DO make calls with usp close to teh
+* end of RAM.
+*
 * Revision 2.13  1991/04/30  12:12:38  apratt
 * Folded setup.c into this file.  Setup.c is no more.
 *
@@ -73,6 +79,23 @@ uint drvsel;
 char nday[] = 
 	/*0 J  F  M  A  M  J  J  A  S  O  N  D  */
 	{ 0,31,28,31,30,31,30,31,31,30,31,30,31 } ;
+
+volatile void __assert(const char *exp, const char *file, long line)
+{
+	char assertbuf[80];
+	char *p1;
+	const char *p2;
+
+	/* poor man's strcpy */
+	for (p2 = "Failed assert: ", p1 = assertbuf; *p1++ = *p2++ ; ) ;
+	--p1;
+	for (p2 = exp; *p1++ = *p2++ ; ) ;
+	--p1;
+	for (p2 = " file ", p1 = assertbuf; *p1++ = *p2++ ; ) ;
+	--p1;
+	for (p2 = file; *p1++ = *p2++ ; ) ;
+	panic1(assertbuf);  /* never returns */
+}
 
 /****************************************************************************/
 
@@ -199,6 +222,15 @@ static long (*funcs[])() = {
 	&ni,		&ni,		&xrename,	&xdatime,
 };
 
+unsigned char funcwords[] = {
+    0, 0, 1, 0, 1, 1, 1, 0, 0, 2, 2, 0, 0, 0, 1, 0,
+    0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0,
+    0, 3, 0, 0, 0, 0, 3, 0, 0, 2, 2, 2, 3, 3, 1, 5,
+    5, 2, 4, 4, 3, 1, 2, 3, 2, 2, 5, 7, 1, 0, 3, 0,
+    1, 0, 0, 0, 0, 0, 5, 4
+};
+
 /*
  * Trap Interface;
  * called from assembly-language trap handler.
@@ -246,10 +278,27 @@ restrt:
 
     /* end of setjmp/longjmp handling */
 
-    /* this copies the max number of args from the arg stack -- bad news */
-    /* if the arg stack abuts the end of real memory! */
+    /*
+     * I used to copy the max number of args from the stack, but this is
+     * bad news if the stack abuts the end of memory, and in some cases it
+     * does (e.g. GEMDOS call from the startup of a program which loads in
+     * alternative RAM.
+     *
+     * So instead, we copy as many words as matter.  This uses the
+     * companion array of bytes (ever thrifty) which match up with
+     * function call numbers.
+     */
 
-    return (funcs[pw[0]])(pw[1],pw[2],pw[3],pw[4],pw[5],pw[6],pw[7]);
+    switch(funcwords[pw[0]]) {
+	case 0: return (funcs[pw[0]])();
+	case 1: return (funcs[pw[0]])(pw[1]);
+	case 2: return (funcs[pw[0]])(pw[1],pw[2]);
+	case 3: return (funcs[pw[0]])(pw[1],pw[2],pw[3]);
+	case 4: return (funcs[pw[0]])(pw[1],pw[2],pw[3],pw[4]);
+	case 5: return (funcs[pw[0]])(pw[1],pw[2],pw[3],pw[4],pw[5]);
+	case 7: return (funcs[pw[0]])(pw[1],pw[2],pw[3],pw[4],pw[5],pw[6],pw[7]);
+	default: ASSERT(0);
+    }
 }
 
 /*
@@ -318,7 +367,14 @@ osi()
 	clear(&run->p_uft[0],&run->p_uft[run->p_uftsize]);
 	for (i=0; i<NUMSTD; i++) run->p_uft[i] = ofdtty(biosdev[i]);
 
-	run->p_hflags = 7;
+	/*
+	 * The root process must NOT have alternative RAM bits set. This is
+	 * because something in a root sector or boot sector might make a
+	 * Malloc call, and that had better come from ST RAM; otherwise
+	 * ACSI hard drives can't boot.
+	 */
+
+	run->p_hflags = 0;
 
 	/* clear the PD table, then add rootpd to it */
 	clear(&pdtab[0],&pdtab[NUMPDS]);

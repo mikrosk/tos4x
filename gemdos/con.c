@@ -1,12 +1,15 @@
 /*
 ***************************     CON.C      ******************************
 *
-* $Revision: 2.10 $	$Source: e:/tos/gd2\RCS\con.c,v $
+* $Revision: 2.11 $	$Source: d:/tos/dos\rcs\con.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:47:08 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/08/11 00:37:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: con.c,v $
+* Revision 2.11  1992/08/11  00:37:02  kbad
+* TOS 4.00 Falcon030 first production version
+*
 * Revision 2.10  1991/03/28  17:47:08  apratt
 * THIS VERSION WORKS! DESKTOP OPS WORK!
 *

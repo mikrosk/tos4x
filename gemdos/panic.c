@@ -1,12 +1,15 @@
 /*
 ***************************    PANIC.C     ******************************
 *
-* $Revision: 2.9 $	$Source: e:/tos/gd2\rcs\panic.c,v $
+* $Revision: 2.10 $	$Source: d:/tos/dos\rcs\panic.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/08/11 00:37:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: panic.c,v $
+* Revision 2.10  1992/08/11  00:37:02  kbad
+* TOS 4.00 Falcon030 first production version
+*
 * Revision 2.9  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *

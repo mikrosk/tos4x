@@ -4,13 +4,16 @@
 * $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/07/27 20:12:04 $
+* $Date: 1992/08/11 00:34:42 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.99  1992/08/11  00:34:42  kbad
+* TOS 4.00 Falcon030 first production version
+*
 * Revision 2.98  1992/07/27  20:12:04  kbad
 * Nearly last Sparrow test BIOS
 *
@@ -353,7 +356,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.98 $
+* $Revision: 2.99 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -413,6 +416,11 @@ ONLY_LONGFRAME	equ	TT
 
 * set the high byte of the version number based on the machine type
 
+.if SPARROW
+vershi		equ	$04
+verslo		equ	$00
+.else
+
 .if TT
 vershi		equ	$03
 .else
@@ -421,6 +429,7 @@ vershi		equ	$02
 
 * set the low byte of the version number each release.
 verslo		equ	$07
+.endif
 
 
 * The date is now in another file, which is updated automatically
@@ -504,6 +513,10 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	_resetscsi
 .endif
 .endif
+
+.if SPARROW
+	.globl	_Dsp_Init		; initialize DSP
+.endif
 .if (TT == 0)
 	.globl	_waketime		; alarm maintenance for STPAD
 .endif
@@ -538,8 +551,6 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	_flopfmt		; format track
 	.globl	_floprate		; get/set floppy seek rate code
 	.globl	_rand			; generate random number
-
-
 .if (SPARROW == 0)
 	.globl	blt_init		; init the blitter chip
 .endif
@@ -644,6 +655,20 @@ ca_date		equ	$e		; (.W) DOS-format creation date
 ca_size		equ	$10		; (.L) application size
 ca_name		equ	$14		; application name (NNNNNNNN.EEE\0)
 
+
+*---- NVRAM contents
+nv_upref	equ	$00		; UNIX/TOS boot preference
+nv_manuf	equ	$02		; factory code, etc.
+nv_AKPlang	equ	$06		; _AKP language
+nv_AKPkb	equ	$07		; _AKP keyboard
+nv_IDTtd	equ	$08		; _IDT time/date pref
+nv_IDTsep	equ	$09		; _IDT date separator
+nv_dspin	equ	$0a		; spinup delay
+nv_iscan	equ	$0b		; IDE scan mask
+nv_sscan	equ	$0c		; SCSI scan mask
+nv_ascan	equ	$0d		; ACSI scan mask
+nv_vmode	equ	$0e		; video mode
+nv_used		equ	$10		; # of bytes of NVRAM used
 
 
 *------ Ram configuration equates
@@ -964,6 +989,10 @@ savend:					; end of register sav area
 hdrcopy:	ds.b	$40		; copy of OS header ["big enough"]
 defcookies:	ds.l	DEFCSIZE*2	; initial cookie jar
 _upref:		ds.w	1		; boot pref for _dmaboot
+dspin:		ds.b	1		; spinup delay before _dmaboot
+iscan:		ds.b	1		; IDE scan mask for _dmaboot
+sscan:		ds.b	1		; SCSI scan mask for _dmaboot
+ascan:		ds.b	1		; ACSI scan mask for _dmaboot
 .if TT
 ttmd:		ds.l	4		; the TT MD for fast RAM (see getmpb)
 .endif
@@ -1035,53 +1064,23 @@ reseth:
 	move.w	#$0100,$ffff8606.w	; reset ACSI chip...
 	move.w	#$0000,$ffff8606.w	; ...leave in read state.
 .endif
-
-
+*+
+* On Sparrow, we must read sp_config before and after reset.
+* Before reset, so that no PMMU lookup is required after reset.
+* After reset, so that the memory controller is configured after
+* a warm boot, in case a PMMU lookup is required to decode cartbase.
+*-
+.if SPARROW
+	move.w	sp_config,d0		; read to auto-config mem cntrlr
+.endif
 	reset				; reset	hardware
 
+.if SPARROW
+	move.w	sp_config,d0		; read to auto-config mem cntrlr
+.endif
 * [ROM only]
 .endif
 
-
-
-.if SPARROW
-	moveq	#0,d1
-	move.b	sp_config,d0	; d0=vvmmrrbf
-	move.b	d0,d1		; d1=vvmmrrbf
-	lsl.b	#6,d1		; d1=bf000000
-	and.b	#$80,d1		; d1=b0000000
-	lsr.b	#6,d0		; d0=000000vv
-	or.b	d0,d1		; d1=b00000vv
-	move.w	d1,sp_VMC	; write to VMC.
-	moveq	#0,d1
-	cmp.b	#1,d0
-	beq	spar_set
-	moveq	#2,d1
-	tst.b	d0
-	bne	spar_nos
-spar_set:
-
-spar_nos:
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-.endif
 
 *+
 *  [ROM only]
@@ -1126,6 +1125,18 @@ tdis:	dc.l	0
 * Makes the boot, including the CRC and RAM tests, faster.
 * Also set the sparrow shifter to 16MHz, and turn on address bus errors.
 *
+* Also, zap sparrow video for a little while here until we can set a
+* "real" video mode, since it seems that the POR state of COMBEL is not
+* happy with VGA monitors.
+* Video is turned off by setting horz sync start to an arbitrary value
+* greater than horz halfline total.
+*
+
+*	or.b	#1,st_sync	; set external sync
+
+	move.w	#$20,sp_HSS
+	move.w	#$10,sp_HHT
+
 	or.b	#$25,sp_clock.w
 .endif
 
@@ -1229,6 +1240,7 @@ resv1:
 	lea	resvchk(pc),a6		; a6 -> WRONG RETURN ADDRESS! See note
 	jmp	(a0)			; execute reset	bailout
 reset3:
+* [ROM only]
 .endif
 
 *+
@@ -1277,19 +1289,17 @@ reset3:
  .if TT
 	move.b	#$01,syncmode		; set external sync mode always
  .else
+  .if (SPARROW == 0)
 	btst.b	#0,os_conf+1		; check bit: configured for 50hz?
 					; MAS BUG: don't use "os_conf+1(PC)"
 	beq	notpal			; (nope -- we're good ol' NTSC)
 	lea	pal_r(pc),a6		; a6 -> ret addr
 	bra	noblank			; make sure we're NOT in vblank
 pal_r:	move.b	#$02,syncmode		; then twiddle to 50hz
+  .endif
  .endif
 * [ROM only]
 .endif
-
-
-
-
 
 notpal:
 
@@ -1420,14 +1430,11 @@ spsic1:	move.l	(a0)+,(a1)+
 * to 14MB max.
 *
 *-
-
-
 .if (TT == 0)
 
 .if SPARROW
-	move.w	sp_config,d0		; read to auto-config mem cntrlr
-;	bset.b	#6,sp_clock		; test and set power-fail bit
-;	beq	sp_cold			; yes, cold-boot
+	bset.b	#6,sp_clock		; test and set power-fail bit
+	beq	sp_cold			; yes, cold-boot
 	cmp.l	#memmagic,memvalid.w	; check first magic number
 	bne	sp_cold			; no - this is a cold boot
 	cmp.l	#memmag2,memval2.w	; check again (for paranoia)
@@ -1454,7 +1461,7 @@ sp_cold:
 gotmem:	move.l	d0,d5		; d5 is phystop
 
 ** end of Sparrow clause; we jump to "clear memory from $400 to..." **
-	bra	mem_sized
+*	bra	mem_sized
 
 .else
 * (TT == 0) && (SPARROW == 0)
@@ -1653,6 +1660,7 @@ mt_done:
 *
 *  SPARROW also doesn't need this.
 *-
+.if (SPARROW == 0)
 	lea	$8000,sp		; initialize SP just this once
 .if (STPAD == 0)
 	move.l	8,a4			; a4 = old BUS ERROR vector
@@ -1687,23 +1695,47 @@ mt_q:	sub.l	d7,a0			; drop down to last successful probe
 * end of if (STPAD == 0)
 .endif
 
+* end of if (SPARROW == 0)
+.endif
+
 *+
 *  [still ROM only]
 *  Clear memory from $400 to 'd5' (phystop). Used to put screen at phystop
 *  - screen size and clear from top down. Now leaves screen where it is (at
 *  64K) and clears from bottom up, so screen still clears early on. Must
 *  preserve d5 = phystop and d6 = mem controller program byte.
+*
+*  I tried clearing only the first meg or so here, but sadly, discovered
+*  that *ALL* of memory must be cleared here.  Apparently, other parts
+*  of the OS stupidly require it to be clear when they Malloc stuff.
+*  So, we'll still clear it all, but we'll do it real fast.
 *-
 mem_sized:
-	move.w	#$400,a0
-	move.l	d5,d4
-	moveq	#0,d0
-clm_1:	move.l	d0,(a0)+
-	move.l	d0,(a0)+
-	move.l	d0,(a0)+
-	move.l	d0,(a0)+
-	cmp.l	d4,a0
-	bne	clm_1
+	lea	$400.w,a4	; start at the bottom
+	move.l	d5,d4		; end at the top
+	sub.l	a4,d4		; size
+	lsr.l	#8,d4		; / 256 = chunk count (good to 16Mb)
+	subq.l	#1,d4		; dbra count
+	lea	512.w,a5	; leapfrog count
+	moveq	#0,d0		; clear 32 bytes worth of regs
+	move.l	d0,a0
+	moveq	#0,d1
+	move.l	d1,a1
+	moveq	#0,d2
+	move.l	d2,a2
+	moveq	#0,d3
+	move.l	d3,a3
+	lea	256(a4),a4
+clm_1:	movem.l	d0-d3/a0-a3,-(a4)   ; clear 32 bytes
+	movem.l	d0-d3/a0-a3,-(a4)   ; clear 32 bytes
+	movem.l	d0-d3/a0-a3,-(a4)   ; clear 32 bytes
+	movem.l	d0-d3/a0-a3,-(a4)   ; clear 32 bytes
+	movem.l	d0-d3/a0-a3,-(a4)   ; clear 32 bytes
+	movem.l	d0-d3/a0-a3,-(a4)   ; clear 32 bytes
+	movem.l	d0-d3/a0-a3,-(a4)   ; clear 32 bytes
+	movem.l	d0-d3/a0-a3,-(a4)   ; clear 32 bytes
+	adda.l	a5,a4		    ; leapfrog area just cleared
+	dbra	d4,clm_1
 
 *+
 *  Set the system variables memcntlr and phystop. Also set the magic values
@@ -2320,7 +2352,11 @@ noswi:
 
 * Switch values are in d0: this fact is used to set _SND below.
 
+#if SPARROW
+	moveq.l	#$1f,d1			; Sparrow: PSG|8bit|16bit|CODEC|DSP
+#else
 	moveq.l	#3,d1			; pre-load "dma and normal sound"
+#endif
 	move.l	#"_SND",(a0)+
 	btst	#7,d0			; test the (possibly fake) sound SWI
 	bne	gotsnd
@@ -2568,22 +2604,43 @@ nofrb:
 * down in the unshift, shift, and caps-lock cases, respectively.
 *
 ********************
+
 .if (TT|SPARROW)
-	subq	#2,sp
-	move.l	sp,a0
-	move.l	a0,-(sp)
-	move.w	#2,-(sp)
-	move.w	#2,-(sp)
-	move.w	#0,-(sp)
-	bsr	NVMaccess
-	add.w	#10,sp
-	move.w	(sp)+,d1
+nv_prefs:
+	link	a6,#(-4-nv_used)	; get some stack space
+	move.l	sp,a5
+	move.l	a0,(a5)			; save cookie pointer
+
+	pea	4(a5)			; buffer address
+	move.w	#nv_used,-(sp)		; count
+	clr.l	-(sp)			; start byte 0, read operation
+	jsr	NVMaccess(pc)
+	move.l	(a5)+,a0		; get coookie pointer
 	tst.w	d0
-	beq	nvok
-	moveq	#0,d1
-nvok:	rol.w	#8,d1
-	move.l	#"_AKP",(a0)+
-	move.l	d1,(a0)+
+	beq.b	nv_ok
+
+	lea	nv_defs,a5		; use default values
+	moveq	#0,d0
+
+nv_ok:	move.w	(a5),_upref.w		; nv_upref
+	addq	#nv_AKPlang,a5
+
+	move.l	#"_AKP",(a0)+		; nv_AKP
+	move.w	d0,(a0)+
+	move.w	(a5)+,(a0)+
+
+	move.l	#"_IDT",(a0)+		; nv_IDT
+	move.w	d0,(a0)+
+	move.w	(a5)+,(a0)+
+
+	move.l	(a5)+,dspin.w		; nv disk stuff
+
+	move.w	(a5),d0			; nv_modecode
+	bne.b	okmode
+	move.w	#$82,d0
+okmode:	move.w	d0,_modecode.w
+
+	unlk	a6
 .endif
 
 * Mark the end of the cookie jar; all done.
@@ -2677,13 +2734,6 @@ ikbdlp1:
 	move.w	_modecode.w,d2
 	bne.b	nomono
 	move.w	#$82,d2			; default modecode (ST, 40 col, 4 bpp)
-
-
-
-
-
-
-
   .else
 	moveq.l	#0,d1			; pre-select low rez
 	btst	#7,gpip			; test mono bit
@@ -2738,10 +2788,8 @@ nb_r1:
 	tst.w	color0			; hit color 0 to go ST video
 .endif
 
-	bsr	_TEST_BLT		; D0 = 0:no chip, 2:chip exists
 .if (SPARROW == 0)
-
-
+	bsr	_TEST_BLT		; D0 = 0:no chip, 2:chip exists
 	jsr	blt_init		; init the blitter chip (with D0)
 	jsr	esc_init		; clear screen, init cursor
 .endif
@@ -2824,6 +2872,7 @@ kbloop:	cmp.l	_hz_200.w,d0
 	jsr	_osi			; initialize DOS
 
 .if SPARROW
+
 DB_STUB = 0
 * @DEBUG: cause a stop before setscreen
 .if DB_STUB
@@ -2841,6 +2890,10 @@ DB_STUB = 0
 	clr.l	-(sp)
 	jsr	_setscreen
 	lea	12(sp),sp
+
+* Initialize the DSP & DSP XBIOS calls
+	jsr	_Dsp_Init(pc)
+
 .endif
 
 	move.w	os_dosdate,_date	; set file system date
@@ -2893,7 +2946,17 @@ noikbdclk:
 * (Note: now that the ROM does a ROM CRC check and a memory test,
 * putting the cursor below the icon is a win for internal reasons, too.)
 *
+* This code uses Line A copy raster form to put the icon on the screen,
+* so it'll work in all resolutions.  Since Setscreen() is now used to
+* set up the initial boot resolution, the VDI is initialized at this point,
+* so it's OK to use Line A.
+*
 
+fuji_blit:
+
+NO_LINEA_FUJI = 0
+
+.if NO_LINEA_FUJI
 .if TT
 colstride	equ	320	; TT MED stride from line to line, 80*4
 mstride		equ	160	; TT HIGH stride, 160
@@ -2936,6 +2999,100 @@ miconw:	move.b	(a0)+,(a1)+
 	dbra	d0,miconl
 *	bra	icondone		; bra to next instruction
 
+.else
+* use Line A to blit the fuji to the screen.
+* stack frame (84 bytes)
+* 0: contrl array	22: srcfdb	42: dstfdb	62: intin
+* $00 opcode	(ign)	$16 fd_addr	$2a fd_addr	$3e wmode
+* $02 nptsin	(ign)	$1a fd_w	$2e fd_w	$40 fgcol
+* $04 nptsout		$1c fd_h	$30 fd_h	$42 bgcol
+* $06 nintin	(ign)	$1e fd_wdwidth	$32 fd_wdwidth	68: ptsin
+* $08 nintout		$20 fd_stand	$34 fd_stand	$44 sx1
+* $0a subfunction	$22 fd_nplanes	$36 fd_nplanes	$46 sy1
+* $0c handle	(ign)	$24 fd_r1	$38 fd_r1	$48 sx2
+* $0e -> srcfdb		$26 fd_r2	$3a fd_r2	$4a sy2	
+* $12 -> dstfdb		$28 fd_r3	$3c fd_r3	$4c dx1
+*							$5e dy1
+*							$50 dx2
+*							$52 dy2
+ICON_BLIT = 1
+.if ICON_BLIT
+* Use icon_blit function
+	lea	ib_ints.w,a0
+	move.l	#$00010001,(a0)+	; MD_REPLACE, BLACK
+	clr.w	(a0)			; WHITE
+	lea	icon_pts,a0
+	lea	ib_pts.w,a1
+	move.l	(a0)+,(a1)+
+	move.l	(a0)+,(a1)+
+	move.l	(a0)+,(a1)+
+	move.l	(a0),(a1)
+	pea	icon_fdb
+	bsr	icon_blit
+	addq	#4,sp
+.else
+	dc.w	$a000
+	lea	4(a0),a1		; -> linea PB array
+
+ICON_ARRAYS = 0
+.if ICON_ARRAYS
+	move.l	#icon_ctl,(a1)+
+	move.l	#icon_ints,(a1)+
+	move.l	#icon_pts,(a1)
+.else
+	sub.w	#$54,sp			; get some variable space
+
+* Initialize arrays
+	moveq	#96,d0			; pixel width
+	moveq	#86,d1			; pixel height
+
+	move.l	sp,(a1)+		; CONTRL
+	lea	$0e(sp),a2		; fdb pointers in contrl
+	lea	$16(sp),a3		; srcfdb
+	move.l	a3,(a2)+		; psrcfdb
+	move.l	#icon_start,(a3)+	; fd_addr
+	move.w	d0,(a3)+		; fd_w
+	move.w	d1,(a3)+		; fd_h
+	move.w	#6,(a3)+		; fd_wdwidth
+	clr.w	(a3)+			; fd_stand
+	move.w	#1,(a3)+		; fd_nplanes
+	clr.l	(a3)+			; fd_r1, fd_r2
+	clr.w	(a3)+			; fd_r3
+	move.l	a3,(a2)+		; pdstfdb
+	clr.l	(a3)+			; addr
+	lea	$10(a3),a3		; the other 8 words don't matter
+
+	move.l	a3,(a1)+		; INTIN
+	moveq	#1,d2
+	move.w	d2,(a3)+		; MD_REPLACE
+	move.w	d2,(a3)+		; fgcol: BLACK
+	clr.w	(a3)+			; bgcol: WHITE
+
+	move.l	a3,(a1)+		; PTSIN
+	subq	#1,d0
+	subq	#1,d1
+	clr.l	(a3)+			; sx1 = sy1 = 0
+	move.w	d0,(a3)+		; sx2 = 95
+	move.w	d1,(a3)+		; sy2 = 85
+	moveq	#4,d2
+	add.w	d2,d1
+	move.l	d2,(a3)+		; dx1 = 0, dy1 = 4
+	move.w	d0,(a3)+		; dx2 = 95
+	move.w	d1,(a3)+		; dy2 = 85+4
+.endif
+	clr.w	$36(a0)			; CLIP = 0
+	move.w	#1,$74(a0)		; COPYTRAN = 1
+
+	dc.w	$a00e			; copy raster form
+.if (ICON_ARRAYS == 0)
+	add.w	#$54,sp			; get back stack
+.endif
+
+* end of ICON_BLIT case
+.endif
+
+* end of NO_LINEA_FUJI case
+.endif
 
 .data
 
@@ -3027,9 +3184,18 @@ icon_start:
 	.dc.l	$01F003E3,$C7C00FBC,$1F1E0000
 	.dc.l	$01E001E3,$C78007B8,$0F1E0000
 
+icon_fdb:				; FDB for fuji icon
+	dc.l	icon_start		; fd_addr
+	dc.w	96,86,6,0,1		; fd_w,fd_h,fd_wd,fd_stand,fd_planes
 
+icon_pts:
+	dc.w	0,0,95,85,0,4,95,89
+
+
+USE_BIOS_MSG = 1
     .text
 icondone:
+.if USE_BIOS_MSG
 	moveq	#7+' ',d7	; code to addr cursor to line 7 (not STLOW)
 	tst.b	sshiftmd.w
 	bne	gotd7
@@ -3050,6 +3216,20 @@ gotd7:
 	trap	#$d		; Bconout(2,' ');
 	addq	#6,sp
 
+.else
+* use Cconws to position cursor
+	clr.w	-(sp)
+	move.l	M0curs,-(sp)	; Cursor move code
+	jsr	_getrez		; get aspect ratio
+	btst	#1,d0		; if 2 or 7
+	bne.b	y91dpi		; ydpi is 91
+	addq.b	#5,2(sp)	; else it's 45
+y91dpi:	pea	(sp)
+	move.w	#9,-(sp)
+	trap	#1
+	lea	12(sp),sp
+
+.endif
 
 *
 * end of icon code
@@ -3084,7 +3264,7 @@ crcstride	equ	4
 ; STPAD is all one chip, so we test it all; all other machines are
 ; two chips.  It is now officially obsolete to have 6 chips for TOS.
 ;
-.if STPAD
+.if (STPAD | SPARROW)
 crcstride	equ	1
 .else
 crcstride	equ	2
@@ -3103,8 +3283,11 @@ crcstride	equ	2
 .endif
 
 .if crcstride == 1
+.if STPAD
 	move.l	#(256*1024)-2,d7	; PAD roms, 256Kb
-
+.else
+	move.l	#(512*1024)-2,d7	; Sparrow ROMs, 512Kb
+.endif
 .else
 	move.l	#(128*1024)-2,d7	; else checksum 128KB per chip
 .endif
@@ -3285,6 +3468,7 @@ bloop1:	add.l	d1,a0			; increment exception number (!030)
 *
 
 	bsr	_dskboot		; attempt to boot from disk
+
 .if systype == rom
 	bsr	dmaboot			; attempt to boot from DMA bus
 .endif
@@ -3716,6 +3900,7 @@ dmaboot:
 
 	move.w	#0,a5
 
+
 dmab_to:
 	cmpa.w	#0,a5		; a5 is a flag: TRUE when the memory test
 				; is done
@@ -3864,6 +4049,7 @@ dmab_todone:
 
 dmab_skip:
 
+
 * Begin scanning DMA devices for a bootable one.  The sequence of devices
 * you scan varies, and is described in dmarfail where the device number is
 * updated.  This code uses the first word of the buffer "the_env"
@@ -3893,7 +4079,7 @@ dmab_skip:
 	pea	_upref.w
 	move.w	#2,-(sp)
 	clr.l	-(sp)
-	jsr	NVMaccess	; NVMaccess(op=0,start=0,count=2,buf=_upref)
+	jsr	NVMaccess(pc)	; NVMaccess(op=0,start=0,count=2,buf=_upref)
 	add.w	#$a,sp
 	tst.w	d0
 	beq	gotpref
@@ -3973,7 +4159,7 @@ dmafail:
 boot_dev_tab:	dc.b	8,9,$a,$b,$c,$d,$e,$f,0,1,2,3,4,5,6,7,$ff
 .else
 .if SPARROW
-boot_dev_tab:	dc.b	$10,8,$ff
+boot_dev_tab:	dc.b	$10,8,9,$a,$b,$c,$d,$e,$f,$ff
 .else
 boot_dev_tab:	dc.b	$10,$11,0,1,2,3,4,5,6,7,$ff
 .endif
@@ -4173,6 +4359,26 @@ vbl:
 	movem.l	d0-d7/a0-a6,-(sp)	; save registers
 	addq.l	#1,_vbclock		; bump unblocked-frame clock
 
+*--- reload color palettes
+	move.l	colorptr.w,d0		; if(colorptr != NULL)....
+	beq	vbl1			; (its NULL, so	don't reload)
+
+.if SPARROW
+	bclr	#0,d0			; test & clear bit 0
+	beq.b	vb_stc			; if it was 0, set ST palette
+	move.w	_n_rgb.w,d1		; move n_rgb longs (set by VsetRGB)
+	lea	sp_color0,a1		; to SP palette
+	bra.b	vbl3
+vb_stc:
+.endif
+	moveq	#8-1,d1			; move 8 longs
+	lea	color0,a1		; to ST palette
+vbl3:	move.l	d0,a0			; from colorptr
+vbl2:	move.l	(a0)+,(a1)+
+	dbra	d1,vbl2
+	clr.l	colorptr.w		; zap colorptr
+vbl1:
+
 *------	Call deferred interrupt	vectors:
 	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
 	beq	vbl12			; (punt	if no vectors)
@@ -4299,16 +4505,6 @@ swmon3:
 
 	jsr	blink			; blink cursor
 
-*--- reload color palettes
-	tst.l	colorptr.w		; if(colorptr != NULL)....
-	beq	vbl1			; (its NULL, so	don't reload)
-	move.l	colorptr.w,a0
-	lea	color0,a1
-	move.w	#8-1,d1
-vbl2:	move.l	(a0)+,(a1)+
-	dbra	d1,vbl2
-	clr.l	colorptr.w		; zap colorptr
-vbl1:
 *--- reload display base register
 	tst.l	screenpt.w		; if(screenpt == NULL) don't;
 	beq	vbl5
@@ -4742,6 +4938,12 @@ _logbase:
 	move.l	_v_bas_ad.w,d0	; set software shadow
 	rts
 
+.if SPARROW
+* _setscreen and _getrez are in vtg.c
+	.globl _setscreen,_getrez
+__esc_init:	jmp esc_init		; for C code linked w/ pre-Sparrow VDIs
+
+.else
 
 *+
 * _getrez - get current screen rez
@@ -4764,12 +4966,6 @@ _getrez:
 .endif
 	rts				; return rez
 
-
-.if SPARROW
-* _setscreen and _getrez are in vtg.c
-	.globl _setscreen,_getrez
-
-.else
 *+
 * _setscreen - set screen location(s), rez
 *	_setscreen(logicalLoc, physicalLoc, rez)
@@ -4932,6 +5128,44 @@ savp_1:	move.w	(a1)+,(a0)+		; save a word
 *
 *-
 do_shroom:
+.if SPARROW
+	lea	ib_ints.w,a0
+	move.l	#$00010001,(a0)+	; MD_REPLACE, BLACK
+	clr.w	(a0)			; WHITE
+
+	lea	ib_pts.w,a0
+	moveq	#15,d6			; x & y span
+	clr.l	(a0)+			; sx1 = sy1 = 0
+	move.w	d6,(a0)+		; sx2
+	move.w	d6,(a0)+		; sy2
+
+	clr.w	(a0)+			; dx1 = 0
+
+	move.l	a0,-(sp)
+	dc.w	$a000			; a0 -> line A info
+	move.w	-4(a0),d7		; vertical rez
+	move.l	(sp)+,a0
+
+	lsr	#1,d7			; / 2
+	subq	#8,d7			; - 8
+	move.w	d7,(a0)+		; = dy1
+	move.w	d6,(a0)+		; dx2 = 15
+	add.w	d6,d7			; dy1 + 15
+	move.w	d7,(a0)			; = dy2
+
+	addq	#1,d6			; d6 = step
+	move.w	d1,d7			; d7 = # of shrooms
+
+	pea	mush_fdb		; pass src fdb
+
+dmlp:	bsr	icon_blit		; blit 'dem shrooms
+	add.w	d6,ib_pts+$8.w
+	add.w	d6,ib_pts+$c.w
+	dbra	d7,dmlp
+
+	addq	#4,sp			; get back stack
+.else
+* !SPARROW
 	move.b	sshiftmd.w,d7
 .if TT
 	and.w	#$0007,d7		; TT: three significant bits
@@ -4971,6 +5205,8 @@ dm2:	move.w	(a1),(a0)+		; draw a word
 	move.l	a2,a0
 	dbra	d6,dm0			; (loop for next line)
 
+*endif !SPARROW
+.endif
 
 	moveq	#29,d7			; wait half a (60Hz) second
 dm3:	bsr	wvbl
@@ -4988,6 +5224,47 @@ mcount:
 dc.w    3,        1,        0,        0, 3,        0, 0,         7
 mwidth:
 dc.w    160,      160,      80,       0, 320,      0, 160,       320
+
+
+*+
+* icon_blit: use line A copy raster form to blit an icon to the screen
+* 4(sp) -> source memory form
+*-
+    .bss
+ib_contrl:	ds.w	7
+ib_psfdb:	ds.l	1
+ib_pdfdb:	ds.l	1
+ib_sfdb:	ds.l	5
+ib_dfdb:	ds.l	5
+ib_ints:	ds.w	3
+ib_pts:		ds.w	8
+
+    .text
+icon_blit:
+	lea	ib_dfdb.w,a0		; destination is screen
+	clr.l	(a0)
+	move.l	a0,ib_pdfdb.w
+	lea	ib_sfdb.w,a1
+	move.l	a1,ib_psfdb.w
+	move.l	4(sp),a0
+	move.l	(a0)+,(a1)+		; fd_addr
+	move.l	(a0)+,(a1)+		; fd_w,fd_h
+	move.l	(a0)+,(a1)+		; fd_wdwidth,fd_stand
+	move.w	(a0),(a1)		; fd_planes
+
+	dc.w	$a000			; a0 -> line A vars
+	clr.w	$36(a0)			; CLIP = 0
+	move.w	#1,$74(a0)		; COPYTRAN = 1
+	addq	#4,a0			; skip PLANES & WIDTH
+	lea	ib_contrl.w,a1
+	move.l	a1,(a0)+
+	lea	ib_ints.w,a1
+	move.l	a1,(a0)+
+	lea	ib_pts.w,a1
+	move.l	a1,(a0)
+	dc.w	$a00e			; copy raster form
+	rts
+
 
 *+
 * _fastcpy - "fast" 512-byte copy
@@ -5320,6 +5597,10 @@ mushroom:				; (sic)
 	dc.w	%0000001111111000
 	dc.w	%0000000011100000
 
+mush_fdb:
+	dc.l	mushroom		; fd_addr
+	dc.w	16,16,1,0,1		; fd_w,fd_h,fd_wd,fd_stand,fd_planes
+
 
 *+
 *  This function replaces 'vwait' -- it is not to return until
@@ -5634,6 +5915,9 @@ Blitmode:
 	bmi	Bmd_1			; (don't set if mode is negative)
 	and.w	d5,d0			; force to soft mode if no chip
 	or.w	d4,d0			; replace installed status
+.if SPARROW
+	bset	#0,d0			; sparrow: force hard blit!
+.endif
 	jsr	_SETBLT			; set blit mode
 
 Bmd_1:	move.w	d3,d0			; return "old" blit mode
@@ -6603,21 +6887,89 @@ trp14tab:
 	dc.l	_VgetRGB		; 94
 	dc.l	_ValidMode		; 95
 
+* 96-127: Sparrow DSP calls from dsp.o
 
+ .globl	_DspDoBlock, 		_DspBlkHandShake,	_DspBlkUnpacked
+ .globl	_DspInStream,		_DspOutStream,		_DspIOStream
+ .globl	_DspRemoveInterrupts,	_DspGetWordSize,	_DspLock
+ .globl	_DspUnlock,		_DspAvailable,		_DspReserve
+ .globl	_DspLdProg,		_DspExProg,		_DspExBoot
+ .globl	_DspLodToBinary,	_DspTriggerHC,		_DspRequestUniqueAbility
+ .globl	_DspGetProgAbility,	_DspFlushSubroutines,	_DspLdSubroutine
+ .globl	_DspInqSubrAbility,	_DspRunSubroutine,	_DspHf0
+ .globl	_DspHf1,		_DspHf2,		_DspHf3
+ .globl	_DspBlkWords,		_DspBlkBytes,		_DspHStat
+ .globl	_DspSetVectors,		_DspMultBlocks
 
+	dc.l 	_DspDoBlock		; 96
+	dc.l	_DspBlkHandShake	; 97
+	dc.l	_DspBlkUnpacked		; 98
+	dc.l	_DspInStream		; 99
+	dc.l	_DspOutStream		; 100
+	dc.l	_DspIOStream		; 101
+	dc.l	_DspRemoveInterrupts	; 102
+	dc.l	_DspGetWordSize		; 103
+	dc.l	_DspLock		; 104
+	dc.l	_DspUnlock		; 105
+	dc.l	_DspAvailable		; 106
+	dc.l	_DspReserve		; 107
+	dc.l	_DspLdProg		; 108
+	dc.l	_DspExProg		; 109
+	dc.l	_DspExBoot		; 110
+	dc.l	_DspLodToBinary		; 111
+	dc.l	_DspTriggerHC		; 112
+	dc.l	_DspRequestUniqueAbility ; 113
+	dc.l	_DspGetProgAbility	; 114
+	dc.l	_DspFlushSubroutines	; 115
+	dc.l	_DspLdSubroutine	; 116
+	dc.l	_DspInqSubrAbility	; 117
+	dc.l	_DspRunSubroutine	; 118
+	dc.l	_DspHf0			; 119
+	dc.l	_DspHf1			; 120
+	dc.l	_DspHf2			; 121
+	dc.l	_DspHf3			; 122
+	dc.l	_DspBlkWords		; 123
+	dc.l	_DspBlkBytes		; 124
+	dc.l	_DspHStat		; 125
+	dc.l	_DspSetVectors		; 126
+	dc.l	_DspMultBlocks		; 127
 
+* 128-151: Sparrow sound calls from spsound.o
 
+ .globl locksnd,unlocksnd,soundcmd,setbuffer
+ .globl setmode,settrack,setmontrack,setinterrupt
+ .globl buffoper,dsptristate,gpio,devconnect
+ .globl sndstatus,buffptr
 
+	dc.l	locksnd			; 128 Open a sound channel
+	dc.l	unlocksnd		; 129 Close a sound channel.
+	dc.l	soundcmd		; 130 Perform a sound functions.
+	dc.l	setbuffer		; 131 Set rec/play buffer location.
+	dc.l	setmode			; 132 Set sound 8/16 bit stereo/mono.
+	dc.l	settrack		; 133 Set number of tracks.
+	dc.l	setmontrack		; 134 Set monitor track.
+	dc.l	setinterrupt		; 135 Set interrupt type.
+	dc.l	buffoper		; 136 Set rec/play buffer operations.
+	dc.l	dsptristate		; 137 Tristates DSP bus
+	dc.l	gpio			; 138 Talks to gpio acording to mode.
+	dc.l	devconnect		; 139 connects src to dst devices.
+	dc.l	sndstatus		; 140 Get current sound status.
+	dc.l	buffptr			; 141 Get current buffer offsets.
+	dc.l	unimpl			; 142 [reserved]
+	dc.l	unimpl			; 143 [reserved]
+* 144
+	dc.l	unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl
 
+* 152-159: Sparrow VDI video calls
 
-
-
-
-
-
-
-
-
+	dc.l	unimpl			; 144
+	dc.l	unimpl			; 145
+	dc.l	unimpl			; 146
+	dc.l	unimpl			; 147
+	dc.l	unimpl			; 148
+	dc.l	unimpl			; 149
+	dc.l	_SetMasks		; 150
+	dc.l	_SetOverlay		; 151
 .endif
 
  .data
@@ -6625,5 +6977,24 @@ trp14tab:
 .if DB_STUB
 Mstop:	dc.b	"Stopped.",0
 .endif
+
+    .globl mtestmsg
+mtestmsg:	dc.b	"Memory Test:",13,10
+.if (SPARROW == 0)
+		dc.b	"ST RAM "
+.endif
+		dc.b	0
+
+	.even
+M0curs:	dc.l	$1b592720 ; Position cursor at row 7, column 0
+
+* NVRAM defaults
+nv_defs:
+	dc.w	0		; _upref
+	dc.l	0		; manuf
+	dc.w	0		; _AKP
+	dc.b	0,'/'		; _IDT
+	dc.l	$20ffffff	; spin/scan
+	dc.w	0		; _modecode
 
 .end

@@ -1,12 +1,15 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.18 $	$Source: d:/tos/dos\rcs\sup.c,v $
+* $Revision: 2.19 $	$Source: d:/tos/dos\rcs\sup.c,v $
 * =======================================================================
-* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/08/11 00:37:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.19  1992/08/11  00:37:02  kbad
+* TOS 4.00 Falcon030 first production version
+*
 * Revision 2.18  1992/07/27  20:09:24  kbad
 * Lattice compiled Sparrow GEMDOS
 *

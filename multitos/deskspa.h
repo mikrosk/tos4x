@@ -35,15 +35,17 @@
 #define L5ITEM   50  /* STRING in Baum ADMENU */
 #define PREFITEM 51  /* STRING in Baum ADMENU */
 #define VIDITEM  52  /* STRING in Baum ADMENU */
-#define READINF  53  /* STRING in Baum ADMENU */
-#define MEMMENU  54  /* STRING in Baum ADMENU */
-#define SAVEITEM 56  /* STRING in Baum ADMENU */
-#define PRINTITE 57  /* STRING in Baum ADMENU */
+#define MEMMENU  53  /* STRING in Baum ADMENU */
+#define PRINTITE 54  /* STRING in Baum ADMENU */
+#define READINF  56  /* STRING in Baum ADMENU */
+#define SAVEITEM 57  /* STRING in Baum ADMENU */
 #define L6ITEM   58  /* STRING in Baum ADMENU */
 #define SUPERITE 59  /* STRING in Baum ADMENU */
 #define BITBLT   60  /* STRING in Baum ADMENU */
 
 #define ADDINFO  1   /* Formular/Dialog */
+#define VERTEXT  2   /* TEXT in Baum ADDINFO */
+#define MINTCBOX 8   /* IBOX in Baum ADDINFO */
 #define DEOK     11  /* BUTTON in Baum ADDINFO */
 
 #define SMILEY   2   /* Formular/Dialog */
@@ -246,10 +248,13 @@
 #define MPDBUTTN 12  /* BUTTON in Baum MNINSAPP */
 #define MPPTITLE 13  /* TEXT in Baum MNINSAPP */
 #define MPPBUTTN 14  /* BUTTON in Baum MNINSAPP */
-#define MPOK     15  /* BUTTON in Baum MNINSAPP */
-#define MPREMOVE 16  /* BUTTON in Baum MNINSAPP */
-#define MPCANCEL 17  /* BUTTON in Baum MNINSAPP */
-#define MPQUIT   18  /* BUTTON in Baum MNINSAPP */
+#define MPMBOX   15  /* IBOX in Baum MNINSAPP */
+#define MPMTITLE 16  /* TEXT in Baum MNINSAPP */
+#define MPMBUTTN 17  /* BUTTON in Baum MNINSAPP */
+#define MPOK     18  /* BUTTON in Baum MNINSAPP */
+#define MPREMOVE 19  /* BUTTON in Baum MNINSAPP */
+#define MPCANCEL 20  /* BUTTON in Baum MNINSAPP */
+#define MPQUIT   21  /* BUTTON in Baum MNINSAPP */
 
 #define MNSETPRE 23  /* Formular/Dialog */
 #define SPDTITLE 3   /* TEXT in Baum MNSETPRE */
@@ -335,6 +340,16 @@
 #define SVLBASE  49  /* BOX in Baum MNMENU */
 #define SVL40    50  /* STRING in Baum MNMENU */
 #define SVL80    51  /* STRING in Baum MNMENU */
+#define MPMBASE  52  /* BOX in Baum MNMENU */
+#define MEM128K  53  /* STRING in Baum MNMENU */
+#define MEM256K  54  /* STRING in Baum MNMENU */
+#define MEM512K  55  /* STRING in Baum MNMENU */
+#define MEM1MEG  56  /* STRING in Baum MNMENU */
+#define MEM2MEG  57  /* STRING in Baum MNMENU */
+#define MEM3MEG  58  /* STRING in Baum MNMENU */
+#define MEM4MEG  59  /* STRING in Baum MNMENU */
+#define MEM8MEG  60  /* STRING in Baum MNMENU */
+#define MEMNOLIM 61  /* STRING in Baum MNMENU */
 
 #define MNSYSTEM 27  /* Formular/Dialog */
 #define SDTITLE  2   /* TEXT in Baum MNSYSTEM */
@@ -497,116 +512,136 @@
 
 #define DESKNAME 69  /* Freier String */
 
-#define STNOAPPL 70  /* Alert String */
+#define MTOSVERS 70  /* Freier String */
 
-#define STNOWIND 71  /* Alert String */
+#define FS128K   71  /* Freier String */
 
-#define STFOEXIS 72  /* Alert String */
+#define FS256K   72  /* Freier String */
 
-#define STDISKFU 73  /* Alert String */
+#define FS512K   73  /* Freier String */
 
-#define STFO8DEE 74  /* Alert String */
+#define FS1MEG   74  /* Freier String */
 
-#define STBADCOP 75  /* Alert String */
+#define FS2MEG   75  /* Freier String */
 
-#define TRSINFO  76  /* Alert String */
+#define FS3MEG   76  /* Freier String */
 
-#define FCNOMEM  77  /* Alert String */
+#define FS4MEG   77  /* Freier String */
 
-#define FCFAIL   78  /* Alert String */
+#define FS8MEG   78  /* Freier String */
 
-#define FCSIZE   79  /* Alert String */
+#define FSNOLIM  79  /* Freier String */
 
-#define FCNOTYPE 80  /* Alert String */
+#define STNOAPPL 80  /* Alert String */
 
-#define SAVETOP  81  /* Alert String */
+#define STNOWIND 81  /* Alert String */
 
-#define PRINTTOP 82  /* Alert String */
+#define STFOEXIS 82  /* Alert String */
 
-#define ABORTCON 83  /* Alert String */
+#define STDISKFU 83  /* Alert String */
 
-#define NOICON   84  /* Alert String */
+#define STFO8DEE 84  /* Alert String */
 
-#define NOAPP    85  /* Alert String */
+#define STBADCOP 85  /* Alert String */
 
-#define NODRIVE  86  /* Alert String */
+#define TRSINFO  86  /* Alert String */
 
-#define NOOUTPUT 87  /* Alert String */
+#define FCNOMEM  87  /* Alert String */
 
-#define CNTOPEN  88  /* Alert String */
+#define FCFAIL   88  /* Alert String */
 
-#define CNTCRTDR 89  /* Alert String */
+#define FCSIZE   89  /* Alert String */
 
-#define WRERROR  90  /* Alert String */
+#define FCNOTYPE 90  /* Alert String */
 
-#define RDERROR  91  /* Alert String */
+#define SAVETOP  91  /* Alert String */
 
-#define CNTCRTFL 92  /* Alert String */
+#define PRINTTOP 92  /* Alert String */
 
-#define CNTDELF  93  /* Alert String */
+#define ABORTCON 93  /* Alert String */
 
-#define CNTDELD  94  /* Alert String */
+#define NOICON   94  /* Alert String */
 
-#define PRINTINF 95  /* Alert String */
+#define NOAPP    95  /* Alert String */
 
-#define RENAME   96  /* Alert String */
+#define NODRIVE  96  /* Alert String */
 
-#define NOBUF    97  /* Alert String */
+#define NOOUTPUT 97  /* Alert String */
 
-#define DELDISK  98  /* Alert String */
+#define CNTOPEN  98  /* Alert String */
 
-#define NOTPRG   99  /* Alert String */
+#define CNTCRTDR 99  /* Alert String */
 
-#define NOSETDIR 100 /* Alert String */
+#define WRERROR  100 /* Alert String */
 
-#define NOAUTO   101 /* Alert String */
+#define RDERROR  101 /* Alert String */
 
-#define NOWINMEM 102 /* Alert String */
+#define CNTCRTFL 102 /* Alert String */
 
-#define NOTYPE   103 /* Alert String */
+#define CNTDELF  103 /* Alert String */
 
-#define ICONTYPE 104 /* Alert String */
+#define CNTDELD  104 /* Alert String */
 
-#define NODIRCOP 105 /* Alert String */
+#define PRINTINF 105 /* Alert String */
 
-#define NOINSTAL 106 /* Alert String */
+#define RENAME   106 /* Alert String */
 
-#define NOMORE   107 /* Alert String */
+#define NOBUF    107 /* Alert String */
 
-#define NOID     108 /* Alert String */
+#define DELDISK  108 /* Alert String */
 
-#define ILLMAT   109 /* Alert String */
+#define NOTPRG   109 /* Alert String */
 
-#define NOCART   110 /* Alert String */
+#define NOSETDIR 110 /* Alert String */
 
-#define NOMATCH  111 /* Alert String */
+#define NOAUTO   111 /* Alert String */
 
-#define DELITEM  112 /* Alert String */
+#define NOWINMEM 112 /* Alert String */
 
-#define MCFAIL   113 /* Alert String */
+#define NOTYPE   113 /* Alert String */
 
-#define FNOTFIND 114 /* Alert String */
+#define ICONTYPE 114 /* Alert String */
 
-#define SNEXT    115 /* Alert String */
+#define NODIRCOP 115 /* Alert String */
 
-#define NOHELP   116 /* Alert String */
+#define NOINSTAL 116 /* Alert String */
 
-#define NOSEA    117 /* Alert String */
+#define NOMORE   117 /* Alert String */
 
-#define KEYUSED  118 /* Alert String */
+#define NOID     118 /* Alert String */
 
-#define CARTNOSH 119 /* Alert String */
+#define ILLMAT   119 /* Alert String */
 
-#define BADKEY   120 /* Alert String */
+#define NOCART   120 /* Alert String */
 
-#define XNFILE   121 /* Alert String */
+#define NOMATCH  121 /* Alert String */
 
-#define NORESCHG 122 /* Alert String */
+#define DELITEM  122 /* Alert String */
 
-#define FTOLAUNC 123 /* Alert String */
+#define MCFAIL   123 /* Alert String */
 
-#define NODROP   124 /* Alert String */
+#define FNOTFIND 124 /* Alert String */
 
-#define NOSHUT   125 /* Alert String */
+#define SNEXT    125 /* Alert String */
 
-#define FCNOWRK  126 /* Alert String */
+#define NOHELP   126 /* Alert String */
+
+#define NOSEA    127 /* Alert String */
+
+#define KEYUSED  128 /* Alert String */
+
+#define CARTNOSH 129 /* Alert String */
+
+#define BADKEY   130 /* Alert String */
+
+#define XNFILE   131 /* Alert String */
+
+#define NORESCHG 132 /* Alert String */
+
+#define FTOLAUNC 133 /* Alert String */
+
+#define NODROP   134 /* Alert String */
+
+#define NOSHUT   135 /* Alert String */
+
+#define FCNOWRK  136 /* Alert String */

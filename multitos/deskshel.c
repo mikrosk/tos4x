@@ -74,12 +74,16 @@ show_file( file )
 	BYTE	*tail,*bptr;
 
 	shel_envrn( (LONG)&bptr, (LONG)SHSHOW );
-	if ( bptr && d_multi )
+	if ( bptr /* && d_multi */ )
 	{
 	  if ( tail = bld_par(1,1) )
 	  {
+#if 0
 	    if ( !( ret = shel_write( 0, 0, 1,(LONG) bptr, (LONG)tail ) ) )
 	      fill_string( bptr, FTOLAUNC );/* was FTOLAUNCH, changed for LC*/
+#else
+	    ret = run_it(bptr, tail, 0, 0, 0, 0L);
+#endif
 	    free( tail );
 	    if ( ret )
 	      return;		
@@ -134,13 +138,19 @@ printit( str )
 	BYTE	*bptr;
 
 	shel_envrn((LONG)&bptr,(LONG)SHPRINT );	/* user defined print program */
-	if ( bptr && d_multi )
+	if ( bptr /* && d_multi */ )
 	{
 	  if ( !m_sfirst( bptr, 0x31 ) )
 	  {
 	    if ( ch_tail( str, Nostr, comtail ) )
+#if 0
 	      if ( shel_write( 0, 0, 1,(LONG)bptr,(LONG)comtail ) )
 		return( 0 );
+#else
+	      if ( run_it(bptr, comtail, 0, 0, 0, 0L) )
+		return( 0 );
+#endif
+
 	  }
 	  else
 	    fill_string( bptr, FTOLAUNC ); /* was FTOLAUNCH, changed for LC */
@@ -166,15 +176,18 @@ print_file( )
 
 	shel_envrn( (LONG)&bptr, (LONG)SHPRINT );
 
-	if ( bptr && d_multi )
+	if ( bptr /* && d_multi */ )
 	{
 	  if ( !m_sfirst( bptr, 0x31 ) )
 	  {
 	    if ( tail = bld_par(1,1) )
 	    {
+#if 0
 	      if ( !( ret = shel_write( 0, 0, 1,(LONG)bptr,(LONG)tail ) ) )
 	        fill_string( bptr, FTOLAUNC); /* was FTOLAUNCH, changed LC */
-
+#else
+	      ret = run_it( bptr, tail, 0, 0, 0, 0L );
+#endif
 	      free( tail );	
 	      if ( ret )
 	        goto p_1;		/* Done */
@@ -455,7 +468,7 @@ e_3:
 
 /*	Run the application	*/
 
-	VOID
+	WORD
 run_it( file, tail, graphic, setdir, code, limit )
 	BYTE	*file,*tail;
 	WORD	graphic, setdir,code;
@@ -463,11 +476,14 @@ run_it( file, tail, graphic, setdir, code, limit )
 {
 	LONG	ptrs[5];
 	BYTE	*ptr;
+	WORD	ret;
+
+	ret = 0;
 
 	if ( strlen( file ) >= PATHLEN )
 	{
 	  do1_alert( NOBUF );
-	  return;
+	  return ret;
 	}
 				/* Set default directory */
 	strcpy( file, g_buffer );
@@ -491,7 +507,7 @@ run_it( file, tail, graphic, setdir, code, limit )
 	  else
 	  {
 	    do1_alert( NOCART );			
-	    return;
+	    return ret;
 	  }
 	}
 	else
@@ -543,7 +559,7 @@ run_it( file, tail, graphic, setdir, code, limit )
 		wind_update(0);		/* make sure screen is free */
 		menu_bar( menu_addr, FALSE );
 	}
-	if ( !shel_write( code, graphic, 1,(LONG)&ptrs[0],(LONG)tail ) )
+	if ( !(ret = shel_write( code, graphic, 1,(LONG)&ptrs[0],(LONG)tail ) ) )
 	  fill_string( file, FTOLAUNC ); /* was FTOLAUNCH, changed for LC */
 
 	if (!d_multi) {
@@ -573,6 +589,8 @@ run_it( file, tail, graphic, setdir, code, limit )
 		hide_windows(FALSE); 
 #endif
 	}
+
+	return ret;
 }
 #if 0
 		/* not need sine we do a save_/read_inf */

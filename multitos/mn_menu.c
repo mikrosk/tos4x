@@ -57,6 +57,7 @@
  * 			- Modified SetListHeight() to handle 
  *			  drop-down list menus whose parents are not
  *			  at the ROOT.
+ * 06/25/93   cjg	- AdjustMenuPosition() - Add SKipFlag.
  */
 
 
@@ -700,15 +701,20 @@ REG MENU_PTR	MenuPtr;	/* ptr to the menu node... */
  *	      of the screen.
  *	      The menu is adjusted downwards if it exceeds the top 
  * 	      of the screen.
+ * 6) SkipFlag
+ *    FALSE - For the Vertical Position, Adjust the starting item
+ *	      to align with the rect button.
+ *    TRUE  - Skip the alignment of the start item.
  */
 VOID
-AdjustMenuPosition( MenuPtr, xpos, ypos, rect, Horizontal_Flag, Vertical_Flag )
+AdjustMenuPosition( MenuPtr, xpos, ypos, rect, Horizontal_Flag, Vertical_Flag, SkipFlag )
 REG MENU_PTR	MenuPtr;	    /* ptr to the Menu Node         */
 WORD		xpos;		    /* xpos that we originally want */
 WORD		ypos;		    /* ypos that we originally want */
 GRECT		*rect;		    /* GRECT of the button          */
 BOOLEAN		Horizontal_Flag;    /* See above...		    */
 BOOLEAN		Vertical_Flag;	    /* See above...		    */
+BOOLEAN		SkipFlag;	    /* See above...		    */
 {
    REG OBJECT *tree;			        /* Local tree variable   */
    REG WORD   parent;				/* menu object           */
@@ -750,7 +756,11 @@ BOOLEAN		Vertical_Flag;	    /* See above...		    */
    * ADJUST IN THE VERTICAL POSITION
    *------------------------------------------------------------------
    */
-   ObY( parent ) = MYPOS( MenuPtr ) = ypos - ObY( MSTART_OBJ( MenuPtr ) );
+   if( !SkipFlag )
+      ObY( parent ) = MYPOS( MenuPtr ) = ypos - ObY( MSTART_OBJ( MenuPtr ) );
+   else
+      ObY( parent ) = MYPOS( MenuPtr ) = ypos;		/* CJG 06/25/93 */
+
    if( Vertical_Flag )	/* Check and adjust if the menu exceeds the */
    {			/* Screen dimensions.			    */
         /* Check and adjust if the menu exceeds the top of the menu */

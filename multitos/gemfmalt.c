@@ -83,6 +83,9 @@ MLOCAL	WORD	ml_ted[MAXERR] = { A00,A01,A02,A03,-1,-1,A06,-1 };
 GLOBAL	WORD	tmpmoff;
 GLOBAL	WORD	tmpmon;
 
+GLOBAL	WORD	gl_incerr;	/* set to "1" when we are in the critical
+				   error handler */
+
 GRECT	al_grect;		/* for form alert	*/
 WORD	al_center;
 
@@ -470,7 +473,7 @@ eralert( n, d )
 {
 	WORD		*pdrive_let;
 	WORD		drive_let;
-	WORD		ret;
+	WORD		ret, oldret;
 	GRECT		t,m;
 	OBJECT		*obj;
 	FDB		tmp;
@@ -478,6 +481,9 @@ eralert( n, d )
 
 	p = currpd;
 	currpd = errpd;
+
+	gl_incerr = 1;		/* remember that we're in a critical error
+				   handler */
 	ctlmouse( 1 );	
 
 	pdrive_let = &drive_let;
@@ -518,8 +524,20 @@ eralert( n, d )
 	    {
 	      if ( obj[ret].ob_flags & EXIT )
 	      {
-	        ret = ( obj[ret].ob_flags & DEFAULT ) ? 1 : 0;
-	        break;
+	        obj[ret].ob_state |= SELECTED;
+		ob_draw( (LONG)obj, ret, MAX_DEPTH );
+		oldret = ret;
+		do {
+			ret = ob_find( (LONG)obj, 0, MAX_DEPTH, gl_xrat, gl_yrat );
+		} while (gl_button != 0 && oldret == ret);
+
+		obj[oldret].ob_state &= ~SELECTED;
+		ob_draw( (LONG)obj, oldret, MAX_DEPTH );
+		if (ret == oldret && (obj[ret].ob_flags & EXIT))
+		{
+	          ret = ( obj[ret].ob_flags & DEFAULT ) ? 1 : 0;
+	          break;
+		}
 	      }
 	    }
 	  }
@@ -556,6 +574,9 @@ eralert( n, d )
 	bb_restore( &m );
 	gl_tmp = tmp;
 	gsx_sclip( &t );
+
+	gl_incerr = 0;
+
 	ctlmouse(0);
 	currpd = p;
 	return( ret );		/* 1 retry 0 cancel */
@@ -624,13 +645,6 @@ ctlmouse( mon )
 	  gr_mouse( M_ARROW|0xC000, ( MFORM *)0L );
 	  tmpmon = gl_mouse;		/* save the mouse on flag	*/
 	  tmpmoff = gl_moff;
-#if 0
-	  if ( !gl_mouse )	/* if the mouse is currently off	*/
-	  {			/* then turn it on			*/	
-	    gsx_1code( SHOW_CUR, 0 );	/* set the flag			*/	
-	    gl_mouse = TRUE;
-	  }
-#else
 
 	  while( gl_moff )
 	   gsx_mon();
@@ -638,21 +652,11 @@ ctlmouse( mon )
 /*	  gsx_1code( SHOW_CUR, 0 );	*/	/* force the mouse on		*/
 /*	  gl_mouse = TRUE;		*/
 /*	  gl_moff = 0;			*/	/* reset the flag to make bbset work	*/
-#endif
 	}
 	else
 	{
-#if 0
-	  gsx_1code( SHOW_CUR, 0 );	/* force the mouse on		*/
-
-	  gsx_ncode( HIDE_CUR, 0x0L );	/* turn off the mouse anyway	*/
-#endif
 	  while( tmpmoff-- )
 	    gsx_moff();
-#if 0	
-	  if ( !tmpmon )		/* the mouse was off so turn off	*/
-	    gsx_ncode( HIDE_CUR, 0x0L );
-#endif
 /*	  gl_mouse = tmpmon; 	*/
 /*	  gl_moff = tmpmoff;	*/
 /*	  gr_mouse( M_RESTORE, (BYTE*)0 );	*/

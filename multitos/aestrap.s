@@ -123,6 +123,7 @@ _desknoerr:
 	bra	call_err
 
 _dk_trap:
+	move.w	4(a7),d0		; get error
 	cmp.w	#-17,d0			; if swap disk, it's OK
 	bne	d_out
 	jmp	_err_trap		; don't return to here

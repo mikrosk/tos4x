@@ -41,9 +41,16 @@ apbuf_init( VOID )
 	if ( ! ( app = ( APP *)malloc( (LONG)( sizeof( APP ) * apsize ) ) ) )
 	  return( FALSE );
 
-	for ( i = 0; i < apsize; i++ )/* set up linked array	*/
-	  app[i].a_next = ( BYTE *)&app[i+1];
+	app1 = app;
 
+	for ( i = 0; i < apsize; i++,app1++ )/* set up linked array	*/
+	{
+	  app1->a_next = (( BYTE *)app1) + sizeof(APP);
+	  app1->a_name = (BYTE *)0;
+	  app1->a_type = app1->a_icon = app1->a_dicon = app1->a_key = 0;
+	  app1->a_doc[0] = 0;
+	  app1->a_limit = 0;
+	}
 /*	app[i-1].a_next = (APP*)0;	*/
 	app[i-1].a_next = ( BYTE *)0;
 
@@ -116,16 +123,17 @@ m_1:	  do1_alert( FCNOMEM );
 	REG BYTE	*ptr;
 	BYTE	*ptr1;
 
-	if ( !lp_start )		/* No memory	*/
-	  goto lp_1;
-	  
+	if ( !lp_start ) {		/* No memory	*/
+	  *buf = (BYTE *)0;
+	  return( path );
+	}
 	ptr1 = ptr = lp_mid;
 
 	do
 	{
 	  if ( ptr >= lp_end )		/* end of buffer */
 	  {
-lp_1:	    *buf = (BYTE*)0;
+	    *buf = (BYTE*)0;
 	    return( path );
 	  }
 

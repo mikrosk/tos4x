@@ -265,10 +265,16 @@ delrect(rp, rlist)
 	return(  ( RLIST *)NULLPTR );
 
     /* initialize rectangle list */
-    if( area == WF_TOOLBAR )	/* cjg 06/01/93 */
-/*        rlist->rect = *( GRECT *)&( wp->ad_tools[ ROOT ].ob_x );*/
+    if( area == WF_TOOLBAR ) {	/* cjg 06/01/93 */
+	WORD x, y;
+#if 0
 	  ob_actxywh( ( LONG )wp->ad_tools, ROOT, &rlist->rect );
-    else {
+#else
+	  ob_gclip( ( LONG )wp->ad_tools, ROOT, &x, &y, 
+		&rlist->rect.g_x, &rlist->rect.g_y, 
+		&rlist->rect.g_w, &rlist->rect.g_h );
+#endif
+     } else {
     
       if (area == WF_WORKXYWH)
 	  rlist->rect = *(GRECT *)&(wp->obj[W_WORK].ob_x);

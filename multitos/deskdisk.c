@@ -333,7 +333,6 @@ fc_1:	  switch( ret )
 	}		
 }
 
-
 /*	format disk	*/
 
 WORD
@@ -341,9 +340,8 @@ fc_format( OBJECT *obj )
 {
 REG	BYTE	*bufaddr;
 REG	WORD	badindex, ret, i, trackno;
-/*	LONG	dsb, valuel, value2; */
 	WORD	devno, j, k, disktype;
-	WORD	sideno, /*curtrk,*/	skew, skewi;
+	WORD	sideno, skew, skewi;
 	WORD	track, numside, cl;
 REG	WORD	*badtable;
 REG	WORD	*fat;
@@ -409,8 +407,14 @@ memerr:	  do1_alert( FCNOMEM );
 	     if ( skewi < 0 )
 	       skewi += spt;
 
-fagain:	     ret = (WORD)( trap14( FORMAT, bufaddr, &sktable[skewi], devno,
+fagain:
+#ifdef OUR_OPTIMIZER_WORKS
+	     ret = (WORD)( Flopfmt( bufaddr, &sktable[skewi], devno,
 			spt, trackno, sideno, INTERLV, MAGIC, VIRGIN ) );
+#else
+	     ret = (WORD)( Flopfmt( bufaddr, ((LONG)sktable)+skewi+skewi, devno,
+			spt, trackno, sideno, INTERLV, MAGIC, VIRGIN ) );
+#endif /* BAD_OPT */
 
 	     if ( ret == -16 )		/* Bad sectors !	*/
 	     {
@@ -447,13 +451,13 @@ fagain:	     ret = (WORD)( trap14( FORMAT, bufaddr, &sktable[skewi], devno,
 
 	if ( ! ret )			/* set up the Boot Sector info	*/
 	{
-	  trap14( PROTOBT, bufaddr, 0x01000000L, disktype, 0 ); 
+	  Protobt( bufaddr, 0x01000000L, disktype, 0 ); 
 	  *bufaddr = (BYTE)0xe9;
 
 	  if( ret = fc_rwsec(WSECTS, (LONG)bufaddr, 0x0001,0x0000, devno) )
 	    goto eout1;
 					/* now set up the fat0 and fat1	*/
-	  bpbaddr = (BPB *)trap13( GETBPB, devno );
+	  bpbaddr = (BPB *)Getbpb( devno );
 
 	  /* 27-Mar-1985 lmd
 	   * write boot sector again
@@ -547,11 +551,7 @@ REG	DSB	*dsbs, *dsbd;
 	WORD	dev, sectno, ssect, dsect, trkops;
 REG	WORD	j, op, loop;
 
-#if 0
-	bootbuf = (LONG)malloc(0x158L );
-#else
 	bootbuf = (LONG)malloc(0x400L );
-#endif
 	if( !bootbuf )
 	{
 errmem:	  do1_alert( FCNOMEM );
@@ -561,7 +561,7 @@ errmem:	  do1_alert( FCNOMEM );
 	devnos = ( obj[SRCDRA].ob_state & SELECTED ) ? 0 : 1;
 	devnod = ( devnos ) ? 0 : 1;
 
-chksrc:	if( !(dsbs = (DSB *)trap13(GETBPB,devnos)) )
+chksrc:	if( !(dsbs = (DSB *)Getbpb(devnos)) )
 	{
 	  if( do1_alert( FCFAIL ) == 1 ) /* retry */
 	    goto chksrc;
@@ -647,7 +647,7 @@ chksrc:	if( !(dsbs = (DSB *)trap13(GETBPB,devnos)) )
 	      {
 		checkit = FALSE;
 fc_c1:
-		dsbd = (DSB *)trap13(GETBPB,devnod);
+		dsbd = (DSB *)Getbpb(devnod);
 		if( !dsbd )
 		{
 		  if( do1_alert( FCFAIL ) == 1 ) /* retry */
@@ -684,7 +684,7 @@ fc_c1:
 	} /* while( loop-- ) */
 
 						/* change the serialno */
-	trap14( PROTOBT, bootbuf, 0x01000000L, -1, -1 );
+	Protobt( bootbuf, 0x01000000L, -1, -1 );
 	fc_rwsec(WSECTS, (LONG) bootbuf, 0x0001, 0x0000, devnod);
 
 bailout:
@@ -698,7 +698,7 @@ fc_rwsec( WORD op, LONG buf, WORD nsect, WORD sect, WORD dev )
 {
 REG	WORD	ret;
 
-rerw:	if( ret = (WORD)trap13(RWABS, op, buf, nsect, sect, dev) )
+rerw:	if( ret = (WORD)Rwabs(op, buf, nsect, sect, dev) )
 	  if( (ret = do1_alert(FCFAIL)) == 1 ) /* retry */
 	    goto rerw;
 	return( ret ); /* 0=>OK, 2=>error */
@@ -755,11 +755,7 @@ fc_bar( REG OBJECT *obj, REG WORD which )
 	wid = ( wid < bar_max ) ? wid : bar_max; /* don't overflow box */
 
 	obj[which].ob_width = wid;
-#if 0
-	obj[which].ob_spec = 0xFF1121L;
-#else
 	obj[which].ob_spec = 0x00FF0000L | (UWORD)helevcol;
-#endif
 	fc_draw( obj, which, 0 );
 }
 
@@ -797,10 +793,8 @@ extern int int_in[], int_out[];
  * requires inputs as well as outputs
  */
  	WORD
-my_windget(w_handle, w_field, pw1, pw2, pw3, pw4)
-	WORD		w_handle;
-	WORD		w_field;
-	WORD		*pw1, *pw2, *pw3, *pw4;
+my_windget(WORD w_handle, WORD w_field, WORD *pw1, WORD *pw2,
+	   WORD *pw3, WORD *pw4)
 {
 	WM_HANDLE = w_handle;
 	WM_WFIELD = w_field;

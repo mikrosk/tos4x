@@ -35,6 +35,7 @@
 EXTERN	WORD	gl_topw;
 EXTERN	GRECT	gl_rmenu;
 EXTERN	WORD	gl_play;			/* in gemaplib.c	*/
+EXTERN	WORD	gl_incerr;			/* in gemfmalt.c	*/
 EXTERN	WORD	ptsout[];
 EXTERN	WORD	intin[];
 EXTERN	WORD	ptsin[];	
@@ -199,7 +200,8 @@ mchange( mx, my )
 	  Debug7("mchange: screen now owns mouse!!!\r\n");
 	}
 
-	post_mouse( gl_mowner, cu_xrat, cu_yrat );
+	if (!gl_incerr)
+	  post_mouse( gl_mowner, cu_xrat, cu_yrat );
 }
 
 
@@ -264,9 +266,10 @@ tchange( c )
 	REG LONG	c;	/* number of ticks that	have gone by	*/
 {
 	REG EVB		*e;
+	REG WORD	oldsr;
 
 	Debug7( "Tchange\r\n" );
-	cli();
+	oldsr = spl7();
 
 	e = tel;		/* pull pd's off the delay list that 	*/
 				/* have waited long enough		*/
@@ -298,7 +301,7 @@ tchange( c )
 	  CMP_TICK = e->e_parm;
 	  NUM_TICK = 0x0L;
 	}
-	sti();
+	spl(oldsr);
 }
 
 
@@ -375,6 +378,8 @@ b_click( newstate )
 	if ( newstate != gl_button )	/* ignore it unless there is a	*/
 	{				/* change			*/
 	  gl_button = newstate;		/* record the new button state	*/
+	  if (gl_incerr)		/* don't do anything else if we */
+	    return;			/*   are in a critical error    */
 	  if ( gl_bdelay )		/* see if we've already set up 	*/
 	  {				/* a wait			*/
 					/* if the change is into the 	*/
@@ -399,7 +404,7 @@ b_click( newstate )
 				/* the button state that cause the event*/
 				/* to be satisfied			*/
 	    }
-	    else {	/* tell the system that something happened	*/	
+	    else  {	/* tell the system that something happened	*/	
 	      temp = ((LONG) newstate << 16L) & 0xFFFF0001L;
 	      forkq( ( WORD(*)())bchange, temp );
 	    }
@@ -429,6 +434,8 @@ b_delay( amnt )
 	  if ( gl_bdelay <= 0 )	/* changed 3/6/91	*/
 	  {
 	    gl_bdelay = 0;	/* reset the delay	*/
+	    if (gl_incerr)
+		return;
 	    temp = (((LONG) gl_bdesired << 16L) & 0xFFFF0000L) + (LONG)gl_bclick;
 	    forkq( ( WORD(*)())bchange, temp );
 				/* if there is another click coming in	*/

@@ -1406,11 +1406,13 @@ sh_put( pdata, len )
 	WORD
 sh_tographic( VOID )
 {
+	WORD oldsr;
+
 	sh_graphic = TRUE;
 
-	cli();
+	oldsr = spl7();
 	retake();				/* retake the gem trap	*/
-	sti();					/* and error trap	*/
+	spl(oldsr);				/* and error trap	*/
 						
 	gsx_graphic( TRUE );			/* convert to graphic	*/
 	gsx_sclip( &gl_rscreen );		/* set initial clip rect*/
@@ -1429,13 +1431,15 @@ sh_tographic( VOID )
 	WORD
 sh_toalpha( VOID )
 {
+	WORD oldsr;
+
 	sh_graphic = FALSE;
 
 	gr_arrow( aesid );			/* force mouse to arrow */
 
-	cli();
+	oldsr = spl7();
 	giveerr();				/* give up gem and 	*/
-	sti();					/* error trap		*/
+	spl(oldsr);				/* error trap		*/
 						
 	ratexit();				/* turn off the mouse	*/
 	gsx_mfree();				/* free the blt buffer	*/

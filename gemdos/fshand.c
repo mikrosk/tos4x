@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.13 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/09 17:40:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.14  1991/05/09  17:40:38  apratt
+* General stuff.
+*
 * Revision 2.13  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -96,7 +99,7 @@ int h;
 	    return ofdtty(h+3);		/* old-style BIOS dev */
         }
 	DBCMD(8,"print syshnd (wpeek (`a6 + 8)) >> "
-	    "lpeek(lpeek(.run)+3c + (4 * wpeek(a6+8))); _c");
+		"lpeek(lpeek(lpeek(.run)+3c) + (4 * wpeek(a6+8)));_c");
 	return run->p_uft[h];
 }
 
@@ -748,6 +751,7 @@ int flg;
     uint rec;
     DMD *dmd;
     uint curcl;
+    int eof_flag = 0;
 
     dfd = ofd->o_dfd;
 
@@ -760,6 +764,9 @@ int flg;
 
     if (n > dfd->dfd_fileln || n < 0)
 	return(ERANGE);
+
+    /* no-op if you aren't really seeking. */
+    if (n == ofd->o_bytnum) return n;
 
     dmd = &drvtbl[dfd->dfd_dev];
 
@@ -780,6 +787,23 @@ int flg;
 		curcl = ofd->o_dfd->dfd_strtcl;
 		swp68(curcl);
 	    }
+	    if (n == dfd->dfd_fileln && (n & (dmd->m_clsizb-1)) == 0) {
+		/*
+		 * seek to end of file which is end of cluster: This is
+		 * flagged in xrw as a special case, where the recno is one
+		 * GREATER than the last record in curcl. "New" will have
+		 * been set above to one cluster more than are in the file,
+		 * so we bump it down and set a flag which gets used later.
+		 * We do it here because if new < old then this can't
+		 * happen -- you aren't seeking to end of file, are you?
+		 */
+		new--;
+		eof_flag = 1;
+		DBCMD(8,(&dfd,&new,&old,&n,  /* force these to be on stack */
+			"print seek to eof at cluster boundary.;"
+			"print n: (lpeek(a6+8)) new: (lpeek(a6-8)) "
+			"old: (lpeek(a6-0c));_c"));
+	    }
 	    clcount = (new-old);
 	}
 
@@ -795,8 +819,15 @@ int flg;
 		(!(curcl = getcl(curcl,dmd)))) return ERROR;
 	}
 
-	/* set rec to the record offset in this clust */
-	rec = (n & (dmd->m_clsizb-1)) >> dmd->m_rblog;
+	/*
+	 * Set rec to the record offset in this clust.  Set it to the
+	 * cluster size in records if you're seeking to the end of file at
+	 * a cluster boundary.  'rec' in that case is always zero (cluster
+	 * bounardy, remember?) and you want the result to be the first
+	 * record number PAST that cluster.
+	 */
+	if (eof_flag) rec = dmd->m_clsiz;
+	else rec = (n & (dmd->m_clsizb-1)) >> dmd->m_rblog;
 
 	ofd->o_curcl = curcl;
 	ofd->o_currec = cl2rec(curcl,dmd) + rec;

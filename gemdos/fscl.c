@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/09 17:40:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.18  1991/05/09  17:40:38  apratt
+* General stuff.
+*
 * Revision 2.17  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -424,14 +427,12 @@ alldone:
  * 
  * clfix(cl,link,dmd) writes 'link' into the FAT entry for cl
  * 
- * nextcl(cl,dmd,extflag,&extended) returns the next cluster in the chain,
- * extending the chain if necessary and extflag.  When extending, marks the
- * new cluster with -1.  *extended reflects whether or not the chain was
- * actually extended; pass in NULL if you don't care. Returns zero on EOF
- * when !extflag, and when extending fails because there are no free
- * clusters, and also if cl's entry is 0 or 0xfffx (where x is 0-e).  If cl
- * itself is zero, the first free cluster on the disk is returned (and
- * marked with -1).
+ * nextcl(cl,dmd,extflag) returns the next cluster in the chain, extending
+ * the chain if necessary and extflag.  When extending, marks the new
+ * cluster with -1.  Returns zero on EOF when !extflag, and when extending
+ * fails because there are no free clusters, and also if cl's entry is 0 or
+ * 0xfffx (where x is 0-e).  If cl itself is zero, the first free cluster
+ * on the disk is returned (and marked with -1).
  * 
  **********************************************************************/
 
@@ -629,17 +630,14 @@ DMD *dmd;
 
 
 uint
-nextcl(cl,dmd,extflag,extended)
+nextcl(cl,dmd,extflag)
 uint cl;
 DMD *dmd;
 int extflag;
-int *extended;
 {
     uint xcl, lastcl, cl2, rover, i;
 
     DBCMD(4,"print nextcl;_c");
-
-    if (extended) *extended = 0;
 
     if (!cl) {
 	if (!extflag) return 0;
@@ -666,7 +664,7 @@ extend:
 	if (!cl && dmd->m_16) {
 	    cl2 = fastcl(dmd,FALSE);
 	    if (!cl2) {
-		DBCMD(4,"print fastcl/no free space;_c");
+		DBCMD(4,"print fastcl, no free space;_c");
 		return 0;
 	    }
 	}
@@ -684,13 +682,12 @@ extend:
 		}
 		if (++rover > lastcl) rover = 0;
 	    }
-	    DBCMD(4,"print slowcl/no free space;_c");
+	    DBCMD(4,"print slowcl, no free space;_c");
 	    return 0;
 	}
 gotone:
 	if (cl) clfix(cl,cl2,dmd);
 	clfix(cl2,-1,dmd);
-	if (extended) *extended = 1;
 	DBCMD(4,"print extended: return cl2;_c");
 	return cl2;
     }
@@ -853,6 +850,13 @@ on a record boundary, the op can't have a head, only a middle and a tail.
  * It seems like this code handles falling off a cluster a lot: in three
  * different places.  If you can think of a better way, let me know.
  * 
+ * There is some oddball code here which sets and interprets currec a
+ * little strangely: if currec is greater than the last record number in
+ * cluster curcl, you are deemed to have stopped a previous read or write
+ * at the end of a cluster.  The true currec is the first record of the
+ * next cluster after curcl, extending if necessary.  This is normally
+ * handled pretty smoothly, but ixlseek has some trouble spoofing this
+ * behavior.
  */
 
 long
@@ -868,7 +872,6 @@ void (*bufxfr) _P((uint, void *, void *));
     uint lenhead, lenmid, lentail;
     uint run_start, run_len;
     uint xcl;
-    int extended = FALSE;
     ulong rc;
     ulong runlen;
     DFD *dfd;
@@ -878,7 +881,7 @@ void (*bufxfr) _P((uint, void *, void *));
     ulong bytnum;
     uint curcl, currec, recoffs;
 
-    DBCMD(4,"print xrw flg: (wpeek (`a6 + 8)) "
+    DBCMD(4,"print _xrw flg: (wpeek (`a6 + 8)) "
 	  "ofd: (lpeek (`a6 + a)) "
 	  "len: (lpeek (`a6 + e)) "
 	  "ubufr: (lpeek (`a6 + 12));_c");
@@ -904,23 +907,23 @@ void (*bufxfr) _P((uint, void *, void *));
 	    /* file is empty */
 	    DBCMD(4,"print file is empty;_c");
 	    if (!wrtflg) return 0;
-	    if (!(curcl = nextcl(0,dmd,wrtflg,NULL))) {
+	    if (!(curcl = nextcl(0,dmd,wrtflg))) {
 		/* can't extend file from zero size */
 		return 0;
 	    }
 	    dfd->dfd_strtcl = curcl;
 	    swp68(dfd->dfd_strtcl);
 	    dfd->dfd_dirty = 1;
-	    /* set extended now; if there's a middle this is set again */
-	    extended = TRUE;
 	}
 	currec = cl2rec(curcl,dmd);
     }
     else {
     	if (currec >= (cl2rec(curcl,dmd) + dmd->m_clsiz)) {
 	    /* a previous read/write ended at a cluster boundary. */
-	    if (!(curcl = nextcl(curcl,dmd,wrtflg,NULL))) {
+	    DBCMD(4,"print previous r/w ended at cluster boundary;_c");
+	    if (!(curcl = nextcl(curcl,dmd,wrtflg))) {
 		/* no next cluster: end of file or full disk */
+		DBCMD(4,"print no next cluster: EOF or full disk;_c");
 		return 0;
 	    }
 	    currec = cl2rec(curcl,dmd);
@@ -951,7 +954,7 @@ void (*bufxfr) _P((uint, void *, void *));
 	/* if more to do, extend file to include next cluster */
 	if (len && ((currec & dmd->m_clrm) == 0)) {
 	    DBCMD(4,"print more to do and fell off - a cluster: advance;_c");
-	    xcl = nextcl(curcl,dmd,wrtflg,NULL);
+	    xcl = nextcl(curcl,dmd,wrtflg);
 	    if (xcl == 0) goto eof;
 	    curcl = xcl;
 	    currec = cl2rec(curcl,dmd);
@@ -972,7 +975,7 @@ void (*bufxfr) _P((uint, void *, void *));
 	    DBCMD(4,"print top of middle loop;_c");
 	    if ((++currec & dmd->m_clrm) == 0) {
 		/* fell off a cluster */
-		xcl = nextcl(curcl,dmd,wrtflg,NULL);
+		xcl = nextcl(curcl,dmd,wrtflg);
 		if (xcl == 0) goto eof;
 		curcl = xcl;
 		currec = cl2rec(curcl,dmd);
@@ -1002,7 +1005,7 @@ void (*bufxfr) _P((uint, void *, void *));
 	/* if there's more work and fell off a clust, advance to next cl */
 	if (lentail && ((currec & dmd->m_clrm) == 0)) {
 	    DBCMD(4,"print there is a tail and it starts a new cluster;_c");
-	    xcl = nextcl(curcl,dmd,wrtflg,&extended);
+	    xcl = nextcl(curcl,dmd,wrtflg);
 	    if (xcl == 0) goto eof;
 	    curcl = xcl;
 	    currec = cl2rec(curcl,dmd);
@@ -1013,11 +1016,12 @@ void (*bufxfr) _P((uint, void *, void *));
 
     if (lentail) {
 	DBCMD(4,"print do the tail;_c");
-	/* getrec for the record; if extended, don't read it in */
-	bufp = getrec(currec + dmd->m_recdata,
-			dmd,
-			(extended ? 2 : wrtflg),
-			NULL);
+	/*
+	 * Call getrec for the record. If bytnum >= old fileln, use
+	 * the flag that says not to read in the record.
+	 */
+	bufp = getrec(currec + dmd->m_recdata,dmd,
+			((bytnum >= dfd->dfd_fileln) ? 2 : wrtflg), NULL);
 	(*bufxfr)(lentail,bufp,ubufr);
 	bytnum += lentail;
 
@@ -1114,8 +1118,8 @@ int drv;
 
 long
 xgetfree(buf,drv)
-uint drv;
 long *buf;
+uint drv;
 {
     uint i;
     uint free;

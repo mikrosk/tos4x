@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
+* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/09 17:40:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.16  1991/05/09  17:40:38  apratt
+* General stuff.
+*
 * Revision 2.15  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -162,6 +165,8 @@ DIR *dir;
  * the "label" bit of a subdir.  You can get YOURSELF into trouble with
  * this, but you can't get GEMDOS into trouble!
  *
+ * QUIET CHANGE FROM ORIGINAL GEMDOS: you can do Fattrib of "." and ".."
+ *
  * ERROR CONSIDERATIONS: when writing, we just call dirdirty().
  */
 
@@ -181,8 +186,8 @@ int attr;			/* attribute byte */
 
     attr &= 0xff;
 
-    /* Will match anything but a label; return any error */
-    if (err = fn2dir(&p,&dir,FN_NORM)) return err;
+    /* Will match anything but a label (incl. "." or ".."); return any error */
+    if (err = fn2dir(&p,&dir,FN_TRAILOK)) return err;
 
     oattr = dir.dir_fcb->f_attrib;
     if (!wrt) return (ulong)oattr;	/* reading */

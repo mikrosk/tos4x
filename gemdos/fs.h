@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/09 17:40:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.21  1991/05/09  17:40:38  apratt
+* General stuff.
+*
 * Revision 2.20  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -84,12 +87,7 @@
 #if __STDC__
 #define _P(x) x
 #define ASSERT(exp) ((exp) ? 0 : __assert (#exp, __FILE__, __LINE__))
-#define __assert(exp,file,line) ( \
-	sprintf(assertbuf,"Failed assert: \"" exp "\" file %s line %ld",\
-		file,(long)line), \
-	panic1(assertbuf))
-extern char assertbuf[];
-extern void sprintf();
+extern volatile void __assert(const char *exp,const char *file,long line);
 #define voidfn void
 #else
 #define _P(x) ()
@@ -350,9 +348,9 @@ OFD
 	DFD	*o_dfd;		/* DFD this OFD refers to */
 	uint	o_use;		/* use count */
         uint    o_mode;		/* mode file opened in (r, w, r/w) */
-	ulong	o_bytnum;	/* byte pointer within file */
-	uint	o_curcl;	/* current cluster pointer */
-	uint	o_currec;	/* rec number of current cluster */
+	ulong	o_bytnum;	/* byte number within file */
+	uint	o_curcl;	/* current cluster number on disk */
+	uint	o_currec;	/* rec number of current r/w poiner */
 };
 
 
@@ -397,10 +395,11 @@ DIR
 	FCB	*dir_fcb;	/* points into buffer, only if fresh */
 };
 
-/* flags to fn2dir */
+/* flags to fn2dir; ok to mix dotsok and trailok */
 #define FN_NORM 0
 #define FN_DOTSOK 1
 #define FN_EARLY 2
+#define FN_TRAILOK 4
 
 /*
  * File Control Block

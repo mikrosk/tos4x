@@ -1,19 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: lozben $
 * =======================================================================
 *
-* $Date: 89/08/25 15:38:36 $
+* $Date: 89/08/25 18:46:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.22  89/08/25  18:46:04  lozben
+* Fixed a bug in EsetShift().
+*
 * Revision 2.21  89/08/25  15:38:36  apratt
 * Added new dma boot code which calls _dmaread, and added _dmaread
 * as XBIOS call $2a.
-*
+* 
 * Revision 2.20  89/08/25  12:23:16  lozben
 * EsetShift() now always returns old shift mode register value.
 * 
@@ -288,7 +291,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.21 $
+* $Revision: 2.22 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -4311,7 +4314,7 @@ crctab:
 	dc.w	$48c4,$58e5,$6886,$78a7,$0840,$1861,$2802,$3823
 	bsr	wvbl			; wait for start of vertical-blank
 	move.w	shiftmd(a5),-(sp)	; save return value
-	move.w	4(sp),shiftmd(a5)	; set shift mode register
+	move.w	8(sp),shiftmd(a5)	; set shift mode register
 	clr.w	vblsem(a5)		; disable vblank processing
 	dc.w	$1080,$00a1,$30c2,$20e3,$5004,$4025,$7046,$6067
 	move.w	#1,vblsem(a5)		; re-enable vblank

@@ -3,18 +3,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/03/22 13:48:22 $
+* $Date: 89/03/23 17:32:00 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.5  89/03/23  17:32:00  apratt
+* Added real memory controller programming and memory sizing for TT.
+* The memory sizing is actually not TT-dependent.
+* Also fixed some things in the DMA SOUND vblank handler... Now
+* it really works.
+*
 * Revision 2.4  89/03/22  13:48:22  apratt
 * Changed monochrome detect code in vblank -- it would wait until GPIP
 * read the same way twice, which might *never* happen.  Now it waits
 * until bit 7 of GPIP reads the same way twice, which is more common.
-*
+* 
 * Revision 2.3  89/03/09  08:32:06  apratt
 * Fixed priv handler -- correct one got lost in folding-in process. (TT only)
 * 
@@ -194,7 +200,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.4 $
+* $Revision: 2.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1233,7 +1239,72 @@ mem3:	addq.w	#4,d6			; adjust config	byte for 512K
 
 cold3:	move.b	d6,memconf		; setup	memory controller
 
+.endc
 	bra	gotshadow
+.ifne TT
+	addq.l	#8,a0			; (compare at shadow+8)
+	lea	memr1(pc),a4		; a4 ->	return addr
+	bra	memchk			; (check the pattern)
+memr1:	beq	mem4			; yes -- small parts
+	move.l	d7,a0
+	add.l	d7,a0
+	addq.l	#8,a0			; (compare at shadow*2+8)
+	lea	memr2(pc),a4		; a4 ->	return addr
+	bra	memchk			; (check it)
+memr2:	beq	mem3			; yes -- medium parts
+	move.w	#8,a0			; pattern matches at $8? (ANY parts?)
+	lea	memr3(pc),a4		; a4 ->	return addr
+	bra	memchk			; (attempt match)
+memr3:	bne	mem4			; no --	nothing	in this	bank
+	addq.w	#4,d6			; adjust config	byte for big parts
+mem3:	addq.w	#4,d6			; adjust config	byte for medium parts
+mem4:	sub.l	#bank1,d1		; decrement bank number
+	beq	mem1			; repeat check for bank	0
+	move.b	d6,memconf		; setup	memory controller
+
+* end of not-stpad clause
+.endif
+* end of not-sparrow clause
+.endif
+.else
+
+* TT memory sizing
+*
+* Routine notes: at the .endc, d5 must hold phystop, and d6 must hold
+* the value to put in memconf and memcntlr.  Furthermore, the ssp
+* should be set to #$8000.
+*	(256Kx4 onboard) plus (256Kx4 add-on)
+*	(256Kx4 onboard strapped at 8M) plus (1Mx4 (=8M) add-on at 0)
+* 	1) consult a calendar  (1Mx4 DRAMs are not expected in
+	move.b	#$a,memconf(a5)		; but mem cntlr for big
+* 	2) a) set the memory controller for 1M parts
+	move.l	d0,$1008(a5)		; clear space first so pattern
+	move.l	d0,$100c(a5)		; doesn't "happen" to be there
+*            c) look for the pattern to be repeated in RAM as though
+	move.l	d0,$8(a5)		; write pattern
+	cmp.l	$1008(a5),d0		; shadowed here?
+	bne.s	mt_big			; no, definitely big parts
+* 	      IF there is a repeat
+	move.l	d0,$c(a5)		; try a different pattern & addr
+	cmp.l	$100c(a5),d0		; shadowed here?
+	beq.s	mt_done			; yes - definitely small parts
+*
+* Routine notes: at the .endif, d5 must hold phystop, and d6 must hold
+* the value to put in memconf and memcntlr.
+	move.b	d6,memconf(a5)
+
+* while we're at it, program fast-RAM memory refresh.  This
+* involves catching the bus error it causes.  $E0 is the proper
+* refresh rate, so we write to $FFD000E0.  See TT spec for this.
+
+	lea.l	$8000,sp
+	lea.l	mt_berr,a0
+	move.l	a0,8(a5)
+	clr.w	$ffd000e0
+
+mt_berr: nop				; placate stupid as68!
+.endc
+	beq	mt_cold			; definitely a cold boot
 
 *  Determine memory size (once we've setup the memory
 *  controller) by probing successive locations until
@@ -1275,19 +1346,9 @@ mt_done:
 *
 *  SPARROW also doesn't need this.
 *-
-.endc
 	lea	$8000,sp		; initialize SP just this once
-.ifne TT
-* TT stopgap memory sizing: assume 2Meg in 256Kbit parts.
-	move.l	#$00200000,d5		; set phystop
-	move.w	#5,d6			; set mem cntlr mode
-	move.b	d6,memconf(a5)
-	move.l	#$8000,sp
-.endc
  endc
 *  - screen size and clear from top down. Now leaves screen where it is (at
-
-
  ifeq systype-rom
 *+
 *  [ROM based system]
@@ -2235,7 +2296,7 @@ vbl:
 	move.b	gpip(a5),d1		; get gpip with monomon
 
 	movem.l	d0-d7/a0-a6,-(sp)	; save registers
-	cmp.b	gpip(a5),d2		; still the same?
+	move.b	gpip(a5),d2		; still the same?
 
 *------	Call deferred interrupt	vectors:
 	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
@@ -2246,7 +2307,7 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	cmp.l	#0,a1			; if(a1	== NULL) continue;
 	beq	vbl11
 	movem.l	d7/a0,-(sp)		; save registers
-	tst.b	d0			; was sound active?
+	jsr	(a1)			; call routine
 	bne.s	v_read2			; yes - don't invert monomon
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
 v_read2:

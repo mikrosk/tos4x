@@ -1,15 +1,22 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.6 $	$Source: fsfs.c,v $
+* $Revision: 2.7 $	$Source: fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:30:04 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 17:07:46 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.7  91/01/23  17:07:46  apratt
+* Previously, using Fdatime to write the date/time of a zero-length file
+* would write that date/time to any open zero-length file in that dir. Fixed.
+*
+* Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
+* d_scan, m_fatofd, m_ofl, and d_dirfil.
+*
 * Revision 2.6  91/01/23  14:30:04  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 
@@ -126,7 +133,7 @@ DND *p;
   f = MGET(OFD);		/* panics when it fails */
       f->o_strtcl = p->d_strtcl;
       f->o_fileln = 0x7fffffffL;
-      f->o_dirfil = p->d_dirfil;
+      f->o_dirfil = p->d_parent->d_ofd;
       f->o_dnode = p->d_parent;
       f->o_dirbyt = p->d_dirpos;
       f->o_date = p->d_date;
@@ -219,7 +226,7 @@ int mod;		/* open mode */
    */
   for (p2 = dn->d_files; p2; p2 = p2->o_link)
     if (p2->o_dirbyt == p->o_dirbyt)
-      break; /* same dir, same dcnt */
+      break; /* same dir, same dirbyt */
 
   p->o_link = dn->d_files;
   dn->d_files = p;
@@ -227,7 +234,6 @@ int mod;		/* open mode */
   if (p2)
     { /* steal time,date,startcl,fileln and add to thread */
       xmovs(12, &p2->o_time, &p->o_time);
-      p2->o_thread = p;
     }
   else
     {
@@ -546,8 +552,10 @@ int wrt;			/* 0:get, 1:set */
   t[1] = buf[1];
   swp68(t[0]);
   swp68(t[1]);
+
+  /* write the time/date of all OFD's for this file. */
   for (fd = f->o_dnode->d_files; fd; fd = fd->o_link) {
-    if (fd->o_strtcl == f->o_strtcl) {
+    if (fd->o_dirbyt == f->o_dirbyt) {
 	fd->o_time = t[0];
 	fd->o_date = t[1];
 	fd->o_flag |= O_DIRTY;
@@ -621,7 +629,7 @@ long pos;			/* position of file in directory file */
     NOTE that both 'for' loops scan for the entire length of their respective
     data structures, and do not drop out of the loop on the first
     occurence of a match.
-    */
+  */
 
   for (fd = dn->d_files; fd; fd = fd->o_link)
     if (fd->o_dirbyt == pos)
@@ -802,10 +810,10 @@ char *s2;	/* new name (just the name part) */
 
     /* change the file name in the parent */
 
-    ixlseek(d->d_dirfil,d->d_dirpos);
-    ixwrite(d->d_dirfil,11L,buf);
+    ixlseek(d->d_parent->d_ofd,d->d_dirpos);
+    ixwrite(d->d_parent->d_ofd,11L,buf);
 
-    return ixclose(d->d_dirfil,CL_DIR);
+    return ixclose(d->d_parent->d_ofd,CL_DIR);
 }
 
 /*	Function 0x42	f_seek

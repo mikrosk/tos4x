@@ -1,16 +1,19 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.8 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.9 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 91/03/27 12:37:31 $     $Locker:  $
+#  $Author: apratt $	$Date: 91/03/27 14:00:26 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.8  91/03/27  12:37:31  apratt
-#  Changed to add the "pad" machine.  Took out TSXMACHINE; dmaread and clock
-#  are the only files for which multiple machines are really the same binary,
-#  and that's just not enough to worry about.
+#  Revision 2.9  91/03/27  14:00:26  apratt
+#  Changed so switches files are in a subdirectory.
 #
+# Revision 2.8  91/03/27  12:37:31  apratt
+# Changed to add the "pad" machine.  Took out TSXMACHINE; dmaread and clock
+# are the only files for which multiple machines are really the same binary,
+# and that's just not enough to worry about.
+# 
 # Revision 2.7  90/11/26  13:16:28  apratt
 # Flop now has .sx, .e, and .t extensions, though .e and .t
 # are really the same thing.  (Both TT and MSTE have high-density
@@ -68,7 +71,7 @@
 # 	g	germany
 # 	f	france
 # 	k	uk
-# 	s	spain (must also set PAL to 0 or 1)
+# 	s	spain
 # 	i	italy
 # 	w	sweden
 # 	a	swissfra
@@ -146,26 +149,30 @@ clear.o:	clear.s
 
 ############
 
+# any switches.x?? will do, where x is machine
+
 flop.$(MACHINE): flop.s
-		cp switches.$(MACHINE)au switches.s
+		cp switches\switches.$(MACHINE)au switches.s
 		$(ASM)
 
 dmaread.$(MACHINE): dmaread.s
-		cp switches.$(MACHINE)au switches.s
+		cp switches\switches.$(MACHINE)au switches.s
 		$(ASM)
 
 clock.$(MACHINE): clock.s
-		cp switches.$(MACHINE)au switches.s
+		cp switches\switches.$(MACHINE)au switches.s
 		$(ASM)
 
 ############
 
+# any switches.xy? will do, where x is machine and y is systype
+
 startup.$(MACHINE)a:	startup.s
-		cp switches.$(MACHINE)au switches.s
+		cp switches\switches.$(MACHINE)au switches.s
 		$(ASM)
 
 startup.$(MACHINE)o:	startup.s
-		cp switches.$(MACHINE)ou switches.s
+		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
 ############
@@ -173,5 +180,5 @@ startup.$(MACHINE)o:	startup.s
 # any switches.x?y will do for BIOS (x is machine, y is country)
 
 bios.$(MACHINE)$(CCODE):	bios.s
-		cp switches.$(MACHINE)a$(CCODE) switches.s
+		cp switches\switches.$(MACHINE)a$(CCODE) switches.s
 		$(ASM)

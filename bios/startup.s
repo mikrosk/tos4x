@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/07 13:00:59 $
+* $Date: 89/02/08 17:45:15 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.33  89/02/08  17:45:15  apratt
+* Backed off screen base to phystop-$25800 for TT (in two places).
+*
 * Revision 1.32  89/02/07  13:00:59  apratt
 * made priv handler conditional on LONGFRAME, not TT
-*
+* 
 * Revision 1.31  89/02/06  21:55:55  apratt
 * Little (but frustrating!) bug fixes so TT would work.
 * 
@@ -166,7 +169,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.32 $
+* $Revision: 1.33 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1261,7 +1264,12 @@ mt_done:
 *-
 	clr.l	a5
 	move.l	d5,d0			; d0 = phystop - 32K
+.ifeq TT
 	sub.l	#$8000,d0
+.endc
+.ifne TT
+	sub.l	#$25800,d0		; TT needs lots of screen RAM
+.endc
 	lsr.w	#8,d0
 	move.b	d0,dbasel(a5)		; dbasel = d0 >> 8
 	swap	d0
@@ -1341,14 +1349,20 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *  used anywhere in the OS.  For a RAM TOS, that's not the one we want:
 	cmp.l	a0,a1			; at end?
 	move.l	phystop(a5),a0		; video_base = phystop - 0x8000
+.ifeq TT
 .if M68030
+*+
+.endc
+.ifne TT
+	sub.l	#$25800,a0		; TT needs LOTS of video RAM
+	move.w	#$9600-1,d1
+.endc
 	move.l	a0,_v_bas_ad(a5)
 	move.b	_v_bas_ad+1(a5),dbaseh(a5) ; load high addr
 	move.b	_v_bas_ad+2(a5),dbasel(a5) ; load low (really, medium) addr
  .ifne STPLUSVIDEO
 	move.b	_v_bas_ad+3(a5),dbasell(a5)	; load lo byte addr
  .endc
-	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero
 *  Setup display base,
 *  clear display memory.
 *

@@ -4,17 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/11/19 15:45:12 $
+* $Date: 90/11/19 19:35:27 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.20  90/11/19  19:35:27  apratt
+* Fixed a bug which has been here since day 1: on single-drive systems,
+* Flopfmt and Flopwr to the boot sector set the state of disk A to "has
+* changed" even if you formatted/wrote to disk B.
+*
+* Documentation alert: the docs say writing to sector zero causes the flag
+* to go to "maybe changed" but it actually goes to "has changed."
+*
 * Revision 2.19  90/11/19  15:45:12  apratt
 * Changed HI_DEN to be TT+STPLUS - it's available in Mega STe.
 * Removed READFIFO, which was unused (was there for an old MCU).
-*
+* 
 * Revision 2.18  90/08/21  17:26:50  apratt
 * Mega STe version: made SLOWACSI true for STPLUS, too.
 * 
@@ -147,7 +155,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.19 $
+* $Revision: 2.20 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1557,12 +1565,19 @@ rwd2:	cmp.b	tcdr,d1
 	dbra	d0,rwd1			; loop d0 times
 	movem.l	(sp)+,d0-d1
 .endif
+	rts
+
+
+
 *+
 * change - check to see if the "right" floppy has been inserted
-	lea	_diskmode.w,a0	; a0 -> disk mode table
+* On the stack:
 *	$10(sp) - dev.W (device#)
 *	 $c(sp) - dsb.L (pointer to Device State Block)
-	move.b	(sp)+,(a0,d0.w)		; set drive's mode
+*	  8(sp) - dma.L (dma pointer)
+*	  4(sp) - ret1.L (caller's return address)
+*	  0(sp) - ret.L (change's return address)
+*
 * Returns:	both media "might have changed" condition
 *		and "grace" timers expired.
 *

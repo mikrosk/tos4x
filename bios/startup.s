@@ -4,25 +4,32 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/26 17:50:25 $
+* $Date: 91/05/02 17:40:55 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.68  91/05/02  17:40:55  apratt
+* Added code to save tbcr in addition to the enable bit from iera
+* in noblank1.  Can't hurt, and probably will help: if somebody
+* has the interrupt enabled and the counter stopped, and we
+* end up leaving the counter running (and restore the enable bit),
+* you'll start getting timer B ints!
+*
+* end up leaving the counter running (and restore the enable bit),
+* you'll start getting timer B ints!
+* 
 * Revision 2.67  91/04/26  17:50:25  apratt
 * Version number is back to x.06, so we can go out with that number.
 * See discussion of even version numbers in the comments.
-*
+* 
 * Added _FDC cookie; this is tentative, and will become firm on or near May
 * 2, 1991.  For now the cookie is installed and the high word is one if
 * configuration switch bit 6 is thrown.
-*
+* 
 * New in-house version number tracking scheme: as soon as there's a release,
-* the number is incremented and 'a' gets added; the letter changes when
-* necessary.  For rev's release, the letter is dropped.
-*
 * the number is incremented and 'a' gets added; the letter changes when
 * necessary.  For rev's release, the letter is dropped.
 * 
@@ -91,7 +98,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.67 $
+* $Revision: 2.68 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -4141,6 +4148,11 @@ p_dstres:	ds.w	1		; destination rez (0, 1)
 p_colpal:	ds.l	1		; -> color palettes
 p_type:		ds.w	1		; printer type (0, 1)
 p_port:		ds.w	1		; printer port (0, 1)
+p_masks:	ds.l	1		; -> halftone masks
+
+	.text
+
+*+
 *-
 
 *
@@ -4155,11 +4167,15 @@ tb_1:	tst.b	tbdr			; changed yet?
 	move.b	iera,d0			; save old iera
 	and.b	#1,d0			; (really only old timer B enable)
 	bclr	#0,iera			; disable Timer B's interrupt
+	swap	d0
+	move.b	tbcr,d0			; save old timer control reg
 	clr.b	tbcr			; halt the timer
 	clr.b	tbdr			; load a zero there
 	move.b	#$08,tbcr		; start timer B in event-count mode
 tb_2:	tst.b	tbdr			; changed yet?
 	beq	tb_2			; (not yet)
+	move.b	d0,tbcr			; restore control register
+	swap	d0
 	or.b	d0,iera			; OR in old enable bit for timer B
 	rts				; return
 

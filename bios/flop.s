@@ -4,13 +4,16 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/11/06 21:27:32 $
+* $Date: 1992/02/12 01:32:28 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.37  1992/02/12  01:32:28  apratt
+* Added loops .if SPARROW to check the SDMA status bit.
+*
 * Revision 2.36  1991/11/06  21:27:32  apratt
 * New code to check _iamanst and avoid hitting denselect if you are.
 * This only works if writing denselect on (non-Mega) STe doesn't buserr.
@@ -120,7 +123,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.36 $
+* $Revision: 2.37 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $
@@ -493,6 +496,7 @@ frd1a:	move.w	#e_error,curr_err	; set general error#
 	tst.b	gpip
 	tst.b	gpip
 	tst.b	gpip
+	tst.b	gpip
 
 * why does this write to diskctl not use wdiskctl? Because it's actually
 * writing to the DMA chip, not the 1770.
@@ -560,7 +564,6 @@ err_bits:
 	bne	eb1
 
 	moveq	#e_crc,d1		; CRC error?
-
 	btst	#3,d0
 	bne	eb1
 	move	def_error.w,d1		; use default error#
@@ -618,8 +621,14 @@ fwr1a:	move.w	#e_error,curr_err.w	; set general error#
 	tst.b	gpip
 	tst.b	gpip
 	tst.b	gpip
-	move.w	#1,d7			; load sector-count register
+	tst.b	gpip
 	move.w	#$190,(a6)		; leave	in WRITE mode
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+
+	move.w	#1,d7			; load sector count register
 	bsr	wdiskctl
 .if SPARROW
 spwait1:
@@ -900,6 +909,11 @@ etok:
 	tst.b	gpip
 	tst.b	gpip
 	move.w	#$190,(a6)
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+
 	moveq	#$60,d7			; (absurd sector count)
 	bsr	wdiskctl
 .if SPARROW
@@ -1038,6 +1052,7 @@ tvr1:	move.b	cdma+3.w,dmalow		; load dma pointer
 	tst.b	gpip
 	tst.b	gpip
 	move.w	#$090,(a6)
+	tst.b	gpip
 	tst.b	gpip
 	tst.b	gpip
 	tst.b	gpip

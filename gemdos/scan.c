@@ -1,12 +1,16 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.17 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.18 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/25 13:04:24 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/26 23:41:50 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.18  1991/06/26  23:41:50  apratt
+* Added a line to fail if a slash is at the end of a string and
+* this isn't a DIR scan.
+*
 * Revision 1.17  1991/06/25  13:04:24  apratt
 * This is slightly simplified from before... dots are always OK,
 * double slashes always stop the scan, and EROOT is returned only
@@ -312,7 +316,7 @@ int scan_type;
 			"-s (lpeek (lpeek (`a6 + 8))) "
 			"dir -x (lpeek (`a6 + c)) is:;"
 			"dirx (lpeek (`a6 + c));_c");
-		return E_OK;
+	    return E_OK;
 	}
 
 	/*
@@ -384,6 +388,8 @@ dotmatch:
 	    /* fail if found a file but not at end of path */
 	    if (!(attr & FA_SUBDIR)) return EPTHNF;
 	    ++name;
+	    /* fail if the slash was the end of the string and not a DIR scan */
+	    if (!trailok && !*name) return EFILNF;
         }
     } while (*name);
 

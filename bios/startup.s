@@ -4,13 +4,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/24 17:16:37 $
+* $Date: 91/04/26 17:50:25 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.67  91/04/26  17:50:25  apratt
+* Version number is back to x.06, so we can go out with that number.
+* See discussion of even version numbers in the comments.
+*
+* Added _FDC cookie; this is tentative, and will become firm on or near May
+* 2, 1991.  For now the cookie is installed and the high word is one if
+* configuration switch bit 6 is thrown.
+*
+* New in-house version number tracking scheme: as soon as there's a release,
+* the number is incremented and 'a' gets added; the letter changes when
+* necessary.  For rev's release, the letter is dropped.
+*
+* the number is incremented and 'a' gets added; the letter changes when
+* necessary.  For rev's release, the letter is dropped.
+* 
 * Revision 2.66  91/04/24  17:16:37  apratt
 * Changed dates and version number for x.07.  Added frestore of null
 * state in reset code (comment was there but code wasn't).  Added
@@ -18,9 +33,6 @@
 * zero are getting zeros on purpose.  Added a write to STPAD power
 * control registers.  Changed the delay back to 90 sec -- there was
 * no reason to change to 60, and if it ain't broke...  Added a
-* ROM CRC check to detect (among other things) incorrect switch
-* settings before you burn half a day debugging it.
-*
 * ROM CRC check to detect (among other things) incorrect switch
 * settings before you burn half a day debugging it.
 * 
@@ -79,7 +91,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.66 $
+* $Revision: 2.67 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -112,7 +124,10 @@
 * reading RAM address >3fffff).
 *
 * The software line in question is First Byte's Kid series.  They have
-* doesn't work for other reasons.
+* been notified of this problem (AKP 5/3/88).
+*
+* As of TT TOS, we have rescinded this restriction, because their software
+* doesn't work for other reasons.  However, a TOS which goes in STe or MSTe
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
 *
@@ -142,21 +157,21 @@ DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
-version		equ	$0207		; version number
-date		equ	$04241991	; STPLUS date, $MMDDYYYY @check@
+version		equ	$0206		; version number
+date		equ	$04251991	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010011000 ; Apr 24, 1991
+dosdate		equ	%0001011010011001 ; Apr 25, 1991
 .else
 .ifne TT
-version		equ	$0307		; version number (need not be even)
-date		equ	$04241991	; TT date, $MMDDYYYY @check@
+version		equ	$0306		; version number (need not be even)
+date		equ	$04251991	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010011000 ; Apr 24, 1991
+dosdate		equ	%0001011010011001 ; Apr 25, 1991
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
-version		equ	$0147
-date		equ	$04241991
+version		equ	$0146
+date		equ	$04251991
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010011000 ; Apr 24, 1991
+dosdate		equ	%0001011010011001 ; Apr 25, 1991
 .endc
 .endc
 
@@ -1508,6 +1523,10 @@ mste:	move.l	a1,$8
 * Furthermore, the "1" state should be the default, since some STEs and TTs
 * are/were manufactured with all switches open (or missing!).
 *
+* Note: at the end of this code, d0 has the switches in it, or $FF if there
+* aren't any.  That's used later to set the _SND and _FDC cookies.
+*
+
 .ifne STPLUS
 * Get here on bus error touching ttscu1 -- we're not a Mega STe.
 .endc
@@ -1530,7 +1549,7 @@ gotem:	move.l	a1,$8
 
 
 .else
-	moveq.l	#0,d0
+	moveq.l	#$ffffffff,d0		; no switches, use FF for other things
 .endc
 	clr.w	d0			; set d0 back to "normal STe"
 * end of TT+STPLUS configuration switches setting.
@@ -1552,6 +1571,40 @@ gotem:	move.l	a1,$8
 	or.b	d2,d1			; or in a 1 for present, 0 for missing
 	move.l	d1,(a0)+		; set _SND value
 .endc
+cdone1:
+.endif
+.endif
+* switches, when zero, means you have high-density capability.  This is
+* defined as "Flopfmt of 18 sectors gives you high-density at 18 sectors"
+* and "Protobt(4) gives you 80 tracks / double sided / 18 spt" and
+* Floprd/Flopwr/Flopver work on high-density disks (and auto-detect them)."
+*
+* The high word of the value of the _FDC cookie holds a value indicating
+* the kinds of drives available: 0000 means 720K only, 0001 means 1.44MB,
+* and other values are undefined, but will eventually mean stuff like
+* 2.88MB.  The low word of the cookie is to be used by vendors who want to
+* identify their products; they should register their desires with somebody
+* (as of 4/25/91 it's Bill Rhebock).  Zero means Atari's 1772-clone that
+* runs reliably at 16MHz.
+*
+* We're being cagey about this because we don't want to preannounce
+* the high-density floppy capability, and besides, we don't want people
+* looking at the switches directly if we can help it.  So, like DMASND,
+* you get a cookie based on a switch.
+*
+gotsnd:	move.l	d1,(a0)+		; write sound cookie value
+	btst.l	#$6,d0			; second switch thrown (read as 0)?
+* d0.b still holds the configuration switches as computed above.
+
+* defined as "Flopfmt of 18 sectors gives you high-density at 18 sectors"
+	move.l	#$00010000,(a0)+	; 1 means 1.44MB, 0 means Atari
+* Floprd/Flopwr/Flopver work on high-density disks (and auto-detect them)."
+* One day we'll have a switch which tells us to install the quad-density
+* version of this cookie, meaning all of the above at 36 spt, plus "Protobt
+* type 5 gives 36 spt."
+*
+* The high byte of the value of the _FDC cookie holds a value indicating
+* the kinds of drives available: 00 means 720K only, 01 means 1.44MB, and
 * other values are undefined, but will eventually mean stuff like 2.88MB. 
 * The low three bytes of the cookie is to be used by vendors who want to
 * identify their products; they should register their desires with somebody

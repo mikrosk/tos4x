@@ -4,16 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/05 15:26:53 $
+* $Date: 1991/09/06 14:50:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.36  1991/09/06  14:50:56  apratt
+* Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
+*
 * Revision 2.35  91/08/05  15:26:53  apratt
 * Modified coldboot code for STPAD
-*
+* 
 * Revision 2.34  91/06/20  14:06:47  apratt
 * Removed new keyboard code (was conditional on OLDIKBD)
 * because I found a way to hook in a TSR to fix overrun without
@@ -84,10 +87,10 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.35 $
+* $Revision: 2.36 $
 * =======================================================================
 *
-* $Source: /u2/MRS/osrevisions/bios/bios.s,v $
+* $Source: e:/tos/bios\RCS\bios.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -126,57 +129,57 @@
 *			%cccccp
 *			      p = pal/ntsc (0 = ntsc, 1 = pal)
 *			     cc = country (0 = usa, ...)
- ifeq country-usa
+*
 *-
-.endc
+
 .globl osconf
- ifeq country-germany
+
 .if country == usa
-.endc
+osconf		equ	%00000
 .endif
- ifeq country-france
+
 .if country == germany
-.endc
+osconf		equ	%00011
 .endif
- ifeq country-uk
+
 .if country == france
-.endc
+osconf		equ	%00101
 .endif
- ifeq country-spain
+
 .if country == uk
-.endc
+osconf		equ	%00111
 .endif
- ifeq country-italy
+
 .if country == spain
-.endc
+osconf		equ	%01001
 .endif
- ifeq country-sweden
+
 .if country == italy
-.endc
+osconf		equ	%01011
 .endif
- ifeq country-swissfra
+
 .if country == sweden
-.endc
+osconf		equ	%01101
 .endif
- ifeq country-swissger
+
 .if country == swissfra
-.endc
+osconf		equ	%01111
 .endif
- ifeq country-turkey
+
 .if country == swissger
-.endc
+osconf		equ	%10001
 .endif
- ifeq country-finland
+
 .if country == turkey
-.endc
+osconf		equ	%10011
 .endif
- ifeq country-norway
+
 .if country == finland
-.endc
+osconf		equ	%10101
 .endif
- ifeq country-denmark
+
 .if country == norway
-.endc
+osconf		equ	%10111
 .endif
 
 .if country == denmark
@@ -191,9 +194,9 @@ osconf		equ	%11001
 	.globl	_timr_ms		;timer C calibration
 	.globl	etv_timer		;system timer handoff vector
 	.globl	_hz_200			;timer c raw tick
-.ifne TT
+	.globl	conterm			;console configuration byte
 	.globl	_dumpflg		;flag to signal a screen dump(alt-HELP)
-.endc
+	.globl	bell_hook		;hook for bell handling
 	.globl	kcl_hook		;hook for keyclick handling
 
 .if TT
@@ -492,10 +495,10 @@ txderr	equ	$124	;transmitter error interrupt
 txbufe	equ	$128	;transmitter buffer empty interrupt
 rxderr	equ	$12C	;receiver error interrupt
 rxbufe	equ	$130	;receiver buffer full interrupt
-.ifne TT
+sysclk	equ	$134	;free...free...free...		timer a
 rng232	equ	$138	;ring indicator rs-232		(i6)
 monitr	equ	$13C	;monochrome monitor detect	(i7)
-.endc
+
 
 .if TT
 ttmfpibase	equ	$140
@@ -1392,7 +1395,7 @@ ikbdwc:
 	move.w	6(sp),d1
 ikbdput:
 	lea	keyboard,a1	;point to ikbd register base
-.ifeq TT
+.if !TT
 * wait 5ms using a trick: assume that Timer C is still programmed as
 * we set it up.  Read the Timer C countdown register, then wait for
 * a new read which is GREATER than that one.  That means (at least)
@@ -1408,7 +1411,7 @@ ikput3:	cmp.b	tcdr(a0),d0	; while (tcdr <= d0)
 	move.w	#191,d0		; do this loop 192 times
 ikput2:	move.b	(a0),d2		; get a value
 ikput3:	cmp.b	(a0),d2		; changed?
-.endc
+	beq	ikput3		; no - loop
 	dbra	d0,ikput2	; yes - load a new value and loop
 ikbdret:
 .else
@@ -1521,7 +1524,7 @@ initmfp:
 	moveq	#$0,d0		;init to zero for clearing mfp
 	movep.l	d0,gpip(a0)	;clear gpip thru iera
 	movep.l	d0,ierb(a0)	;clear ierb thru isrb
-.ifne TT
+	movep.l	d0,isrb(a0)	;clear isrb thru vr
 
 	move.b	#$48,vr(a0)	;set mfp autovector and s-bit
 	bset.b	#2,aer(a0)	* NOTE: Trigger on Withdrawn CTS
@@ -1529,7 +1532,7 @@ initmfp:
 .if TT
 	lea	ttmfp,a0	; init TT mfp
 	moveq.l	#0,d0
-.endc
+	movep.l	d0,gpip(a0)	; clear TT_gpip thru TT_iera
 	movep.l	d0,ierb(a0)	; clear TT_ierb thru TT_isrb
 	movep.l	d0,isrb(a0)	; clear isrb thru vr
 
@@ -1577,7 +1580,7 @@ initmfp:
 *	TTMFP has no control lines, so that doesn't matter.
 *	The TT's two SCC channels are initialized here, too.
 *
-.ifne TT
+
 	lea.l	mfp,a0
 	move.l	#$00880105,d0
 	movep.l	d0,scr(a0)	;inits scr,ucr,rsr,tsr
@@ -1585,11 +1588,11 @@ initmfp:
 .if TT
 	lea.l	ttmfp,a0
 	move.l	#$00880105,d0
-.endc
+	movep.l	d0,scr(a0)
 
-.ifne TT+STPLUS
+.if TT | STPLUS
 	move.b	#1,(brate+ttribufptr).w	; save in ttmfp's iorec
-.endc
+.endif
 
 	tst.b	_iamanst		; if you're an ST don't do this
 	bne	noscc
@@ -1603,13 +1606,13 @@ initmfp:
 
 *	initialize the rs-232 buffer record structure
 
-.ifne TT
+	lea	ribufptr.w,a0
 	lea	rs232init,a1
 	moveq	#rssize,d0
 	bsr	lbmove		;do block move
 
 .if TT
-.endc
+* initialize the rs-232 buffer record structure for TTMFP
 	lea	ttribufptr.w,a0
 	lea	ttrs232init,a1
 	moveq	#rssize,d0
@@ -1704,7 +1707,7 @@ st1:     move.l  d1,d2
 	lea	midikey,a2
         moveq   #$6,d0          ;load in interrupt # to setup
         bsr     initint         ;go to service routine
-.ifne TT
+
 	lea	ctsint,a2	;point to the CTS interrupt routine...
 	moveq	#$2,d0		;point to the CTS interrupt number
 	bsr	initint
@@ -1717,7 +1720,7 @@ st1:     move.l  d1,d2
 
 	move.l	(a3)+,(a0)+		; copy four vectors
 	move.l	(a3)+,(a0)+
-.endc
+	move.l	(a3)+,(a0)+
 	move.l	(a3)+,(a0)+
 
 	or.b	#%00011110,ttmfp+iera	; enable RS232 ints
@@ -2445,20 +2448,20 @@ bumxit:	rts
 * For TT, if the argument is 0 (for RS232), we read the current mapping
 * from the variable mapiorec, which is maintained by Bconmap.
 *
-.ifne TT+STPLUS
+.if TT | STPLUS
 
-.endc
+.endif
 	.globl	iorec
 
 iorec:
 	move.w	4(sp),d1
-.ifne TT+STPLUS
+.if TT | STPLUS
 .globl mapiorec
 
 	beq	auxiorec
 	asl.l	#2,d1			;x4=index into devtab space
 	move.l	devtab(pc,d1.w),d0	;get device bufrec pointer
-.endc
+.endif
 	rts
 
 auxiorec:
@@ -2793,7 +2796,7 @@ defmaptab:	ds.l	$18 * deftabsize
 *
 * The last entry here is not a routine pointer, it's an iorec pointer.
 * It gets stuffed into the variable mapiorec, and that variable is returned
-.ifne TT
+* as the value of an Iorec(0) call.
 *
 
 .text
@@ -2804,7 +2807,7 @@ imapvecs:
 	dc.l	bistat,bin,bostat,bout,brsconf,chbibufptr
 	dc.l	ttistat,ttin,_ttostat,_ttout,ttrsconf,ttribufptr
 	dc.l	aistat,ain,aostat,aout,arsconf,chaibufptr
-.ifne STPLUS
+.if STPLUS
 deftabsize	equ	4	; number of lines in imapvecs
 defmap		equ	0	; index into imapvecs of ROM-default map
 
@@ -2818,10 +2821,10 @@ imapvecs:
 
 deftabsize	equ	1
 defmap		equ	0
-; end ifne STPLUS
-.endc
-; end ifne TT
-.endc
+; end if STPLUS
+.endif
+; end if TT
+	dc.l	bistat,bin,bostat,bout,brsconf,chbibufptr
 	dc.l	aistat,ain,aostat,aout,arsconf,chaibufptr
 
 deftabsize	equ	3
@@ -2899,7 +2902,7 @@ mapend:	rts
 * This (re-)initializes xconstat etc. for device 1 (the mappable one).
 *
 
-.ifne STPLUS
+.if STPLUS
 * We have to check now: if you're really an STPLUS, not a Mega STe,
 	move.l	a0,maptab.w
 	move.w	#deftabsize,maptabsize.w
@@ -2916,7 +2919,7 @@ ttscu1		equ	$ffff8e09
 	move.l	$8,a2
 	move.l	#mapierr,$8
 	tst.b	ttscu1
-.endc
+	move.w	#deftabsize,d0		; no error: on a Mega STe!
 mapierr:
 	move.l	a1,sp
 	move.l	a2,$8
@@ -2937,7 +2940,7 @@ iloop:	move.l	(a1)+,(a0)+
 	move.l	(a1)+,$20(a0)
 	move.l	(a1)+,$40(a0)
 	move.l	(a1)+,$60(a0)
-.ifne TT
+	move.l	(a1)+,maprsconf.w
 	move.l	(a1)+,mapiorec.w
 
 	rts
@@ -3115,9 +3118,9 @@ ttritxoff:	ds.b	1
 ttrirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 *					* Bit 1 = Handshake (0=Disabled)
 ttrisendnow:	ds.b	1
-.endc
+ttbrate:	ds.b	1		* saved baud rate for Rsconf(-2)
 ttmask:		ds.b	1		; not used
-.ifne TT+STPLUS
+.if TT | STPLUS
 
 
 .even
@@ -3279,12 +3282,12 @@ _setupscc:
 
 	move.l	a0,$8		; un-catch bus error
 	lea	sccvecbase,a0	; write interrupt vectors
-.ifne TT
+	lea	intvecs(PC),a1
 	moveq	#$f,d0
 vloop:	move.l	(a1)+,(a0)+
 	dbra	d0,vloop
 
-.endc
+.if TT
 * the next instruction (clear sccctl) disables SCC DMA on TT, but
 * can't be executed on (Mega-) STe because there's no SCC DMA chip.
 
@@ -4012,7 +4015,7 @@ chbirxoff:	ds.b	1
 chbitxoff:	ds.b	1
 chbirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 *					* Bit 1 = Handshake (0=Disabled)
-.endc
+.endif
 .text
 
 *	revised 05/01/86	Mike Schmal
@@ -4439,7 +4442,7 @@ altkp1:
 	move.w	d0,altkp		;and store it back
 	move.l	(sp)+,a0		;pop saved register
 	rts				;and return
-	ifeq	country-germany
+
 * no, it wasn't ALT plus a keypad number key
 
 notaltkp:
@@ -4468,9 +4471,9 @@ altger2:
 	bne.b	outside		;no...
 	move.b	#$5d,d0		;put in ']', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
-	endc
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	ifeq	country-spain
+	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 
 .endif
@@ -4513,9 +4516,9 @@ altspa3:
 	move.b	#$00,d0		;put in $00, instead...it's a alt-shift ;
 	bra	conin25a		;process it
 altspa4:
-	endc
+	cmpi.b	#$27,d1		;is it a ALT-n~
 	bne.b	outside		;no...
-	ifeq	country-france
+	move.b	#$00,d0		;put in $00, instead...it's a alt-shift ;
 	bra	conin25a		;process it
 
 .endif
@@ -4550,10 +4553,10 @@ altfr3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
 	move.b	#$40,d0		;put in '@', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
-	endc
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7e,d0		;put in '|', instead...it's a alt-shift #
-	ifeq	country-sweden
+	bra	conin25a		;process it
 
 .endif
 
@@ -4588,10 +4591,10 @@ altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
 	move.b	#$5e,d0		;put in '^', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
-	endc
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$40,d0		;put in '@', instead...it's a alt-shift #
-	ifeq	country-norway
+	bra	conin25a		;process it
 
 .endif
 
@@ -4626,11 +4629,11 @@ altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
 	move.b	#$5e,d0		;put in '^', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
-	endc
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$40,d0		;put in '@', instead...it's a alt-shift #
 	bra	conin25a		;process it
-	ifeq	country-italy
+
 .endif
 
 
@@ -4661,11 +4664,11 @@ altsw2:	cmpi.b	#$2b,d1		;is it a ALT-\ ?
 	beq	conin25a	;process it as unshifted
 	move.b	#'~',d0		;put in '~',instead...it's a alt-shift-\
 	bra	conin25a	;process it
-	endc
+altsw3:	cmpi.b	#$60,d1		;is it a ALT-ISO?
 	bne.b	outside		;no...
 	move.b	#'`',d0		;put in '`'; shifted value is also '`'
 	bra	conin25a		;process it
-	ifeq	country-swissger
+
 .endif
 
 
@@ -4704,10 +4707,10 @@ altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	bne.b	outside		;no...
 	move.b	#$7e,d0		;put in '~', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
-	endc
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7c,d0		;put in |', instead...it's a alt-shift umlaut!
-	ifeq	country-turkey
+	bra	conin25a		;process it
 
 .endif
 
@@ -4758,11 +4761,11 @@ altsw5:	cmpi.b	#$35,d1		;is it a ALT-$?
 	bne.b	outside		;no...
 	move.b	#$3c,d0		;put in '<', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
-	endc
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$3e,d0		;put in '>', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
-	ifeq	country-swissfra
+
 .endif
 
 
@@ -4801,10 +4804,10 @@ altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	bne.b	outside		;no...
 	move.b	#$7e,d0		;put in '~', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
-	endc
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7c,d0		;put in |', instead...it's a alt-shift umlaut!
-	ifeq	country-denmark
+	bra	conin25a		;process it
 
 .endif
 
@@ -4842,7 +4845,7 @@ altden3:
 	bne.b	outside		;no...
 	move.b	#$40,d0		;put in '@', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
-	endc
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$27,d0		;put in <'>, instead...it's a alt-shift #
 	bra	conin25a		;process it
@@ -5064,7 +5067,7 @@ mauskey1:
 *
 * compile in the limit of 1MB and clear it from ROM.
 *
-.ifne STPAD
+* Yes, you can really only clear 1MB.  If you clear 4MB on a 1MB machine
 	move.l	#$8,a0
 * megabyte it shadows.
 	move.l	#$00040000-1,d1
@@ -5073,7 +5076,7 @@ mauskey1:
 .globl coldboot
 coldboot:
 	move.w	#$2700,sr
-.ifne TT
+.if STPAD | SPARROW
 .if M68030
 	move.l	#$808,d0		; clobber the cache
 	movec	d0,cacr			; (clear & disable)
@@ -5085,7 +5088,7 @@ coldboot:
 .data
 tdis:	dc.l	0
 .text
-.endc
+
 .endif
 
 	move.l	$4,$8			; set bus error to reset vector
@@ -5100,12 +5103,12 @@ cploop:	move.l	d0,(a0)+
 .if M68030
 	move.l	#$808,d0		; clobber the cache
 	movec	d0,cacr			; (clear & disable)
-.ifne TT
+	moveq.l	#0,d0
 	movec	d0,vbr			; write 0 to the vector base address
 	pmove	tdis,tc
 	dc.l	$f0390800,tdis		; pmove tdis,tt0
 	dc.l	$f0390c00,tdis		; pmove tdis,tt1
-.endc
+.data
 tdis:	dc.l	0
 .text
 
@@ -5114,7 +5117,7 @@ tdis:	dc.l	0
 	move.w	#(coldend-coldcode)/4,d0	; number of longs - 1
 	lea.l	coldcode(PC),a0
 	move.l	#$c,a1
-.ifne TT
+mloop:	move.l	(a0)+,(a1)+
 	dbra	d0,mloop
 	jmp	$c			; with no cache this is safe
 
@@ -5122,10 +5125,10 @@ tdis:	dc.l	0
 * cold boot code - clear all of slow memory (until bus error),
 * then all of fast memory (until bus error) if on a TT.
 * 
-.endc
+
 coldcode:
 .if TT
-.endc
+	lea.l	berr1(PC),a0	; TT: bus error goes to second phase
 	move.l	a0,$8
 .else
 	move.l	$4,$8		; not TT: bus error jumps to reset vector
@@ -5770,7 +5773,7 @@ snd1:
 ringbel:
 	btst.b	#$2,conterm.w
 	beq.b	rgbel
-	ifeq	country-usa
+	move.l	bell_hook,a0
 	jsr	(a0)
 	rts
 
@@ -5829,10 +5832,10 @@ keyshif:
 	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
 	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	.endc
+	dc.b	$00,$00,$00,'(',')','/','*','7'
 	dc.b	'8','9','4','5','6','1','2','3'
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	ifeq	country-turkey
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
 keycl:
 	dc.b	$00,$1b,'1','2','3','4','5','6'
@@ -5891,11 +5894,11 @@ keyshif:
 	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
 	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	.endc
+	dc.b	'X',$00,$00,'(',')','/','*','7'
 	dc.b	'8','9','4','5','6','1','2','3'
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	ifeq	country-uk
+
 keycl:
 	dc.b	$00,$1b,'+','1','2','3','4','5'
 	dc.b	'6','7','8','9','0','-',$08,$09
@@ -5955,10 +5958,10 @@ keyshif:
 	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 	dc.b	'|',$00,$00,'(',')','/','*','7'
-	.endc
+	dc.b	'8','9','4','5','6','1','2','3'
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	ifeq	country-germany
+
 keycl:
 	dc.b	$00,$1b,'1','2','3','4','5','6'
 	dc.b	'7','8','9','0','-','=',$08,$09
@@ -6017,9 +6020,9 @@ keyshif:
 	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
 	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	.endc
+	dc.b	'>',$00,$00,'(',')','/','*','7'
 	dc.b	'8','9','4','5','6','1','2','3'
-	ifeq	country-spain
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
 keycl:
@@ -6078,10 +6081,10 @@ keyshif:
 	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
 	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	.endc
+	dc.b	'>',$00,$00,'(',')','/','*','7'
 	dc.b	'8','9','4','5','6','1','2','3'
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	ifeq	country-france
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
 keycl:
 	dc.b	$00,$1b,'1','2','3','4','5','6'
@@ -6140,9 +6143,9 @@ keyshif:
 	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
 	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	.endc
+	dc.b	'>',$00,$00,'(',')','/','*','7'
 	dc.b	'8','9','4','5','6','1','2','3'
-	ifeq	country-sweden
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
 keycl:
@@ -6171,10 +6174,10 @@ keycl:
 keytran:
 	.dc.b   0,esc,"1234567890+",$82,bs,tab,'qwertyuiop',$86,$81,cr,0
 	.dc.b	"asdfghjkl",$94,$84,"'",0,$5c,'zxcvbnm,.-',0,0,0,space,0
-	.endc
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	ifeq	country-norway
+	.dc.b	'<',0,0,'()/*7894561230.',cr
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 
 keyshif:
@@ -6203,10 +6206,10 @@ keycl:
 keytran:
 	.dc.b   0,esc,"1234567890+",$82,bs,tab,'qwertyuiop',$86,$81,cr,0
 	.dc.b	"asdfghjkl",$b3,$91,"'",0,$5c,'zxcvbnm,.-',0,0,0,space,0
-	.endc
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	ifeq	country-italy
+	.dc.b	'<',0,0,'()/*7894561230.',cr
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 
 keyshif:
@@ -6239,10 +6242,10 @@ keytran:
 	dc.b	'd','f','g','h','j','k','l',$95,$85,$97,0,'\','z','x','c','v'
 	dc.b	'b','n','m',',','.','-',0,0,0,' ',0,0,0,0,0,0
 	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
-	endc
+	dc.b	0,0,0,del,0,0,0,0,0,0,0,0,0,0,0,0
 	dc.b	'<',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
 	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
-	ifeq	country-swissger
+
 keyshif:
 	dc.b	0,esc,'!','"',$9c,'$','%','&','/','(',')','=','?','^', bs,tab
 	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$82,'*', cr,0,'A','S'
@@ -6271,10 +6274,10 @@ keycl:
 keytran:
         dc.b    0,esc,'1234567890',"'",'^',bs,tab,'qwertzuiop',$81,$B9,cr,0
         dc.b    "asdfghjkl",$94,$84,$DD,0,"$yxcvbnm,.-",0,0,0,space,0
-	.endc
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
         dc.b    '-',0,0,0,'+',0,0,0,0,del
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-	ifeq	country-swissfra
+        dc.b    '<',0,0,'()/*7894561230.',cr
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
 
 keyshif:
@@ -6303,9 +6306,9 @@ keycl:
 keytran:
         dc.b    0,esc,'1234567890',"'",'^',bs,tab,'qwertzuiop',$8a,$B9,cr,0
         dc.b    "asdfghjkl",$82,$85,$DD,0,"$yxcvbnm,.-",0,0,0,space,0
-	.endc
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
         dc.b    '-',0,0,0,'+',0,0,0,0,del
-	ifeq	country-denmark
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
         dc.b    '<',0,0,'()/*7894561230.',cr
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
 
@@ -6334,7 +6337,7 @@ keycl:
 keytran:
 	.dc.b   0,esc,"1234567890+",$ba,bs,tab,'qwertyuiop',$86,'*',cr,0
 	.dc.b	"asdfghjkl",$91,$b3,$82,0,'#','zxcvbnm,.-',0,0,0,space,0
-	endc
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
 	.dc.b	'<',0,0,'()/*7894561230.',cr
@@ -6414,8 +6417,7 @@ bellsnd:
 	.dc.b	5,0
 	.dc.b	6,0
 	.dc.b	7,$FE
-*
-	.end
+	.dc.b	8,$10		;enable envelope, ch a
 	.dc.b	9,0
 	.dc.b	10,0
 	.dc.b	11,0

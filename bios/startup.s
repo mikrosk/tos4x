@@ -1,19 +1,24 @@
 .super
 ****************** Revision Control System *****************************
 *
-* $Author: lozben $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/10/23 18:37:17 $
+* $Date: 89/12/06 14:03:49 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.35  89/12/06  14:03:49  apratt
+* In the reset-bailout vector test, there are some sanity checks.
+* One of them checks to be sure that the high byte of the vector is 00.
+* This is OK on ST and STE, but not TT, so I made it conditional.
+*
 * Revision 2.34  89/10/23  18:37:17  lozben
 * Set the rez shadow register when setting the shifter on the TT.
-*
+* 
 * Revision 2.33  89/10/03  12:41:40  apratt
 * Added VBLQ1ST switch (in *this* file, not switches.s) which, when
 * nonzero, moves the VBL queue processing to the beginning of
@@ -346,7 +351,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.34 $
+* $Revision: 2.35 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1260,8 +1265,11 @@ reset2:
 reset2:	cmp.l	#resmagic,resvalid.w	; is resvalid the magic	number?
 * if STPAD, read the switches register to learn the state of top closed &
 * power on.  Clobber resvalid if they are BOTH down, which is a state that
+.ifeq TT
+* install a reset vector to never-never land; you can't just turn off the
 * power and wait for RAM to decay.  Note that other things (modem wake,
 * alarm wake, extern wake) can bring the power bit down besides the button;
+.endc
 *
 * Also read the STylus button register & don't jump through resvector
 * if both buttons are down.  Well, there's no STylus so this is moot.

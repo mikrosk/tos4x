@@ -4,21 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/06/13 16:29:42 $
+* $Date: 91/06/20 14:09:52 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.6  91/06/20  14:09:52  apratt
+* Added another bit in the flags word of the BPB: set flags & 2 when
+* the floppy claims to have fewer than two FATs.  New GEMDOSes
+* should check this and not write two FATs when this is set.
+*
 * Revision 2.5  91/06/13  16:29:42  apratt
 * Added a check of the four-byte serial number that MSDOS 5.0 puts at offset
 * $27 in the boot sector.  For non-MSDOS 5.0 disks, this is just another four
 * bytes' worth of chance to be different, but for MSDOS 5.0 disks it's the
 * ONLY chance, since they all appear to have the same serial number.
-*
+* 
 * See also GEMDOS of this date for new media change handling.
-*
+* 
 * Revision 2.4  91/05/21  16:57:45  apratt
 * Removed things which were ifdef DAS_BOOT, and left in unconditionally those
 * things which were ifndef DAT_BOOT.  Added Protobt type 5 for quad density,
@@ -63,7 +68,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.5 $
+* $Revision: 2.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -356,6 +361,10 @@ WORD dev;
     p->datrec = p->fatrec + p->rdlen + p->fsiz;
     p->numcl = (u2i(diskbuf + IBM_NSECTS) - p->datrec) / p->clsiz;
     p->bflags = 0;	/* Floppies always have 12-bit FATs */
+
+    /* if the disk has only one FAT, set a flag in bflags saying so. */
+    /* Newer GEMDOSes check this and only write the FAT once if set. */
+    if (diskbuf[IBM_NFATS] < 2) p->bflags |= 2;
 
     q->dnsides = u2i(diskbuf + IBM_NSIDES);		/* "extra" info */
     q->dspt = u2i(diskbuf + IBM_SPT);

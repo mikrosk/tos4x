@@ -3,19 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/12/30 11:42:22 $
+* $Date: 89/01/13 15:41:07 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.26  89/01/13  15:41:07  apratt
+* NO CODE CHANGE: just comment changes around trp13tab and trp14tab
+* documenting assigned BIOS and XBIOS function numbers.
+*
 * Revision 1.25  88/12/30  11:42:22  apratt
 * Change for STPLUS only: dbasell was defined as the address of the
 * register as a WORD, but was being used as a byte.  Now it's the
 * address as a byte.  Also, D.RENN assures me that the register's low-
 * order bit will always read as zero, so I don't need to mask it out.
-*
+* 
 * Revision 1.24  88/12/21  11:01:45  apratt
 * Fixed two places where (a5) was used when a5 wasn't clear.
 * Oops.  Also updated some comments before 'reset2' with cleverer
@@ -140,7 +144,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.25 $
+* $Revision: 1.26 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2270,10 +2274,9 @@ b_supr:	move.w	(sp)+,d0		; get function#
 * can't use high byte of address on M68030: use low bit instead.
 	bclr.l	#0,d1			; clear & test odd bit
 	move.l	d1,a0			; doesn't affect ccr!
+	beq	b_1			; was clear before: points to code.
 .endif
 	move.l	(a0),a0			; indirect through RAM...
-
-
 *
 trp14tab:
 *
@@ -2324,35 +2327,40 @@ trp13tab:
 
 	dc.l	unimpl			; 40: used by AKP's DB alpha vers.
 
-	dc.l	unimpl			; 42: unused
+
+	dc.l	unimpl			; 42: unused (0x2a)
 	dc.l	unimpl			; 43: unused
 	dc.l	unimpl			; 44: unused
 	dc.l	unimpl			; 45: unused
 	dc.l	unimpl			; 46: unused
 	dc.l	unimpl			; 47: unused
-	dc.l	unimpl			; 48: unused
-	dc.l	unimpl			; 49: unused
 	dc.l	_setcolor		; 7: set single color
-	dc.l	unimpl			; 50: unused
-	dc.l	unimpl			; 51: unused
-	dc.l	unimpl			; 52: unused
-	dc.l	unimpl			; 53: unused
-	dc.l	unimpl			; 54: unused
-	dc.l	unimpl			; 55: unused
-	dc.l	unimpl			; 56: unused
-	dc.l	unimpl			; 57: unused
-	dc.l	unimpl			; 58: unused
-	dc.l	unimpl			; 59: unused
+	dc.l	_floprd			; 8: read floppy sector(s)
 	dc.l	_flopwr			; 9: write floppy sector
-	dc.l	unimpl			; 60: unused
-	dc.l	unimpl			; 61: unused
-	dc.l	unimpl			; 62: unused
-	dc.l	unimpl			; 63: unused
+	dc.l	_flopfmt		; 10: format floppy track
+	dc.l	_getdsb			; 11: no-op (but returns 0L);
+					; 11 is also used by AKP's debugger, DB
+	dc.l	midiws			; 12: write string to MIDI port
+	dc.l	mfpint			; 13: initialize MFP interrupt
+	dc.l	iorec			; 14: set I/O record
+	dc.l	rsconf			; 15: configure RS-233 communications
+	dc.l	keytrans		; 16: set keyboard translation tables
+
+	dc.l	_rand			; 17: generate 24-bit random number
+	dc.l	_proto_bt		; 18: prototype boot sector
+	dc.l	_flopver		; 19: floppy verify
+
+	dc.l	_dumpit			; 20: dump screen
+	dc.l	_cursconf		; 21: get/set cursor configuration
+	dc.l	setclock		; 22: set ikbd/clock chip time
+	dc.l	getclock		; 23: get ikbd/clock chip time
+	dc.l	bioskeys		; 24: reset keyboard to powerup default
 	dc.l	ikbdws			; 25: write string to ikbd
 
-* NOTE: I have given away sections of the XBIOS function-number space.
-* Unfortunately, I have forgotten which ones.  They're all just above
-* decimal 64, though.  Watch this space.
+* 0x41..0x48 are assigned to Arabic TOS for their use.  Don't ask me 
+* what that use is.  If you use up 0x2a..0x2f you'll have to pad
+* this table with seven "assigned" entries before you get to the
+* "unused" ones.
 	dc.l	dosound			; 32: startup sound daemon
 	dc.l	unimpl			; 50: assigned
 	dc.l	unimpl			; 66: assigned

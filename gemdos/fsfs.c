@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
+* $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.12  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 2.11  1991/02/21  03:07:32  apratt
 * This version performs this testbed perfectly.
 *
@@ -49,9 +52,11 @@ DIR *dir;
 	    dfd->dfd_dirrec == dir->dir_recno &&
 	    dfd->dfd_diroffs == dir->dir_recoffs) {
 		/* same file */
+		DBCMD(8|4,"print getdfd: found one;_c");
 		return dfd;
 	}
     }
+    DBCMD(8|4,"print getdfd: did not find one;_c");
     return NULL;
 }
 
@@ -91,7 +96,7 @@ DIR *dir;
 
     if (attr & FA_LABEL) {
 	/* Not coded up yet */
-	ASSERT(0);
+	DBCMD(-1,"print Dont know much about volume labels");
     }
 
     /*
@@ -143,101 +148,6 @@ DIR *dir;
 
 
 /*
- *  Open file.  Finds the DIR entry for the file & calls ixopen.
- */
-
-long
-xopen(name, mod)
-char *name;
-int mod;
-{
-    DIR dir;
-    long err;
-
-    /* find the file */
-    err = fn2dir(&name,&dir,FN_NORM);
-    if (err) return err;
-
-    return ixopen(&dir,mod);
-}
-
-/*
- * ixopen: given a DIR entry, open the file.
- *
- * ERROR CONSIDERATIONS:
- * 
- * Since this function doesn't do any writes, it can't mangle the disk. We
- * allocate an OFD early because we know we'll need one, and free it if we
- * then need a DFD and can't get one, but that's all that can go wrong.
- */
-
-long
-ixopen(dir,mod)
-DIR *dir;
-uint mod;
-{
-    FCB *fcb;
-    int h;
-    DFD *dfd;
-    OFD *ofd;
-
-    /* fail if opening for mode other than zero and file is RO */
-    if (mod && (dir->dir_fcb->f_attrib & FA_RO)) return EACCDN;
-
-    /* fail if there are no handles left */
-    if ((h = uftprobe()) < 0) return ENHNDL;
-
-    /* get an OFD first, because we know we'll need one */
-    /* and failure should get us out of here NOW. */
-
-    if ((ofd = MGET(OFD)) == NULL) return ENHNDL;
-
-    if ((dfd = getdfd(dir)) == NULL) {
-	/* no DFD for this file already; get a new one, fill it in */
-	if ((dfd = MGET(DFD)) == NULL) {
-	    MFREE(ofd);
-	    return ENHNDL;
-	}
-
-	fcb = dir->dir_fcb;
-
-	dfd->dfd_time = fcb->f_time;
-	dfd->dfd_date = fcb->f_date;
-	dfd->dfd_strtcl = fcb->f_clust;
-	dfd->dfd_fileln = fcb->f_fileln;
-	swp68l(fcb->f_fileln);
-	dfd->dfd_attrib = fcb->f_attrib;
-	dfd->dfd_dev = dir->dir_dev;
-	dfd->dfd_dircl = dir->dir_clust;
-	dfd->dfd_dirrec = dir->dir_recno;
-	dfd->dfd_diroffs = dir->dir_recoffs;
-	dfd->dfd_use = 0;
-	dfd->dfd_dirty = 0;
-
-	/* link it in */
-	dfd->dfd_next = dfd_head;
-	dfd_head = dfd;
-    }
-
-    /* fill in the OFD */
-    ofd->o_next = ofd_head;
-    ofd_head = ofd;
-    ofd->o_mode = mod;
-    ofd->o_curcl = 0;	/* flag meaning r/w clust info uninitialized */
-    ofd->o_currec = 0;
-    ofd->o_bytnum = 0;
-
-    ofd->o_use = 1;
-    ofd->o_dfd = dfd;
-    dfd->dfd_use++;
-
-    /* make handle h refer to this ofd and return h */
-
-    run->p_uft[h] = ofd;
-    return h;
-}
-
-/*
  * Fattrib: Get/Set file attributes.  There are some restrictions on 
  * "set:" mainly, you can't change the "folder" bit, and you can't change
  * the "label" bit of a subdir.  You can get YOURSELF into trouble with
@@ -250,12 +160,17 @@ long
 xchmod(p,wrt,attr)
 char *p;			/* -> filename */
 int wrt;			/* 0:get, 1:set */
-char attr;			/* attribute byte */
+int attr;			/* attribute byte */
 {
     char oattr;
     DIR dir;
     long err;
     DFD *dfd;
+
+    DBCMD(1,"print xchmod -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c)) "
+	    "(wpeek (+ `a6 e));_c");
+
+    attr &= 0xff;
 
     /* Will match anything but a label; return any error */
     if (err = fn2dir(&p,&dir,FN_NORM)) return err;
@@ -278,55 +193,6 @@ char attr;			/* attribute byte */
 
 
 /*
- * Fdatime, Get/Set File Date and Time
- *
- * Megamax C relies on this function leaving the input buffer alone on a
- * read when the handle isatty, and on changing it (with the file's info)
- * when the handle !isatty.  We can preserve that and still return EIHNDL
- * with the handle refers to a tty.
- *
- * We change the DFD for the open file, not what's on disk. Fsfirst/next
- * has to look for a DFD or it will be out of date.
- *
- * NO DISK ACTIVITY, NO ERROR CONSIDERATIONS.
- */
-
-long
-xdatime(buf, h, wrt)
-int *buf;			/* -> user buffer */
-int h;				/* file handle */
-int wrt;			/* 0:get, 1:set */
-{
-    OFD *ofd;
-    DFD *dfd;
-    int t[2];			/* buffer to hold user input for swapping */
-
-    ofd = syshnd(h);
-    if (ofd == NULL || ofdisatty(ofd)) return EIHNDL;
-  
-    dfd = ofd->o_dfd;
-    if (!wrt) {
-	buf[0] = dfd->dfd_time;
-	buf[1] = dfd->dfd_date;
-	swp68(buf[0]);
-	swp68(buf[1]);
-	return E_OK;
-    }
-
-    /* else it's a write */
-
-    t[0] = buf[0];
-    t[1] = buf[1];
-    swp68(t[0]);
-    swp68(t[1]);
-
-    dfd->dfd_time = t[0];
-    dfd->dfd_date = t[1];
-    dfd->dfd_dirty = 1;
-    return E_OK;
-}
-
-/*
  * Delete a file.  This is the external version: calls ixdel to do the
  * dirty deed.  Simple returns from errors suffice.
  */
@@ -339,9 +205,11 @@ char *name;
     OFD **uft, **uftend;
     OFD *ofd;
     DFD *dfd;
-    PD *pd, **pdend, **ppd;
+    PD *pd, **ppd;
     int youflag = 0;
     int i;
+
+    DBCMD(1,"print xdelete -s (lpeek (+ `a6 8));_c");
 
     /* find normal files only, return any error */
     if (err = fn2dir(&name,&dir,FN_NORM)) return err;
@@ -361,22 +229,19 @@ char *name;
 
     if (dfd = getdfd(&dir)) {
 	/* yes, *somebody* has this file open */
-	ppd = &pdtab[0];
-	pdend = &pdtab[NUMPDS];
-	while (ppd < pdend) {
-	    pd = *ppd;
-	    uft = &pd->p_uft[0];
-	    uftend = &pd->p_uft[pd->p_uftsize];
-	    while (uft < uftend) {
-		ofd = *uft;
-		if (ofd != NULL && !ofdisatty(ofd) && ofd->o_dfd == dfd) {
-		    /* got one! */
-		    if (pd == run) youflag = 1;
-		    else return EACCDN;
+	for (pd = *(ppd = &pdtab[0]); ppd < &pdtab[NUMPDS]; pd = *(++ppd)) {
+	    if (pd) {
+		uft = &pd->p_uft[0];
+		uftend = &pd->p_uft[pd->p_uftsize];
+		while (uft < uftend) {
+		    ofd = *uft++;
+		    if (ofd != NULL && !ofdisatty(ofd) && ofd->o_dfd == dfd) {
+			/* got one! */
+			if (pd == run) youflag = 1;
+			else return EACCDN;
+		    }
 		}
-		++uft;
 	    }
-	    ++ppd;
 	}
     }
 
@@ -482,10 +347,14 @@ char *p2;			/* new name */
 {
     DIR dir1;
     DIR dir2;
+    DMD *dmd;
     long err;
     char attr;
     FCB fcbhold;
     uint cl;
+
+    DBCMD(1,"print xrename (wpeek (+ `a6 8)) "
+	    "-s (lpeek (+ `a6 a)) (lpeek (+ `a6 e));_c");
 
     /* try to find the old file, return any error. */
 
@@ -530,11 +399,10 @@ char *p2;			/* new name */
 	    /* construct a dir struct for the second slot of the dir */
 	    cl = fcbhold.f_clust;
 	    swp68(cl);
-	    dir1.dir_recno = realcl2rec(cl,&drvtbl[dir1.dir_dev]);
-	    dir1.dir_recoffs = sizeof(FCB);
-
-	    /* "freshen" our constructed struct, change strtcl */
-	    dir2dir(&dir1);
+	    dir1.dir_clust = cl;
+	    dmd = &drvtbl[dir1.dir_dev];
+	    if (err = dirfirst(&dir1,dmd)) return err;
+	    if (err = dirnext(&dir1,dmd)) return err;
 	    dir1.dir_fcb->f_clust = dir2.dir_clust;
 	    swp68(dir1.dir_fcb->f_clust);
 	    dirdirty(&dir1);
@@ -543,70 +411,3 @@ char *p2;			/* new name */
     }
 }
 
-/*
- * xlseek: update the read-write pointer of a file. Calls ixlseek on the
- * OFD and new pointer location.
- *
- * For tty's, returns zero.  Some programs use this to determine isatty.
- */
-
-long
-xlseek(n,h,flg)
-long n;
-int h;
-int flg;
-{
-    OFD *ofd;
-    DFD *dfd;
-    uint new;
-    uint old;
-    uint clcount;
-    uint rec;
-    DMD *dmd;
-    uint curcl;
-
-    if ((ofd = syshnd(h)) == NULL) return EIHNDL;
-    if (ofdisatty(ofd)) return 0;
-
-    dfd = ofd->o_dfd;
-
-    if (flg == 2)
-	n += dfd->dfd_fileln;
-    else if (flg == 1)
-	n += ofd->o_bytnum;
-    else if (flg)
-	return(EINVFN);
-
-    if (n > dfd->dfd_fileln || n < 0)
-	return(ERANGE);
-
-    dmd = &drvtbl[dfd->dfd_dev];
-
-    /* set OFD r/w pointer fields to the right values */
-    if (!n) ofd->o_curcl = 0;
-    else {
-	new = n >> dmd->m_clblog;
-	old = ofd->o_bytnum >> dmd->m_clblog;
-	if (new < old) {
-	    curcl = dfd->dfd_strtcl;
-	    clcount = new;
-	}
-	else {
-	    /* (new >= old) */
-	    curcl = ofd->o_curcl;
-	    clcount = (old-new);
-	}
-	while (clcount--) {
-	    if (!(curcl = getcl(curcl,dmd))) return ERROR;
-	}
-
-	/* set rec to the record offset in this clust */
-	rec = (n & (dmd->m_clsizb-1)) >> dmd->m_rblog;
-
-	ofd->o_curcl = curcl;
-	ofd->o_currec = cl2rec(curcl,dmd) + rec;
-    }
-
-    ofd->o_bytnum = n;
-    return(n);
-}

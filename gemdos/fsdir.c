@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
+* $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.12  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 2.11  1991/02/21  03:07:32  apratt
 * This version performs this testbed perfectly.
 *
@@ -129,7 +132,7 @@ uint drv;
 
     dir.dir_dev = drv;
     dir.dir_clust = run->p_curdir[drv];
-    dirfirst(&dir,&drvtbl[drv]);
+    if (err = dirfirst(&dir,&drvtbl[drv])) return err;
 
     *buf = '\0';
     if ((err = _getndir(&buf,len,&dir,&drvtbl[drv])) < 0) 
@@ -171,12 +174,9 @@ DMD *dmd;
     dir2.dir_dev = dir->dir_dev;
     dir2.dir_clust = dir->dir_fcb[1].f_clust;	/* f_clust of .. slot */
     swp68(dir2.dir_clust);
-    dir2.dir_curcl = dir2.dir_clust;
-    dir2.dir_recno = realcl2rec(dir2.dir_clust,dmd);
-    dir2.dir_recoffs = 0;
 
     /* "freshen" this new dir */
-    dir2dir(&dir2);
+    if (err = dirfirst(&dir2,dmd)) return err;
     if ((len = _getndir(pbuf,len,&dir2,dmd)) <= 0) return len;
 
     /* now *pbuf points to the place where dir's name should go. */
@@ -240,6 +240,7 @@ char *s;
     static char dotdotstr[12] = "..         ";
     int i;
     BCB *bcb;
+    uint dirtime, dirdate;
 
     /* allocate a cluster, initialize it, ixcreat the file, and link them */
 
@@ -278,8 +279,15 @@ char *s;
     fcb->f_name[1] = 0x20;
     fcb->f_attrib = FA_SUBDIR;
     for (i=10; i; fcb->f_fill[--i] = 0) ;
-    fcb->f_time = realtime;
-    fcb->f_date = realdate;
+
+    /* copy current time & date to temps, use them now & later.	   */
+    /* You can get in trouble if midnight happens btw these insns! */
+    dirtime = realtime;
+    dirdate = realdate;
+    swp68(dirtime);
+    swp68(dirdate);
+    fcb->f_time = dirtime;
+    fcb->f_date = dirdate;
     swp68(cl);
     fcb->f_clust = cl;
     fcb->f_fileln = 0;
@@ -292,7 +300,7 @@ char *s;
     fcb->f_time = fcbhold.f_time;
     fcb->f_date = fcbhold.f_date;
     fcb->f_clust = fcbhold.f_clust;
-    fcb->f_fileln = fcbhold.f_fileln;	/* really zero */
+    fcb->f_fileln = 0;
 
     /* zero out the rest of this record */
     fcb++;
@@ -331,14 +339,12 @@ char *s;
 
     fcb->f_attrib = FA_SUBDIR;
     for (i=10; i; fcb->f_fill[--i] = 0) ;
-    fcb->f_time = realtime;
-    swp68(fcb->f_time);
-    fcb->f_date = realdate;
-    swp68(fcb->f_date);
-    fcb->f_fileln = 0;
+    fcb->f_time = dirtime;
+    fcb->f_date = dirdate;
 
     /* set the starting-cluster field of the entry (cl is already swapped) */
     fcb->f_clust = cl;
+    fcb->f_fileln = 0;
 
     dirdirty(&dir);
     fatdirty(dir.dir_dev);
@@ -356,28 +362,30 @@ char *s;
  *		EBADRQ (attempting to rmdir the root)
  *
  * NOTE: check to see if it's somebody's current directory by going through
- * all basepages from 'run' up; later, when there are more processes,
- * this will have to change.  Presumes that exec doesn't "inherit"
- * directories until "go" time, not at "load" time.
+ * all basepages from 'run' up; later, when there are more processes, this
+ * will have to change.  Presumes that exec doesn't "inherit" directories
+ * until "go" time, not at "load" time.
  *
- * There are some systems now which change 'run' to implement some
- * limited multi-tasking. These make it possible to remove a directory
- * which is somebody else's current directory.  One way for a user to
- * guard against this is not to have empty directories as their current
- * directories very much.  Still, rm -r will do it.  This is deadly, because
- * your run->p_curdir array isn't checked for validity. [dirfirst could..]
+ * There are some systems now which change 'run' to implement some limited
+ * multi-tasking. These make it possible to remove a directory which is
+ * somebody else's current directory.  One way for a user to guard against
+ * this is not to have empty directories as their current directories very
+ * much.  Still, rm -r will do it.  This is deadly, because your
+ * run->p_curdir array isn't checked for validity. [dirfirst could..]
  */
 long
 xrmdir(p)
 char *p;
 {
     DIR dir, dir2;
-    PD *pd;
+    PD **ppd, *pd;
     long err;
     uint cl;
     DMD *dmd;
     uint dev;
     char c;
+
+    DBCMD(1,"print xrmdir -s (lpeek (+ `a6 8));_c");
 
     if (err = fn2dir(&p,&dir,FN_NORM)) {
 	if (err == EFILNF) return EPTHNF;
@@ -391,8 +399,8 @@ char *p;
     swp68(cl);
 
     /* check to see that nobody has cl as his current dir */
-    for (pd = run; pd; pd = pd->p_parent) {
-	if (pd->p_curdir[dev] == cl) return EACCDN;
+    for (ppd = &pdtab[0], pd = *ppd; ppd < &pdtab[NUMPDS]; pd = *(++ppd)) {
+	if (pd && pd->p_curdir[dev] == cl) return EACCDN;
     }
 
     dmd = &drvtbl[dev];
@@ -405,9 +413,11 @@ char *p;
     /* advance to .. entry before starting loop */
     if (err = dirnext(&dir2,dmd)) return err;
 
-    /* see if there are any files in this dir (except . and ..) */
-    /* (this loop is structured this way for efficiency & clarity) */
-    /* (so don't give me any heat!) */
+    /*
+     * see if there are any files in this dir (except . and ..) (this loop
+     * is structured this way for efficiency & clarity) (so don't give me
+     * any heat!)
+     */
 
     while (1) {
 	if ((err = dirnext(&dir2,dmd)) != 0) break;
@@ -418,7 +428,7 @@ char *p;
 
     if (err && err != ENMFIL) return err;
 
-    /* freshen the parent and call ixdel */
+    /* ok, dir is empty: freshen the parent and call ixdel */
     dir2dir(&dir);
     return ixdel(&dir);
 }

@@ -1,12 +1,15 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\pool.c,v $
+* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
+* Revision 2.13  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 2.12  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -62,17 +65,6 @@ and extra checking.
 
 #include "fs.h"
 
-#ifdef POOLDEBUG
-
-int _debug = 0;
-#define Debug(s) (_debug ? trap14(11,5,-1,s) : 0)
-
-#else
-
-#define Debug(s) /*nothing*/
-
-#endif POOLDEBUG
-
 /* struct block and Bis* predicates and Bmake* actions are in fs.h */
 
 char *root[20];			/* still used so people can give us pool */
@@ -86,40 +78,40 @@ char osmem[LENOSM];
 voidfn
 poolinit()
 {
-    Debug("print Enter xminit");
+    DBCMD(16,"print Enter xminit;_c");
     blockhead = 0;
-    addheap(osmem,LENOSM);
-    Debug("print Leave xminit");
+    (void)addheap(osmem,LENOSM);
+    DBCMD(16,"print Leave xminit;_c");
 }
 
 /*
  * addheap: cut a chunk of memory into big blocks.
+ * Returns a flag: 1 if some was added at blockhead, 0 if not.
  */
 
-void
+int
 addheap(ptr,size)
 void *ptr;
 long size;
 {
     struct block *bp = ptr;
 
-    Debug("print Enter addheap ptr: `a5 size: `d7");
+    DBCMD(16,"print Enter addheap ptr: (lpeek (+ `a6 8)) "
+	     "size: (lpeek (+ `a6 c));_c");
 
     /* round size down to large block size */
     size = (size/LSIZE)*LSIZE;
 
-    Debug("print addheap: rounded size is `d7");
+    if (!size) return 0;
 
-    while (size) {
+    do {
 	bp->b_next = blockhead;
 	blockhead = bp;
 	Bmakefree(bp);
 	size -= LSIZE;
-	Debug("print addheap block at `a5");
 	bp++;
-    }
-
-    Debug("print addheap returns");
+    } while (size);
+    return 1;
 }
 
 /************************************************************************
@@ -144,7 +136,7 @@ void
     REG int count;
     REG int lfree;	/* free small blocks in the whole pool */
 
-    Debug("print Enter getbig... check for a free block");
+    DBCMD(16,"print Enter getbig, check for a free block;_c");
 
     lfree = 0;
 
@@ -160,7 +152,7 @@ void
 		}
 	    }
 	    if (count == 4) {
-	   	Debug("print Cut block `a5 is all free so use it");
+	   	DBCMD(16,"print Cut block is all free so use it;_c");
 	   	goto gotone;				/* all free! */
 	    }
 	}
@@ -168,20 +160,20 @@ void
 
     /* well, no joy looking for free blocks... */
 
-    Debug("print No free block... check for new pool");
+    DBCMD(16,"print No free block, check for new pool;_c");
 
     if (ptr = newpool()) goto gotone;
 
     /* no new pool, either... */
 
-    Debug("print -n No new pool ...");
+    DBCMD(16,"print -n No new pool, ;_c");
     if (lfree >= 4) {
-	Debug("print enough free to compact: try that.");
+	DBCMD(16,"print enough free to compact: try that.;_c");
 	if (ptr = compact()) goto gotone;
 	/* panic: compact failed (shouldn't happen) */
 	goto abort;
     }
-    Debug("print not enough to try compact");
+    DBCMD(16,"print not enough free to try compact;_c");
 
     /* can't compact little blocks... */
     
@@ -194,7 +186,7 @@ abort:
      */
 
 gotone:
-    Debug("print Gotone at `a5 ... make it used & return it");
+    DBCMD(16,"print Gotone: make it used & return it;_c");
     Bmakeused(ptr);
 
     /* clear block before returning it */
@@ -226,15 +218,16 @@ struct block
     } *pool;
     REG struct pool *next;
     REG struct pool *end;
+    int foundsome = 0;
 
-    Debug("print enter newpool");
+    DBCMD(16,"print enter newpool;_c");
 
     pool = (struct pool *)root[4];    /* root[4] is where pool gets added */
 
     if (!pool) return 0;
 
     while (pool) {
-	Debug("print top of loop: pool = `a5");
+	DBCMD(16,"print top of newpool loop;_c");
 	next = pool;
 
 	/* skip until noncontiguous */
@@ -245,18 +238,24 @@ struct block
 
 	next = next->p_next;	/* keep this for next time */
 
-	Debug("print contiguous: pool `a5 thru end `a3 .. next is `a4");
+	DBCMD(16,"print found a contiguous block;_c");
 
 	/* add heap (will do nothing if too small) */
-	addheap(pool,((char *)end)-((char *)pool));
+	foundsome |= addheap(pool,((char *)end)-((char *)pool));
 
 	/* set pool = next and look for another contiguous block */
 	pool = next;
     }
-    Debug("print newpool returns (lpeek ._blockhe)");
 
     /* ensure that next call won't see this same stuff */
     root[4] = 0;
+
+    if (!foundsome) {
+	DBCMD(16,"print addheap didn't actually add any;_c");
+	return 0;
+    }
+
+    DBCMD(16,"print newpool returns (lpeek ._blockhe);_c");
 
     return blockhead;
 }
@@ -281,7 +280,7 @@ MD
     REG MD *md;
     REG int i;
 
-    Debug("print enter getsmall");
+    DBCMD(16,"print enter getsmall;_c");
 
     free = 0;
 
@@ -290,7 +289,7 @@ MD
 	else if (Biscut(ptr)) {
 	    for (md = &(ptr->b_data.b_mem[0]), i=3; i>=0; i--, md++) {
 		if ((long)md->m_own == 1) {
-		    Debug("print hole in cut block `a5 , `d7 ... return it");
+		    DBCMD(16,"print hole in cut block, return it;_c");
 		    goto gotmd;
 		}
 	    }
@@ -299,32 +298,32 @@ MD
 
     /* there were no cut blocks with free slots */
 
-    Debug("print no unstuffed cut blocks");
+    DBCMD(16,"print no unstuffed cut blocks;_c");
 
     if (free) {
-	Debug("print -n ...but there was a free block ...");
+	DBCMD(16,"print -n but there was a free block, ;_c");
 	ptr = free;
 	goto cutit;
     }
 
     /* there were no free uncut blocks, either */
 
-    Debug("print And no free uncut either");
+    DBCMD(16,"print And no free uncut either;_c");
 
     if (ptr = newpool()) {
-	Debug("print -n newpool worked!");
+	DBCMD(16,"print -n newpool worked!;_c");
 	goto cutit;
     }
 
     /* there was no more pool */
     
-    Debug("print newpool struck out");
+    DBCMD(16,"print newpool struck out;_c");
     /* we struck out */
 
     return 0;
 
 cutit:
-    Debug("print cut block at `a5 & return it");
+    DBCMD(16,"print cut block and return it;_c");
     Bmakecut(ptr);
 
     /* mark first three free */
@@ -372,35 +371,35 @@ struct block
     /* find the cut block with the least number of used MDs (min 1) */
     /* and also the first candidate dest block which isn't that one */
 
-    Debug("print enter compact");
+    DBCMD(16,"print enter compact;_c");
 
     dptr = sptr = 0;
     ptr = blockhead;
     maxcount = 0;
 
     while (ptr) {
-	Debug("print Major loop. ptr= `a4");
+	DBCMD(16,"print Major loop.;_c");
 	if (Biscut(ptr)) {
-	    Debug("print -n is cut,");
+	    DBCMD(16,"print -n block is cut,;_c");
 	    count = 0;
 	    for (md = &(ptr->b_data.b_mem[0]), i=3; i>=0; i--, md++) {
 		if ((long)md->m_own == 1) {
-		    Debug("print -n F");
+		    DBCMD(16,"print -n F;_c");
 		    count++;
 		    if (dptr == 0) {
-			Debug("print -n {dptr}");
+			DBCMD(16,"print -n {dptr};_c");
 			dptr = ptr;
 		    }
 		}
 	    }
-	    Debug(count ? "print count is `d5" : "print no free");
 	    if (count > maxcount) {
-		Debug(count < 3 ? 
-			"print A new record!" : "print Best you can ask!");
+		DBCMD(16,(count < 3 ? 
+			"print A new record!;_c" :
+			"print Best you can ask!;_c"));
 		sptr = ptr;
 		maxcount = count;
 		if (count == 4) {
-		    Debug("print Count is 4! This block is all free!");
+		    DBCMD(16,"print Count is 4! This block is all free!;_c");
 		    return sptr;
 		}
 		if (count == 3) break;	/* best you can ask for! */
@@ -414,10 +413,10 @@ struct block
 
     if (dptr == sptr) {
 	if (!(dptr = sptr->b_next)) {
-	    Debug("print ...and LAST! (quit)");
+	    DBCMD(16,"print and LAST! - (quit);_c");
 	    return 0;
 	}
-	Debug("print first was best... Dptr := (lpeek (- `a6 4))");
+	DBCMD(16,"print first was best;_c");
     }
     dindex = 0;
 
@@ -428,8 +427,6 @@ struct block
 	 (long)md->m_own == 1;
 	 sindex++, md++) /* no body */ ;
 
-    Debug("print -n sindex is `d6");
-
     /*
      * now stuff md's from sptr into dptr, advancing dptr as necessary
      * (at top of loop, we know (sptr,sindex) is used, but not that
@@ -437,27 +434,26 @@ struct block
      */
 
     while (1) {
-	Debug("print top of move loop");
+	DBCMD(16,"print top of move loop;_c");
 
 	dest_md = advance(&dptr,&dindex,sptr);
 
-	Debug("print move `a5 `d6 to (lpeek (- `a6 4)) (wpeek (- `a6 6))");
+	DBCMD(16,"print move src block/slot to dest block/slot;_c");
 	mdmove(md,dest_md);
 
 	/* mark the slot we just vacated as unused */
 	*(long *)&(md->m_own) = 1;
 
 	for (++md, ++sindex ; sindex < 4; sindex++, md++) {
-	    Debug("print Check `a5 `d6 for free-ness");
+	    DBCMD(16,"print Check block/slot for free-ness;_c");
 	    if ((long)md->m_own != 1) goto notdone;
-	    Debug("print Was free");
+	    DBCMD(16,"print Was free;_c");
 	}
-	Debug((Bmakefree(sptr),
-		"print compact is done! {sindex fell off end}"));
+	DBCMD(16,"print compact is done! {sindex fell off end};_c");
 	return sptr;				/* we're done */
 
 notdone:
-	Debug("print Advanced sindex to `d6");
+	DBCMD(16,"print Advanced sindex to `d6;_c");
     }
 }
 	
@@ -496,7 +492,7 @@ MD *target, *dest;
     REG MD **q;
     REG int i;
 
-    Debug("print -n mdmove `a5 into `a4");
+    DBCMD(16,"print -n mdmove (lpeek (+ `a6 8)) into (lpeek (+ `a6 c));_c");
 
     /* outer loop steps qq through mfl and mal of both pmd's */
     /* inner loop goes through the list at qq */
@@ -508,14 +504,14 @@ MD *target, *dest;
 	}
     }
 
-    Debug("print fails.");
+    DBCMD(16,"print fails(!);_c");
 
     return;		/* error! small block isn't on either list */
 
 foundit:
 
     /* now q is prev of (sptr,sindex) */
-    Debug("print succeeds");
+    DBCMD(16,"print succeeds;_c");
 
     *dest = *target;	/* structure copy including "next" pointer */
     *q = dest;		/* link target's prev to new location */
@@ -541,25 +537,25 @@ int *pdindex;
     dindex = *pdindex;
     while (dptr) {
 	if (Biscut(dptr)) {
-	    Debug("print advance dptr,dindex starting at `a5 `d7");
+	    DBCMD(16,"print advance dptr,dindex starting;_c");
 	    for (md = &(dptr->b_data.b_mem[dindex]);
 		dindex < 4;
 		dindex++, md++) {
 		    if ((long)md->m_own == 1) {
 			*pdptr = dptr;
 			*pdindex = dindex;
-			Debug("print advance returns `a5 `d7 { `a4 }");
+			DBCMD(16,"print advance returns;_c");
 			return md;
 		    }
 	    }
 	}
 	else {
-	    Debug("print block is not cut");
+	    DBCMD(16,"print block is not cut;_c");
 	}
 
-	Debug("print no free there, bump dptr");
+	DBCMD(16,"print no free there, bump dptr;_c");
 	if ((dptr = dptr->b_next) == sptr) {
-	    Debug("print skip dptr over sptr");
+	    DBCMD(16,"print skip dptr over sptr;_c");
 	    dptr = dptr->b_next;
 	}
 	dindex = 0;
@@ -582,16 +578,16 @@ void *ptmp;
 {
     REG struct block *ptr;
 
-    Debug("print enter freebig `a5");
+    DBCMD(16,"print enter freebig (lpeek (+ `a6 8));_c");
     ptr = (struct block *)(ptmp-HEADSIZE);
 
     if (Bisfree(ptr)) {
-	/* panic! block isn't free */ 
+	/* panic! block is free */ 
 	Panic();
     }
 
     Bmakefree(ptr);
-    Debug("print success! freebig returns");
+    DBCMD(16,"print success! freebig returns;_c");
     return 0;
 }
 
@@ -603,32 +599,35 @@ MD *ptr;
     REG MD *md;
     REG int i;
 
-    Debug("print enter freesmall `a5");
+    DBCMD(16,"print enter freesmall (lpeek (+ `a6 8));_c");
 
     for (p = blockhead; p; p = p->b_next) {
 	if ((char *)p < (char *)ptr && (char *)(p+1) > (char *)ptr) {
 	    /* got it */
-	    Debug("print `a5 is in range of block `a4");
+	    DBCMD(16,"print small one is in range of a block;_c");
 
 	    if (!Biscut(p)) {
 		/* panic: if not cut, big trouble */
+		DBCMD(-1,"print freesmall panic! small in range of uncut big!");
 		goto abort;
 	    }
 	    for (md = &(p->b_data.b_mem[3]), i=3;
 		 i>=0;
 		 i--,md--) {
 		    if (ptr == md) {
-			Debug("print Slice `d7");
+			DBCMD(16,"print found which slice;_c");
 			if ((long)md->m_own == 1) {
 			    /* panic! it's already free! */
+			    DBCMD(-1,"print freesmall of already free small!");
 			    goto abort;
 			}
 			*(long *)&(md->m_own) = 1;
-			Debug("print success! freesmall returns");
+			DBCMD(16,"print success! freesmall returns;_c");
 			return;
 		    }
 	    }
 	    /* panic: the MD is within a block but not at a slice boundary */
+	    DBCMD(-1,"print freesmall panic! MD not at slice boundary");
 	    goto abort;
 	}
     }

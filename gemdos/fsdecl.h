@@ -1,12 +1,15 @@
 /*
 ***************************    FSDECL.H    ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\fsdecl.h,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\rcs\fsdecl.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdecl.h,v $
+* Revision 2.9  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 2.8  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -26,6 +29,8 @@
  * declarations for fs*.c
  *
  */
+
+extern long _dblev;	/* debugger level mask */
 
 extern uint logmsk[];
 

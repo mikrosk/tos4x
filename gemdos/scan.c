@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.4 $	$Source: e:/tos/gd2\rcs\scan.c,v $
+* $Revision: 1.5 $	$Source: e:/tos/gd2\rcs\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.5  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 1.4  1991/02/21  03:07:32  apratt
 * This version performs this testbed perfectly.
 *
@@ -388,9 +391,8 @@ DIR *dir;
     }
 
     rec = realcl2rec(cl,dmd);
-	fcb = getrec(rec+i,dmd,0,&bcb);
+
     /* zero out that cluster */
-	bcb->b_dirty = 1;
 
     for (i=dmd->m_clsiz; --i >= 0; ) {
 	/* on getrec error, should probably clfix(cl,0) */

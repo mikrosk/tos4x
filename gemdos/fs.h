@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\fs.h,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\rcs\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.15  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 2.14  1991/02/21  03:07:32  apratt
 * This version performs this testbed perfectly.
 *
@@ -41,8 +44,23 @@
 
 /* prototypes and GCC qualifiers */
 
-#define DBMSG(s) trap14(11,5,0xf000,(s))
-#define DBCMD(s) trap14(11,5,0xf100,(s))
+/*
+ * Macros to send debugger messages.  The "level" argument qualifies the
+ * message; a one-bit match with the mask _dblev is required. The level
+ * numbers are not ordered, they're just a way of selecting which messages
+ * you want to see.
+ *
+ *	Level	    Usage
+ *	$ 01	    top level calls
+ *	  02	    getrec and flush - disk I/O
+ *	  04	    xrw and clusters
+ *	  08	    handles
+ *	  10	    pool
+ *	FFFFFFFF    really important, "non-maskable" stuff, like panic.
+ */
+
+#define DBMSG(level,s) { if (_dblev & (level)) trap14(11,5,0xf000,(s)); }
+#define DBCMD(level,s) { if (_dblev & (level)) trap14(11,5,0xf100,(s)); }
 
 #if __STDC__
 #define _P(x) x
@@ -50,13 +68,13 @@
 #define __assert(exp,file,line) ( \
 	sprintf(assertbuf,"Failed assert: \"" exp "\" file %s line %ld",\
 		file,(long)line), \
-	DBMSG(assertbuf))
+	DBMSG(-1,assertbuf))
 extern char assertbuf[];
 extern void sprintf();
 #define voidfn void
 #else
 #define _P(x) ()
-#define ASSERT(exp) ((exp) ? 0 : DBMSG("Failed assert"))
+#define ASSERT(exp) ((exp) ? 0 : DBMSG(-1,"Failed assert"))
 #define void char
 #define voidfn void
 #define volatile

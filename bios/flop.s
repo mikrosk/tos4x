@@ -4,16 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/21 17:26:50 $
+* $Date: 90/11/19 15:45:12 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.19  90/11/19  15:45:12  apratt
+* Changed HI_DEN to be TT+STPLUS - it's available in Mega STe.
+* Removed READFIFO, which was unused (was there for an old MCU).
+*
 * Revision 2.18  90/08/21  17:26:50  apratt
 * Mega STe version: made SLOWACSI true for STPLUS, too.
-*
+* 
 * Revision 2.17  90/08/03  13:22:58  apratt
 * TTOS FINAL RELEASE
 * 
@@ -143,7 +147,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.18 $
+* $Revision: 2.19 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -218,10 +222,7 @@
 
 SLOWACSI	equ	TT+STPLUS	; set to 1 for TT(?) @check@
 
-READFIFO	equ	0	; fixes a bug in TT MCU 4/90, but
-				; is deadly to older MCU's!
-
-HI_DEN		equ	TT	; 1.44MB flag same as TT flag.
+HI_DEN		equ	TT+STPLUS	; 1.44MB flag
 * to speed.								*
 denselect	equ	$ffff860e	; density bits (in TT only)
 

@@ -4,17 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/05/21 12:21:15 $
+* $Date: 90/05/22 13:53:33 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.15  90/05/22  13:53:33  apratt
+* In go2track, an EQ return from flopcmds doesn't mean success, it
+* only means no timeout; you have to check the error bits in d7
+* to see if the seek-with-verify actually succeeded.  This is why
+* lengthening timeouts caused failure: before, the short timeout
+* expired first, so this code worked.  Now it works anyway.
+*
 * Revision 2.14  90/05/21  12:21:15  apratt
 * Lengthened timeouts; they were so short they timed out before the
 * 1772 could return record-not-found errors.
-*
+* 
 * Revision 2.13  90/04/30  18:43:55  apratt
 * Added code to check the cookie jar for _FRB the first time alternative
 * RAM is used, rather than counting on the BIOS having found the alt. RAM
@@ -127,7 +134,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.14 $
+* $Revision: 2.15 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1139,7 +1146,7 @@ floplock:
 	move.w	$16(sp),cside.w		; save side# (0	.. 1)
 	move.w	$18(sp),ccount.w	; save sector count (1..spt)
 	move.w	#retries,retrycnt.w	; setup retry count
-	bsr	flopcmds		; do it
+
 *--- pick a DSB:
 	lea	dsb0.w,a1
 * _acctim (last floppy access time) is used by rwabs:mediach() for a
@@ -1185,7 +1192,7 @@ unlok1:	move.l	d0,-(sp)		; (save return value)
 * period for media change.  Previously the 200Hz timer was used, but this
 * could cause problems (esp. in game s/w) if the 200Hz timer is disabled. 
 * Since floppy write protect status (used to set media state) is checked by
-	bra	flopcmds		; (without verify...)
+* the floppy vblank handler, we now use the frame clock (updated EVERY
 * vblank) for _acctim.  890206 kbad
 *
 * In addition, the drop-dead time to deselect the drives regardless of
@@ -1208,8 +1215,15 @@ unlok1:	move.l	d0,-(sp)		; (save return value)
 	move.l	_frclock.w,4(a0)	; set last-accessed time for floppy 1
 
 unlok2:	move.l	(sp)+,d0		; restore return value
-	bsr	flopcmds		; seek
+	movem.l	regsave.w,d3-d7/a3-a6	; restore C registers
+	clr.w	flock			; unlock floppies
+	bsr	unfast			; do tail copy if necessary
+	rts
 
+
+
+*+
+* hseek  - seek to 'ctrack' without verify
 * hseek1 - seek to 'd7' without verify
 * hseek2 - seek to 'd7' without verify, keep current error number
 *
@@ -1232,20 +1246,26 @@ hseek1:	move.w	#e_seek,curr_err	; possible error = "seek error"
 *+
 * reseek - home	head, then reseek track
 .ifeq HI_DEN
-	bne	go2trr
+*-
+reseek:
+	move.w	#e_seek,curr_err	; set "seek error"
 	bsr	restore			; restore head
-	beq	go2ok			; success
+	bne	go2trr			; (punt if home fails)
+
+	clr.w	dcurtrack(a1)		; current track = 0
+	move.w	#trkreg,(a6)		; set "current track" reg on 1770
 	clr.w	d7
 	bsr	wdiskctl
 
 	move.w	#datareg,(a6)		; seek out to track five
+	move.w	#$10,d6
 	move.w	denselect,d0		; set the other density
-	and.w	#3,d0			; mask of unused bits
+
 * a seek with no verify can't fail! Why do we bother to check?
 * have failed and we wouldn't know.
 	move.w	d0,ddenflags(a1)	; to control register and to dsb
 	move.w	#5,dcurtrack(a1)	; set current track#
-	bne	go2trr			; really failed! (den changed twice)
+
 *+
 * go2track - seek proper track
 * Passed:	Current floppy parameters (ctrack, et al.)
@@ -1253,7 +1273,7 @@ hseek1:	move.w	#e_seek,curr_err	; possible error = "seek error"
 .endc
 *-
 go2track:
-	and.b	#$18,d7			; check	for RNF, CRC_error, lost_data
+
 .if HI_DEN
 	move.w	#1,go2count		; init hi-den retry count
 go2retry:

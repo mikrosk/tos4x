@@ -1,12 +1,15 @@
 .super
 ***************************     RWA.S      ******************************
 *
-* $Revision: 1.4 $	$Source: d:/tos/dos\rcs\rwa.mac $
+* $Revision: 1.5 $	$Source: d:/tos/dos\rcs\rwa.mac $
 * =======================================================================
-* $Author: unknown $ 	$Date: 1992/05/20 00:31:58 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: rwa.mac,v $
+* Revision 1.5  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 1.4  1992/05/20  00:31:58  unknown
 * This ci removes the memprot stuff from this file.  Other changes
 * from revision 1.3 persist.
@@ -46,8 +49,8 @@
 	.globl	_longjmp	; longjmp(...)
 	.globl	_dojmp		; "jump" / "goto"
 	.globl	_gouser		; resume process
-	.globl	_trap13		; BIOS trap binding
-	.globl	_trap14		; XBIOS trap handling (AKP)
+	.globl	_trapD		; BIOS trap binding
+	.globl	_trapE		; XBIOS trap handling (AKP)
 	.globl	_obdos		; variable holding old trap 2 vector
 	.globl	_ntrap2		; new trap 2 vector
 	.globl	_otime		; variable holding old timer-tick vector
@@ -67,13 +70,14 @@
 *  Trap 13 Handler
 *
 *-
-_trap13:
+_trapD:
 	move.l	(sp)+,biosav		; save return address
 	trap	#13			; do the trap
 	move.l	biosav,-(sp)		; restore return address, return
 	rts
 
-_trap14:
+* Trap 14 handler
+_trapE:
 	move.l	(sp)+,biosav
 	trap	#14
 	move.l	biosav,-(sp)
@@ -477,18 +481,31 @@ xi_exit:
 *  (which is a real-time clock chip if there's one installed in the system)
 *  (Note: before 7/89, this jsr'ed directly into BIOS; now it traps.)
 *
-	.globl	_clksync			; (export)
-	.globl	_realdate,_realtime		; (import)
+	.globl	_clksync		; (export)
+ .if REALTIME
+	.globl	_realtime,_realdate
+ .else
+	.globl	_date,_time		; (import)
+ .endif
 
 _clksync:
+*	movem.l	d2/a2,-(sp)
 	move.w	#$17,-(sp)		; Gettime XBIOS call
 	trap	#$e
 	addq.l	#2,sp
+*	movem.l	(sp)+,d2/a2
 	move.w	sr,d1			; save IPL
 	or.w	#$0700,sr		; disable interrupts
+ .if REALTIME
 	move.w	d0,_realtime		;;<7> set time
 	swap	d0			;;<7>
 	move.w	d0,_realdate		;;<7> set date
+ .else
+	move.w	d0,_time		;;<7> set time
+	swap	d0			;;<7>
+	move.w	d0,_date		;;<7> set date
+ .endif
+
 	move.w	d1,sr			;;<7> re-enable interrupts
 	rts
 
@@ -500,11 +517,18 @@ _clksync:
 *
 	.globl	_upd_tod
 _upd_tod:
+*	movem.l	d2/a2,-(sp)
+ .if REALTIME
 	move.w	_realtime,-(sp)		; time in low word
 	move.w	_realdate,-(sp)		; date in high word
+ .else
+	move.w	_time,-(sp)		; time in low word
+	move.w	_date,-(sp)		; date in high word
+ .endif
 	move.w	#$16,-(sp)		; Settime(date << 16 | time)
 	trap	#14
 	addq	#6,sp			; cleanup and return
+*	movem.l	(sp)+,d2/a2
 	rts
 
 
@@ -532,6 +556,15 @@ _upd_tod:
 	.globl	__udivsi3, ___udivsi3
 	.globl	__umodsi3, ___umodsi3
 	.globl	_ldiv, ldiv
+
+; lattice entry point
+	.globl	__CXD22
+__CXD22:
+	move.l	d1,-(sp)
+	move.l	d0,-(sp)
+	bsr.b	ldiv
+	addq	#8,sp
+	rts
 
 ldiv:
 _ldiv:
@@ -608,6 +641,16 @@ ___umodsi3:
 	.even
 	.globl	__mulsi3, ___mulsi3
 	.globl	_lmul, lmul
+
+; lattice entry point
+	.globl	__CXM22,__CXM33
+__CXM22:
+__CXM33:
+	move.l	d0,-(sp)
+	move.l	d1,-(sp)
+	bsr.b	lmul
+	addq	#8,sp
+	rts
 
 lmul:
 _lmul:
@@ -695,6 +738,7 @@ odd:	dbra	d0,bloop
 	.bss
 	.even
 biosav:		ds.l	1
+*d2a2:		ds.l	2
 regsav:		ds.l	16
 		ds.w	1000
 fstrt:		ds.l	1

@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.20 $	$Source: d:/tos/dos\rcs\fsfs.c,v $
+* $Revision: 2.21 $	$Source: d:/tos/dos\rcs\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/25 13:16:22 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.21  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.20  1991/06/25  13:16:22  apratt
 * Changed FN_NORM etc for SCAN_NORM _DIR and _EARLY
 * and added handling for Fcreate of volume labels.
@@ -354,7 +357,7 @@ DIR *dir;
      * Mark the directory entry as erased.
      */
 
-    dir->dir_fcb->f_name[0] = 0xe5;
+    dir->dir_fcb->f_name[0] = ERASED;
     dirdirty(dir);
 
     /*
@@ -430,12 +433,44 @@ char *p2;			/* new name */
 
     /* at this point, dir2 is fresh, dir1 might not be */
 
-    /* Can you rename an open file? No. Don't even check if directory */
-    if (!(attr & FA_SUBDIR) && (getdfd(&dir1) != NULL)) return EACCDN;
+    if (attr & FA_SUBDIR) {
+	/* Dir rename; fail if dir2 is a child of dir1. */
+	DIR d2dad = dir2;
+	uint cl1;
+	DBCMD(0x20,"print dir rename, checking parents of dst;_c");
+	dir2dir(&dir1);
+	cl1 = dir1.dir_fcb->f_clust;
+	swp68(cl1);
+	cl = d2dad.dir_clust;
+	dmd = &drvtbl[dir2.dir_dev];
+	while (cl && cl != cl1) {
+	    /* while parent startcl isn't root, check it against src */
+	    d2dad.dir_clust = cl;
+	    if (err = dirfirst(&d2dad,dmd)) return err; /* . */
+	    if (err = dirnext(&d2dad,dmd)) return err; /* .. */
+	    cl = d2dad.dir_fcb->f_clust;
+	    swp68(cl);
+	}
+	if (cl)
+	{
+	/* Didn't make it to root!
+	 * Return EBADRQ: this rename will never work.
+	 */
+	    DBCMD(0x20,"print oops... src is parent of dst!;_c");
+	    return EBADRQ;
+	}
+	DBCMD(0x20,"print at root, src is not parent of dst;_c");
+    }
+    else if (getdfd(&dir1) != NULL) {
+	/* Fail if dir1 is an open file. */
+	return EACCDN;
+    }
 
     if (dir1.dir_clust == dir2.dir_clust) {
-	/* same directory. Copy new name in. Error on illegal file names */
-	/* Have to freshen dir1 because its offset filed is old file's slot. */
+	/* Same directory:  Copy new name in, error on illegal file names.
+	 * Have to freshen dir1 because its offset is old file's slot.
+	 * (name2fcb is basically a no-op if src and dst are the same file)
+	 */
 	DBCMD(0x20,"print same directory, just reuse slot;_c");
 	dir2dir(&dir1);
 	if (err = name2fcb(p2,NULL,dir1.dir_fcb)) return err;
@@ -451,10 +486,10 @@ char *p2;			/* new name */
 
 	/* new file was created in dir2; remove from dir1 */
 	dir2dir(&dir1);
-	*dir1.dir_fcb->f_name = 0xe5;		/* erase old file */
+	*dir1.dir_fcb->f_name = ERASED;
 	dirdirty(&dir1);
 
-	if (fcbhold.f_attrib & FA_SUBDIR) {
+	if (attr & FA_SUBDIR) {
 	    /* we just renamed a subdir; change its .. entry too. */
 	    /* construct a dir struct for the second slot of the dir */
 	    cl = fcbhold.f_clust;

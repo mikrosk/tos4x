@@ -1,7 +1,19 @@
 # Makefile for GEMDOS - requires Lattice or GNU make
 # =======================================================================
-# $Id: makefile.,v 2.22 1992/07/05 01:01:10 kbad Exp $
+# $Id: makefile.,v 2.23 1992/07/27 20:09:24 kbad Exp $
 # History is in the above file in the RCS directory (use rlog to see it).
+
+ifdef NODB
+DBFLAG=-DNODB
+else
+DBFLAG=
+endif
+
+ifdef T
+R=-D=REALTIME=1
+else
+R=-D=REALTIME=0
+endif
 
 # Rules
 # =======================================================================
@@ -12,60 +24,66 @@
 # Assembler rules
 # -----------------------------------------------------------------------
 AS=pasm
-ASFLAGS=-U -3 -B #-B for pasm
+ASFLAGS=-ub2 $R #-b for pasm
 .mac.o:
-	$(AS) $(ASFLAGS) $*.mac
+	$(AS) $(ASFLAGS) -o=$@ $<
 .gas.og:
-	gcc-as -o $*.o $*.gas
+	gcc-as -o $@ $<
+.s.o:
+	$(AS) $(ASFLAGS) -o=$@ $<
+
 
 # Lattice rules
 # -----------------------------------------------------------------------
-CDEF=
+CDEF=$(DBFLAG)
 CERR=-j135i
 #135: Assignment to shorter data type (precision may be lost)
-CMOD=-w
-COPT=-d -O
+# -w: short ints
+# -b0 -bn: no base reg, a4 is reg. var
+CMOD=-w -b0 -bn
+# -d2: debug, include local symbols
+# -O: optimize
+# -mf: frames (link/unlk)
+# -z2: DRI output
+# -hd3 -ha3: temps end at d3/a3
+COPT=-d2 -O -mf -z2 -hd3 -ha3
 .c.ol:
-	$(CC) -m3 -c $(CFLAGS) -o$@ $<
+	$(CC) -c $(CFLAGS) -o$@ $<
 
-ifdef USELC
-# Lattice-specific rules
-# -----------------------------------------------------------------------
-CC=lcc
-CFLAGS=$(CDEF) $(CERR) $(CMOD) $(COPT)
-.c.ot:
-	$(CC) -m3 -z2 -c $(CFLAGS) -o$@ $<
-.c.o:
-	$(CC) -z2 -c $(CFLAGS) -o$@ $<
-
-else
-# GCC rules
+ifdef GCC
+# GCC-specific rules
 # -----------------------------------------------------------------------
 CC=gcc
-CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
-	-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem
 
-.s.o:
-	$(CC) -c $<
-.s.ot:
-	$(CC) -m68020 -c $<
+CFLAGS=$(DBFLAG) -O -Wall -mshort \
+	-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
+	-fstrength-reduce -fcombine-regs -fforce-mem
+
 
 # comment out the .c.o .c.ot rules to use gas as gcc's back end
 .c.o:
 	$(CC) $(CFLAGS) -S -o $*.1 $<
-	sed -f gass $*.1 > $*.2
+	sed -f ss $*.1 > $*.2
 	$(AS) $(ASFLAGS) $*.2 -O=$*.o
-	rm $*.1 $*.2
-
-#	emacs @gas2mac.rc temp.s
+	mv $*.1 $*.2 seds
+#	emacs @gas2mac.rc $*.2
 
 .c.ot:
 	$(CC) -m68020 $(CFLAGS) -S -o $*.1 $<
-	sed -f gass $*.1 > $*.2
+	sed -f ss $*.1 > $*.2
 	$(AS) $(ASFLAGS) $*.2 -O=$*.ot
-	rm $*.1 $*.2
+	mv $*.1 $*.2 tseds
+#	emacs @gas2mac.rc $*.s
+else
+# Lattice-specific rules used by default
+# -----------------------------------------------------------------------
+CC=lcc
+CFLAGS=$(CDEF) $(CERR) $(CMOD) $(COPT)
+.c.ot:
+	$(CC) -m3 -c $(CFLAGS) -o$@ $<
+.c.o:
+	$(CC) -c $(CFLAGS) -o$@ $<
 
-#	emacs @gas2mac.rc temp.s
 endif
 
 
@@ -85,25 +103,36 @@ OTFILES = fscl.ot fsdir.ot fsfs.ot fshand.ot scan.ot \
 	time.ot panic.ot rwa.o mem.ot pool.ot sup.ot con.ot \
 	fsproc.ot
 
+# OTDFILES for linking debug stub with TOS
+OTDFILES = fscl.ot fsdir.ot fsfs.ot fshand.ot scan.ot \
+	time.ot panic.ot rwa.o mem.ot pool.ot sup.otd con.ot \
+	fsproc.ot $S\fsstpar.o
+
 # S= directory where loader files live
+# $S\clock.o - not used no more?  -----v
 S=sys
-LOADER=$S\self.o $S\ld_dos.o $S\clear.o $S\clock.o $S\announce.o $S\fsstpar.o
+LOADER=$S\self.o $S\ld_dos.o $S\clear.o  $S\announce.o $S\fsstpar.o version.o
 
 
 # Targets
 # =======================================================================
 
 default:
-	@echo 'use: make [USELC=] [all] [dos.sys] [gemdos.030] [gemdos.68k] [gtest.prg]'
+	@echo 'use: make [NODB=] [GCC=] [all] [dos.68k] [dos.030] [gemdos.68k] [gemdos.030] [gtest.prg]'
 
-all: dos.sys gemdos.68k gtest.prg
+all: dos.sys gemdos.030 gemdos.68k gtest.prg
 
 
-dos.sys: $(LOADER) gemdos.030
-	mkvers $S\announce.o
-	aln -l -o dos.sys $<
+dos.68k: $(LOADER) gemdos.68k
+	aln -l -o $@ $<
 
-gemdos.030: $(OTFILES) 
+dos.030: $(LOADER) gemdos.030
+	aln -l -o $@ $<
+
+gemdos.030: $(OTFILES)
+	aln -u -p -l -o $@ $<
+
+gemdos.03d: $(OTDFILES)
 	aln -u -p -l -o $@ $<
 
 gemdos.68k: $(OFILES)
@@ -119,6 +148,13 @@ fs.h: fsdecl.h gemerror.h
 
 proto.h: $(CFILES)
 	mkptypes -z $< >proto.h
+
+version.o: # always make this by hand
+	lcc -c $(CMOD) $(COPT) version.c
+
+sup.otd: sup.c
+	$(CC) -DSTUB -m3 -c $(CFLAGS) -o$@ $<
+
 
 # Assembler objects
 docall.o: docall.mac

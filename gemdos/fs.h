@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.26 $	$Source: d:/tos/dos\rcs\fs.h,v $
+* $Revision: 2.27 $	$Source: d:/tos/dos\rcs\fs.h,v $
 * =======================================================================
-* $Author: unknown $ 	$Date: 1991/12/12 22:51:12 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.27  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.26  1991/12/12  22:51:12  unknown
 * Added some prototypes
 *
@@ -75,7 +78,11 @@
 *									*
 \***********************************************************************/
 
-/* prototypes and GCC qualifiers */
+/* prototypes and compiler-dependent qualifiers */
+
+#ifdef LATTICE
+#pragma ignore 135  /* Assignment to shorter data type */
+#endif
 
 /*
  * Macros to send debugger messages.  The "level" argument qualifies the
@@ -96,12 +103,17 @@
  *	FFFFFFFF    really important, "non-maskable" stuff, like panic.
  */
 
-#define DBMSG(level,s) { if (_dblev & (level)) trap14(11,5,0xf000,(s)); }
-#define DBCMD(level,s) { if (_dblev & (level)) trap14(11,5,0xf100,(s)); }
+#ifdef NODB
+#define DBMSG(level,s) /* */
+#define DBCMD(level,s) /* */
+#else
+#define DBMSG(level,s) { if (_dblev & (level)) trapE(11,5,0xf000,(s)); }
+#define DBCMD(level,s) { if (_dblev & (level)) trapE(11,5,0xf100,(s)); }
+#endif
 
 #if __STDC__
 #define _P(x) x
-#define ASSERT(exp) ((exp) ? 0 : __assert (#exp, __FILE__, __LINE__))
+#define ASSERT(exp) ((exp) ? (void)0 : __assert (#exp, __FILE__, __LINE__))
 extern volatile void __assert(const char *exp,const char *file,long line);
 #define voidfn void
 #else
@@ -175,23 +187,15 @@ extern volatile void __assert(const char *exp,const char *file,long line);
 #define GETMD()		((MD *)getsmall())
 #define MFREE(p)	freebig(p)
 #define xmfreblk(p)	freebig(p)
-#define bconstat(a)	trap13(1,(short)a)
-#define bconin(a)	trap13(2,(short)a)
-#define bconout(a,b)	trap13(3,(short)a,(short)b)
-#define bconostat(a)	trap13(8,(short)a)
-#define getbpb(a)	(BPB *)trap13(7,(short)a)
-#define mediach(a)	(int)trap13(9,(short)a)
-#define gettime()	(ulong)trap14(0x17)
+#define bconstat(a)	trapD(1,(short)a)
+#define bconin(a)	trapD(2,(short)a)
+#define bconout(a,b)	trapD(3,(short)a,(short)b)
+#define bconostat(a)	trapD(8,(short)a)
+#define getbpb(a)	(BPB *)trapD(7,(short)a)
+#define mediach(a)	(int)trapD(9,(short)a)
+#define gettime()	(ulong)trapE(0x17)
 
-#if !__GNUC__
-
-#define swp68(x)	s68(&(x))
-#define swp68l(x)	s68l(&(x))
-voidfn s68 _P(( void *word_to_swap ));
-voidfn s68l _P(( void *long_to_swap ));
-
-#else
-
+#if __GNUC__
 #define swp68(x) ((x) = ({				\
     register short retvalue = (short)(x);		\
     __asm__ volatile (					\
@@ -212,16 +216,32 @@ voidfn s68l _P(( void *long_to_swap ));
 	);						\
     retvalue; }))
 
+#else
+
+#define swp68(x)	s68(&(x))
+#define swp68l(x)	s68l(&(x))
+voidfn s68 _P(( void *word_to_swap ));
+voidfn s68l _P(( void *long_to_swap ));
+
+#if LATTICE
+#pragma inline s68(a0) {register d0; "3010e0583080";}
+	/* move.w (a0),d0/ror.w #8,d0/move.w,d0,(a0) */
+#pragma inline s68l(a0) {register d0; "2010e0584840e0582080";}
+	/* move.l (a0),d0/ror.w #8,d0/swap d0/ror.w #8,d0/move.l d0,(a0) */
+#endif
+
 #endif /* __GNUC__ */
 
-#if !UNREAL
-#define getmpb(a)	(void)trap13(0,(long)a)
-#define setexc(e,h)	(void (*)())trap13(5,e,((long)(h)))
-#endif
+/*
+ * I believe Allan meant for these to be jsrs, but I'm leaving 'em traps
+ * for simplicity.
+ */
+#define get_mpb(a)	(void)trapD(0,(long)a)
+#define setexc(e,h)	(void (*)())trapD(5,e,((long)(h)))
 
 #define min(a,b)	(((a)<(b))?(a):(b))
 
-#define rwabs(a,b,c,d,e) if(rwerr=trap13(4,a,b,c,d,e)){errdrv=e;\
+#define rwabs(a,b,c,d,e) if(rwerr=trapD(4,a,b,c,d,e)){errdrv=e;\
 /* ------------------------------------------ */	longjmp(errbuf,rwerr);}
 
 #define cl2rec(cl,dm) (!(cl) ? 0 : (((cl)-2) << (dm)->m_clrlog))
@@ -547,33 +567,57 @@ typedef long jmp_buf[3];
 
 /*
  * prototypes for functions which aren't in C
+ *
+ * NOTE: Until Alex fixes his compiler, all these assembler functions must
+ *	preserve d2/a2 when compiling with Lattice.
  */
 
-long trap1 _P(( int,... ));
-long trap13 _P(( int,... ));
-long trap14 _P(( int,... ));
+/* Functions in rwa */
+
+long trap1 _P(( int,... ));	/* yeah, right */
+long trapD _P(( int,... ));
+long trapE _P(( int,... ));
 
 int uc _P(( int ));
-voidfn clear _P(( void *start, void *last_plus_1 ));
-voidfn usr2xfr _P(( uint n, void *d, void *s ));
-voidfn xfr2usr _P(( uint n, void *s, void *d ));
-voidfn upd_tod _P(( void ));
+
+voidfn dojmp _P(( long addr ));
+
+#if 0
+#ifdef LATTICE
+#pragma inline dojmp(a0) {"4ed0";}
+#endif
+#endif
 
 long setjmp _P(( jmp_buf buf ));
 long longjmp _P(( jmp_buf buf, long code ));
 
 volatile void gouser _P(( void ));
-voidfn dojmp _P(( long addr ));
+
 voidfn clksync _P(( void ));
+voidfn upd_tod _P(( void ));
+voidfn usr2xfr _P(( uint n, void *d, void *s ));
+voidfn xfr2usr _P(( uint n, void *s, void *d ));
+
+/* BIOS support functions not in rwa */
+#ifndef LATTICE
+#define __far /* */
+#endif
+__far voidfn clear _P(( void *start, void *last_plus_1 ));
+
 
 /*
  * Macros and inlines
  */
 
 /* move 'count' bytes from 's' to 'd' - count must be >0; coded for dbra */
+#ifdef LATTICE
+void *__builtin_memcpy(void *, const void *, long);
+#define xmovs(n,s,d) (void)__builtin_memcpy((d),(s),(int)(n))
+#else
 #define xmovs(xcount,xs,xd) ((void)({ \
 	int count = xcount; char *s = (char *)xs; char *d = (char *)xd; \
 	--count; do { *d++ = *s++; } while (--count != -1); }))
+#endif
 
 /*
  * dirfirst macro: initialize dir to the first slot in the dir from the dev/cl 

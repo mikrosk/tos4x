@@ -339,8 +339,23 @@ procedure docut a
   print length: -x8 lpeek(`a + 8) own: -x8 lpeek(`a + c)
 .
 
-alias allblocks "(t0 = lpeek(.blockhead));_blocks"
-alias _blocks "if `t0 'block `t0 1;(t0 = lpeek(`t0));_blocks'"
+# db complained about recusion in the following, so I made it a proc
+#alias allblocks "(t0 = lpeek(.blockhead));_blocks"
+#alias _blocks "if `t0 'block `t0 1;(t0 = lpeek(`t0));_blocks'"
+procedure allblocks
+    local bl
+    `bl = lpeek(.blockhead)
+    print all blocks:
+#:doblock
+    if !`bl goto end
+    print -n -x07 `bl
+    block `bl 1
+    `bl = lpeek(`bl)
+    goto doblock
+#:end
+    print done.
+.
+
 
 procedure pdtab
   local pd ppd ppdend
@@ -397,8 +412,8 @@ procedure showtail tail
 
 procedure _dopexec mode arg1 arg2 arg3
   print -n Pexec -x `mode
-  if (mode == 0 || mode == 3) "print -n name= -x `arg1 tail=;showtail arg2+1;print env= -x `arg3"
-  if (mode == 4 || mode == 6) print arg1= `arg1 basepage= -x `arg2 arg3 = `arg3
+  if (mode == 0 || mode == 3) "print -n name= -x `arg1 -s `arg1 tail=;showtail arg2+1;print env= -x `arg3"
+  if (mode == 4 || mode == 6) print arg1= -x `arg1 basepage= -x `arg2 arg3 = -x `arg3
   if (mode == 5 || mode == 7) "print -n arg1= -x `arg1 tail=;showtail arg2+1;print env= -x `arg3"
 .
 

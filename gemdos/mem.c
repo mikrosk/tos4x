@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.22 $	$Source: d:/tos/dos\rcs\mem.c,v $
+* $Revision: 2.23 $	$Source: d:/tos/dos\rcs\mem.c,v $
 * =======================================================================
-* $Author: unknown $ 	$Date: 1992/05/20 00:30:02 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.23  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.22  1992/05/20  00:30:02  unknown
 * This ci represents falling back to 2.19, pre-memprot.  It has one
 * thing put back in from 2.20: freesmall on MD's given up by xmunhook.
@@ -130,7 +133,7 @@ xminit()
     unsigned long s;
     unsigned long adjust;
 
-    (void)getmpb(&pmd);
+    (void)get_mpb(&pmd);
 
     /* 
      * Make sure that each free block we got back starts on a quantum
@@ -143,7 +146,7 @@ xminit()
     for (p = pmd.mp_mfl; p; p = p->m_link) {
 	if (s = (((unsigned long)(UNFLAG(p->m_start))) & (QUANTUM-1))) {
 	    adjust = QUANTUM - s;
-	    p->m_start += adjust;
+	    (char *)p->m_start += adjust;
 	    p->m_length -= adjust;
 	}
 	p->m_length = p->m_length & ~(QUANTUM-1);
@@ -259,7 +262,7 @@ int type;
 	    return(0);
 
 	p1->m_length = p->m_length - amount;
-	p1->m_start = p->m_start + amount;	/* preserves flags */
+	p1->m_start = (char *)p->m_start + amount;	/* preserves flags */
 	p1->m_link = p->m_link;
 	p->m_length = amount;
 	*q = p1;
@@ -329,7 +332,7 @@ found:
      * Create a memory descriptor for the freed portion of memory.
      */
     if (!(m = getsmall())) return ERROR;
-    m->m_start = p->m_start + len;		/* preserves flag */
+    m->m_start = (char *)p->m_start + len;		/* preserves flag */
     m->m_length = p->m_length - len;
     p->m_length = len;
     freeit(m,&pmd);
@@ -379,7 +382,7 @@ MPB *mp;
      */
 
     if (p) {
-	if (m->m_start + m->m_length == p->m_start) {
+	if ((char *)m->m_start + m->m_length == p->m_start) {
 	    /* join to higher neighbor */
 	    DBCMD(0x80,"print freeit: coalesce up;_c")
 	    m->m_length += p->m_length;
@@ -391,7 +394,7 @@ MPB *mp;
 
     /* if there's a prev, join to lower neighbor */
     if (p1) {
-	if (p1->m_start + p1->m_length == m->m_start) {
+	if ((char *)p1->m_start + p1->m_length == m->m_start) {
 	    /* join to lower neighbor */
 	    DBCMD(0x80,"print freeit: coalesce down;_c")
 	    p1->m_length += m->m_length;
@@ -494,22 +497,24 @@ PD *pid;
 {
     REG MD *m;
     REG MD **q;
-    REG MD *hold;
-    
+
     DBCMD(0x80,"print xmunhook pid: -x (lpeek (`a6 + 8));_c");
 
-    for (m = *(q = &pmd.mp_mal); m; ) {
-	if (m->m_own == pid) {
-	    /* here's one: link prev's next to m's next (and change m) */
+    for (m = *(q = &pmd.mp_mal); m; )
+	if (m->m_own != pid) m = *(q = &m->m_link);
+	else
+	{
+	/* here's one: link prev's next to m's next, and advance m */
+/************************************************************************
+	    freesmall(m);
+@BUG
+Something is definitely strange here, but I think it only shows up in a
+RAM-loaded system.  The above freesmall() call causes a panic because
+one of the MD's at startup is pointing at the BIOS MD!  Haven't figured
+out how or why that happens yet.  For now, I'm leaving this commented out.
+*************************************************************************/
 	    *q = m = m->m_link;
 	}
-	else {
-	    /* not one: move m and q onward */
-	    hold = m;
-	    m = *(q = &m->m_link);
-	    freesmall(hold);
-	}
-    }
 }
 
 /*
@@ -589,7 +594,7 @@ unsigned long siz;
 
     if (s = (((long)blk) & (QUANTUM-1))) {
 	s = QUANTUM-s;
-	blk += s;
+	(char *)blk += s;
 	siz -= s;
     }
     siz &= ~(QUANTUM-1);
@@ -604,5 +609,110 @@ unsigned long siz;
     freeit(m,&pmd);
     return 0L;
 } 
+
+void *s_start;
+signed long s_length;
+
+/* Function 0x15: void *xsrealloc(signed long size);
+ * 920709 kbad
+ * This call is brought to you by the ingenious wizards who created
+ * a machine with a video mode that uses more than 70% of system memory.
+ *
+ * GEMDOS now must keep track of a resizable block at the end of ST RAM.
+ * To avoid intruding on the rest of GEMDOS memory management,
+ * this block is maintained separately from those on the pmd lists.
+ *
+ * xsrealloc(-1L) returns the size of the largest possible screen,
+ * xsrealloc(size) returns a pointer to the newly reallocated screen,
+ * or NULL on failure.
+ *
+ * Note that this code intentionally does signed math with pointer values.
+ */
+void *
+xsrealloc(ss)
+signed long ss;
+{
+    MD	*p, *lastp, **q;
+    long ssmax, newstart;
+
+/* Find the last free MD in ST RAM (the free list is ordered by start addr) */
+    lastp = p = *(q = &pmd.mp_mfl);
+    while (p && !FLAG(p->m_start))
+	lastp = p, p = *(q = &p->m_link);
+    p = lastp;
+
+/*
+ * Compute the max available screen size:
+ * The current size, plus the size of the last free block
+ * (if there is one, and it's contiguous with the screen),
+ * minus screen pad (screens can't abut the end of memory).
+ * If this call is a size inquiry, return it.
+ */
+    ssmax = s_length - 0x100L;
+    if (!p) newstart = (long)s_start;
+    else
+    {
+        newstart = (s_start) ? (long)p->m_start + (long)p->m_length : 0L;
+        if (newstart == (long)s_start)
+            ssmax += (long)p->m_length;
+    }
+    if (ssmax < 0L) ssmax = 0L;
+    if (ss < 0L)
+        return (void *)(ssmax);
+
+    ss += 0x100L; /* pad size: screens can't abut the end of memory */
+
+/*
+ * Lose if the request is too big, or if the last free block is not
+ * contiguous with the current screen.
+ */
+    if (ss > ssmax || newstart != (long)s_start )
+	return NULPTR;
+
+/*
+ * At this point, we have a valid size,
+ * so calculate & align the new screen start.
+ */
+    newstart = (newstart + s_length - ss) & ~0xffL;
+
+    if (newstart < 0)
+    {
+    /* No screen has yet been allocated:
+     * newstart is actually an offset from the end of the last free block.
+     */
+	newstart = -newstart;
+	if (p->m_length < newstart) /* paranoia */
+	    return NULPTR;
+	p->m_length -= (s_length = newstart);
+	newstart = (long)p->m_start + (long)p->m_length;
+    }
+
+    else if (newstart != (long)s_start)
+    {
+	if (p)
+	{
+	/* Resize the adjacent block */
+	    if (newstart < (long)p->m_start) /* paranoia */
+		return NULPTR;
+	    p->m_length = (ulong)(newstart - (long)p->m_start);
+	}
+	else
+	{
+	/* Smaller screen: make an MD for the new free block */
+	    if ( !(p = getsmall()) )
+		return NULPTR;
+	    p->m_start = s_start;
+	    p->m_length = (ulong)(newstart - (long)p->m_start);
+	    freeit(p, &pmd);
+	    /* p=NULPTR isn't needed here to avoid the zap below,
+	     * since this new block isn't zero length.
+	     */
+	}
+	s_length += (long)s_start - newstart;
+    }
+    if (p && !p->m_length) /* zap zero length blocks */
+	*q = p->m_link, freesmall(p);
+
+    clear((void *)newstart, (void *)(newstart+s_length));
     return (s_start = (void *)newstart);
 }

@@ -1,4 +1,4 @@
- /*	GEMSHLIB.C	4/18/84 - 01/07/85	Lee Lorenzen		*/
+/*	GEMSHLIB.C	4/18/84 - 01/07/85	Lee Lorenzen		*/
 /*	68k		2/18/85 - 05/28/85	Lowell Webster		*/
 /*	International 	07/19/85		Derek Mui		*/
 /*	french		08/08/85		Mike Schmal		*/
@@ -56,6 +56,7 @@
 #include "dispvars.h"
 #include "gemdos.h"
 #include "message.h"
+#include "osbind.h"
 #include "aesmint.h"
 #include "rslib.h"
 #include "signal.h"
@@ -70,6 +71,8 @@ EXTERN	WORD	gl_multi;
 EXTERN	WORD	gl_width;
 EXTERN	WORD	gl_height;
 EXTERN	WORD	gl_handle;
+EXTERN	WORD	biosfd;
+EXTERN	WORD	consfd;
 EXTERN	USERBLK	*aesDDD;			/* in GSXIF.C		*/
 EXTERN	LONG	gl_vdo;
 EXTERN	WORD	gl_restype;
@@ -239,8 +242,9 @@ sys_reschange( res )
 	WORD	res;
 {
 	if ( res == gl_restype )
+	{
 	  return( FALSE );	
-
+	}
 	gl_restype = res;
 	gl_rschange = TRUE;
 	return( TRUE );
@@ -269,7 +273,6 @@ sh_reschg( mode, res )
 	  if ( ( !mode ) && ( res != gl_restype ) )
 	    ret = sys_reschange( res );
 	}
-
 	if ( ret )
 	  reschid = currpd->p_pid;
 
@@ -555,7 +558,9 @@ sh_fork( program, tail, envrn )
 	  tail[CMDLEN-1] = 0;
 		
 	  if (gl_multi)
-	    i = dos_pexec( 100, program, tail, envrn );
+	  {
+    	    i = dos_pexec( 100, program, tail, envrn );
+	  }
 	  else
 	  {
 	    Debug1("Free memory: "); Ndebug1((LONG)dos_xalloc(-1L, 3));
@@ -593,11 +598,6 @@ sh_fork( program, tail, envrn )
 		Debug1( "sh_fork: after while loop\r\n" );
 		all_run();	/* Make sure SCREEN runs first to */
 				/* update the menu bar. */
-#if 0		
-		/* not neede this we do an all_run() */
-		 sh_draw( " " ); 
-		 mn_bar(0x0L, 0x200);
-#endif
 	    }
 	    return( p->p_pid );
 	  }
@@ -614,7 +614,6 @@ sh_background( VOID )
 {
 	WORD		i;
 	WORD		*wptr;
-	PARMBLK		*par;
 	REG OBJECT	*obj;
 						/* get st_desk ptr	*/
 	rs_gaddr(ad_sysglo, R_TREE, SCREEN, &ad_stdesk);
@@ -630,8 +629,7 @@ sh_background( VOID )
 
 	if ( aesDDD )			/* user defined background	*/
     	{
-	  par = (PARMBLK*)aesDDD->ub_parm;
-	  wptr = ( WORD *)&par->pb_parm;
+	  wptr = (WORD *) (&((USERBLK *)aesDDD)->ub_parm);
 	  *wptr = gl_handle;	
       	  obj[0].ob_type = G_USERDEF;	
       	  obj[0].ob_spec = ( LONG )aesDDD;		
@@ -685,7 +683,8 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 
 	ret = 0;		/* return code, assuming failed  */
 
-	if (doex & 0xFF00)	/* extended mode	*/
+	if (doex & 0xEF00)	/* extended mode: note 0x1000 doesn't require
+				   the other extensions	*/
 	{
 	  ptr = ( LONG *)pcmd;		/* This is the file name */
 	  pcmd = ( BYTE *)ptr[0];
@@ -877,8 +876,10 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 		} else {
 			sh_inwrite = TRUE;
 		}
+		wm_update(1);
+		swap_next( currpd, TRUE );
 		w_drawchange(&gl_rscreen, NIL, NIL);
-		mn_bar(0x0L, 0x200 | TRUE); 
+		wm_update(0);
 	      } else {
 		ret = sh_fork( ad_shcmd, ad_shtail, envrn );
 	      }
@@ -1143,6 +1144,7 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 	WORD		i;
 	WORD		*wptr;
 	WORD		buffer[8];
+	WORD sa_rezword, sb_rezword, s_restype;
 
 	switch( doex & 0x00FF )
 	{
@@ -1174,11 +1176,27 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 	    {
 	      case 0:
 	      case 1:
+		sa_rezword = a_rezword;
+		sb_rezword = b_rezword;
+		s_restype = gl_restype;
+
 	        if ( sh_shutdown( -1, 0 ) )	/* can we shutdown? */
 	        {				/* can we change res? */
      		  if ( sh_reschg( isover, isgem ) )/* do the shut down mode */
-	            return( sh_shutdown( 1, AP_RESCHG ) );		
-		}	
+		  {
+	            i = sh_shutdown( 1, AP_RESCHG );
+		    if (!i)
+		    {
+		      a_rezword = sa_rezword;
+		      b_rezword = sb_rezword;
+		      gl_restype = s_restype;
+		    }
+		    return i;
+		  }
+		}			/* res. chg. failed, restore old values */
+		a_rezword = sa_rezword;
+		b_rezword = sb_rezword;
+		gl_restype = s_restype;
 	    }
 
 	    return( FALSE );
@@ -1372,8 +1390,9 @@ sh_put( pdata, len )
 	  }
 	  else
 	    return( FALSE );
+	} else {
+	  D.s_size = len;
 	}
-
 	LBCOPY( D.s_save, pdata, len );
 	return( TRUE );
 }
@@ -1655,12 +1674,14 @@ sh_spath( path )
 
 	temp = *(p1+1);		/* is it to add or remove ? */	
 	add = ( temp ) ? TRUE : FALSE;
-	*(p1+1) = 0;
+	if (temp)
+	  *(p1+1) = 0;
 
 	len = strlen( path );
 	sh_envrn( ( LONG *)&p2, path );
 
-	*(p1+1) = temp;		/* restore the path	*/
+	if (temp)
+	  *(p1+1) = temp;		/* restore the path	*/
 
 	if ( !p2 )		/* if not found */
 	{

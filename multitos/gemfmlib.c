@@ -27,6 +27,7 @@
 
 #include "machine.h"
 #include "objaddr.h"
+#include "osbind.h"
 #include "aesmint.h"
 #include "gemusa.h"
 
@@ -52,10 +53,6 @@ EXTERN	GRECT	gl_rscreen;
 EXTERN	THEGLO	D;
 EXTERN	PD	*currpd;
 EXTERN	PD	*gl_mowner;
-
-
-EXTERN  LONG	trap();
-EXTERN  LONG	trap13();
 
 
 
@@ -334,7 +331,7 @@ fm_do( tree, start_fld )
 	    next_obj = ob_find(tree, ROOT, MAX_DEPTH, rets[0], rets[1]);
  	    if (next_obj == NIL)
 	    {
-	      trap13( 0x0003,0x0002, 7 );		/* Bconout(CON, 7)	*/
+	      Bconout( 2, 7 );		/* Bconout(CON, 7)	*/
 	      next_obj = 0;
 	    }
 	    else

@@ -110,6 +110,9 @@ MLOCAL	BYTE	FMDTAIL[] = "-f A:";
 MLOCAL	BYTE	COPYTAIL[] = "-c A: B:";
 MLOCAL	BYTE	DESKFMT[] = "DESKFMT=";	
 MLOCAL	WORD	w_inc;
+MLOCAL	WORD	helevcol;
+MLOCAL	WORD	hslidcol;
+
 MLOCAL	WORD	bar_max;	/* in case user copies disk > 80 tracks */
 MLOCAL	WORD	ttable[ ] = { FCCNCL, FCCOPY, FCFORMAT, SRCDRA, SRCDRB, ADRIVE,
 			      BDRIVE };
@@ -136,6 +139,7 @@ fc_start( BYTE *source, WORD op )
 	LONG		value,save;	
 	BYTE		*bptr;
 	BYTE		tail[20];
+	EXTERN WORD my_windget( WORD, WORD, WORD *, WORD *, WORD *, WORD * );
 
 	/* Launch process if DESKFMT= is in the environment */
 
@@ -192,12 +196,29 @@ fc_2:	  if ( obj[FCHIGH].ob_state & SELECTED )
 	w_inc = width / MAXTRACK;
 	bar_max = width = w_inc * MAXTRACK;
 	obj[FCBARB].ob_width = obj[BARA].ob_width = obj[BARB].ob_width = obj[FCBARA].ob_width = width;
-	
+
+	i = 17;		/* W_HSLIDE */
+	my_windget(0, WF_DCOLOR, &i, &hslidcol, &i, &i);
+	i = 18;		/* W_HELEV */
+	my_windget(0, WF_DCOLOR, &i, &helevcol, &i, &i);
+
+	obj[FCBARA].ob_spec &= 0xFFFF0000L;
+	obj[FCBARA].ob_spec |= (UWORD)hslidcol;
+	obj[FCBARB].ob_spec &= 0xFFFF0000L;
+	obj[FCBARB].ob_spec |= (UWORD)hslidcol;
+
+	obj[FCBARA].ob_flags |= (IS3DOBJ|IS3DACT);
+	obj[FCBARB].ob_flags |= (IS3DOBJ|IS3DACT);
+	obj[FCBARA].ob_state |= SELECTED;
+	obj[FCBARB].ob_state |= SELECTED;
+
 	obj[BARA].ob_x = obj[FCBARA].ob_x;
 	obj[BARA].ob_y = obj[FCBARA].ob_y;
 	obj[BARB].ob_x = obj[FCBARB].ob_x;
 	obj[BARB].ob_y = obj[FCBARB].ob_y;
 	
+	obj[BARA].ob_spec = obj[FCBARA].ob_spec;
+	obj[BARA].ob_spec = obj[FCBARA].ob_spec;
 
 	for ( i = 0 ; i < 7; i++ )
 	  obj[ttable[i]].ob_state = NORMAL;
@@ -734,7 +755,11 @@ fc_bar( REG OBJECT *obj, REG WORD which )
 	wid = ( wid < bar_max ) ? wid : bar_max; /* don't overflow box */
 
 	obj[which].ob_width = wid;
+#if 0
 	obj[which].ob_spec = 0xFF1121L;
+#else
+	obj[which].ob_spec = 0x00FF0000L | (UWORD)helevcol;
+#endif
 	fc_draw( obj, which, 0 );
 }
 
@@ -761,4 +786,32 @@ fc_draw( OBJECT *obj, WORD which, WORD wait )
  	  wind_update(0);
 	}
 	wait_msg( d_handle, obj );
+}
+
+#include "crysbind.h"
+
+extern int int_in[], int_out[];
+
+/*
+ * the wind_get binding in the old library can't handle WF_DCOLOR, which
+ * requires inputs as well as outputs
+ */
+ 	WORD
+my_windget(w_handle, w_field, pw1, pw2, pw3, pw4)
+	WORD		w_handle;
+	WORD		w_field;
+	WORD		*pw1, *pw2, *pw3, *pw4;
+{
+	WM_HANDLE = w_handle;
+	WM_WFIELD = w_field;
+	WM_IX = *pw1;
+	WM_IY = *pw2;
+	WM_IW = *pw3;
+	WM_IH = *pw4;
+	crys_if( WIND_GET );
+	*pw1 = WM_OX;
+	*pw2 = WM_OY;
+	*pw3 = WM_OW;
+	*pw4 = WM_OH;
+	return( RET_CODE );
 }

@@ -33,25 +33,6 @@
 #include "pdesk.h"			/* Prototypes */
 #include "pmisc.h"
 
-#ifdef NEVER
-/* -- External Function declarations -- */
-EXTERN	BYTE	*r_slash();
-EXTERN	BYTE	*get_fstring();
-EXTERN	WORD	strlen();
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
-EXTERN	BYTE	*g_name();
-EXTERN	BYTE	*strcpy();
-EXTERN	BYTE	*lp_fill();
-EXTERN	WINDOW	*get_win();
-EXTERN	APP		*app_icon();
-EXTERN	OBJECT	*get_tree();
-EXTERN	WORD	in_parent();
-EXTERN	APP		*app_xtype();
-EXTERN	DIR		*get_dir();
-EXTERN	BYTE	*put_name();
-#endif
-
 /* -- External global variables -- */
 EXTERN	WORD	desk_id;
 EXTERN	WORD	d_display;
@@ -65,6 +46,58 @@ EXTERN	WORD	x_type;
 WORD	back_update;					/* update background	*/
 BYTE	scapath[] = "?:\\CLIPBRD\\";	/* default clip board path */
 BYTE	DESKCOPY[] = "DESKCOPY=";
+
+/*	Special version of "strlen" which also counts any extra length	*/
+/*	that will be needed for quoting special characters		*/
+WORD
+qstrlen( BYTE *s )
+{
+	WORD len = 0;
+	WORD numquotes = 0;
+	WORD numspaces = 0;
+	BYTE c;
+
+	if (*s == '\'')
+		numspaces = 1;	/* force quoting */
+
+	while ((c = *s++) != 0) {
+		if (c == ' ')
+			numspaces++;
+		else if (c == '\'')
+			numquotes++;
+		len++;
+	}
+	if (numspaces) {
+		len += 2 + numquotes;
+	}
+	return len;
+}
+
+BYTE *
+qstrcpy( BYTE *src, BYTE *dest )
+{
+	BYTE *t, c;
+	WORD needquotes = 0;
+
+	if (*src == '\'')
+		needquotes = 1;
+	else {
+		for (t = src; *t; t++)
+			if (*t == ' ') needquotes = 1;
+	}
+	if (needquotes) {
+		*dest++ = '\'';
+	}
+	while ((c = *src++) != 0) {
+		if (needquotes && c == '\'')
+			*dest++ = c;
+		*dest++ = c;
+	}
+	if (needquotes)
+		*dest++ = '\'';
+	*dest++ = 0;
+	return dest;
+}
 
 /*	Build an command tail. File name will be build as C:\XXXX		*/
 /*	Directory will be built as C:\BIN\ If the style is 1, then there is	*/
@@ -86,7 +119,7 @@ BYTE
 		len = style ? 1 : 0;		/* Number of byte to increase	*/
 		while( status )
 		{
-			len += strlen( str ) + 1;	/* string and space */
+			len += qstrlen( str ) + 1;	/* string and space */
 			status = x_next( &str, &type );
 		}
 		
@@ -109,7 +142,7 @@ BYTE
 					if ( !full )		/* file name only	*/
 						str = g_name( str );	
 
-				addr = strcpy( str, addr ) - 1;
+				addr = qstrcpy( str, addr ) - 1;
 				*addr++ = ' ';
 				status = x_next( &str, &type );
 			}
@@ -1330,12 +1363,14 @@ BYTE	sbuff[200];
 #define DD_NAK		1
 #define DD_EXT		2
 #define DD_LEN		3
+#define DD_TRASH	4
+#define DD_PRINTER	5
 
 /* timeout in milliseconds */
 #define DD_TIMEOUT	2000
 
 /* number of bytes of "preferred
- * extensions" sent by receipient during
+ * extensions" sent by recipient during
  * open
  */
 #define DD_NUMEXTS	8
@@ -1401,13 +1436,13 @@ d_dragdrop( WORD apid, WORD winid, WORD msx, WORD msy )
  *
  * Output Parameters:
  * exts:	A 32 byte buffer into which the
- *		receipient's 8 favorite
+ *		recipient's 8 favorite
  *		extensions will be copied.
  *
  * Returns:
  * A positive file descriptor (of the opened
  * drag & drop pipe) on success.
- * -1 if the receipient doesn't respond or
+ * -1 if the recipient doesn't respond or
  *    returns DD_NAK
  * -2 if appl_write fails
  */
@@ -1478,7 +1513,7 @@ abort_dd:
 }
 
 /*
- * see if the receipient is willing to accept a certain
+ * see if the recipient is willing to accept a certain
  * type of data (as indicated by "ext")
  *
  * Input parameters:
@@ -1522,7 +1557,7 @@ ddstry( WORD fd, BYTE *ext, BYTE *name, LONG size)
 }
 
 
-/* Code for either receipient or originator */
+/* Code for either recipient or originator */
 
 /*
  * close a drag & drop operation
@@ -1536,7 +1571,7 @@ ddclose( WORD fd )
 }
 
 
-/* Code for receipient */
+/* Code for recipient */
 
 /*
  * open a drag & drop pipe
@@ -1600,7 +1635,9 @@ ddopen( WORD ddnam, BYTE *preferext)
  *
  * Output Parameters:
  * name:	a pointer to the name of the drag & drop item
- *		(note: this area must be at least DD_NAMEMAX bytes long)
+ *		(note: this area must be at least DD_NAMEMAX*2 bytes long,
+ *		 and will also be used to store the file name)
+ * fname:	a pointer to a pointer to a file name for this item
  * whichext:	a pointer to the 4 byte extension
  * size:	a pointer to the size of the data
  *
@@ -1614,7 +1651,7 @@ ddopen( WORD ddnam, BYTE *preferext)
  */
 
 WORD
-ddrtry( WORD fd, BYTE *name, BYTE *whichext, LONG *size)
+ddrtry( WORD fd, BYTE *name, BYTE **fname, BYTE *whichext, LONG *size)
 {
 	WORD hdrlen;
 	WORD i;
@@ -1637,8 +1674,8 @@ ddrtry( WORD fd, BYTE *name, BYTE *whichext, LONG *size)
 		return -1;
 	}
 	hdrlen -= 8;
-	if (hdrlen > DD_NAMEMAX)
-		i = DD_NAMEMAX;
+	if (hdrlen > DD_NAMEMAX+DD_NAMEMAX)
+		i = DD_NAMEMAX+DD_NAMEMAX;
 	else
 		i = hdrlen;
 	if (Fread(fd, (long)i, name) != i) {
@@ -1654,6 +1691,15 @@ ddrtry( WORD fd, BYTE *name, BYTE *whichext, LONG *size)
 	if (hdrlen > 0)
 		Fread(fd, (long)hdrlen, buf);
 
+/* find the file name, if it is there */
+	hdrlen = i;	/* original amount of data we read */
+	for (i = 0; i < hdrlen-1; i++) {
+		if (name[i] == 0) {
+			i++;
+			break;
+		}
+	}
+	*fname = name+i;
 	return 0;
 }
 
@@ -1685,61 +1731,250 @@ ddreply( WORD fd, WORD ack)
 
 /*
  * rec_ddmsg(int *msg): given a drag & drop message, act as
- * a receipient and get the data
+ * a recipient and get the data
  */
 
-static char ourexts[DD_EXTSIZE] = "";
+static char ourexts[DD_EXTSIZE] = "PATH";
 
 VOID
 rec_ddmsg( WORD msg[] )
 {
 	WORD winid;
-	WORD msx, msy, kstate;
+	WORD mx, my, kstate;
 	WORD fd, pnam;
-/* JTT - These aren't needed now, so I commented them out. */
-/*	WORD i; */
-/*	BYTE txtname[DD_NAMEMAX], ext[5]; */
-/*	LONG size; */
+	WORD ditem, dtype;
+	WORD exec, d_id;
+	WINDOW *dwin;
+	OBJECT *dobj;
+	WORD handle, id, ddresult;
+	IDTYPE *itype;
+	WORD reply;
+	BYTE *path;
+	BYTE buffer[14];
+	DIR  *dir;
+	BYTE *txtname, ext[5];
+	BYTE *filename;
+	LONG size;
+	BYTE *pathbuf;
 
 	winid = msg[3];
-	msx = msg[4];
-	msy = msg[5];
+	mx = msg[4];
+	my = msg[5];
 	kstate = msg[6];
 	pnam = msg[7];
 
 	fd = ddopen(pnam, ourexts);
 	if (fd < 0) return;
 
-/* we don't understand any drops, yet, so
- * just reply with an ACK
- */
-	ddreply( fd, DD_NAK );
-	ddclose( fd );
+	reply = DD_NAK;
 
-#if 0
-/* sample code for later, maybe */
-	for(;;) {
-		i = ddrtry(fd, txtname, ext, &size);
-		if (i < 0) {
-			ddclose(fd);
-			return;
-		}
-		if (!strcmp(ext, "ARGS")) {
-			pastespace = 1;
-			goto dopaste;
-		}
-		if (!strcmp(ext, ".TXT") || !strcmp(ext, ".ASC")) {
-dopaste:
-			ddreply(fd, DD_OK);
-			pastefd(w, fd);
-			if (pastespace)
-				pastestr(w, " ");
-			ddclose(fd);
-			return;
-		}
-		ddreply(fd, DD_EXT);
+	pathbuf = malloc( 1024L );
+	if (!pathbuf) {
+		ddreply(fd, DD_NAK);
+		ddclose(fd);
+		return;
 	}
+	txtname = pathbuf + 512;
+
+	exec = ch_obj( mx, my, &dwin, &ditem, &dtype );
+
+	if ( dtype == DESKICON ) {
+		dobj = background;
+		d_id = 0;
+	} else {
+		dobj = dwin->w_obj;
+		d_id = dwin->w_id;
+	}
+	if ( ditem && exec ) {
+		if ( !(dobj[ditem].ob_state & SELECTED) ) {
+			dobj[ditem].ob_state |= SELECTED;
+			do_redraw( d_id, &full, ditem );
+		}
+	}
+
+	handle = wind_find( mx, my );
+	if (handle != winid)
+		goto finish;
+	wind_get( handle, WF_OWNER, &id, &pnam, &pnam, &pnam );
+	if ( id != desk_id )
+		goto finish;
+
+	if (dtype == DESKICON) {
+		itype = &backid[ditem];
+		if (itype->i_type == TRASHCAN) {
+			reply = DD_TRASH;
+			goto finish;
+		} else if (itype->i_type == PRINTER) {
+			reply = DD_PRINTER;
+			goto finish;
+		} else if (itype->i_type == XDIR) {
+			path = itype->i_path;
+		} else if (itype->i_type == DISK) {
+			strcpy( wildext, buffer );
+			buffer[0] = (BYTE)(itype->i_cicon.monoblk.ib_char & 0x00ff);
+			path = buffer;
+		} else {
+	/* get the clipboard directory */
+			path = pathbuf+1;
+			*path = 0;
+			if (scrp_read(path) == 0 || path[0] == 0) {
+				strcpy(scapath, path);
+				path[0] = ( isdrive() & 0x04 ) ? 'C' : 'A';
+				Dcreate( path );
+				scrp_write( path );
+			}
+		}
+	} else {
+		path = dwin->w_buf;
+		strcpy( dwin->w_path, path );
+		if (ditem) {
+			dir = get_dir( dwin, ditem );
+			if ( dir->d_att & SUBDIR )
+				cat_path( dir->d_name, path );
+		}
+	}
+	if (path != pathbuf+1) {
+	  strcpy(path, pathbuf+1); /* +1 so we can put a command line length byte in */
+	  path = pathbuf+1;
+	}
+	*(r_slash(path) + 1) = 0;
+
+	for (;;) {
+		ddresult = ddrtry(fd, txtname, &filename, ext, &size);
+		if (ddresult < 0) {
+			reply = -1;
+			break;
+		}
+	/* note: strcmp semantics are *not* ANSI!!! */
+		if (strcmp(ext, "PATH") == TRUE) {
+			if (size < strlen(path)+1) {
+				ddreply(fd, DD_LEN);
+				continue;
+			}
+			ddreply(fd, DD_OK);
+			Fwrite(fd, (LONG)strlen(path)+1, path);
+			reply = -1;	/* no reply needed */
+			break;
+		}
+
+		if (ext[0] == '.') {
+		  ddreply(fd, DD_OK);
+		  pnam = copypipe(fd, size, path, filename, ext);
+		  reply = -1;	/* no reply needed */
+		  if (pnam && dtype == DESKICON) {
+		    if (exec && itype->i_type == XFILE)
+		    {
+		      --path;
+		      *path = strlen( path + 1 );
+		      exec_file( backid[ditem].i_path, (WINDOW *)0, ditem,
+					path );
+#if 0
+		      Fdelete( path + 1 ); /* delete temp. file */
 #endif
+		    } else if (!exec) {
+		      save_ext( path, buffer );
+		      app_icon(buffer, -1, &pnam);
+		      pnam = make_icon( 0, pnam, XFILE, txtname );
+		      if (pnam == -1)
+		        do1_alert( NOICON );
+		      else {
+			app_mtoi( mx, my, &background[pnam].ob_x,
+				&background[pnam].ob_y );
+			lp_fill( path, &backid[pnam].i_path );
+			if ( !backid[pnam].i_path ) {
+			  do1_alert( NOICON );
+			  background[pnam].ob_flags |= HIDETREE;
+			} else {
+			  do_redraw( 0, &full, pnam );
+			}
+		      } 
+		    }
+		  }
+		  up_2allwin( path );
+		  break;
+		} else {
+			ddreply(fd, DD_EXT);
+		}
+	}
+
+finish:
+	if (reply >= 0)		/* -1 indicates no reply necessary */
+		ddreply( fd, reply );
+	ddclose( fd );
+	free(pathbuf);
+	Fselect(500, 0L, 0L, 0L);	/* pause a bit */
+	if (ditem && exec) {
+		dobj[ditem].ob_state &= ~SELECTED;
+		do_redraw( d_id, &full, ditem );
+	}
 }
 
 
+WORD
+copypipe(ifd, size, path, filename, ext)
+	WORD ifd;
+	LONG size;
+	BYTE *path;
+	BYTE *filename;
+	BYTE *ext;
+{
+	BYTE temp[80];
+	BYTE *addr;
+	LONG chunksize, i;
+	WORD ofd;
+	WORD ret;
+
+	ret = FALSE;
+	addr = (BYTE *)Mxalloc( size, 3 );
+	chunksize = size;
+
+	if (!addr) {
+		chunksize = 8192L;
+		addr = (BYTE *)Mxalloc( chunksize, 80 );
+		if (!addr) {
+			addr = temp;
+			chunksize = 80;
+		}
+	}
+	if (*filename) {
+		strcat( filename, path );
+	} else {
+		strcat( "DRAGDROP", path );
+		strcat( ext, path );
+	}
+
+#if 0
+	strcpy("[4][ DRAGDROP: type ", temp);
+	strcat(ext, temp);
+	strcat("|to: ", temp);
+	strcat(path, temp);
+	strcat("][ OK |Cancel]", temp);
+	i = form_alert(1, temp);
+
+	if (i == 1) {
+#endif
+retry1:
+	ofd = Fcreate( path, 0 );
+	if (ofd < 0) {
+		if ( fill_string( filename, CNTCRTFL ) == 2 )
+			goto retry1;
+	} else {
+		while (size > 0) {
+			i = Fread(ifd, chunksize, addr);
+			if (i > 0) {
+				size -= i;
+				Fwrite(ofd, i, addr);
+			} else
+				size = 0;
+		}
+		Fclose(ofd);
+		ret = TRUE;
+	}
+#if 0
+	}
+#endif
+	if (addr != temp) {
+		Mfree( addr );
+	}
+	return ret;
+}

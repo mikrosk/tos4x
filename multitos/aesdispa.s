@@ -150,6 +150,10 @@ _switchto:
 *****************************************************************
 
 _runaes:
+	tst.l	tempstack
+	bne	LOK1
+	move.l	#topstack,tempstack	; make sure 'tempstack' is initialized
+LOK1:
 	move.l	#_Nostr,-(sp)		; create an intermediate basepage
 	clr.l	-(sp)			; in order to launch the program
 	move.l	#7,-(sp)		; Gemdos will allocate a biggest
@@ -389,7 +393,5 @@ _runacc:	.ds.l	1		; acc exec code address
 psetsr:		.ds.w	1		; for psetup and process switching
 		.ds.b	2048		; 2K stack
 topstack:	.ds.l	1		; top of stack
-	.data
-		.even
-tempstack:	.dc.l	topstack
+tempstack:	.ds.l	1		; initialize to topstack
 	.end

@@ -464,7 +464,7 @@ gr_slidebox(tree, parent, obj, isvert)
 	  
 	setxy = 0;
 
-	if ( cstate ) 	/* if the child is 3D, then adjust its size 	    */
+	if ( cstate )	/* if the child is 3D, then adjust its size 	    */
 	{	
  	  pt->g_x -= ADJ3DPIX;
 	  pt->g_y -= ADJ3DPIX;
@@ -472,12 +472,20 @@ gr_slidebox(tree, parent, obj, isvert)
 	  pt->g_h += (ADJ3DPIX << 1);
 	}
 
+	if ( pstate )
+	{
+ 	  pc->g_x -= ADJ3DPIX;
+	  pc->g_y -= ADJ3DPIX;
+	  pc->g_w += (ADJ3DPIX << 1);
+	  pc->g_h += (ADJ3DPIX << 1);
+	}
+
 	gr_dragbox( pt->g_w, pt->g_h, pt->g_x + pc->g_x, pt->g_y + pc->g_y, 
 		    pc, &pt->g_x, &pt->g_y ); 
 
-	if (cstate) {
-		pt->g_x += ADJ3DPIX;
-		pt->g_y += ADJ3DPIX;
+	if ( cstate ) {
+		pt->g_x += ADJ3DPIX/2;
+		pt->g_y += ADJ3DPIX/2;
 	}
 
 	if ( isvert )		/* vertical movement	*/

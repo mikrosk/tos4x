@@ -1171,11 +1171,13 @@ tt_color( put )
 	if ( put )
 	{
 	  windspec = (UWORD)winp[j];
-	  background[0].ob_spec = (UWORD)deskp[j];
+	  if (background[0].ob_type != G_USERDEF)
+	    background[0].ob_spec = (UWORD)deskp[j];
 	}
 	else
 	{
-	  deskp[j] = (UWORD)background[0].ob_spec;
+	  if (background[0].ob_type != G_USERDEF)
+	    deskp[j] = (UWORD)background[0].ob_spec;
 	  winp[j] = (UWORD)windspec;
 	}
 }

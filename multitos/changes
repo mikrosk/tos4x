@@ -1,3 +1,126 @@
+Changes made 6/9/93:
+
+geminit.c:
+	Created a new MiNT device, AES_BIOS, which will manage BIOS I/O
+	for GEM applications. Now, if an application (such as the desktop)
+	makes a Bconin() call, it gets its key from the evnt_keybd() buffer.
+	This fixes contention between the AES and clients for keyboard
+	events, and fixes the slow response of the UNDO key during
+	desktop operations (for example).  
+gem*.c:
+	Began to replace "trap" calls with appropriate osbind macros,
+	both to improve readability and to make it easier to find
+	dependence on OS calls.
+
+Changes made 6/8/93:
+
+gemqueue.c:
+	Restored the "redraw message" optimization.
+deskact.c:
+	In bld_par(), provide quoting for any files containing spaces
+	or starting with single quotes.
+gemcli.c:
+	Look for accessories along ACCPATH *first*, as this allows
+	a different set of accessories to be used for MultiTOS versus
+	plain TOS.
+gemshlib.c:
+	Fixed a bug in the environment code (it would try to write
+	to some static data; for ROMs, this is bad news :-( ).
+gemctrl.c, gemmnlib.c:
+	Have the screen manager send only process id's to the AES,
+	not process structures; this prevents a race condition where the
+	AES can delete a process before receiving a message from SCREEN.
+gemdisp.c:
+	In pdterm(), notice if the shell has exited and mark shellpd
+	invalid if so.
+
+Changes made 6/4/93:
+
+geminit.c:
+	Created the AES_MT device only once (we only need it created once!)
+
+Changes made 6/1/93:
+
+gemwmlib.c:
+	Fixed the _DDD drawing code so that the _DDD cookie works
+	as documented.
+
+Changes made 5/24/93:
+
+geminit.c:
+	Allowed the mouse to be displayed during the opening dialog. This
+	used to cause crashes on Falcons; in fact the problem was in MiNT
+	(which was trying to be too clever about logical screen addresses)
+	and not in the AES.
+gemmnlib.c, gemshlib.c:
+	Fixed a bug which would cause the desktop to hang in
+	single tasking mode after coming back from executing a program
+	(if no windows were open, then the screen manager would become
+	the keyboard owner via the phantom window, and everyone would
+	hang).
+
+Changes made 5/21/93:
+
+deskact.c:
+	Expanded the drag&drop code so that the desktop can be the
+	target of a drag & drop; in this case, either the path
+	to which things were dragged is sent back to the application,
+	or else the desktop creates a file containing the data
+	and puts an icon there for the user.
+
+Changes made 5/20/93:
+
+deskmenu.c:
+	Fixed the "window bottoming" code so that the new top window
+	gets put on top.
+
+Changes made 5/19/93:
+
+gemshlib.c:
+	Fixed the resolution change code so that if res. change fails,
+	we're not stuck in an intermediate state (it used to be that if
+	you tried to switch to a resolution and failed, you could never
+	switch to that resolution until after you'd successfully changed
+	to a third resolution.
+deskwin.c:
+	Fixed an "off by one" bug in the code for blitting window
+	rectangles, which could sometimes cause a crash if a window
+	was partly off-screen.
+gemshlib.c:
+	Fixed shel_put so that when a new, smaller buffer is written
+	(e.g. when a smaller desktop.inf is read in) then the buffer
+	size is set to the new size.
+
+Changes made 5/18/93:
+
+gemwmlib.c:
+	Fixed the slider code so that the same algorithm is used for
+	slider sizes when creating a window and when doing wind_set on
+	it (the former case didn't use to check for sliders smaller than
+	gl_hbox).
+
+Changes made 5/14/93:
+
+deskdisk.c:
+	Made the desktop disk copy/format box use window part colors
+	(gets rid of some annoying interlace flicker in most modes).
+gemfslib.c:
+	Made the file selector parts have the same colors as window parts.
+gemwmlib.c:
+	Used gray as the default color for window parts in >4 color modes
+	(as the window color CPX does).
+
+Changes made 5/13/93:
+
+gemoblib.c:
+	Added code to detect whether or not the VDI vr_trnfm reverses
+	pixels in 16 color pixel packed mode, so that color icons
+	will be displayed correctly for both kinds of VDI.
+deskrom.c:
+	Changed the glue file format to allow for compressed glue files.
+	Added decompression code, and wrote a new "newglue.prg" that
+	can output compressed files. Everything fits in ROM now!
+
 Changes made 5/11/93:
 
 desk*.c: ++hmk

@@ -48,6 +48,8 @@
 #include "gemdos.h"
 #include "rslib.h"
 #include "gemusa.h"
+#include "windlib.h"
+#include "osbind.h"
 
 #define LEN_FSNAME 16
 #define NM_NAMES 9
@@ -64,9 +66,6 @@ typedef	struct	fstruct
 
 static VOID		r_sort( REG FSTRUCT *buffer, WORD count );
 
-EXTERN  LONG	trap();
-EXTERN	LONG	trap13();
-
 
 EXTERN  WORD	DOS_AX;
 EXTERN	WS	gl_ws;
@@ -76,6 +75,7 @@ EXTERN  LONG	ad_sysglo;
 EXTERN	PD	*currpd;
 EXTERN	WORD	gl_button;
 EXTERN	WORD	gl_multi;
+EXTERN	WORD	wtcolor[];
 GLOBAL  GRECT	gl_rfs;
 
 GLOBAL LONG	ad_fstree;
@@ -276,7 +276,7 @@ bye2:	  fm_show( NOMEMORY, 0x0L, 1 );
 	}
 
 						/* save the current dta	  */
-	savedta = trap( 0x2F );
+	savedta = Fgetdta( );
 
 	gsx_gclip( &clip );			/* get the clipping rect  */
 						/* set the new one	  */
@@ -284,6 +284,19 @@ bye2:	  fm_show( NOMEMORY, 0x0L, 1 );
 						/* reset the height	*/
 	LWSET( OB_Y( FSVELEV ), 0 );	
 	LWSET( OB_HEIGHT( FSVELEV ), LWGET( OB_HEIGHT( FSVSLID ) ) );
+
+/* set element colors to the appropriate window part colors */
+	((TEDINFO *)obj[FTITLE].ob_spec)->te_color = (UWORD)wtcolor[W_NAME];
+	obj[FCLSBOX].ob_spec &= 0xFFFF0000L;
+	obj[FCLSBOX].ob_spec |= (UWORD)wtcolor[W_CLOSER];
+	obj[FDNAROW].ob_spec &= 0xFFFF0000L;
+	obj[FDNAROW].ob_spec |= (UWORD)wtcolor[W_DNARROW];
+	obj[FUPAROW].ob_spec &= 0xFFFF0000L;
+	obj[FUPAROW].ob_spec |= (UWORD)wtcolor[W_UPARROW];
+	obj[FSVSLID].ob_spec &= 0xFFFF0000L;
+	obj[FSVSLID].ob_spec |= (UWORD)wtcolor[W_VSLIDE];
+	obj[FSVELEV].ob_spec &= 0xFFFF0000L;
+	obj[FSVELEV].ob_spec |= (UWORD)wtcolor[W_VELEV];
 
 	gr_mouse( 258, 0x0L );
 	gr_mouse( 0, 0x0L );
@@ -347,7 +360,8 @@ down:	    case FDNAROW:			/* scroll down	*/
 	      if ( fs_topptr >= botptr )
 	      {
 out:		FXWait();
-	        FXDeselect( xtree, ret );
+		if (ret != FSVSLID);
+	          FXDeselect( xtree, ret );
                 gsx_sclip( &gl_rfs );
 		break;
 	      }
@@ -370,23 +384,19 @@ up:	    case FUPAROW:			/* scroll up	*/
 		fs_topptr = 0;
 
 sfiles:	      
-	      if( !( xtree[ ret ].ob_state & SELECTED ))
+	      if( !( xtree[ ret ].ob_state & SELECTED ) && ret != FSVSLID )
 		FXSelect( xtree, ret );
 
               gsx_sclip( &gl_rfs );
 
 	      r_sfiles( fs_topptr, value );
 
-#if 0
-              if (!gl_multi)
-                        dsptch();
-#endif
-
 	      if( gl_button )
 		  goto cg_1;
 	      
 	      FXWait();
-	      FXDeselect( xtree, ret );
+	      if (ret != FSVSLID)
+	        FXDeselect( xtree, ret );
 	      gsx_sclip( &gl_rfs );
 	      break;
 
@@ -697,7 +707,7 @@ REG	BYTE	*filename;/*4*/
  				/* the drive present ? 	*/
 	k = 1L;
 	k = k << drvid; 
-	j = trap13( 0xa );	/* get the drive map	*/
+	j = Drvmap( );		/* get the drive map	*/
 
 	if ( !( k & j ) )	/* drive not there	*/
 	  return( FALSE );
@@ -908,10 +918,21 @@ ini_fsel( VOID )
 	obj[FDNAROW].ob_y = y;
 	y += obj[FDNAROW].ob_height + ADJ3DPIX;
 	obj[FILEBOX].ob_height = obj[SCRLBAR].ob_height = y;
-	w = obj[FCLSBOX].ob_width + obj[FTITLE].ob_width + ( ADJ3DPIX << 3 );
-	w -= obj[FUPAROW].ob_width + ( ADJ3DPIX << 2 );
+	w = obj[FCLSBOX].ob_width + obj[FTITLE].ob_width + ( ADJ3DPIX << 2 );
+	w -= obj[FUPAROW].ob_width;
 	obj[FILEBOX].ob_width = w;
 	obj[SCRLBAR].ob_x = obj[FILEBOX].ob_x + w;
+	obj[SCRLBAR].ob_spec = 0;
+#if 0
+	obj[FSVSLID].ob_flags &= ~(IS3DOBJ|IS3DACT);
+	obj[FSVSLID].ob_width += ADJ3DPIX;
+	obj[FSVELEV].ob_x += ADJ3DPIX;
+	obj[FUPAROW].ob_x += ADJ3DPIX;
+	obj[FDNAROW].ob_x += ADJ3DPIX;
+#else
+	obj[FSVSLID].ob_flags |= (IS3DOBJ|IS3DACT);
+	obj[FSVSLID].ob_state |= SELECTED;
+#endif
 
 	ob_offset( ( LONG )tree, FILEBOX, &x, &y );
 	y = obj[FILEBOX].ob_height + y + 6 + ADJ3DPIX;
@@ -919,30 +940,7 @@ ini_fsel( VOID )
 	y += obj[OK].ob_height + ADJ3DPIX + 6;
 	obj[0].ob_height = y;
 
-/* if we don't have color, put a nice pattern in the title */
-	if (gl_ws.ws_ncolors <= LWHITE)
-	{
-	  edspec = (TEDINFO *)obj[FTITLE].ob_spec;
-/*	  edspec->te_color &= ( WORD )0xffffff00L;*/
-	  edspec->te_color &= ( WORD )0xff00;
-	  edspec->te_color |=0x41;
-	}
-#if 0
-/* ++ERS 1/19/93: the colors are already set up correctly by objc_draw,
- * because we now say that "hollow, white, 3D objects" should get set
- * to the appropriate 3D colors
- */
-        if (gl_ws.ws_ncolors > LWHITE)
-	  return;
-
-        obj[FCLSBOX].ob_spec = (obj[FCLSBOX].ob_spec & 0xfffffff0) | WHITE;
-        obj[FUPAROW].ob_spec = (obj[FUPAROW].ob_spec & 0xfffffff0) | WHITE;
-        obj[FDNAROW].ob_spec = (obj[FDNAROW].ob_spec & 0xfffffff0) | WHITE;
-        obj[FSVELEV].ob_spec = (obj[FSVELEV].ob_spec & 0xfffffff0) | WHITE;
-
-	for ( i = DRIVEA; i <= DRIVEP; i++ )
-	   obj[i].ob_spec = (obj[i].ob_spec & 0xfffffff0) | WHITE;
-#endif
+/* colors will be set up at run time based on window colors */
 }
 
 
@@ -1015,4 +1013,3 @@ WORD   obj;
          ob_draw( ( LONG )tree, obj, MAX_DEPTH );
        }
 }
-

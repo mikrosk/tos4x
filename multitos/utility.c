@@ -831,17 +831,14 @@ wildcmp(pwild, ptest)
 	BYTE	*src,*dest;
 	WORD	n;
 {
-	WORD	len;
-	BYTE	*ret;
-	BYTE	temp;
+	WORD len;
 
 	len = strlen( src );
-	if ( len >= n )
-	  len = n - 1 ;
+	if (len >= n)
+	  len = n - 1;
 
-	temp = src[len];
-	src[len] = 0;
-    	ret = strcpy( src, dest );	/* changed 2/28/92	*/
-	src[len] = temp;
-	return( ret );
+	while (len-- > 0)
+	 *dest++ = *src++;
+	*dest++ = 0;
+	return( dest );
 }

@@ -69,7 +69,8 @@
 #include "machine.h"
 #include "dispvars.h"
 #include "objaddr.h"
-#include "aesmint.h"
+#include "osbind.h"
+#include "mintbind.h"
 #include "rslib.h"
 #include "signal.h"
 #include "gemusa.h"
@@ -120,11 +121,6 @@ BYTE	uhex2_dig( REG WORD wd);
 #define CACHE_ON	0x00003919L
 #define CACHE_OFF	0x00000808L
 #define LONGFRAME	*(WORD *)(0x59eL)
-
-
-EXTERN  LONG	trap();
-EXTERN  LONG	trap13();
-EXTERN  LONG	trap14();
 
 
 EXTERN	WORD	pref_save;
@@ -211,6 +207,7 @@ GLOBAL	LONG	ad_armice;
 GLOBAL	LONG	ad_hgmice;
 GLOBAL	LONG	ad_stdesk;
 GLOBAL	LONG	ad_fsel;
+GLOBAL	WORD	biosfd;		/* file descriptor for BIOS file */
 GLOBAL	WORD	autoexec;	/* autoexec a file ?	*/
 GLOBAL	WORD	g_flag;
 GLOBAL  WORD	ctldown;	/* ctrl key down ?	*/
@@ -262,7 +259,7 @@ EXTERN LONG dos_lseek();
 #define KBTSTDLEN	386
 
 MLOCAL BYTE 	*kbt_buf;
-MLOCAL BYTE	*KBTFNAME = "C:\\MULTITOS\\KEYBD.TBL";
+MLOCAL BYTE	KBTFNAME[25]; /* = "C:\\MULTITOS\\KEYBD.TBL"; */
 MLOCAL VOID	set_kbdtbl( VOID );
 
 typedef struct {
@@ -393,6 +390,7 @@ ldaes( inbuffer )
 	BYTE	*inbuffer;
 {
 	BYTE		*tail;
+	MLOCAL char blank[2];
 
 	tail = scasb( inbuffer, ' ' );	/* find the tail */
 	if ( *tail == ' ' )		/* Yes	*/
@@ -411,7 +409,8 @@ ldaes( inbuffer )
 	sh_draw( inbuffer );
 	dos_setdir( inbuffer, 0 );
 	sh_write( 0, 0, 0, inbuffer, ad_shtail );
-	sh_draw( " " );
+	blank[0] = ' ';
+	sh_draw( blank );
 }
 
 /*	Set up the initial stuff, do it only once */
@@ -513,6 +512,7 @@ main( VOID )
 	REG THEGLO	*DGLO;
 	LONG		*ptr;
 	WORD		buffer[4];
+	OBJECT		*obj;
 
 	currpd = idtopd( aesid );
 
@@ -580,7 +580,9 @@ main( VOID )
 	shel_magic = 0x0L;			/* shell magic number	*/
 
 	if (gl_multi) {
-	  mt_opendev();			/* install our special AES device */
+	  if (gl_doitonce)
+	    mt_opendev();	/* install our special AES device */
+	    bi_opendev();	/* install BIOS replacements */
 #if 0
 				/* This is the trap2 AES semaphore */
 					/* ("_MUI") */
@@ -610,7 +612,7 @@ main( VOID )
 						/* screen manager 	*/
 	/* New stuff 8/13/91	*/
 
-	ctldown = trap13( 0x0b, -1 ) & 0x0004 ? TRUE : FALSE;
+	ctldown = Kbshift( -1 ) & 0x0004 ? TRUE : FALSE;
 
 	/* Read the system COOKIES	*/
 	
@@ -709,17 +711,15 @@ main( VOID )
 
 	if ( gl_doitonce )
 	{
-	  gsx_moff();
-	  rs_gaddr( ad_sysglo, R_TREE, STARTUP, &tree );
-	  ob_center( tree, ( GRECT *)&buffer[0] );
-	  ob_draw( tree, 0, MAX_DEPTH );
 	  if (gl_multi)
+	  {
+	    rs_gaddr( ad_sysglo, R_TREE, STARTUP, &tree );
+	    ob_center( tree, ( GRECT *)&buffer[0] );
+	    ob_draw( tree, 0, MAX_DEPTH );
 	    Fselect( 2000, 0x0L, 0x0L, 0x0L );
-	  else {
+	    ob_draw( ad_stdesk, 0, MAX_DEPTH );	/* clear the box	*/
 	  }
-	  ob_draw( ad_stdesk, 0, MAX_DEPTH );	/* clear the box	*/
 	  gl_doitonce = FALSE;
-	  gsx_mon();
 	}
 
 				/* preget the critcial error object */
@@ -764,6 +764,11 @@ main( VOID )
 
 					/* get the AES menu		*/
 	rs_gaddr( ad_sysglo, R_TREE, AESMENU, ( LONG *)&scr_pd->p_mnaddr );
+	if (!gl_multi)
+	{			/* set title to read "TOS" instead of "MultiTOS" */
+	  obj = (OBJECT *)scr_pd->p_mnaddr;
+	  strcpy("  TOS  ", (BYTE *)obj[AESTITLE].ob_spec);
+	}
 	set_desk( scr_pd );	/* set the background window to screen */
 
 	if ( !idesk(1) )	/* allocate a desktop process	*/
@@ -859,9 +864,7 @@ i_6:
 i_7:
 	cli();			
  	gl_ticktime = gsx_tick( tiksav, &tiksav );
-/*	Debug6( "Returns trap 2\r\n" ); */
 	givecpm();			/* return trap2 vector	*/
-/*	Debug6( "Free runacc memory\r\n" ); */
 	dos_free( ( LONG )runacc );
 	sti();
 
@@ -1167,7 +1170,7 @@ p_1:
 		  else
 		  {		/* turn on the bit ?		*/
 		    scan2_2( temp + 5, &res );		/* 02/16/93 ERS and CJG */
-		    trap14( ( ( res & 0xF0 ) >> 4 ) ?  0x00400001L : 0x00400000L );
+		    xbios( ( ( res & 0xF0 ) >> 4 ) ?  0x00400001L : 0x00400000L );
 		  }
 
 
@@ -1236,9 +1239,9 @@ bailout( ptr )
 	BYTE	*ptr;
 {
 				/* Must go to the screen */
-	trap( 9, ptr );
-	trap( 9, "Please reboot the machine!" );
-	while( !trap13( 1,2 ) );
+	Cconws( ptr );
+	Cconws( "Please reboot the machine!" );
+	while( !Bconstat( 2 ) );
 }
 
 #ifdef LOADKBT
@@ -1255,7 +1258,8 @@ set_kbdtbl()
 	LONG	len;
 	WORD	hdr;	/* header containig magic word */
 
-	*KBTFNAME = ( isdrive() & 0x4 ) ? 'C' : 'A';
+	strcpy("C:\\MULTITOS\\KEYBD.TBL", KBTFNAME);
+	KBTFNAME[0] = ( isdrive() & 0x4 ) ? 'C' : 'A';
 	if ( ( fd = dos_open(KBTFNAME, RMODE_RD) ) >= 0 )
 	{
 	  len = dos_lseek(fd, 2, 0L);
@@ -1270,7 +1274,7 @@ set_kbdtbl()
 		goto sl_end;
 	  if ( dos_read( fd, (WORD) len, (LONG)kbt_buf ) > 0 )
 	  {
-		kbtp = (KEYTAB * ) trap14(16, -1L, -1L, -1L);
+		kbtp = (KEYTAB * ) Keytbl(-1L, -1L, -1L);
 		kbtp->unshift = kbt_buf;	/* normal key table */
 		kbtp->shift = (BYTE *) (kbt_buf + 128L); /* shifted */
 		kbtp->capslock = (BYTE *) (kbt_buf + 256L); /* caps lock */
@@ -1366,4 +1370,168 @@ hex2_dig(achar)
 	  return(achar - 'A' + 10);
 
 	return(0);
+}
+
+
+/*
+ * MiNT BIOS device replacement.
+ * Under MiNT+MultiTOS, we redirect device -1 to point to this device,
+ * to that old (buggy) programs that mix GEM and BIOS calls will
+ * actually get all their input from the AES; i.e. Bconout(2) will
+ * return "true" only if there is data available in the process' AES
+ * buffer.
+ */
+
+struct kerinfo *bi_kernel;
+
+#define BI_FWRITE (*bi_kernel->dos_tab[0x40])
+#define BI_GETPID (*bi_kernel->dos_tab[0x10b])
+#define BI_SYIELD (*bi_kernel->dos_tab[0xff])
+#define BI_FCNTL  (*bi_kernel->dos_tab[0x104])
+
+GLOBAL int consfd;
+
+LONG BID_open(FILEPTR *f)
+{
+	(*bi_kernel->debug)("MT_open");
+	f->flags |= O_TTY;
+	return 0;
+}
+
+/* BUG: we only read 1 (long word) character at a time. That's fine
+ * for what we're going to use this for (namely emulation
+ * of BIOS I/O)
+ */
+
+LONG BID_read(FILEPTR *f, char *buf, LONG bytes)
+{
+	WORD pid;
+	PD *pd;
+	REG CQUEUE *qptr;
+	REG LONG r;
+
+	pid = (WORD) BI_GETPID();
+	if (pid <= 0) return -1L;
+	pd = systopd(pid);
+	if (!pd) return 0;
+
+	(*bi_kernel->debug)("BID_read(%ld)", bytes);
+	qptr = &pd->p_cda.c_q;
+	while (!qptr->c_cnt) {
+		BI_SYIELD();
+	}
+/* BUG: technically we should grab the AES semaphore before
+ * dequeueing characters. However, we're in supervisor mode
+ * here, so no task switches can happen; and I'm not
+ * certain that the current process doesn't already have the
+ * AES semaphore!
+ */
+
+	r = (UWORD) dq( pd );
+	r = ((r & 0x0000ff00L) << 8) | (r & 0x00ffL);
+	*((long *)buf) = r;
+	(*bi_kernel->debug)("BID_read: result is %lx", r);
+	return 4L;
+}
+
+LONG BID_write(FILEPTR *f, char *buf, LONG bytes)
+{
+	long ret = 0;
+/* BUG: the O_NDELAY flag doesn't work; doesn't matter,
+ * we're the only legitimate users of this device
+ */
+	buf += 3;	/* point to the character part of the longword */
+	while (bytes > 0) {
+	    if (BI_FWRITE(consfd, 1L, buf) <= 0)
+		break;
+	    buf += 4; bytes -= 4; ret+= 4;
+	}
+	return ret;
+}
+
+#define FIONREAD	(('F'<< 8) | 1)
+#define FIONWRITE	(('F'<< 8) | 2)
+
+LONG BID_ioctl(FILEPTR *f, WORD mode, void *buf)
+{
+	PD *p;
+	LONG *r = (LONG *)buf;
+	CQUEUE *qptr;
+
+	if (mode == FIONREAD) {
+		p = systopd( BI_GETPID() );
+		if (!p) return -1L;
+		qptr = &p->p_cda.c_q;
+		*r = qptr->c_cnt;
+	} else if (mode == FIONWRITE) {
+		*r = 1L;
+	} else {
+/* note that the kernel interface wants arguments in a different order
+ * than we get, hence the reversal
+ */
+		return BI_FCNTL(consfd, buf, mode);
+	}
+	return 0;
+}
+
+LONG BID_error(FILEPTR *f)
+{
+	return -1;
+}
+
+LONG BID_close(FILEPTR *f, WORD pid)
+{
+	return 0;
+}
+
+/*
+ * BUG: Fselect won't work. We don't care, we don't use it.
+ */
+LONG BID_select(FILEPTR *f, LONG p, WORD mode)
+{
+	return 1L;
+}
+
+VOID BID_unselect(FILEPTR *f, LONG p, WORD mode)
+{
+}
+
+DEVDRV bi_devinfo = {
+BID_open,	/* open */
+BID_write,	/* write */
+BID_read,	/* read */
+(LONG (*)(FILEPTR *, LONG, WORD))BID_error,	/* lseek */
+BID_ioctl,	/* ioctl */
+(LONG (*)(FILEPTR *, WORD *, WORD))BID_error,	/* datime */
+BID_close,	/* close */
+BID_select,	/* select */
+BID_unselect	/* unselect */
+};
+
+MLOCAL struct tty aestty;
+
+struct dev_descr BID_descr = {
+	&bi_devinfo,
+	0,
+	O_TTY,
+	&aestty
+};
+
+VOID
+bi_opendev( )
+{
+	bi_kernel = (struct kerinfo *)Dcntl(DEV_INSTALL, "U:\\DEV\\AES_BIOS",
+						&BID_descr);
+
+	biosfd = (WORD)Fopen("U:\\DEV\\AES_BIOS", 2);
+	if (biosfd <= 0)
+		bailout("Unable to open AES BIOS device\r\n");
+
+/* open "consolefd" as a global file */
+	consfd = (WORD)Fopen("U:\\DEV\\CONSOLE", 0x1002);
+
+/* now redirect our CON: handle to point at AES_BIOS, so that all of our
+ * children will do their BIOS I/O through the AES_BIOS device
+ */
+	Fforce(-1, biosfd);
 }

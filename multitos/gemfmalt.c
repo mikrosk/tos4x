@@ -35,6 +35,7 @@
 #include "machine.h"
 #include "objaddr.h"
 #include "rslib.h"
+#include "osbind.h"
 #include "aesmint.h"
 #include "gemusa.h"
 
@@ -524,14 +525,22 @@ eralert( n, d )
 	  }
 	  else
 	  {
-	    if ( trap13( 1, 2 ) == -1 )
+#if 0
+	    if ( Bconstat( 2 ) == -1 )
 	    {
-	      if ( ( trap13( 2, 2 ) & 0x00ff ) == 0x0D )
+	      if ( ( Bconin( 2 ) & 0x00ff ) == 0x0D )
 	      {
 	        ret = 1;
 		break;
 	      }
 	    }
+#else
+	    if ( (newchkkbd() & 0x00ff) == 0x0D )
+	    {
+	      ret = 1;
+	      break;
+	    }
+#endif
 	  }
 	    	
 	}while( 1 );

@@ -49,34 +49,34 @@ doq( donq, p, m )
 	if (donq)
 	{
 	  LBCOPY(p->p_qaddr + p->p_qindex, m->qpb_buf, n);
+#if 1
+	/* the code below was commented out for MultiTOS */
+	/* why?? */
 						/* if its a redraw msg	*/
 						/*   try to find a 	*/
 						/*   matching msg and	*/
 						/*   union the redraw	*/
 						/*   rects together	*/
-/*
-	  if (!gl_multi) {
-		  nm = (WORD *) &p->p_queue[p->p_qindex];
+	  nm = (WORD *) &p->p_queue[p->p_qindex];
 
-		  if ( nm[0] == WM_REDRAW )
-		  {
-		    index = 0;
-		    while ( (index < p->p_qindex) &&
-			    (n) )
-		    {
-		      om = (WORD *) &p->p_queue[index];
-		      if ( (om[0] == WM_REDRAW) &&
-			   (nm[3] == om[3]) )
-		      {
-			rc_union(&nm[4], &om[4]);
-		        n = 0;
-		      }
-		      else
-		        index += (om[2] + 16);
-		    }
-		  }
-	}
-*/
+	  if ( nm[0] == WM_REDRAW )
+	  {
+	    index = 0;
+	    while ( (index < p->p_qindex) &&
+		    (n) )
+	    {
+	      om = (WORD *) &p->p_queue[index];
+	      if ( (om[0] == WM_REDRAW) &&
+		   (nm[3] == om[3]) )
+	      {
+		rc_union(&nm[4], &om[4]);
+	        n = 0;
+	      }
+	      else
+	        index += (om[2] + 16);
+	    }
+	  }
+#endif
 	  p->p_qindex += n;
 	}
 	else

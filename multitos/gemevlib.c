@@ -236,8 +236,6 @@ check_event( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 
 	what = 0;
 
-	Debug7( currpd->p_name );
-	Debug7( " Check_event calls chkkbd\r\n" );
 	chkkbd();			/* process all the events	*/
 
 	Debug7( " Check_event calls forker\r\n" );
@@ -356,12 +354,7 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 /*	LONG		i;*/
 
 	what = wmask = kbmsk = xbumsk = bumsk = m1msk = m2msk = qrmsk = tmmsk = 0x0;
-#if 0
-	chkkbd();			/* process all the events	*/
 
-	forker();
-#endif
-	
 	if ( ( currpd->p_state == PS_ALLRUN ) && ( currpd != errpd ) 
 		&& ( currpd != scr_pd ) )
 	{

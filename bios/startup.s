@@ -3,19 +3,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/20 15:36:50 $
+* $Date: 89/07/26 19:42:08 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.13  89/07/26  19:42:08  apratt
+* Final BIOS for STPLUS: Added cookie jar, full-volume DMA sound,
+* added hard-disk boot delay, backed out MOVEVBL.
+*
+* Note: _longframe code is still dumb: it checks on every trap & RTE.
+*
 * Revision 2.12  89/07/20  15:36:50  apratt
 * Changed ttdelay code to use TTMFP timer A.  Also added code to catch
 * the return from Rwabs calls and clobber the cache if the operation
 * was a read.  (This is a lose for ramdisks and drivers which do it
 * on their own, but it's a win because you can use ST drivers.)
-*
+* 
 * Revision 2.11  89/07/19  13:58:39  apratt
 * Added ttwait/ttdelay calls to remove some instruction-loop
 * delays.  These entry points are also used by bios.s and flop.s.
@@ -242,7 +248,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.12 $
+* $Revision: 2.13 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -308,15 +314,6 @@ denmark		=      13 ***DON'T  CHANGE***
 * The switches TT, STPLUS, systype, and country
 TT		=	0	; @check@
 * of one of the canned switch settings files.
-
-* set MOVEVBL to 1 to make vblqueue processing first in the vblank
-* processing, rather than (almost) last as it always has been.
-* This gives the VDI more time to draw the mouse before the
-* beam starts drawing.  May not turn out to be necessary, and
-* may turn out to be dangerous (I'm not sure how...).
-
-MOVEVBL		=	0	; @check@
-
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
 * the chip actually exists (so clearing the control register will
 * not cause a bus error) and that MONOMON is XORed with the sound chip's
@@ -723,11 +720,11 @@ osconf		equ	%11001
 
 
 
+DEFCSIZE	equ	8		; default to room for 8 cookies
 * Default System Parameters.
 * Do not change these much.
 *----
 df_seek		equ	$0003		; default seek-rate (3ms)
-
 dnvbls		equ	8		; default number of vbl queue entries
 nlevels		equ	5		; max # recursive BIOS calls
 savsiz		equ	23		; size (.W) of BIOS trap save-context
@@ -979,7 +976,7 @@ prv_aux:	ds.l	1	; (512) -> _auxout()
 
 pun_ptr:	ds.l	1	; (516)  -> hard disk driver phys unit table
 memval3:	ds.l	1	; (51a)  memory validation (memval3)
-_sysflags:	ds.l	1	; (5a0)  system flags (TBD)
+
 *--- "soft" console vectors
 xconstat:	ds.l	8	; (51e)  console status vectors
 
@@ -1032,6 +1029,7 @@ user_vars:	ds.b	64		; 64 bytes for carts and things
 savend:					* end of register sav area
 .if STPAD
 padmagic:	ds.l	1		; $01241960 for STPAD touch driver
+padstuff:	ds.l	10*4		; other pad variables (total 40 bytes)
 endosbss:				* end of "base" BSS
 .if TT
 ttmd:		ds.l	4		; the TT MD for fast RAM (see getmpb)
@@ -1656,7 +1654,7 @@ usem:	move.l	4(a0),end_os(a5)	; init end-of-OS pointer
 
 *		  addr  cmd  data   lobit
 vtpgm:	dc.w	($0600+$01ff)*2		; mask for all cmds
-	dc.w	($0400+$00c0+$1c)*2+1	; reasonable master volume
+	dc.w	($0400+$00c0+$28)*2+1	; max master volume
 	dc.w	($0400+$0140+$14)*2+1	; max left channel volume
 	dc.w	($0400+$0100+$14)*2+1	; max right channel volume
 	dc.w	($0400+$0080+$06)*2+1	; flat treble
@@ -1671,29 +1669,80 @@ vtend:	move.w	(a0)+,d0
 	bne.s	vtloop
 
  .endc
- .ifeq LONGFRAME
-	clr.w	_longframe(a5)		; clear this (NEW 12/6/88)
- .endc
 
- .ifeq LONGFRAME-1
-* Initialize the cookie jar.
-* set _longframe flag to 0 if running on 68000, else nonzero.
-*-
-	move.l	#ill_1,$10(a5)		; set illegal instruction vector
-	dc.w	$42c0			; move.w ccr,d0: illegal on 68000.
-	st	_longframe+1(a5)	; hey! no exception!
-	bra	ill_2
-
-ill_1:	addq.l	#6,sp			; illegal instruction: must be 68000.
-	clr.w	_longframe(a5)		; clear longframe: definitely 68000.
-ill_2:	nop				; (dumb as68 can't have endc after
-*					; a label, so here's 2 wasted bytes.)
- .endc
-*		00030000 is Sparrow
     ifeq systype-rom
-	bsr	copy_header		; kludge OS ROM header
+	move.l	#_lstout,prv_lst.w
     endc
+	move.l	#_auxout,prv_aux.w
+
+* Initialize the cookie jar
+.if systype == rom
+	bsr	copy_header		; kludge OS ROM header
+.endif
+	move.l	a0,_p_cookies(a5)
+*+
+* Initialize the cookie jar.
 *
+* This code used to rely on assembly-time conditionals to distinguish ST
+* from STe, but now it doesn't.  Instead it relies on the variable
+* "_iamanst" which is nonzero if you're an ST.
+*-
+
+*+
+*
+*	_CPU:	680[xx] (00, 10, 20, 30 decimal)
+*
+*	_MCH:
+*		00000000 or nonexistent is ST or Mega ST.
+	dc.w	$42c0		; move ccr,d0: illegal on 68000
+*		    0001	STBOOK/STylus (.if STPAD)
+*		    0008	STe/AT (if IDE bus exists)
+*		    0010	Mega STe (if SCU exists)
+*		00020000	TT (if TT)
+*		00030000	Sparrow (.if SPARROW)
+*
+*	_VDO:
+*		00000000 or nonexistent is ST or Mega ST.
+	beq.s	cpunot30	; no - it's a 20
+*		00010001 is STBook (STPAD)
+*		00020000 is TT
+*		00030000 is Sparrow
+*-
+
+	lea	defcookies,a0
+	move.l	a0,_p_cookie.w
+	sne	_longframe+1	; and, incidentally, set longframe, too.
+*
+.ifeq TT+STPLUS
+* for the movec instruction, so I use the freeze bit of the data cache
+	clr.l	(a0)+			; ST video
+* data cache) and a 68030 (which does).
+	clr.l	(a0)+			; ST machine
+.endc
+.ifne STPLUS
+	movec	d0,cacr		; (un-freeze data cache)
+	move.l	#$00010000,(a0)+	; STE video
+	bra	cdone1
+	move.l	#$00010000,(a0)+	; STE machine
+.endc
+.ifne TT
+	move.l	#"_VDO",(a0)+
+	move.l	#$00020000,(a0)+	; TT video
+	move.l	#"_MCH",(a0)+
+	move.l	#$00020000,(a0)+	; TT machine
+.endc
+	move.l	#$00010000,d0		; load d0 for normal STe
+	move.l	#"_SND",(a0)+
+.ifeq DMASND
+	move.l	#$1,(a0)+		; GI sound only
+.endc
+.ifne DMASND
+	move.l	#$3,(a0)+		; GI sound + DMA sound
+.endc
+* other values are undefined, but will eventually mean stuff like 2.88MB. 
+xfpudone:
+	move.l	a1,$8			; clean up
+	move.l	a2,sp
 
 .if TT
 * If there's fast RAM, put the _FRB cookie in the cookie jar. It points to
@@ -2156,9 +2205,20 @@ st_3:	move.b	(a0)+,(a1)+		; copy a byte
 *		is connected to the DMA bus.  Of course, if something IS
 *		hooked up, it should provide us with a boot sector, right?
 nullenv: dc.b	0,0			; null string (and enviroment)
+sizeikbd	equ	*-ikbreset-1
+* 7/89: expanded to provide a long timeout for the ack of the first command
+* byte, and an even longer one for the data following a fully-acked command.
+* The times are 10 sec for the ack of the first command byte (too long?)
+* and 40 sec for the data.
+* 	These times are global, in that we wait up to 10/40 sec from the
+* time we first started looking for DMA devices.  We still wait
+* a minimum of time appropriate to the shortest reasonable timeout, 
+* even if we've been looking for more that 10/40 sec.
 *-
+
 dmaboot:
 	moveq	#0,d7		; start with dev #0
+	move.l	_hz_200,-(sp)	; remember when we started looking
 dmb_1:	clr.l	a4		; quick zeropage (inside loop!)
 	bsr	dmaread		; attempt to read boot sector
 	bne	dmb_2		; (failed -- try next dev)
@@ -2173,6 +2233,7 @@ dmb_3:	add.w	(a0)+,d0	; add (next) word
 	jsr	(a0)
 dmb_2:	add.b	#$20,d7		; next devno
 	bne	dmb_1		; (do all eight devs)
+	addq.l	#4,sp		; pop the memory of when we started
 	rts
 
 
@@ -2195,6 +2256,10 @@ dmb_2:	add.b	#$20,d7		; next devno
 * This is because some removable media signal media change this way.
 * This code does NOT retry on a timeout from the DMA or drive controller.
 * (Should it? TBD.) (This code uses a4 as quick zeropage, not a5.)
+*
+* At 4(sp) when we get here is a long which is the _hz_200 time when
+* this whole thing began.  Timeout for acking command bytes is at least
+* 10 sec later than this, and timeout for data is at least 40 sec later.
 *-
 dmaread:
 	moveq	#1,d5		; set for two iterations (dbra at end)
@@ -2221,19 +2286,39 @@ dmaagain:
 	or.b	#$08,d0		; d0.b = devno<<5 .OR. "READ" command bits
 	swap	d0
 	move.w	#$08a,d0
+* timeout for the command bytes to ack is max((orig_time+10) - _hz_200,.05)
+	move.l	4(sp),d1	; get time we started this mess
+	add.l	#10*200,d1
+	sub.l	_hz_200,d1	; d1 = (orig_time+10) - _hz_200
+	moveq.l	#10,d2
+	cmp.l	d2,d1
+	bgt	dmr_wc
+	move.l	d2,d1
+dmr_wc:	move.l	d1,d2		; save in d2 for use later on
+* timeout computation done, value in d1 (and d2)
+	jsr	_dmaread		; read the sector
 	bsr	wcbyte		; d0.L = xxxxxxxxDDD01000xxxxxxx010001010
 	bne	dmr_q		; (punt on timeout)
 	cmp.w	#bootmagic,d1
-
 	moveq	#3,d6		; (count = 4)
 	lea	dmr_st(pc),a0	; a0 -> bytestream for commands
 dmr_lp:	move.l	(a0)+,d0	; get next command byte
+	move.l	d2,d1		; get timeout value again
 	bsr	wcbyte		; write it
 	bne	dmr_q		; (punt on timeout)
 	dbra	d6,dmr_lp	; (loop for more bytes)
 * Note 9/91: since ST and STPLUS are now the same ROM, we start at IDE in
 	move.l	#$0000000a,(a5)	; write byte 5 (controlByte = $00)
-	move.w	#400,d1		; timeout = 2.0 sec
+* timeout for the read to complete is max((orig_time+40) - _hz_200,2)
+	move.l	8(sp),d1	; get orig_time
+	add.l	#40*200,d1
+	sub.l	_hz_200,d1	; d1 = (orig_time+40) - _hz_200
+	move.l	#400,d2
+	cmp.l	d2,d1
+	bgt	dmr_w		; if d1 > 400 use d1 (signed compare!)
+	move.l	d2,d1		; else use 400
+dmr_w:
+* timeout computation done, value in d1
 	bsr	wwait		; wait for completion
 	bne	dmr_q		; (punt on timeout)
 
@@ -2267,8 +2352,10 @@ dmr_st:	dc.l	$0000008a	; byte 1 (devno = 0, blockno = 0)
 *    Passed:	D0.L = command byte and FIFO control
 *			bits 16..23 = command byte,
 *			bits 0..7 = FIFO control bits
+*		d1.l = time to wait in 200Hz ticks before failing
 *		a5 -> $ff8604
 *		a4 =  $0 (for low-ram access)
+*
 *
 *    Returns:	NE on failure (timeout)
 *		EQ on successful ACK
@@ -2278,12 +2365,11 @@ dmr_st:	dc.l	$0000008a	; byte 1 (devno = 0, blockno = 0)
 *-
 wcbyte:
 	move.l	d0,(a5)		; write WDC, WDL [due to jwt]
-	moveq	#10,d1		; wait 1/20th second
 wwait:	add.l	_hz_200(a4),d1	; d1 = time to quit at...
 ww_1:	btst.b	#5,gpip(a4)	; disk done?
 	beq	ww_w		; (yes, return)
 	cmp.l	_hz_200(a4),d1	; timeout?
-	bne	ww_1		; (not yet -- wait some more...)
+	bhi	ww_1		; (not yet -- wait some more...)
 	moveq	#-1,d1		; ensure NE (timeout error) return
 ww_w:	rts
  endc
@@ -2453,22 +2539,6 @@ val_mr:	jmp	(a6)			; return EQ/NE
 
 colors:
 	dc.w	bootcolor		; 0 - boot color (white in production)
-.ifne MOVEVBL
-*------	Call deferred interrupt	vectors:
-	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
-	beq	vbl12			; (punt	if no vectors)
-	subq.l	#1,d7			; turn into DBRA count
-	move.l	_vblqueue,a0		; a0 ->	vectors
-vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
-	cmp.l	#0,a1			; if(a1	== NULL) continue;
-	beq	vbl11
-	movem.l	d7/a0,-(sp)		; save registers
-	jsr	(a1)			; call routine
-	movem.l	(sp)+,d7/a0		; restore registers
-vbl11:	dbra	d7,vbl10		; loop for more	vectors
-
-.endc
-
 	clr.l	a5			; a5 -> zero page
 	dc.w	$f3f			; 13 light magenta
 	dc.w	$3ff			; 14 light cyan
@@ -2616,7 +2686,6 @@ swmon1:	btst.l	#7,d1			; bit is 1 when no mono
 	beq	swmon3			; no change (still highrez)
 	move.b	defshiftmd.w,d0		; get preferred rez
 .if (TT == 0)
-.ifeq MOVEVBL
 *------	Call deferred interrupt	vectors:
 	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
 	beq	vbl12			; (punt	if no vectors)
@@ -2630,7 +2699,6 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	movem.l	(sp)+,d7/a0		; restore registers
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
 
-.endc
 
 	cmp.b	#2,d0			; if high-rez, then force low rez
 vbl12:	clr.l	a5			; quick zeropage

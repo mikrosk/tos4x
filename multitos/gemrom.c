@@ -2,13 +2,13 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.0 $	$Source: /u2/MRS/osrevisions/aes/gemrom.c,v $
+*  $Revision: 1.1 $	$Source: f:\multitos/RCS/gemrom.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/02/03 21:26:46 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/02/24 23:52:46 $	$Locker:  $
 * =======================================================================
 *  $Log: gemrom.c,v $
-*  Revision 1.0  93/02/03  21:26:46  ersmith
-*  MultiTOS version 1.0
+*  Revision 1.1  1993/02/24  23:52:46  ersmith
+*  1 meg floppy MultiTOS
 *
 * Revision 2.2  89/04/26  18:26:27  mui
 * TT
@@ -48,6 +48,8 @@
 *	-----------------------------------------------------------
 */	
 
+#define ONE_LANG	/* only 1 country resource */
+
 #include <compiler.h>
 #include <machine.h>
 #include <obdefs.h>
@@ -71,6 +73,18 @@ MLOCAL	LONG		gl_pglue;
 MLOCAL	LONG		gemptr;		/* GEM's rsc pointer		*/
 MLOCAL	UWORD		*tosrsc;
 
+#ifdef ONE_LANG
+MLOCAL	BYTE	*RSCTABLE[] =
+{
+	USARSC,		/* USA, UK	*/
+	USARSC,		/* GERMAN	*/
+	USARSC,		/* FRENCH	*/
+	USARSC,		/* reserved	*/
+	USARSC,		/* SPANISH	*/
+	USARSC,		/* ITALIAN	*/
+	USARSC		/* suppose to be SWEDISH	*/
+};	
+#else
 MLOCAL	BYTE	*RSCTABLE[] =
 {
 	USARSC,		/* USA, UK	*/
@@ -81,6 +95,7 @@ MLOCAL	BYTE	*RSCTABLE[] =
 	ITARSC,		/* ITALIAN	*/
 	USARSC		/* suppose to be SWEDISH	*/
 };	
+#endif
 
 GLOBAL	WORD		st_lang;	/* Language code	*/
 GLOBAL	LONG		deskptr;	/* DESKTOP'S rsc pointer	*/

@@ -174,8 +174,23 @@ p_nameit(p, pname)
 	PD		*p;
 	BYTE		*pname;
 {
+	WORD i;
+	BYTE c;
+
 	bfill(PSNAME, ' ',  &p->p_name[0]);
+#if 0
 	strscn( pname, &p->p_name[0], '.' );
+#else
+	/* someone could send us a longer name! */
+	/* ++ERS 2/11/93 */
+
+	for (i = 0; i < PSNAME; i++)
+	{
+	  c = *pname++;
+	  if (c == '.' || c == 0) break;
+	  p->p_name[i] = c;
+	}
+#endif
 }
 
 
@@ -220,8 +235,11 @@ p_nameit(p, pname)
 	  p1->p_tick = 2;	/* give them 2 ticks to count down this	*/
 				/* is to prevent process continue to	*/
 				/* run in PS_ALLRUN state		*/
+#if 0
 	  strcpy( name, &p1->p_prgname[2] );
-
+#else
+	  nstrcpy( name, &p1->p_prgname[2], 13 );
+#endif
 	  Debug7( p1->p_name );
 	  Debug7( "allocated at " );
 	  Ndebug7( p1 );

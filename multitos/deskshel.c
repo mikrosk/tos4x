@@ -80,7 +80,7 @@ show_file( file )
 	  {
 	    if ( !( ret = shel_write( 0, 0, 1, bptr, tail ) ) )
 	      fill_string( bptr, FTOLAUNCH );
-	    Mfree( tail );
+	    free( tail );
 	    if ( ret )
 	      return;		
 	  }
@@ -175,7 +175,7 @@ print_file( )
 	      if ( !( ret = shel_write( 0, 0, 1, bptr, tail ) ) )
 	        fill_string( bptr, FTOLAUNCH );
 
-	      Mfree( tail );	
+	      free( tail );	
 	      if ( ret )
 	        goto p_1;		/* Done */
 	    }
@@ -234,7 +234,6 @@ launch_pref()
 	WORD	graphic;
 	REG OBJECT	*obj;
 	BYTE	*ptr, *progname;
-	WORD	fullpath;
 
 	obj = get_tree( DLAUNCH );
 	inf_sset( obj, RUNNAME, Nostr );
@@ -257,23 +256,11 @@ launch_pref()
 	    progname = path1;
 	    if ( path1[1] == ':' )
 	      path1[0] = toupper( path1[0] );
-	    else {
+	    else if (path1[0] != '\\') {
 /* ERS (12/8/92): if no path or drive is given, look for
  * the file in the current directory
  */
-/* see if there's a slash */
-		fullpath = FALSE;
-		ptr = path1;
-		while (*ptr)
-		{
-		  if (*ptr == '\\') fullpath = TRUE;
-		  ptr++;
-		}
-/* if no slash and an open window, look for the file
- * in that window's directory; if found, use that
- * file for sure
- */
-		if (!fullpath && winhead && winhead->w_id != -1)
+		if (winhead && winhead->w_id != -1)
 		{
 		  strcpy( winhead->w_path, path2 );
 		  ptr = r_slash( path2 );
@@ -462,7 +449,7 @@ exec_file( infile, win, item, intail )
 
 e_3:
 	if ( newtail )
-	  Mfree( newtail );
+	  free( newtail );
 }
 
 

@@ -11,7 +11,7 @@
 #define SAVE_ATARI 128		/* Atari specific bytes in DESKTOP.INF file	*/
 #define SIZE_AFILE 4192		/* size of DESKTOP.INF file	*/
 
-#define	MAXERR	7		/* maximum critical error object	*/
+#define	MAXERR	8		/* maximum critical error object	*/
 
 #define MU_KEYBD 	0x0001	/* mu_flags		*/
 #define MU_BUTTON 	0x0002

@@ -498,14 +498,20 @@ hctl_rect( mx, my )
 	{
 	  obj = mn_addr;
 
+#if 0
 	  /* clean up all the check mark in the menu */
-
 	  for( i = 0; i <= obj[0].ob_tail; i++ )
 	    xdo_chg( obj, i, CHECKED, FALSE, FALSE, TRUE  );
+#endif
 
 	  if ( idtopd( gl_kbid )->p_mobj != -1 )
+	  {
 	    xdo_chg( mn_addr, idtopd( gl_kbid)->p_mobj, CHECKED, TRUE, FALSE, TRUE );
 
+	    /* clean up all the check mark in the menu */
+	    for( i = 0; i <= obj[0].ob_tail; i++ )
+	      xdo_chg( obj, i, CHECKED, FALSE, FALSE, TRUE  );
+	  }
 	  kill = FALSE;		/* assume we will not kill the process */
 
 	  if ( mn_hdo( &title, &ptree, &pmenu, &item, &keyret ) )
@@ -795,7 +801,7 @@ screenmgr()
 				 gl_ctwait.m_w,
 				 gl_ctwait.m_h,
 				 msgbuff,
-				 0x500,0x0,
+				 (ctrl_shut ? 0x10 : 0x500),0x0,
 				 &rets[0], &rets[1],
 				 &rets[2],
 				 &rets[3],

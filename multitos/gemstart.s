@@ -68,9 +68,12 @@ gemstart:
 	trap	#1
 	addq.l	#6,sp
 	bra	exit
-
-g1:	
-	move.l	gemstart,$4fe	; exec_os 6/23/92
+g1:
+;
+; There's no need to set exec_os, MiNT already did so
+; ++ERS 2/17/93
+;
+;	move.l	gemstart,$4fe	; exec_os 6/23/92
 ;
 ; Here we munge the environment so the hard disk gets searched, if present,
 ; by shel_path.  This is for compatibility with the old shel_path, which

@@ -15,6 +15,7 @@
 #include <deskusa.h>
 
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 
 BYTE	*lp_start;
 BYTE	*lp_mid;
@@ -67,7 +68,7 @@ apbuf_init()
 	  appfree = app;
 
 	if ( appnode )
-	  Mfree( appnode );
+	  free( appnode );
 
 	appnode = app;			/* new app buffer		*/
 
@@ -92,7 +93,7 @@ m_1:	  do1_alert( FCNOMEM );
 
 	if ( !apbuf_init() )
 	{
-	  Mfree( lp_start );	/* free the write buffer	*/
+	  free( lp_start );	/* free the write buffer	*/
 	  goto m_1;
 	}
 	
@@ -182,7 +183,7 @@ lp_collect( )
 	  app = app->a_next;
 	}
 
-	Mfree( lp_start );
+	free( lp_start );
 	lp_start = addr;	
 	return( TRUE );
 }

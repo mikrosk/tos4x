@@ -136,9 +136,11 @@ WORD	tb3[MAXMENU] = { OPENITEM, SHOWITEM, SEAMENU,  DELMENU,  NEWFITEM,
 			 READINF,  MEMMENU,  SAVEITEM, PRINTITE, BITBLT,
 			 VIDITEM };
 
+#if 0	/* no longer used: ++ERS 2/17/93 */
 /*	Alternate Number Table	*/
 
 WORD	altnum[] = { 0x7800, 0x7900, 0x7a00, 0x7c00, 0x7d00, 0x7b00, 0 };
+#endif
 
 WORD	o_status;	/* for o_select	*/
 WINDOW	*o_win;
@@ -410,6 +412,14 @@ hd_keybd( key, keystate )
 	  }
 	}
 
+#if 0
+/* commented out 2/17/93 by ERS, for 2 reasons: (1) to
+ * save a bit of space, and (2) because using an ALT key
+ * to select the current resolution produced a bogus
+ * error message. We're concentrating on Falcon now,
+ * and this code never did work on Falcon, so it isn't
+ * worth the hassle to maintain it.
+ */
 					/* 7/16/92 */
 	if ( ( gl_vdo & HIGHWORD ) <= TT )
 	{
@@ -424,6 +434,7 @@ hd_keybd( key, keystate )
 	    }
 	  }
 	}
+#endif
 					/* open a disk drive	*/
 	if ( loop_find( key, keytable, &i ) )
 	{
@@ -506,7 +517,7 @@ hx_1:	  strcpy( wildext, buffer );
 	  {	   	
 	    if ( save_inf( FALSE ) )	/* save the current environment */
 	    {
-	      obj = get_tree( WINICON );
+	      obj = get_tree( SMILEY );
 	      iblk = (ICONBLK*)obj[1].ob_spec;
 	      wind_calc( 0, MOVE|CLOSE, 2, full.y, iblk->ib_wtext, 
 			 iblk->ib_hicon + iblk->ib_htext, &x, &y, &w, &h );
@@ -696,7 +707,7 @@ opt1:	      ins_icons();
 		  else
 		    do1_alert( ILLMAT );
 
-		  Mfree( afile );
+		  free( afile );
 		}
 
 		Fclose( handle );
@@ -999,7 +1010,7 @@ hd_wicon( msgbuff )
 {
 	OBJECT	*obj;
 
-	obj = get_tree( WINICON );
+	obj = get_tree( SMILEY );
 
 	switch( msgbuff[0] )
 	{

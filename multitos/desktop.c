@@ -47,6 +47,7 @@ typedef struct cblk
 
 EXTERN	BYTE	*get_fstring();
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 EXTERN	OBJECT	*get_tree();
 
 EXTERN	UWORD	d_rezword;
@@ -276,7 +277,7 @@ ini_rsc()
 
 	if ( !ciconaddr )	/* 7/10/92 */
 	{
-	  if ( ciconaddr = Malloc( (LONG)( sizeof(CICONBLK) * maxicon ) ) )
+	  if ( ciconaddr = malloc( (LONG)( sizeof(CICONBLK) * maxicon ) ) )
 	  {		
 	    for ( i = 0; i < maxicon; i++ )
 	    {
@@ -548,7 +549,7 @@ m_2:	  desknoerr();
 	}
 
 	Debug1( "Menu_register\r\n" );
-	menu_register( desk_id, "  \016\017 DESKTOP" );
+	menu_register( desk_id, get_fstring(DESKNAME) );
 
 	Debug1( "Open def\r\n" );
 	open_def();			/* open default windows	*/
@@ -575,13 +576,13 @@ m_2:	  desknoerr();
 
 	wind_set( 0, WF_NEWDESK, 0x0L, 0, 0 );
 	
-	Mfree( lp_start );		/* free string buffer	*/
+	free( lp_start );		/* free string buffer	*/
 
-	Mfree( appnode );		/* free app buffer	*/
+	free( appnode );		/* free app buffer	*/
 	
-	Mfree( backid );
+	free( backid );
 
-	Mfree( q_addr );		/* update inf file on disk	*/
+	free( q_addr );			/* update inf file on disk	*/
 
 	wind_update( 0 );		/* release window	*/
 
@@ -595,7 +596,7 @@ m_2:	  desknoerr();
 m_1:
 	if ( ciconaddr )	/* start everything over again	*/	
 	{
-	  Mfree( ciconaddr );
+	  free( ciconaddr );
 	  ciconaddr = (BYTE*)0;
 	}
 

@@ -1,8 +1,8 @@
 /* kballoc.c - fast allocator for LC5 based on AKP's nalloc2.c
  * ===========================================================================
  * $Log: kballoc.c,v $
- * Revision 1.0  1993/02/03  21:26:46  ersmith
- * MultiTOS version 1.0
+ * Revision 1.1  1993/02/24  23:52:46  ersmith
+ * 1 meg floppy MultiTOS
  *
  * 911025 kbad added mavail(), mheap()
  * 910508 kbad
@@ -57,13 +57,19 @@ typedef unsigned long size_t;
 #define MLOCAL	static
 #define GLOBAL	/* */
 #define VOID	/* */ /* void for ANSI, else empty comment */
+#if 0
 typedef void	*VOIDP;	/* void* for ANSI, else char* */
+#else
+typedef char	*VOIDP;
+#define __NOPROTO
+#endif
 
 #ifndef NULL
 #define NULL	((VOIDP)0L)
 #endif
 
 #undef __PROTO
+
 #ifndef __NOPROTO
 #define __PROTO(a) a
 #else
@@ -130,7 +136,11 @@ MLOCAL ARENA *a_first = NULL;
 MLOCAL ARENA *a_heap = NULL;
 MLOCAL long minarena = 0;
 
+#if 0
 #define MAXARENA (100L*1024L)
+#else
+#define MAXARENA (32*1024L)
+#endif
 
 #if VALIDATE
 /* ---------------------------------------------------------------------------

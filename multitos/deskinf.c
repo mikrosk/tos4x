@@ -26,6 +26,7 @@
 
 EXTERN	UWORD	rom_ram();
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 EXTERN  BYTE	*scasb();
 EXTERN	BYTE	*r_slash();
 EXTERN	BYTE	*lp_fill();
@@ -532,7 +533,7 @@ read_inf( )
 
 	if ( afile[0] != '#' )
 	{
-	  Mfree( afile );		/* free old pointer	*/
+	  free( afile );		/* free old pointer	*/
 
 	  if ( isdrive() )
 	  {
@@ -584,7 +585,7 @@ re_1:	    afile = malloc( (LONG)INFSIZE );
 	tt_color( TRUE );		/* stuff color into system var	*/
 
 	inf_scan( afile );		/* analyze the inf file		*/
-	Mfree( afile );
+	free( afile );
 
 	app = applist;
 
@@ -680,6 +681,7 @@ save_inf( todisk, path )
 	LONG		size;
 	BYTE		buf1[2];
 
+	afile = 0;
 	if ( size = malloc( 0x5000L ) )	/* get 20K memory	*/
 	{
 	  buf = pcurr = size;
@@ -961,7 +963,7 @@ if_1:
 	*pcurr = 0;		/* end of string mark */
 
 	len = strlen( buf );
-	Mfree( afile );	
+	if (afile) free(afile);
 	afile = malloc( (LONG)((UWORD)len) );
 	bfill( len, 0, afile );		/* clean up buffer	*/
 	shel_put( buf, len );		/* copy to aes buffer	*/
@@ -1004,7 +1006,8 @@ if_3:					/* create a file, read & write	*/
 	}/* todisk */
 	
 if_2:
-	Mfree( buf );
+	free( buf );
+	if (afile) free(afile);
 
 	if ( todisk )
 	  up_allwin( path, FALSE ); /* rebuild any window on the INF drive */

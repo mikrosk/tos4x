@@ -1481,8 +1481,9 @@ enddialog1:
 	  {		/* ST compatability mode */
 	    if ( ( mode_code & 0x80 ) || ( flag != pref_save ) )	
 	    {
-	       pref_save = flag;
 	       ret = desk_chres( flag, 0 );
+	       if (ret)		
+	         pref_save = flag;
 	    }
 	  }	
 

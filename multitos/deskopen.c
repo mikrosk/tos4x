@@ -22,6 +22,7 @@
 
 EXTERN	BYTE	*get_fstring();
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 EXTERN	WINDOW	*w_gfirst();
 EXTERN	WINDOW	*get_win();
 EXTERN	WINDOW	*get_top();
@@ -288,6 +289,11 @@ ss_3:
 
 	  if ( ( !newstr ) || ( !oldstr ) )
 	  {
+	    if (newstr)
+	    {
+	      free( newstr );
+	      newstr = 0;
+	    }
 	    do1_alert( FCNOMEM );
 	    goto ss_5;
 	  }
@@ -434,8 +440,8 @@ sf_2:
 	  }				/* OK is selected	*/
 
 ss_6:
-	  Mfree( newstr );
-	  Mfree( oldstr );
+	  free( newstr );
+	  free( oldstr );
 
 	  if ( which == FICNCL )	/* stop */
 	    break;
@@ -728,7 +734,7 @@ open_wfile( win, item, tail, swin, sitem )
 	  bptr = put_name( win, dir->d_name );	
 	  if ( win == swin )
 	  {
-	    i = strlen( bptr );
+	    i = strlen( bptr ) + 1;	/* +1 for trailing 0 */
 	    if ( addr = malloc( (LONG)i ) )
 	      strcpy( bptr, addr );
 	    else
@@ -742,7 +748,7 @@ open_wfile( win, item, tail, swin, sitem )
 	  exec_file( addr, win, item, tail );
 
 	  if ( ( addr ) && ( !bptr ) )
-	    Mfree( addr );
+	    free( addr );
 	}
 }
 
@@ -912,7 +918,7 @@ u_1:	      if ( strcmp( s, backid[i].i_path ) )
 		      strcpy( new, addr );
 	              strcat( wilds, addr );
 	              lp_fill( addr, &backid[i].i_path );
-		      Mfree( addr );
+		      free( addr );
 		    }	
 		  }
 		  else			

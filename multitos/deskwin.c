@@ -270,7 +270,9 @@ up_win( win, mediac )
 	  {
 	    strcpy( wilds, &win->w_path[2] );
 	    return( open_subdir( win, 0, FALSE, FALSE, TRUE ) );
-	  }
+	  } else {
+	    return( FALSE );
+	  }	    
 	}
 
 	return( TRUE );
@@ -366,7 +368,7 @@ free_path()
 	if ( d_path )
 	{
 /*	  form_alert( 1, "[1][ Free Path Memory ][ OK ]" );	*/
-	  Mfree( d_path );
+	  free( d_path );
 	  d_path = (BYTE*)0;
 	}
 }
@@ -1100,7 +1102,7 @@ ret_win( win )
 {
 	if ( win->w_obj )
 	{
-	  Mfree( win->w_obj );
+	  free( win->w_obj );
 	  win->w_obj = (OBJECT*)0;
 	}
 
@@ -1258,7 +1260,7 @@ close_window( handle, closeit )
   	
 	  if ( win->w_memory )
 	  {
-	    Mfree( win->w_memory );
+	    Mfree( win->w_memory );	/* yes, Mfree -- see deskfile.c */
 	    win->w_memory = (BYTE*)0;
 	  }
 	
@@ -1301,7 +1303,7 @@ free_windows( )
 
 	   if ( win->w_obj )
 	   {
-	     Mfree( win->w_obj );
+	     free( win->w_obj );
 	     win->w_obj = (OBJECT*)0;
 	   }			
 	

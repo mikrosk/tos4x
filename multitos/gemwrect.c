@@ -2,13 +2,13 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.0 $	$Source: /u2/MRS/osrevisions/aes/gemwrect.c,v $
+*  $Revision: 1.1 $	$Source: /u2/MRS/osrevisions/aes/gemwrect.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/02/03 21:26:46 $	$Locker:  $
+*  $Author: ersmith $	$Date: 93/02/24 23:52:46 $	$Locker:  $
 * =======================================================================
 *  $Log: gemwrect.c,v $
-*  Revision 1.0  93/02/03  21:26:46  ersmith
-*  MultiTOS version 1.0
+*  Revision 1.1  93/02/24  23:52:46  ersmith
+*  1 meg floppy MultiTOS
 *
 * Revision 2.2  89/04/26  18:27:35  mui
 * TT

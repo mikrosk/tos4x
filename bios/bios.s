@@ -4,21 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/16 16:43:07 $
+* $Date: 90/02/26 17:31:51 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.12  90/02/26  17:31:51  apratt
+* Changed instruction-loop delays to use dowait (see startup) during boot
+* and another trick in the other place which needs it: ikbdwc. The trick
+* expects that Timer C is running as we programmed it, but does not rely
+* on the interrupt being enabled or our handler still handling it.
+*
 * Revision 2.11  90/02/16  16:43:07  apratt
 * Added SCC serial-port code to the bconmap section.  All works.
-*
+* 
 * Added initializing registers 9 and 10 to zero in the keyclick-sound
 * data list, in the hopes that this would fix it: some sounds cause
 * subsequent keyclicks to come out wrong.  Don't know if this fixes
 * it or not, because my TT has no speaker!
-*
+* 
 * Revision 2.10  90/02/02  13:37:53  apratt
 * Added conmap code, and TTMFP serial port code.  The conmap code
 * should really be dependent on a separate conditional, not TT
@@ -164,7 +170,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.11 $
+* $Revision: 2.12 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -244,7 +250,7 @@ osconf		equ	%11001
 .ifne TT
 	.globl	_dumpflg		;flag to signal a screen dump(alt-HELP)
 .endc
-
+	.globl	dowait			;wait you can use in booting only
 .ifne TT
 	.globl	ttmfpvectr		;interrupt handlers (from ttmfp.s)
 .endc
@@ -1424,19 +1430,30 @@ ikbdwc:
 	move.w	6(sp),d1
 ikbdput:
 *
-	move.w	#$3b6,d2	; delay aprox. 1/200 of a sec
-.ifeq TT
-iklp:
-	jsr	ikbdret
-	dbra	d2,iklp
-.endc
+* delay 5ms: on TT, use ttwait; on not TT, use a trick:
+* assume that Timer C is still counting 5ms in 192 ticks.
+* I don't want to assume that 200hz interrupts are happening,
+* but I do want to be sure this doesn't use instruction loops.
+* The trick is to read the timer, then wait for a new reading
+* which is HIGHER than the first; then you know (at least)
+* 5ms have gone by.  If you read anything >190 initially, wait for
+* something less than that, so we don't (a) wait forever for
+* something >192 or (b) wait a long time to catch 192 or 191.
+*
+	lea	keyboard,a1	;point to ikbd register base
 .ifne TT
 ikput2:	move.b	(a0),d2		; get a value
 ikput3:	cmp.b	(a0),d2		; changed?
+.else
+ikwait:	move.b	mfp+tadr,d0	; get current timer value
+	cmp.b	#190,d0
+	bhs	ikwait		; be sure it's not too high
+
+ikloop:	cmp.b	mfp+tadr,d0	; do { (nothing) 
+	bhs	ikloop		; } while (tadr <= d0)
 .endc
 	dbra	d0,ikput2	; yes - load a new value and loop
-ikbdret:
-	rts			;done for now
+	rts
 	move.w	#$0400,d0	; 256 * 20us = 5ms
 	bsr	ttwait
 .endif
@@ -3375,7 +3392,7 @@ nolan:
 	move.l	#chbibuffer,chbibufptr.w	; fix up the differences
 	move.l	#chbobuffer,chbobufptr.w
 
-	jsr	ttwait
+	bsr	dowait
 	SCCw	#9,#%11000000	; software reset both channels
 
 * wait four PCLK's after resetting SCC - something over 4us should do.
@@ -6329,7 +6346,7 @@ bellsnd:
 	.dc.b	6,0
 	.dc.b	7,$FE
 *
-	.end
+.end
 	.dc.b	9,0
 	.dc.b	10,0
 	.dc.b	11,0

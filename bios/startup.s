@@ -1,18 +1,32 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/03/30 04:35:49 $
+* $Date: 89/04/17 13:26:22 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.7  89/04/17  13:26:22  apratt
+* Added the new system variable _sysflags, definition TBD ($5a0)
+*
+* Added fast-RAM refresh & sizing for TT.  Includes new system variables
+* _ramtop ($5a4), and _ramvalid ($5a8), which is validated with rammagic.
+*
+* Added programming the volume/tone generator for a sane volume & tone,
+* and to mix the GI sound with the DMA sound.
+*
+* Added DMAINV assembly-time switch: set to 1 if DMASND and the DMA chip
+* inverts MONOMON when it's IDLE.  Will go away one day.
+*
+* Slight changes elsewhere.
+*
 * Revision 2.6  89/03/30  04:35:49  kbad
 * Changed return code of _term from 1 to -1 ($ffff), "error."
-*
+* 
 * Revision 2.5  89/03/23  17:32:00  apratt
 * Added real memory controller programming and memory sizing for TT.
 * The memory sizing is actually not TT-dependent.
@@ -203,7 +217,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.6 $
+* $Revision: 2.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -277,6 +291,12 @@ TT		=	0	; @check@
 
 DMASND		=	0	; @check@
 * have a short-frame processor (68000).  Currently that's only TT.
+* set DMAINV to 1 if the machine you're building ROMs for inverts
+* monomon when DMA sound chip is idle.  Older STPLUS and TT machine
+* do this, newer ones have the idle state noninverting.
+
+DMAINV		=	0	; @check@
+
 * set STPLUSVIDEO to 1 if you have ST PLUS video, with four bits per
 * gun instead of three in the palette.
 
@@ -288,7 +308,7 @@ STPLUSVIDEO	=	0	; @check@
 
 LONGFRAME	=	0	; @check@
 
-systype		=	ram	; 'rom' or 'ram' @check@
+systype		=	rom	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
@@ -683,12 +703,12 @@ DEFCSIZE	equ	$10		; default to room for 16 cookies
 
 
 
+*--------------	Magic Numbers
 resmagic	equ	$31415926	; validates 'resvalid'
 diagmagic	equ	$fa52235f	; validate diagnostic cartridge
 memmagic	equ	$752019f3	; validates 'memvalid'
 memmag3		equ	$5555aaaa	; validates 'memval3'
 bootmagic	equ	$1234		; magic checksum for boot sector
-
 rammagic	equ	$1357bd13	; validates 'ramtop'
 
 *---- Floppy state variables:
@@ -924,8 +944,11 @@ prv_aux:	ds.l	1	; (512) -> _auxout()
 
 pun_ptr:	ds.l	1	; (516)  -> hard disk driver phys unit table
 memval3:	ds.l	1	; (51a)  memory validation (memval3)
+_sysflags:	ds.l	1	; (5a0)  system flags (TBD)
+*--- "soft" console vectors
+xconstat:	ds.l	8	; (51e)  console status vectors
 
-*				; (5a0)
+*				; (5ac)
 
 _longframe:	ds.w	1	; (59e)  if nonzero, we're on 680[1-3]0.
 _p_cookie:	ds.l	1	; (5a0)  pointer to the Cookie Jar
@@ -941,7 +964,7 @@ kcl_hook:	ds.l	1	; (5b0)  handler for keyclick
 *	This space reserved for		:
 *	future RAM-loaded fixes		:
 		.globl	fix_it_up
-fix_it_up:	ds.b	$800-$5a0
+fix_it_up:	ds.b	$800-$5ac
 levelA:		ds.b	$40
 levelB1:	ds.b	$40
 levelB2:	ds.b	$40
@@ -1180,10 +1203,7 @@ notpal:	lea	color0(a5),a1		; a1 ->	hardware reg
 .ifne STPLUSVIDEO+TT
 	clr.b	dbasell(a5)		; set lo byte ptr
 .endc
- endc
 	move.b	#$80,$ffff827f		; write LCD and power control
-
- ifeq systype-rom
 	tst.w	$d00000			; clear "conversion done" int.
 *  [ROM based system]
 
@@ -1241,7 +1261,7 @@ mem3:	addq.w	#4,d6			; adjust config	byte for 512K
 ; OK, dbasell holds its value: you're an STe.
 
 cold3:	move.b	d6,memconf		; setup	memory controller
-
+	clr.l	a5
 .endc
 	bra	gotshadow
 .ifne TT
@@ -1278,6 +1298,12 @@ mem4:	sub.l	#bank1,d1		; decrement bank number
 * should be set to #$8000.
 *	(256Kx4 onboard) plus (256Kx4 add-on)
 *	(256Kx4 onboard strapped at 8M) plus (1Mx4 (=8M) add-on at 0)
+	move.b	memcntlr(a5),d6
+	move.l	phystop(a5),d5
+* concept to the one used in the ST series, but different in details.
+*
+ret_2:	beq	reset4			; already sized; don't size of test.
+* parts.  To figure out which are actually installed on your board, you
 * 	1) consult a calendar  (1Mx4 DRAMs are not expected in
 	move.b	#$a,memconf(a5)		; but mem cntlr for big
 * 	2) a) set the memory controller for 1M parts
@@ -1296,16 +1322,6 @@ mem4:	sub.l	#bank1,d1		; decrement bank number
 * the value to put in memconf and memcntlr.
 	move.b	d6,memconf(a5)
 
-* while we're at it, program fast-RAM memory refresh.  This
-* involves catching the bus error it causes.  $E0 is the proper
-* refresh rate, so we write to $FFD000E0.  See TT spec for this.
-
-	lea.l	$8000,sp
-	lea.l	mt_berr,a0
-	move.l	a0,8(a5)
-	clr.w	$ffd000e0
-
-mt_berr: nop				; placate stupid as68!
 .endc
 	beq	mt_cold			; definitely a cold boot
 
@@ -1350,30 +1366,116 @@ mt_done:
 *  SPARROW also doesn't need this.
 *-
 	lea	$8000,sp		; initialize SP just this once
- endc
+	move.l	a0,8			; to catch non-existant controllers
+*  Indicate that memory has successfully
+*  been sized and tested.  Set the variables
+*  to magic values ...
+*
+	move.l	a0,d5			; d5 -> end of RAM (as we know it)
+	clr.l	a5			; cheap zeropage
+	move.b	d6,memcntlr(a5)		; save configuration byte
+	move.l	d5,phystop(a5)		; save physical top-of-memory
+	move.l	#memmagic,memvalid(a5)	; indicate memory was configured
+	move.l	#memmag2,memval2(a5)	; ditto (paranoia variable)
+	move.l	#memmag3,memval3(a5)	; ditto (paranoia extraordinaria)
 *  - screen size and clear from top down. Now leaves screen where it is (at
- ifeq systype-rom
+.ifne TT
+*  preserve d5 = phystop and d6 = mem controller program byte.
+* We're still in ifeq systype-rom ... start refreshing fast RAM.  This
+* involves catching the bus error it causes.  $E0 is the proper
+* refresh rate, so we write to $FFD000E0.  See TT spec for this.
+
+refresh	equ	$e0
+
+	move.l	#mt_berr,8(a5)
+	move.w	#0,$ffd00000+refresh	; write don't-care data here
+
+mt_berr: nop				; placate stupid as68!
+
+	move.w	#$400,a0
+	move.l	d5,d4
+* contrary: that's dual-purpose, slow, compatibility-mode RAM.  Primary
+* RAM starts at $01000000 and is contiguous from there.  The first N bytes
+* of it (N>=0) is fast, nybble-mode RAM.  The rest of it is on the VME
+* bus.  The VME bus and the RAM you put there is jumpered to start at
+	move.l	d0,(a0)+
+	cmp.l	d4,a0
+	bne	clm_1
+
+*+
+*  Set the system variables memcntlr and phystop. Also set the magic values
+*
+*  aren't done until fast RAM is sized, then we set bit 0 of SCU general
+	move.l	#mt_pq,8(a5)		; BUS ERROR to catch missing cntrlrs
+	move.l	d5,phystop.w		; save physical top-of-memory
+
+	move.l	#memmagic,memvalid.w	; indicate memory was configured
+	move.l	#memmag2,memval2.w	; ditto (paranoia variable)
+	move.l	#memmag3,memval3.w	; ditto (paranoia extraordinaria)
+
+.if TT
+
+*+
+* [still ROM only]
+*
+* Now size primary RAM.  What? You thought ST RAM was primary RAM? On the
+* contrary: that's dual-purpose, slow, compatibility-mode RAM.  Primary RAM
+* starts at $01000000 and is contiguous from there.  The first N bytes of
+* it (N>=0) is fast, nybble-mode RAM.  The rest of it is on the VME bus. 
+* The VME bus and the RAM you put there is jumpered to start at
+* $01000000+N.  Alas, there's no way to tell what N is.
+*
+* Now that fast RAM is refreshing properly, all I need to do is size the
+* fast+VME RAM which starts at $01000000.  I'll check on 128K boundaries,
+* just for grins and so I can steal code from above.  First bus error or
+* compare error and you're out.
+*-
+
+	move.l	#mt_p0,$8		; set bus error vector
+	move.w	#0,refresh		; set refresh rate (causes berr)
+mt_p0:
+
+	move.l	#mt_pq,$8		; BUS ERROR to catch missing cntrlrs
+	move.w	#$fb55,d3		; d3 = a nice random number
+	moveq.l	#0,d0			; random number seed
+	move.l	#$20000,d7		; d7 = 128K
+	move.l	#$01020000,a0		; a0 -> first location to probe
+
+mt_p1:	move.l	a0,a1			; a1 -> end of RAM (as we know it)
+	move.w	d0,d2			; d2 = copy of random #
+	moveq	#42,d1			; d1 = # words to stuff
+mt_p2:	move.w	d2,-(a1)		; stuff a word (or get a BUS ERROR)
+	move.l	d5,_ramtop(a5)		; store ramtop value
+	move.l	#rammagic,_ramvalid(a5)	; mark as valid
+.endc
+
+.ifeq TT
+	clr.l	_ramtop			; store zero value
+	move.l	#rammagic,_ramvalid(a5)	; mark as valid
+.endc
+mt_pq:	sub.l	d7,a0			; drop down to last successful probe
+
 *+
 *  [ROM based system]
-*  Put screen at phystop - 32K
+*  Put screen at phystop - screen size
 *  Clear memory from $400 to 'd5' (phystop).
 	cmp.l	#$01000000,a0		; was there any RAM at all?
 *-
 	clr.l	a5
-	move.l	d5,d0			; d0 = phystop - 32K
+	move.l	phystop(a5),d0		; d0 = (phystop) - (screen size)
 .ifeq TT
-	sub.l	#$8000,d0
+	sub.l	#$8000,d0		; ST needs this much screen RAM
 .endc
 .ifne TT
 	sub.l	#$25800,d0		; TT needs lots of screen RAM
+.endc
+.ifne STPLUSVIDEO+TT
+	move.b	d0,dbasell(a5)
 .endc
 	lsr.w	#8,d0
 	move.b	d0,dbasel(a5)		; dbasel = d0 >> 8
 	swap	d0
 	move.b	d0,dbaseh(a5)		; dbaseh = d0 >> 16
-.ifne STPLUSVIDEO+TT
-	clr.b	dbasell(a5)
-.endc
 	move.l	d5,a0			; start at the end
 	move.l	#$400,d4		; where to end
 	moveq	#0,d0			; d0-d3 = zeros
@@ -1386,24 +1488,18 @@ clm_1:	movem.l	d0-d3,-(a0)		; ... work our way back
 	movem.l	d0-d3,-(a0)
 	cmp.l	d4,a0			; done?
 	bne	clm_1			; (loop for more bytes)
- endc
-mt_pr:
- ifeq systype-rom
-*+
-*  Indicate that memory has successfully
-*  been sized and tested.  Set two variables
-*  to magic values ...
 *
-*-
-	clr.l	a5			; cheap zeropage
-	move.b	d6,memcntlr(a5)		; save configuration byte
-	move.l	d5,phystop(a5)		; save physical top-of-memory
-	move.l	#memmagic,memvalid(a5)	; indicate memory was configured
-	move.l	#memmag2,memval2(a5)	; ditto (paranoia variable)
-	move.l	#memmag3,memval3(a5)	; ditto (paranoia extraordinaria)
- endc
-.else
+* end of .ifeq systype-rom for memory sizing
+	clr.l	a0			; no - set ramtop to zero.
+mt_pr:
+.endc
 
+*
+* Now that d5 holds the end address of primary RAM, put it someplace
+* useful.  I've chosen the next available system variable, which is
+* of a RAM-loaded system.
+* non-TT ST's, of course).
+.else
 
 	clr.l	a5			; quick zeropage
 .endif
@@ -1514,6 +1610,33 @@ usem:	move.l	4(a0),end_os(a5)	; init end-of-OS pointer
 *--- Prtblk vectors:
  .ifne DMASND
 	clr.w	dmasndc(a5)		; reset sound chip
+
+* program the volume/tone controller for a sane volume & tone, and
+* mix the GI sound in with the DMA sound so it comes out the speaker.
+
+	lea.l	vtpgm(pc),a0
+	move.w	(a0)+,mwmask(a5)
+	bra.s	vtend
+
+* data for the MicroWire interface...  The low high bit is set for
+* each of these so we can tell when it's shifted completely out.
+
+*		  addr  cmd  data   lobit
+vtpgm:	dc.w	($0600+$01ff)*2		; mask for all cmds
+	dc.w	($0400+$00c0+$1c)*2+1	; reasonable master volume
+	dc.w	($0400+$0140+$14)*2+1	; max left channel volume
+	dc.w	($0400+$0100+$14)*2+1	; max right channel volume
+	dc.w	($0400+$0080+$06)*2+1	; flat treble
+	dc.w	($0400+$0040+$06)*2+1	; flat bass
+	dc.w	($0400+$0000+$01)*2+1	; mix GI sound with DMA sound
+	dc.w	$0			; end of this list
+
+vtloop:	move.w	d0,mwdata(a5)		; write data
+vtwait:	tst.w	mwdata(a5)		; wait for data == 0
+	bne.s	vtwait
+vtend:	move.w	(a0)+,d0
+	bne.s	vtloop
+
  .endc
  .ifeq LONGFRAME
 	clr.w	_longframe(a5)		; clear this (NEW 12/6/88)
@@ -1700,7 +1823,12 @@ tb_x:	move.b	d0,sshiftmd(a5)		; set software rez
 	bmi	nomono			; (no)
 .endc
 .ifne DMASND
+.ifne DMAINV
 	bpl	nomono			; (POSITIVE means color for DMASND)
+.endc
+.ifeq DMAINV
+	bmi	nomono
+.endc
 .endc
 .ifeq TT
 * don't wait if TT: vwait doesn't work and it's not necessary.
@@ -2311,7 +2439,12 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	beq	vbl11
 	movem.l	d7/a0,-(sp)		; save registers
 	jsr	(a1)			; call routine
+.ifne DMAINV
 	bne.s	v_read2			; yes - don't invert monomon
+.endc
+.ifeq DMAINV
+	beq.s	v_read2
+.endc
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
 v_read2:
 	move.b	shiftmd(a5),d0		; get current rez

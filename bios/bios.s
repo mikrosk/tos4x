@@ -4,19 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/06/13 16:29:56 $
+* $Date: 91/06/20 14:06:47 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.34  91/06/20  14:06:47  apratt
+* Removed new keyboard code (was conditional on OLDIKBD)
+* because I found a way to hook in a TSR to fix overrun without
+* changing the keyboard code.
+*
 * Revision 2.33  91/06/13  16:29:56  apratt
 * Added alt-keypad functionality: hold down ALT, type a decimal number on the
 * keypad, and let go of alt to get that ASCII code into the keyboard buffer. 
 * The result has zero as the scan code and the kbshift value at the moment
 * you let go of ALT (so you can't get ALT itself in there).
-*
+* 
 * Revision 2.32  91/05/21  16:54:10  apratt
 * Changed error handling in midi/ikbd so I could hook in a TSR to fix the
 * overrun problems.  The overrun fixing might one day be part of the OS.  The
@@ -76,7 +81,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.33 $
+* $Revision: 2.34 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -103,20 +108,6 @@
 * 
 
 .include "switches.s"
-
-*
-* OLDIKBD: the sequence of operations for errors on the data channel is new
-* as of 5/91.  Before that, the overrun bit was the only one which caused a
-* jump through the error handler, and in that case the byte in the receive
-* register was actually handled as a valid byte, which is wrong, BEFORE
-* the error handler was called.  Now either the error handler or the data
-* handler is called, but not both.  In this case the error handler has to
-* clear the error.
-*
-* You get the old behavior back if you set OLDIKBD to 1.
-*
-
-OLDIKBD		equ	0
 
 * SPARROW and TT are both M68030.
 
@@ -1627,11 +1618,7 @@ initmfp:
 	lea	mbufrec.w,a0
 	lea	minit,a1
 	moveq	#mssize,d0
-.if OLDIKBD
 	bsr	lbmove		;do block move and return
-.else
-	move.l	#verror,d0	;init to ikbd and midi error handler address
-.endc
 
 *	mark the altkp accumulator as invalid
 	move.w	#-1,altkp
@@ -4088,7 +4075,6 @@ vecikbd:
 	lea	keyboard,a1	;point to keyboard register base
 	movea.l vkbderr.w,a2	;load in the jump vector
 	bra	astatus		;goto general acia status check routine
-.if OLDIKBD
 
 astatus:
 	move.b	comstat(a1),d2	;grab device status
@@ -4100,33 +4086,6 @@ astatus:
 	bsr.b	arcvrint
 	movem.l	(sp)+,d2/a0-a2
 mk1:	andi.b	#%00100000,d2
-.else
-	move.b	d2,d0
-	and.b	#%00110000,d0	;error indication?
-	bne	mk1		;yes, take the error vector
-	btst	#0,d2		;see if receiver buffer is full
-	beq.b	aciaexit	;nope...it's empty
-	movem.l	d2/a0-a2,-(sp)
-	bsr.b	arcvrint	;yes...get byte
-	movem.l	(sp)+,d2/a0-a2
-	rts			;and return
-
-* You get here when an error bit is set; we jump to an error handler
-* which must clear the error and rts.  The default handler for vkbderr
-* and vmiderr are both verror.
-
-mk1:	jmp	(a2)
-
-*
-* verror is the default value stuffed into vkbderr; it reads the data
-* register to clear the error condition and returns.
-*
-
-verror:	move.b	iodata(a1),d0	;grab data byte from acia data register
-				; and fall through to RTS
-aciaexit:
-	rts
-.endc
 	beq	aciaexit
 	move.b	iodata(a1),d0
 	jmp	(a2)

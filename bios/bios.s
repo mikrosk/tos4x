@@ -3,18 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/07/21 12:17:34 $
+* $Date: 88/07/25 18:21:00 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.12  88/07/25  18:21:00  apratt
+* Got rid of the damn '.w' after 8 in coldboot code.  Gremlins.
+*
 * Revision 1.11  88/07/21  12:17:34  apratt
 * Fixed fatfinger in reboot code: adding wrong offset to KBCL
 * (was adding 16 bits, but 24 bits is right) meant you could
 * never reboot.
-*
+* 
 * Revision 1.10  88/06/28  16:35:29  apratt
 * Inexplicably, no revision actually had the rsconf(-2) code in it.
 * Now it's there.
@@ -55,7 +58,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.11 $
+* $Revision: 1.12 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3265,7 +3268,7 @@ rloop:	move.l	(a0)+,(a1)+
 .endif
 cstart:
 	lea.l	berr(PC),a0
-	move.l	a0,$8.w
+	move.l	a0,$8
 	lea.l	cend(PC),a0
 	moveq.l	#0,d0
 	move.l	d0,d1

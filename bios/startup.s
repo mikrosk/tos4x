@@ -3,20 +3,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/12/06 17:02:06 $
+* $Date: 88/12/13 14:43:44 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.22  88/12/13  14:43:44  apratt
+* Added some code for STPLUS: more proper use of the low-byte-of-video-base
+* register (and an equate for it: dbasell), and DMASND code which works
+* for the latest board (with MONOMON and DMASND XORed together) including
+* resetting DMASND during the boot, and handling the XOR case during
+* boot and in VBLANK.  Also the new default color palette for STPLUS: 7's
+* become F's.
+*
 * Revision 1.21  88/12/06  17:02:06  apratt
 * Added a system variable at $59e: _longframe.  It's zero if you're
 * on a 68000, nonzero otherwise.  This is used on entry and exit
 * for BIOS/XBIOS (at "traph") so we can deal with the extra word
 * on the stack for 680[1-3]0 exception frames.  MASSIVELY UNTESTED,
 * and almost no change if you leave LONGFRAME equ 0.
-*
+* 
 * Revision 1.20  88/12/06  16:24:23  apratt
 * Added code for STPLUS to fix the check for MONOMON in the Vblank
 * handler: it gets inverted when the DMA sound is active, so this code
@@ -117,7 +125,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.21 $
+* $Revision: 1.22 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -185,12 +193,12 @@ STPLUS		=	0		; set to 1 for ST PLUS video & palette
 
 LONGFRAME	=	0		; set to 1 to enable long frames
 
-systype		=	ram		; 'rom' or 'ram'
+systype		=	rom		; 'rom' or 'ram'
 country		=	usa      	; 'usa', etc....
 version		=	$0104		; version number *MUST BE EVEN*
-date		=	$11091988	; date, $MMDDYYYY
+date		=	$12131988	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		=	%0001000101101001 ; Nov 9, 1988
+dosdate		=	%0001000110001101 ; Dec 13, 1988
 
 
 ****
@@ -617,6 +625,11 @@ SPAR_CONF	equ	$ffff8006	; read here to auto-config
 
 shiftmd		equ	$ffff8260	; video	shift mode (resolution)
 SPAR_VMC	equ	$ffff82c0	; video master control
+.ifne STPLUS
+*--- ST PLUS shifter
+dbasell		equ	$ffff820c
+.endc
+.endif
 *--- DMA chip:
 diskctl		equ	$ffff8604	; disk controller data access
 fifo		equ	$ffff8606	; DMA mode control
@@ -678,9 +691,11 @@ ttucr	equ	ttmfp+$29		; USART control reg
 ttrsr	equ	ttmfp+$2b		; receiver status
 tttsr	equ	ttmfp+$2d		; transmit status
 ttudr	equ	ttmfp+$2f		; USART data
+.ifne STPLUS
+*--- DMA SOUND REGISTERS (only one interesting one)
+DMASND	equ	$ffff8900
+.endc
 midictl	equ	$fffffc06		; MIDI ACIA control
-
-
 ttsysistate	equ	$ffff8e03	; "sys" int state in SCU
 
 ttscu1		equ	$ffff8e09	; general-purpose SCU register 1
@@ -1027,7 +1042,10 @@ notpal:	lea	color0,a1		; a1 ->	hardware reg
 * We also read from $d00000, to clear the "conversion done" interrupt
 * from the STylus touch-screen hardware.  This is as good a place to
 	move.b	#$01,dbaseh		; set high ptr
-	move.b	#$00,dbasel		; set low ptr
+	clr.b	dbasel			; set low ptr
+   .ifne STPLUS
+	clr.b	dbasell			; set lo byte ptr
+   .endc
  endc
 	move.b	#$80,$ffff827f		; write LCD and power control
 
@@ -1149,7 +1167,9 @@ mt_done:
 	move.b	d0,dbasel		; dbasel = d0 >> 8
 	swap	d0
 	move.b	d0,dbaseh		; dbaseh = d0 >> 16
-
+ .ifne STPLUS
+	clr.b	dbasell
+ .endc
 	move.l	d5,a0			; start at the end
 	move.l	#$400,d4		; where to end
 	moveq	#0,d0			; d0-d3 = zeros
@@ -1226,6 +1246,9 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 	move.l	a0,_v_bas_ad(a5)
 	move.b	_v_bas_ad+1(a5),dbaseh	; load high addr
 	move.b	_v_bas_ad+2(a5),dbasel	; load low (really, medium) addr
+ .ifne STPLUS
+	move.b	_v_bas_ad+3(a5),dbasell	; load lo byte addr
+ .endc
 	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero
 *  Setup display base,
 *  clear display memory.
@@ -1279,11 +1302,14 @@ usem:	move.l	4(a0),end_os		; init end-of-OS pointer
 *--- Disk vectors:
 	move.l	#_dskinit,hdv_init.w	; initialization
 *--- Prtblk vectors:
-.ifeq LONGFRAME
+ .ifne STPLUS
+	clr.w	DMASND(a5)		; reset sound chip
+ .endc
+ .ifeq LONGFRAME
 	clr.w	_longframe		; clear this (NEW 12/6/88)
-.endc
+ .endc
 
-.ifeq LONGFRAME-1
+ .ifeq LONGFRAME-1
 * Initialize the cookie jar.
 * set _longframe flag to 0 if running on 68000, else nonzero.
 *-
@@ -1296,7 +1322,7 @@ ill_1:	addq.l	#6,sp			; illegal instruction: must be 68000.
 	clr.w	_longframe		; clear longframe: definitely 68000.
 ill_2:	nop				; (dumb as68 can't have endc after
 *					; a label, so here's 2 wasted bytes.)
-.endc
+ .endc
 *		00030000 is Sparrow
     ifeq systype-rom
 	bsr	copy_header		; kludge OS ROM header
@@ -1432,7 +1458,12 @@ TBCR	equ	$fffffa1b		* timer B control reg
 tb_x:	move.b	d0,sshiftmd		; set software rez
 
 	move.b	gpip,d0			; monochrome monitor attached?
+.ifeq STPLUS
 	bmi	nomono			; (no)
+.endc
+.ifne STPLUS
+	bpl	nomono			; (POSITIVE means color for STPLUS)
+.endc
 	lea	vwt_r(pc),a6		; a6 -> ret addr
 	bra	vwait			; wait for vblank
 vwt_r:	move.b	#2,shiftmd		; set hardware highrez
@@ -1858,6 +1889,9 @@ ca_2:	tst.l	(a0)			; test link address
 ca_r:	rts
 
 
+
+ .ifeq STPLUS
+
 colors:	dc.w	$777			; 0 white
 	dc.w	$700			; 1 red
 	dc.w	$070			; 2 green
@@ -1875,7 +1909,31 @@ colors:	dc.w	$777			; 0 white
 	dc.w	$377			; 14 light cyan
 	dc.w	$000			; 15 black
 
+ .endc
 
+ .ifne STPLUS
+
+* full-magnitude colors for STPLUS palette means 'f' not 7
+
+colors:	dc.w	$fff			; 0 white
+*	Passed:		d1.l = offset
+*			a0 = base of pattern ($1f8 bytes long)
+*			a4 -> return address
+*
+*	Returns:	EQ: the	pattern	matched
+*			NE: the	pattern	didn't match
+*
+*	Uses:		d0.w, a1
+*
+*	Called-by:	Coldstart memory-sizing	routine.
+*-
+memchk:
+	add.l	d1,a0			; a0 ->	memory to check
+	clr.w	d0			; zap pattern seed
+	lea	$1f8(a0),a1		; a1 ->	ending address
+
+.endc
+memchk1: cmp.w	(a0)+,d0		; match?
 	bne	memchkr			; (no -- return	NE)
 * hbl - force caller to IPL
 	cmp.l	a0,a1			; matched entire pattern?
@@ -1928,25 +1986,29 @@ colors:
 hbl:	move.w	d0,-(sp)		; save d0
 *** (note: the move from shiftmd is inside the conditional so the conditional
 *** doesn't end with a label, which is a no-no in old as68)
-.ifne STPLUS
+hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
+ .ifne STPLUS
 	addq.l	#1,_frclock		; bump frame clock
-	move.w	$8900,d0		; read sound state once
-	move.b	gpip,d1			; get gpip with monomon
-	cmp.b	gpip,d1			; still the same?
+	move.b	DMASND+1(a5),d0		; read sound state once
+	move.b	gpip(a5),d1		; get gpip with monomon
+	cmp.b	gpip(a5),d1		; still the same?
 	bne.s	v_read1			; no - start over
-	cmp.w	$8900,d0		; sound state still the same?
+	cmp.b	DMASND+1(a5),d0		; sound state still the same?
 	move.l	_vblqueue.w,a0		; a0 ->	vectors
-	tst.w	d0			; was sound active?
-	beq.s	v_read2			; no - don't invert monomon
-	bchg	#7,d1			; yes - invert it to get true MONOMON
+	tst.b	d0			; was sound active?
+	bne.s	v_read2			; yes - don't invert monomon
+	bchg	#7,d1			; no - invert it to get true MONOMON
 v_read2:
-	move.b	shiftmd,d0		; get current rez
-.endc
+	move.b	shiftmd(a5),d0		; get current rez
+ .endc
+
 *** non-STPLUS equivalent: just get the input from gpip
-.ifeq STPLUS
-	move.b	gpip,d1			; get "High Rez" input
-	move.b	shiftmd,d0		; get current rez
-.endc
+
+ .ifeq STPLUS
+	move.b	gpip(a5),d1		; get "High Rez" input
+	move.b	shiftmd(a5),d0		; get current rez
+ .endc
+
 ***	READ sound status (to d0)
 ***	READ gpip (to d1)
 ***	IF gpip != d1 then try again
@@ -1968,7 +2030,7 @@ v_read1:
 	cmp.b	d1,d2
 	bne	v_read1			; no - start over
 swmon2:	move.b	d0,sshiftmd(a5)		; set shadow & hardware shift-mode
-	move.b	d0,shiftmd
+	move.b	d0,shiftmd(a5)
 	move.l	swv_vec(a5),a0		; go through "change rez" panic vector
 .if (TT == 0)
 	and.b	#3,d0			; strip bucky bits
@@ -1991,6 +2053,9 @@ vbl1:	tst.l	screenpt(a5)		; if(screenpt == NULL) don't;
 
 	move.l	screenpt(a5),_v_bas_ad(a5)	; set OS variable
 	move.l	_v_bas_ad(a5),d0		; d0 ->	screen bottom
+ .ifne STPLUS
+	move.b	d0,dbasell		; for STPLUS use these 8 bits
+ .endc
 	lsr.l	#8,d0			; strip	lower 8	bits
 	move.b	d0,dbasel		; load "low" pointer
 	lsr.w	#8,d0
@@ -2406,7 +2471,7 @@ _get_mpb:
 	clr.l	8(a0)			; mp_rover = 0; (not used any more)
 
 *--- initialize MD:
-	clr.l	d0			; cast to unsigned longword
+	clr.l	(a1)			; m_link = NULL;
 	move.w	_timr_ms(a5),d0		; get calibration
 	move.l	_memtop.w,d0		; m_length = _memtop - _membot;
 	sub.l	_membot.w,d0
@@ -2421,9 +2486,9 @@ _get_mpb:
 	bls	nottram
 	move.b	dbasel,d0		; load and shift bits 8..15
 	lea.l	ttmd.w,a2
- 	.ifne	STPLUS
- 	move.b	$ffff820c,d0		; load bits 0..7 on STPLUS only
- 	.endc
+ .ifne	STPLUS
+ 	move.b	dbasell,d0		; load low byte for STPLUS
+ .endc
 
 	sub.l	#$01000000,d0
 	move.l	d0,8(a2)		; ttmd.m_length = (length)
@@ -2468,7 +2533,7 @@ f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
 	move.b	9(sp),dbaseh		; set bits 16..23 of hardware pointer
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
  .ifne STPLUS
- 	move.b	$b(sp),$ffff820c	; STPLUS set low 8 bits, too
+ 	move.b	$b(sp),dbasell		; STPLUS set low 8 bits, too
  .endc
 phydone:
 	rts				; return pointer in d0
@@ -2583,11 +2648,14 @@ _term:
 	and.w	#$0003,d7
 *
 	dc.w	$4eb9		; jsr (not bsr!)
-	clr.l	d0
+	dc.l	savp_2		; target address
 	move.b	dbaseh,d0
 savp_2:	move.l	(sp)+,proc_pc.w		; save bogus PC + exception number
 	move.b	dbasel,d0
 .else
+ .ifne STPLUS
+	move.b	dbasell,d0
+ .endc
 	movem.l	d0-d7/a0-a7,proc_regs
 	add.w	mindex(pc,d7.w),a0	; a0 -> base of mem to draw at
 	move.l	usp,a0			; save USP

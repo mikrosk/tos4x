@@ -1,21 +1,24 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/02/13 12:03:37 $
+* $Date: 89/02/27 18:09:50 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.22  89/02/27  18:09:50  kbad
+* Added ITALY keyboard code for new Italian keyboard
+*
 * Revision 1.21  89/02/13  12:03:37  apratt
 * Check for reboot used to include ASCII part of the key code, so if you
 * redefined the keyboard it wouldn't reboot.  Now just the
 * scan code and kbshift bits are checked.  This will be trouble
 * if any keyboard doesn't have delete on the same scan code ($53).
-*
+* 
 * Revision 1.20  89/02/06  12:20:25  apratt
 * Added a timeout to Gettime ... if time doesn't arrive in 1 sec, return 0.
 * 
@@ -98,7 +101,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.21 $
+* $Revision: 1.22 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -145,7 +148,7 @@ FINLAND		equ     5 ***DON'T  CHANGE*** same as swedish keyboard
 NORWAY		equ    11 ***DON'T  CHANGE***
 DENMARK		equ    12
 
-COUNTRY	equ	USA	;set country of origin
+COUNTRY	equ	FRANCE	;set country of origin
 
 
 
@@ -2966,37 +2969,33 @@ altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bra	conin25a		;process it
 	ifeq	COUNTRY-ITALY
 .endif
-	cmpi.b	#$1a,d1		;is it a ALT-^?
 
-	move.b	#$5b,d0		;put in '[', then check the shift keys
+
+ 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25a		;process it as unshifted
-	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift ^
-	bra	conin25a		;process it
-altsw1	cmpi.b	#$1b,d1		;is it a ALT-$?
+	cmpi.b	#$1a,d1		;is it a ALT-`e ?
+	bne.b	altsw1		;no...
+	move.b	#'[',d0		;put in '[', then check the shift keys
+altsw1	cmpi.b	#$1b,d1		;is it a ALT-+ ?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
-	move.b	#$5d,d0		;put in ']', then check the shift keys
+	beq	conin25a	;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a	;process it
-	beq	conin25a		;process it as unshifted
-	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift $
-	bra	conin25a		;process it
-altsw2	cmpi.b	#$28,d1		;is it a ALT-
+altsw1:	cmpi.b	#$1b,d1		;is it a ALT-+ ?
+	bne.b	altsw2		;no...
+	move.b	#']',d0		;put in ']', then check the shift keys
+altsw2	cmpi.b	#$2b,d1		;is it a ALT-\ ?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
-	move.b	#$60,d0		;put in '`', then check the shift keys
+	beq	conin25a	;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a	;process it
-	beq	conin25a		;process it as unshifted
-	move.b	#$7e,d0		;put in '~',instead...it's a alt-shift
-	bra	conin25a		;process it
-altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
+altsw2:	cmpi.b	#$2b,d1		;is it a ALT-\ ?
+	bne.b	altsw3		;no...
+	move.b	#$f8,d0		;put in bullet, then check the shift keys
+altsw3	cmpi.b	#$60,d1		;is it a ALT-ISO?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
-	move.b	#$5e,d0		;put in '^', then check the shift keys
-	move.b	kbshift(a5),d2	;grab current setting
-	andi.b	#$3,d2		;KBRSH+KBLSH bits
-	beq	conin25a		;process it as unshifted
-	move.b	#$40,d0		;put in '@', instead...it's a alt-shift #
+	beq	conin25a	;process it as unshifted
 	move.b	#'~',d0		;put in '~',instead...it's a alt-shift-\
 	bra	conin25a	;process it
 	endc
@@ -4478,34 +4477,38 @@ keytran:
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
 	ifeq	COUNTRY-ITALY
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+
 keyshif:
-	.dc.b   0,esc,"1234567890+",$82,bs,tab,'qwertyuiop',$86,$81,cr,0
-	.dc.b	"asdfghjkl",$94,$84,"'",0,$5c,'zxcvbnm,.-',0,0,0,space,0
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'-',0,0,0,'+',0,0,0,0,del
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'<',0,0,'()/*7894561230.',cr
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+	dc.b	nul,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
+	dc.b	'q','w','e','r','t','y','u','i','o','p',$8a,'+', cr,nul,'a','s'
+	dc.b	'd','f','g','h','j','k','l',$95,$85,$97,nul,'\','z','x','c','v'
+	dc.b	'b','n','m',',','.','-',nul,nul,nul,' ',nul,nul,nul,nul,nul,nul
+	dc.b	nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,'-',nul,nul,nul,'+',nul
+	dc.b	nul,nul,nul,del,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
+	dc.b	'<',nul,nul,'(',')','/','*','7','8','9','4','5','6','1','2','3'
+	dc.b	'0','.', cr,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
 keycl:
 	.dc.b	0,esc,"1234567890+",$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
-	.dc.b	0,esc,'!"#$%&/()=?',$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
-	.dc.b	'ASDFGHJKL',$99,$8e,'*',0,'|ZXCVBNM;:_',0,0,0,space,0
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'-',0,0,0,'+',0,0,0,0,del
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'>',0,0,'()/*7894561230.',cr
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+	dc.b	nul,esc,'!','"',$9c,'$','%','&','/','(',')','=','?','^', bs,tab
+	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$82,'*', cr,nul,'A','S'
+	dc.b	'D','F','G','H','J','K','L','@','#',$dd,nul,'|','Z','X','C','V'
+	dc.b	'B','N','M',';',':','_',nul,nul,nul,' ',nul,nul,nul,nul,nul,nul
+	dc.b	nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,'-',nul,nul,nul,'+',nul
+	dc.b	nul,nul,nul,del,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
+	dc.b	'>',nul,nul,'(',')','/','*','7','8','9','4','5','6','1','2','3'
+	dc.b	'0','.', cr,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
 
 
-	.dc.b	0,esc,"1234567890+",$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
-	.dc.b	"ASDFGHJKL",$99,$8e,"'",0,$60,'ZXCVBNM,.-',0,0,0,space,0
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'-',0,0,0,'+',0,0,0,0,del
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'<',0,0,'()/*7894561230.',cr
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+	dc.b	nul,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
+	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$8a,'+', cr,nul,'A','S'
+	dc.b	'D','F','G','H','J','K','L',$95,$85,$97,nul,'\','Z','X','C','V'
+	dc.b	'B','N','M',',','.','-',nul,nul,nul,' ',nul,nul,nul,nul,nul,nul
+	dc.b	nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,'-',nul,nul,nul,'+',nul
+	dc.b	nul,nul,nul,del,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
+	dc.b	'<',nul,nul,'(',')','/','*','7','8','9','4','5','6','1','2','3'
+	dc.b	'0','.', cr,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
 	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
-	.endc
+	endc
 	dc.b	'<',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
 	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
 	ifeq	COUNTRY-SWISSGER

@@ -4,18 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/05/21 16:57:45 $
+* $Date: 91/06/13 16:29:42 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.5  91/06/13  16:29:42  apratt
+* Added a check of the four-byte serial number that MSDOS 5.0 puts at offset
+* $27 in the boot sector.  For non-MSDOS 5.0 disks, this is just another four
+* bytes' worth of chance to be different, but for MSDOS 5.0 disks it's the
+* ONLY chance, since they all appear to have the same serial number.
+*
+* See also GEMDOS of this date for new media change handling.
+*
 * Revision 2.4  91/05/21  16:57:45  apratt
 * Removed things which were ifdef DAS_BOOT, and left in unconditionally those
 * things which were ifndef DAT_BOOT.  Added Protobt type 5 for quad density,
 * against future need.  Changed some magic numbers into #defined constants.
-*
+* 
+* 
 * Revision 2.3  90/08/03  13:23:37  apratt
 * TTOS FINAL RELEASE
 * 
@@ -54,7 +63,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.4 $
+* $Revision: 2.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -116,6 +125,14 @@
  *
  */
 
+/*
+ * June 1991: added a check on the 32-bit serial number that MSDOS 5.0
+ * puts at offset $27 in the boot sector.  For non-MSDOS 5.0 disks,
+ * it's just another chance for two disks to be different.  For MSDOS 5.0
+ * disks it's the only chance, since they all appear to have the same
+ * three-byte serial number at offset 8.
+ */
+
 
 #define	MAXACCTIM	82L	/* about 1.5 sec. "free" time... */
 				/* Since this is based on video frames, */
@@ -145,7 +162,7 @@
 #define	IBM_SPT		0x18	/* (.W) #sectors/track		*/
 #define	IBM_NSIDES	0x1a	/* (.W) #sides on dev		*/
 #define	IBM_NHID	0x1c	/* (.W) #hidden sectors		*/
-
+#define MSDOS5_SER	0x27	/* four-byte serial number	*/
 
 
 #define	CRITICAL_RETRY	0x00010000L		/* "retry" return code */
@@ -216,6 +233,7 @@ struct dsb {
 		dspt,			/* #sectors/track */
 		dhidden;		/* #hidden tracks */
 	char	dserial[3];		/* 24-bit volume serial number */
+	char	dmsd5_ser[4];		/* 32-bit serial # from MSDOS 5.0 */
 } dsbtab[2];
 
 
@@ -347,6 +365,8 @@ WORD dev;
 
     for (i = 0; i < 3; ++i)				/* copy serial# */
 	q->dserial[i] = diskbuf[VOL_SERIAL + i];
+    for (i = 0; i < 4; ++i)
+	q->dmsd5_ser[i] = diskbuf[MSDOS5_SER + i];
 
 							/* make safe/unsure */
     diskmode[dev] = (wplatch[dev] = wpstatus[dev]) ? UNSURE : SAFE;
@@ -423,6 +443,9 @@ WORD dev;
 
 	    for (i = 0; i < 3; ++i)
 		if (diskbuf[VOL_SERIAL + i] != p->dserial[i])
+			return CHANGED;
+	    for (i = 0; i < 4; ++i)
+		if (diskbuf[MSDOS5_SER + i] != p->dmsd5_ser[i])
 			return CHANGED;
 
 	    /* Reset write-protect latch */

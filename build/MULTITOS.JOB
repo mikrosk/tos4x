@@ -1,15 +1,16 @@
-# TOS 4.92 build (Falcon RAM TOS of the beta boot floppy), run by C:\AUTO\RUNNER.PRG at boot
-# (commands: build/src/runner.c). S: is the repository, D: the work copy, M: the RAM disk the
-# makefiles expect. cptree gives every copied file the same time stamp, so make rebuilds only what
-# is missing. Everything is built from the sources, the Lattice C parts with Lattice 5.52;
-# D:\ROM\TOS.IMG must be TOS.IMG of the 4.92 floppy byte for byte (EXPECT.LST).
+# TOS 4.92 as a 512 KB ROM (the BIOS with systype rom, linked at $E00000 as TOS 4.04), run by
+# C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c). S: is the repository, D: the work copy,
+# M: the RAM disk the makefiles expect. cptree gives every copied file the same time stamp, so make
+# rebuilds only what is missing. Everything is built from the sources, the Lattice C parts with
+# Lattice 5.52. 4.92 was released only as a RAM TOS; D:\ROM\TOS.IMG must be this job's own image
+# byte for byte (EXPECT.LST).
 
 echo copy the sources to D:
 rmtree D:\
 rmtree M:\
 cptree S:\BIOS D:\BIOS
 cptree S:\GEMDOS D:\GEMDOS
-cptree C:\ROM D:\ROM
+cptree C:\ROM492 D:\ROM
 copy C:\SLAV\AS68SYMB.DAT M:\AS68SYMB.DAT
 echo the surviving MAS versions reject clr.l An; the shipped objects hold suba.l An,An
 subst D:\BIOS\STARTUP.S clr.l\ta5 suba.l\ta5,a5
@@ -18,7 +19,7 @@ subst D:\BIOS\XINOUT.S clr.l\ta5 suba.l\ta5,a5
 setenv MACPATH=C:\INC\
 setenv INCLUDE=C:\LC\INCLUDE
 
-echo BIOS, RAM build (Lattice make)
+echo BIOS, ROM build (Lattice make)
 setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
 cd D:\BIOS\DSP
 setenv MACPATH=C:\INC\DSP\
@@ -29,7 +30,7 @@ x make spsound.o
 cd D:\BIOS
 echo an existing file "version" keeps biosvers from writing today's date into version.s
 touch version
-x make RAM=1 allbios
+x make RAM=0 allbios
 
 echo GEMDOS (Lattice make; pasm is Pure C PASM)
 setenv PATH=C:\LC\BIN;C:\PUREC;C:\SLAV;C:\BIN;C:\UTIL
@@ -808,15 +809,15 @@ copy C:\MTOS\ALN.TOS D:\MULTITOS\ALN.TOS
 setenv PATH=D:\MULTITOS;C:\UTIL;C:\LC\BIN;C:\SLAV
 x make -f makegem aes40usa.o
 
-echo RAM TOS image from the sources
+echo ROM from the sources
 setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
 cd D:\ROM
-copy D:\BIOS\ALLBIOS.AWU D:\ROM\ALLBIOS.AWU
+copy D:\BIOS\ALLBIOS.OWU D:\ROM\ALLBIOS.OWU
 copy D:\PIXVDI\SOURCES\SMVDI.O D:\ROM\SMVDI.O
 copy D:\GEMDOS\GEMDOS.030 D:\ROM\GEMDOS.030
 copy D:\MULTITOS\AES40USA.O D:\ROM\AES40USA.O
 x make
-ramimg tos.abs tos.img
+romimg tos.abs tos.img 524288
 
 echo compare with the expected checksums
 check C:\EXPECT.LST

@@ -4,561 +4,43 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/03 13:23:45 $
+* $Date: 90/08/21 17:15:28 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.58  90/08/21  17:15:28  apratt
+* This version works in both STe and Mega STe, distinguishing between
+* them at runtime by checking for bus error when accessing ttscu1.
+*
+* Bconmap is no longer conditional.
+*
+* Probe for the SFP004 only if not TT.  Fix the FPU cookie, which was
+* broken before, but only on non-TT (whew!).
+*
+* This version is NOT country-dependent.  The only country dependency was
+* osconf, and that's now an EQU exported from BIOS (which is already
+* country dependent).
+*
+* Other log messages removed.
+*
+* 
+* Other log messages removed.
+* 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-*
-* Revision 2.56  90/08/01  13:12:28  apratt
-* Changed boot color to white, and commented out color-cycling code.
-* Changed date to 8/1/90.  This is the final TT release revision.
-* 
-* Revision 2.55  90/07/27  15:08:15  apratt
-* Removed obsolete (and long-commented-out) dmaboot code.
-* 
-* Added "boot preference" code: first ttscu1 bits 7-3, then the first
-* word of NVM are used as boot preference.  If NVM is invalid it's zero.
-* 
-* Revision 2.54  90/07/25  14:24:45  apratt
-* Re-added clear of bootdev at reset time when you're a RAM TOS so the
-* floppy's AUTO folder gets executed, not the hard disk's.
-* 
-* Improved privilege violation handler (again and for the last time!)
-* to handle D registers as dest of move.
-* 
-* Revision 2.53  90/07/19  18:52:11  apratt
-* Changed date to 7/19 and color to slightly yellow, pulsing from
-* full yellow to full white.  Added pulsing for non-TT, too.
-* 
-* Revision 2.52  90/07/19  15:17:54  apratt
-* Moved TT screen base to phystop-screen_size-$100, so the low byte is
-* zero and programs which double buffer and write directly to the shifter
-* work.
-* 
-* Moved the PMMU page tables into RAM at $700-$800, so they're protected
-* from user-mode access and less likely to be clobbered by programs that
-* assume they can take over the whole system.  However, they are not
-* protected from supervisor OR DMA access.
-* 
-* Added better code to handle privilege violation when it's a move from
-* SR. See the label "priv" for details.
-* 
-* Revision 2.51  90/07/19  14:55:04  apratt
-* Added ONLY_LONGFRAME code, which you set on TT to just assume
-* longframe.  
-* 
-* Removed VBLQ1ST; now VBLQ is always first.  
-* 
-* Added pulsing boot colors. 
-* 
-* Removed frestore of null state: it is not necessary and it was before
-* we checked for the existence of the 881.  Catch coprocessor violation
-* in the FPU probe; this "shouldn't happen." 
-* 
-* Made ttwait/ttdelay use timer C of TTMFP because leaving Timer A free
-* is nicer: Timer A doesn't shade a control register with another timer. 
-* 
-* Moved TT screen base to phystop
-* 
-* Revision 2.50  90/06/18  16:36:11  apratt
-* Changed date to 6/16/90, boot color to dark blue  (n.b. was a sky blue
-* before; "blue" isn't descriptive enough).
-* 
-* Fixed a BIG BUG: ttwait/ttdelay used STMFP timer A, not TTMFP timer A
-* as intended.
-* 
-* Clobbering code now clobbers PMMU, cache, VBR, and FPU with frestore of
-* null state.
-* 
-* Hit a key to stop the boot delay, then do a warm boot within 90 sec:
-* now you don't wait again.
-* 
-* 
-* Revision 2.49  90/05/21  12:16:46  apratt
-* Moved some conditionals around, changed boot color to green.
-* This rev (cross your fingers) could be sent to developers, etc.
-* 
-* Revision 2.48  90/05/16  11:54:21  apratt
-* Added some ifne TT conditionals, so it compiles for not-TT.
-* Also changed boot color to dark blue, because light blue was taken.
-* 
-* Revision 2.47  90/05/09  16:45:37  apratt
-* Added _FPU cookie; see the comments there for details.
-* Boot color: sky blue.
-* 
-* Revision 2.46  90/04/30  18:44:45  apratt
-* Changed Getmpb call to conform to new GEMDOS style: one MD for both
-* ST RAM and alternative RAM, with the low bit of the block start address
-* nonzero for alt. RAM.
-* 
-* Noblank and noblank1 clobber Timer B always, so it doesn't survive a rez
-* change ever -- see comments there.
-* 
-* Added nvmaccess call to XBIOS list ($2e).  It's implemented in clock.s.
-* 
-* Revision 2.45  90/03/19  16:00:50  apratt
-* Changed TT to TT+STPLUS w.r.t. SCU: catch & ignore bus errors in the
-* init code for SCU so it runs on either STe or Mega STe.
-* 
-* Fixed the out-of-range check for Bcon* functions: was (devno > maxdev)
-* but is now (devno >= maxdev).
-* 
-* Revision 2.44  90/03/02  17:45:44  apratt
-* This rev is the source for the 3/1/90 ROM.
-* 
-* Revision 2.43  90/03/02  10:39:08  apratt
-* Added a comment to the effect that anybody who programs Timer B
-* to a value of 1 (that is, interrupt every time) will defeat
-* noblank/noblank1 processing.  I don't want to actually WRITE
-* to Timer B's data register in noblank, since it would kill
-* somebody's real programming, but there is this danger.
-* 
-* initmfp in bios.s now writes 0 (meaning 256) to Timer B's data
-* register, so if NOBODY uses it, it will have a legal value (not 1).
-* 
-* Revision 2.42  90/03/01  17:10:51  apratt
-* Added equates for TTMFP: ttgpip, ttiera, etc.
-* Fixed ttwait, stwait for new equates.
-* Added use of noblank, rather than vwait: see comments at noblank.
-* Noblank1 is similar, but returns via rts.
-* Fixed a some things causing STe not to work.
-* Removed restriction (in findpackages) that phystop be on a 1K boundary.
-* 
-* Revision 2.41  90/02/26  17:27:28  apratt
-* Fixed up conditionals, using else rather than endc/if. Added stwait,
-* using STMFP timer A for delays, suitable for delays during boot
-* (applications can use timer A later on). Used calls to dowait in boot,
-* (stwait or ttwait as appropriate), to replace ttwait in TT, and
-* instruction loops in not-TT. Removed VBLQ1ST once and for all - now
-* vblq is always 1st. Hope this doesn't hurt if we ever build ST ROMS
-* again! Changed _term to use dc.w's to get what I'm after: a jsr (not
-* bsr) to the next instruction.
-* 
-* Revision 2.40  90/02/22  17:51:41  apratt
-* Changed bootup BG color from yellow to magenta.  Added moveq #0,d0
-* to clear screen so it doesn't turn green.  Removed twin color
-* tables: $f is full-magnitude on STe and TT, and eq to $7 on ST.
-* 
-* Revision 2.39  90/02/16  16:50:17  apratt
-* Fixed an oops in the startup code which made RAM TOSes not work. Also,
-* initialize ssp to its ultimate destination (_supstk+supsiz) rather than
-* $8000 at reset4.  Also, after reset4, changed to clear from the start
-* of the BSS which needs clearing (that is, endosbss) to the true end of
-* the BSS: endaesbss in ROM systems, ostext in RAM.
-* 
-* Default boot-up rez code changed: if no mono detect, ST LOW; else
-* ST HIGH or TT HIGH as appropriate.
-* 
-* MMU code works, and is now enabled.
-* 
-* Revision 2.38  90/02/02  14:17:54  apratt
-* Reordered entire startup sequence to improve clarity and
-* function.  Cold boot for TT is defined as "ttscu1 bit 0 is clear."
-* This happens on power-up only, not on reset-button or keyboard
-* reset.  (Keyboard cold boot clears the bit, though.)  The
-* distinction is not well tested.
-* 
-* Also added code necessary for Bconmap functions to work.
-* 
-* Revision 2.37  89/12/28  15:35:09  apratt
-* Moved the line which sets the refresh rate for fast RAM.  Now
-* it's outside the ROM/RAM conditional, and most of all outside
-* the coldboot/warmboot conditional.  Turns out fast RAM
-* decays faster, so it might not be valid even when slow RAM is.
-* This won't hurt anything, since nothing in fast RAM is presumed
-* valid across a warm boot.  Not by the OS, anyway.
-* 
-* Also added 'moveq.l #0,d0' to some of Slavik's calls so they
-* don't return garbage in the high parts of d0.
-* 
-* Revision 2.36  89/12/08  15:45:14  apratt
-* Fixed Lozben's fatfinger in _setscreen concerning wvbl.
-* Also changed TT background color to blue: it's nonwhite, so you
-* know this is not the final ROM (per LT), but it's not black,
-* so you can tell your TT is doing something.
-* 
-* Revision 2.35  89/12/06  14:03:49  apratt
-* In the reset-bailout vector test, there are some sanity checks.
-* One of them checks to be sure that the high byte of the vector is 00.
-* This is OK on ST and STE, but not TT, so I made it conditional.
-* 
-* Revision 2.34  89/10/23  18:37:17  lozben
-* Set the rez shadow register when setting the shifter on the TT.
-* 
-* Revision 2.33  89/10/03  12:41:40  apratt
-* Added VBLQ1ST switch (in *this* file, not switches.s) which, when
-* nonzero, moves the VBL queue processing to the beginning of
-* the VBLANK handler, not the end.  VDI likes this so it has more
-* time to draw the mouse before the beam starts painting it.
-* (This was MOVEVBL, then removed, and now it's back.)
-* 
-* Revision 2.32  89/09/22  16:43:29  apratt
-* THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
-* No functional changes from previous revision, which is the last to
-* require Alcyon's AS68 assembler.
-* 
-* Revision 2.31  89/09/21  13:40:41  apratt
-* The vbl part of Setscreen() copied the new palette to TT regs
-* rather than ST regs -- now it copies to the ST regs always.
-* This was a vestige of bit-shifting in software, now unnecessary.
-* 
-* Revision 2.30  89/09/18  13:35:33  apratt
-* Removed LONGFRAME conditional assembly: now LONGFRAME is all there is.
-* Removed code which emulated STE color registers; it turns out
-* that the TT shifter's ST-compatible registers *are* like STE regs.
-* Added code to retry _dmaread if it returns a "retryable" error
-* (other than timeout).
-* 
-* Revision 2.29  89/09/07  16:29:00  apratt
-* Changed date & dosdate and added 'check' to date lines.
-* 
-* Revision 2.28  89/09/05  17:49:47  apratt
-* Fixed dumb bug in setpalette code for TT.  Works now.
-* 
-* Revision 2.27  89/08/30  16:02:43  apratt
-* Added def_frb variable, set to the value that the _FRB cookie gets.
-* Zero if no fast RAM.  Added moving end_os up by 64K as well as _membot.
-* Added code to match the boot spec: scan of bootable devices stops
-* when hdv_rw changes.  Cut bomb-handler delay from 1 sec to 0.5 sec.
-* 
-* Revision 2.26  89/08/30  15:18:42  lozben
-* Fixed a bug in _EsetShift().
-* 
-* Revision 2.25  89/08/29  17:36:45  apratt
-* Added code (two lines) to set GEMDOS date/time when XBIOS Settime()
-* call is made.
-* 
-* Revision 2.24  89/08/28  21:01:16  kbad
-* Changed mushroom code to get rid of the LUT for initial screen offset,
-* since there are only two of them (and TT res offsets are > word length)
-* 
-* Revision 2.23  89/08/28  19:03:23  kbad
-* Fixed(?) bomb handler for all resolutions.  Also fixed a couple of
-* fatfingers at dmaboot. (_diskbufp != _dskbufp !!!)
-* 
-* Revision 2.22  89/08/25  18:46:04  lozben
-* Fixed a bug in EsetShift().
-* 
-* Revision 2.21  89/08/25  15:38:36  apratt
-* Added new dma boot code which calls _dmaread, and added _dmaread
-* as XBIOS call $2a.
-* 
-* Revision 2.20  89/08/25  12:23:16  lozben
-* EsetShift() now always returns old shift mode register value.
-* 
-* Revision 2.19  89/08/24  16:54:58  lozben
-* Added EgetShift() and EsetShft() xbios function calls. Deleted
-* EsetRez() and EsetPhysBase() xbios function calls.
-* 
-* Revision 2.18  89/08/18  13:44:47  apratt
-* All changes are TT only:  added _FRB cookie pointing to a 64K buffer
-* in slow RAM for ACSI transfers to/from fast RAM.  Only present if there
-* is any fast RAM.
-* 
-* Changed bomb handler to get the exception number from the stack frame.
-* 
-* Changed Setcolor and Setpalette so, to the caller, the RGB values
-* are like STe (hi-order bit is least significant).
-* 
-* Revision 2.17  89/07/31  12:08:51  apratt
-* Added .globl clrcache directive.
-* 
-* Revision 2.16  89/07/29  21:40:50  kbad
-* Put the reset back at reseth.  It was a gratuitous incomprattibility.
-* 
-* Revision 2.15  89/07/28  20:59:12  apratt
-* Changed delay for DMA command bytes and data to count time from
-* power on, not from when we started looking.  This makes warm boots
-* happen fast.
-* 
-* Note that the 'reset' instruction at reseth was taken out.
-* I sure hope it wasn't necessary, and some devices (esp. SCSI) really
-* hated it.
-* 
-* Revision 2.14  89/07/27  18:06:22  apratt
-* Added kcl_hook and bell_hook variables and initializations.
-* Added _SWI cookie and set bit 1 of _SND based on bit 7 of _SWI.
-* 
-* Revision 2.13  89/07/26  19:42:08  apratt
-* Final BIOS for STPLUS: Added cookie jar, full-volume DMA sound,
-* added hard-disk boot delay, backed out MOVEVBL.
-* 
-* Note: _longframe code is still dumb: it checks on every trap & RTE.
-* 
-* Revision 2.12  89/07/20  15:36:50  apratt
-* Changed ttdelay code to use TTMFP timer A.  Also added code to catch
-* the return from Rwabs calls and clobber the cache if the operation
-* was a read.  (This is a lose for ramdisks and drivers which do it
-* on their own, but it's a win because you can use ST drivers.)
-* 
-* Revision 2.11  89/07/19  13:58:39  apratt
-* Added ttwait/ttdelay calls to remove some instruction-loop
-* delays.  These entry points are also used by bios.s and flop.s.
-* 
-* Revision 2.10  89/06/15  15:43:11  apratt
-* Changed STPLUSVIDEO to STPLUS, because it covers everything STPLUS
-* unique (DMASND covers other things).  Changed version number to 1.6,
-* and date to 6/16/89.  Added STPLUS memory sizing.  The BIOS revs
-* with this date or earlier are correct for STPLUS (now called STE).
-* I think.
-* 
-* Revision 2.9  89/05/10  14:00:24  apratt
-* Added MOVEVBL switch to make vblqueue happen early in vblank.
-* Moved memory clearing around so the screen clears early on as before.
-* (Previous rev had a substantial delay between power-on and clear screen.)
-* 
-* Revision 2.8  89/04/17  14:43:48  apratt
-* Added mwdata and mwmask equates... Oops.
-* 
-* Revision 2.7  89/04/17  13:26:22  apratt
-* Added the new system variable _sysflags, definition TBD ($5a0)
-* 
-* Added fast-RAM refresh & sizing for TT.  Includes new system variables
-* _ramtop ($5a4), and _ramvalid ($5a8), which is validated with rammagic.
-* 
-* Added programming the volume/tone generator for a sane volume & tone,
-* and to mix the GI sound with the DMA sound.
-* 
-* Added DMAINV assembly-time switch: set to 1 if DMASND and the DMA chip
-* inverts MONOMON when it's IDLE.  Will go away one day.
-* 
-* Slight changes elsewhere.
-* 
-* Revision 2.6  89/03/30  04:35:49  kbad
-* Changed return code of _term from 1 to -1 ($ffff), "error."
-* 
-* Revision 2.5  89/03/23  17:32:00  apratt
-* Added real memory controller programming and memory sizing for TT.
-* The memory sizing is actually not TT-dependent.
-* Also fixed some things in the DMA SOUND vblank handler... Now
-* it really works.
-* 
-* Revision 2.4  89/03/22  13:48:22  apratt
-* Changed monochrome detect code in vblank -- it would wait until GPIP
-* read the same way twice, which might *never* happen.  Now it waits
-* until bit 7 of GPIP reads the same way twice, which is more common.
-* 
-* Revision 2.3  89/03/09  08:32:06  apratt
-* Fixed priv handler -- correct one got lost in folding-in process. (TT only)
-* 
-* Revision 2.2  89/03/08  15:59:37  apratt
-* Contains Slavik's Xbios calls & other changes for TT.  Insignificant
-* changes if not TT.  Some things are conditional on STPLUSVIDEO+TT,
-* which is meant to be an OR of those two assembly-time conditions.
-* 
-* Revision 2.1  89/02/21  17:23:11  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.35  89/02/17  12:09:32  apratt
-* Fixed byte-count for clearing screen at clrm_2, and
-* fixed priv handler: must clear & disable caches after clobbering
-* the instruction, then restore cacr to its previous value.
-* 
-* Revision 1.34  89/02/12  20:23:32  kbad
-* changed version, date, and dosdate equates from `=' to `equ'.  It seems
-* that as68 doesn't like `=' assignments inside conditional statements.  Urk.
-* 
-* Revision 1.33  89/02/08  17:45:15  apratt
-* Backed off screen base to phystop-$25800 for TT (in two places).
-* 
-* Revision 1.32  89/02/07  13:00:59  apratt
-* made priv handler conditional on LONGFRAME, not TT
-* 
-* Revision 1.31  89/02/06  21:55:55  apratt
-* Little (but frustrating!) bug fixes so TT would work.
-* 
-* Revision 1.30  89/02/06  15:17:41  apratt
-* Oops - left out _termtab.
-* 
-* Revision 1.29  89/02/06  13:22:23  apratt
-* Added TT code.  No change if you set TT = 0.  EXCEPT:
-* bombs now cause Pterm(-1) to be called, rather than Pterm0().
-* TT code is prototypical, esp. in memory sizing.
-* 
-* Revision 1.28  89/02/06  12:39:45  apratt
-* Split STPLUS conditional assembly into STPLUSVIDEO and DMASND, because
-* DMASND is true for TT as well, but STPLUSVIDEO isn't.  This
-* is in preparation for adding TT conditional assembly.
-* 
-* Revision 1.27  89/01/23  11:43:21  kbad
-* Restored `nop' after jsr in _term, it's required because of dumb AS68.
-* 
-* Revision 1.26  89/01/13  15:41:07  apratt
-* NO CODE CHANGE: just comment changes around trp13tab and trp14tab
-* documenting assigned BIOS and XBIOS function numbers.
-* 
-* Revision 1.25  88/12/30  11:42:22  apratt
-* Change for STPLUS only: dbasell was defined as the address of the
-* register as a WORD, but was being used as a byte.  Now it's the
-* address as a byte.  Also, D.RENN assures me that the register's low-
-* order bit will always read as zero, so I don't need to mask it out.
-* 
-* Revision 1.24  88/12/21  11:01:45  apratt
-* Fixed two places where (a5) was used when a5 wasn't clear.
-* Oops.  Also updated some comments before 'reset2' with cleverer
-* reset-handler instructions (just comment change here).
-* 
-* Revision 1.23  88/12/13  16:35:41  apratt
-* Added lots of (a5)'s for otherwise-long addresses, both low RAM
-* and high I/O space.
-* 
-* Revision 1.22  88/12/13  14:43:44  apratt
-* Added some code for STPLUS: more proper use of the low-byte-of-video-base
-* register (and an equate for it: dbasell), and DMASND code which works
-* for the latest board (with MONOMON and DMASND XORed together) including
-* resetting DMASND during the boot, and handling the XOR case during
-* boot and in VBLANK.  Also the new default color palette for STPLUS: 7's
-* become F's.
-* 
-* Revision 1.21  88/12/06  17:02:06  apratt
-* Added a system variable at $59e: _longframe.  It's zero if you're
-* on a 68000, nonzero otherwise.  This is used on entry and exit
-* for BIOS/XBIOS (at "traph") so we can deal with the extra word
-* on the stack for 680[1-3]0 exception frames.  MASSIVELY UNTESTED,
-* and almost no change if you leave LONGFRAME equ 0.
-* 
-* Revision 1.20  88/12/06  16:24:23  apratt
-* Added code for STPLUS to fix the check for MONOMON in the Vblank
-* handler: it gets inverted when the DMA sound is active, so this code
-* has to un-invert it.  It's not quite bulletproof, but it should be
-* pretty damn rare that a spurious reset sneaks through.  Well-nigh
-* impossible, I hope.
-* 
-* Only a tiny code change if not STPLUS.
-* 
-* Revision 1.19  88/11/28  11:16:44  kbad
-* Put the magic back in.  Dungeon Master was depending on the AES magic
-* to reclaim the AES BSS after the boot sequence takes it away.  This
-* is deemed a Good Feature - 12K is no small potatoes on a 520 ST.
-* 
-*
-* Revision 1.18  88/11/16  15:10:19  apratt
-* Added STPLUS assembly-time flag.  Set to 1 for ST PLUS, 0 for ST.
-* This flag influences the following:
-* Physbase/Setscreen: read & write new low-byte-of-display-base register.
-* Setcolor: after reading color register, masks with $0777 for ST, $0fff
-* for STPLUS.
-* No other changes required for ST PLUS.  Even screen dump is fine.
-* 
-* Revision 1.17  88/11/02  15:21:19  apratt
-* Backed out clearing of _bootdev; caused more pain than it's worth.
-* Specifically, people with bootable ramdisks (!) became unhappy.
-* 
-* Also added code to set GEMDOS time from IKBD if real-time clock chip
-* doesn't exist or has a bad time, and if IKBD has a good time.
-* JWT says IKBD clock is defined as starting up at 0/0/00, which is
-* an unambiguously illegal date.
-* 
-* Revision 1.16  88/10/12  17:25:57  apratt
-* Added table entry for floprate call: see flop.s for more.
-* 
-* Revision 1.15  88/10/03  15:01:09  kbad
-* Incorporated changes for new build method (several things were made
-* obsolete -- look for the keyword "newbuild" to find these changes).
-* 
-* Revision 1.14  88/09/21  15:08:19  apratt
-* Whoops.. dmaread claimed to try twice, but really tried once.
-* Now it tries twice.
-* 
-* Revision 1.13  88/09/06  11:39:52  kbad
-* Added osconf word for denmark.
-* 
-* Revision 1.12  88/05/06  16:06:38  apratt
-* In dmaread: removed "retry on no error/no data" and replaced it
-* with "retry on any error" (except timeout).
-* 
-* Revision 1.11  88/05/05  13:41:04  apratt
-* Added clr.w _bootdev to startup sequence, to fix bootable hard disk
-* bug (when using ALT to avoid HD boot, A:\auto doesn't get executed).
-* This was because GEMDOS set the current drive based on _bootdev,
-* which wasn't getting cleared by anybody.
-* 
-* Revision 1.10  88/05/03  15:09:56  apratt
-* Added comments as relates to the version number and problems with
-* First Byte's Kid series of software -- you get address error unless
-* the version number is even.  See comments above 'systype' for more
-* information.
-* 
-* Revision 1.9  88/04/28  16:08:09  apratt
-* Backed out table entry for Flopwp XBIOS call. See flop.s for more.
-* 
-* Revision 1.8  88/04/22  13:07:53  apratt
-* Fixed dmahi to dmahigh in dmaread (slip of the finger...)
-* 
-* Revision 1.7  88/04/08  17:45:24  apratt
-* Backed out reset bail-out vector fix -- leave it broken.  The workaround
-* is to return to the reset code via "jmp $24(a6)" rather than
-* with "jmp (a6)" as advertised.  THE RESET CODE CAN'T CHANGE thanks to this.
-* 
-* Revision 1.6  88/04/05  17:47:50  apratt
-* Changed Flopwp call to Xbios $29 because of internal versions of AKP's
-* debugger, which uses $28.  Must keep Xbios $11 unused.
-* (Newer versions of the debugger use Xbios calls $11 and $F000)
-* 
-* Revision 1.5  88/03/31  15:58:23  apratt
-* <BACKED OUT -- SEE VERSION 1.7 NOTES>
-* 
-* Also fixed some bsr's to jsr's so gemdos can be far away from here.
-* 
-* Revision 1.4  88/03/28  11:46:47  apratt
-* Added Flopwp call (Xbios call $29).  Actual code is in flop.s
-* 
-* Revision 1.3  88/03/18  16:16:59  apratt
-* Added code to dmaread: retry the read if the first one succeeds (status
-* code 0 (no error)) but the DMA counter hasn't changed.
-* The removable-media drives we have use this to signal media change.
-* 
-* Revision 1.2  87/11/25  18:17:00  lozben
-* Added new flags for finland, norway, and turkey.
-* 
-* Revision 1.1  87/11/20  14:24:44  lozben
-* Initial revision
-* 
-*
-* Revision 2.57  90/08/03  13:23:45  apratt
-* TTOS FINAL RELEASE
-* $Revision: 2.57 $
+* $Revision: 2.58 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
-*+
-*	--- Switch and country definitions (never change these):
-*-
 * =======================================================================
-rom		=	0 ***DON'T  CHANGE***	; system in 192K ROM
-ram		=	1 ***DON'T  CHANGE***	; system loaded in RAM
-
-usa		=	0 ***DON'T  CHANGE***
-germany		=	1 ***DON'T  CHANGE***
-france		=	2 ***DON'T  CHANGE***
-uk		=	3 ***DON'T  CHANGE***
-spainpal	=	4 ***DON'T  CHANGE***	PAL  version
-spain		=	5 ***DON'T  CHANGE***	NTSC version
-italy		=	6 ***DON'T  CHANGE***
-sweden   	=	7 ***DON'T  CHANGE***
-swissfra   	=	8 ***DON'T  CHANGE***
-swissger 	=	9 ***DON'T  CHANGE***
-turkey		=      10 ***DON'T  CHANGE***
-finland		=      11 ***DON'T  CHANGE***
-norway		=      12 ***DON'T  CHANGE***
-denmark		=      13 ***DON'T  CHANGE***
-*+
-*		         ***CHANGE THESE (DOWN HERE)***
+*
 *************************************************************************
-*		||		||		||		||
-*		||		||		||		||
-*	       \\//	       \\//	       \\//	       \\//
-*		\/		\/		\/		\/
-*
-*
 
 *************************************************************************
 *
@@ -580,6 +62,7 @@ denmark		=      13 ***DON'T  CHANGE***
 * In addition, the target of the short branch at reseth must not 
 * be more than $3e bytes away, for the same reason (bus error when
 * reading RAM address >3fffff).
+*
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
 *
@@ -588,6 +71,11 @@ denmark		=      13 ***DON'T  CHANGE***
 * The switches TT, STPLUS, systype, and country
 * are all moved to the file "switches.s" which is normally a copy
 * of one of the canned switch settings files.
+* When USEDB is set, the startup will initialize a remote-debugger stub
+* just before initializing GEMDOS.
+
+USEDB		equ	0
+
 
 .include "switches.s"
 
@@ -604,237 +92,43 @@ DMASND		equ	1
 DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
-.ifeq TT
-version		equ	$0106		; version number *MUST BE EVEN*
-date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
+.ifne STPLUS
+version		equ	$0200		; version number *MUST BE EVEN*
+date		equ	$08201990	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001001111110 ; Mar 30, 1989
+dosdate		equ	%0001010100010100 ; August 20, 1990
 .else
+.ifne TT
 version		equ	$0300		; version number (need not be even)
 date		equ	$08011990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010100000001 ; August 8, 1990
-.endc
-
-.ifne TT
-bootcolor	equ	$fff		; WHITE for TT production ROMs (!)
+dosdate		equ	%0001010100000001 ; August 1, 1990
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
-bootcolor	equ	$fff		; white for production ROMs
+version		equ	$0142
+date		equ	$08011990
+*			 YYYYYYYMMMMDDDDD
+dosdate		equ	%0001010100000001 ; August 1, 1990
+.endc
 .endc
 
-*******************************************************************************
-*+
-*  Country-specific configuration word (os_conf)
-*
-*			%cccccp
-*			      p = pal/ntsc (0 = ntsc, 1 = pal)
-*			     cc = country (0 = usa, ...)
-*
-*-
- ifeq country-usa
-osconf		equ	%00000
-.endc
-
- ifeq country-germany
-osconf		equ	%00011
-.endc
+* The date is now in another file, which is updated automatically
 * in the makefile.  date and dosdate are imported here for use in
- ifeq country-france
-osconf		equ	%00101
-.endc
+* the OS header.
+
+.globl date
+.globl dosdate
+
+version		equ	(vershi * $100) + verslo
+
 bootcolor	equ	$fff		; WHITE for production ROMs
- ifeq country-uk
-osconf		equ	%00111
-.endc
-
- ifeq country-spainpal
-osconf		equ	%01001
-.endc
-
- ifeq country-spain
-osconf		equ	%01000
-.endc
-
- ifeq country-italy
-osconf		equ	%01011
-.endc
-
- ifeq country-sweden
-osconf		equ	%01101
-.endc
-
- ifeq country-swissfra
-osconf		equ	%01111
-.endc
-
- ifeq country-swissger
-osconf		equ	%10001
-.endc
-
- ifeq country-turkey
-osconf		equ	%10011
-.endc
-
- ifeq country-finland
-osconf		equ	%10101
-.endc
-
- ifeq country-norway
-osconf		equ	%10111
-.endc
-
- ifeq country-denmark
-osconf		equ	%11001
-.endc
-
 
 *************************************************************************
 *									*
-*	Copyright 1984, 1985, 1986, 1987 Atari Corp.			:
+* The country-specific configuration word 'osconf' is now an equate	*
 * which is exported from BIOS.S and imported here for placement		*
 * in the OSHEADER.  That way, this file has no country dependencies.	*
-*-----									:
-* 18-Mar-1987 lmd	Removed call to 'esce' [not important anyway].	:
-*			 Clear '_drvbits' on reset.			:
-* 16-Mar-1987 lmd	Placed JMP in 'hdrcopy' before the actual header:
-*			 and modified 'copy_header' to hack the instrs	:
-*			 appropriately.  Four longwords just past the	:
-*			 header now contain pointers to critical var-	:
-*			 iables, plus one reserved location.		:
-* 27-Feb-1987 lmd	Modified header-copy routine to copy the entire	:
-*			 header, not just the first $20 bytes of it.	:
-*			Also must maintain the size of 'hdrcopy' in BSS.:
-* 11-Feb-1987 lmd	Added pointers to "hidden" variables, just after:
-*			 the OS header, so we can get to them later.	:
-* 10-Feb-1987 lmd	Fixed masking bug in Blitmode().		:
-*  9-Feb-1987 lmd	Added blit support (_TEST_BLT, changed blit	:
-*			  initialization code slightly, added BIOS call	:
-*			  number 64 to get/set blit mode, Blitmode()).	:
-*			Added code that moves the character device	:
-*			  jump table into RAM, so it can be re-directed	:
-*			  later (for shell and window system use in the	:
-*			  future).					:
-*									:
-* 19-jan-1987 rms	Fix to mouse init code. We now send a reset to  :
-*			the keyboard after the ikbd response. This code :
-*			has been moved to this file.			:
-* 13-Jan-1987 lmd	Added 'pun_ptr' and bumped the new memory check	:
-*			variable up a longword [for AHDI driver].	:
-*  6-Jan-1987 lmd	Added fix to memory clear; position screen at	:
-*			end of memory (so it is cleared almost immed-	:
-*			iately).  Sped up that clear with multiple	:
-*			MOVEM instrs.					:
-* 23-Dec-1986 lmd	Set '_date' directly (without calling GEMDOS)	:
-* 18-Dec-1986 rms	New feature blt_init. Call to this routine	:
-*			to set the system to use the blit chip.		:
-*-----									:
-* 15-Dec-1986 rms	Due to mixup on hard disk driver legal tos	:
-*			roms test, the ascii date in the header of the	:
-*			roms needs to be the gemdos date word		:
-*-----									:
-* 11-Dec-1986 lmd	Fixed bus-error problem in memory size probe.	:
-*			Added another cold-reset variable.		:
-*			Added RICOH clock chip handler.			:
-*			Unused vectored interrupts point to an RTE.	:
-*									:
-*-----									:
-* 14-Apr-1986 lmd	Fixed bug in `dmaread' that locked up DMA bus if:
-*			more than one hard disk was attached.		:
-*-----									:
-* 02-Feb-1985 lmd	Converted from CP/M BIOS.			:
-* 24-Feb-1985 lmd	I munge this file every day.			:
-* 25-Feb-1985 lmd	Added _cmdload flag (load COMMAND.COM from disk):
-* 25-Feb-1985 lmd	Changed _get_mpb, added "hard_reset" conditional:
-*			assembly switch.				:
-* 27-Feb-1985 lmd	Added hard disk hooks.				:
-*  1-Mar-1985 lmd	Added _supstk (from GEMDOS)			:
-*  1-Mar-1985 lmd	Added _mediach BIOS function			:
-*  4-Mar-1985 lmd	Added 'cartscan' and associated calls to it	:
-*  7-Mar-1985 lmd	Integrate new character I/O			:
-*  8-Mar-1985 lmd	Critical error handler, random trap hacking	:
-*  9-Mar-1985 lmd	BIOS traps are re-entrant to 3 levels, and	:
-*			callable from user mode.			:
-* 10-Mar-1985 lmd	Consolidated BSS, installed "extended" traps	:
-* 15-Mar-1985 lmd	Re-integration with RBIOS.  200hz raw sysTick	:
-* 16-Mar-1985 lmd	Warmstart banished.  Procdump on uncaught traps	:
-* 27-Mar-1985 lmd	Added "_scrdmp" trap#14 function		:
-* 27-Mar-1985 lmd	Added "getshift" trap#13 function		:
-*  8-Apr-1985 lmd	Re-integration with serial code			:
-*  8-Apr-1985 lmd	Moved floppy/FIFO lock to public basepage	:
-*  9-Apr-1985 lmd	get/set shift bits (trap #13, $0b)		:
-*  9-Apr-1985 lmd	Added _dskbufp -> _diskbuf			:
-* 13-Apr-1985 lmd	Added _autopath (autoexec path pointer)		:
-* 15-Apr-1985 lmd	Happy IRS day.					:
-* 15-Apr-1985 lmd	Moved _vblqueue to low memory (thank Ghu!)	:
-* 17-Apr-1985 lmd	Added _prtblk primitive				:
-* 17-Apr-1985 lmd	Hblank (vector interrupt #2) hacks caller's IPL	:
-*			to 3.						:
-*  1-May-1985 lmd	Added supexec() & wvbl() extended functions	:
-*  8-May-1985 lmd	RAM-loaded system wired 'memcntrl' to 512K;	:
-*			now it takes whatever the boot ROMs give it.	:
-*  9-May-1985 lmd	Added _asc_out to character device table.	:
-* 15-May-1985 lmd	Moved _cursconf to escape module.		:
-* 23-May-1985 lmd	Added 'magic' parameter -- makes it easy to	:
-*			blow the GEM AES away.  Huzzah!			:
-* 24-May-1985 lmd	Added mushroom cloud display on processor	:
-*			exception, out of sheer boredom.		:
-* 28-May-1985 lmd	Added new _prtblk.  Screen dump understands high:
-*			quality print mode.				:
-*  3-Aug-1985 lmd	Fixed _prtcnt interface, fixed mushroom display :
-*			for high-rez mode, new mushroom graphics.	:
-* 13-Aug-1985 lmd	Added 'dmaboot()'; attempts to load boot sectors:
-*			from devices on the DMA bus (wheee!).		:
-* 13-Aug-1985 lmd	Do dos SETDATE() call to set date from word in	:
-*			the OS header.  (Kludge, kludge, kludge...)	:
-* 28-Aug-1985 lmd	Fix dmaboot(); sector count should have been	:
-*			1, not 0.					:
-* 28-Aug-1985 lmd	Fix monochrome problem on reset (screen messes	:
-*			up) by letting vblank set shiftmd and sshiftmd	:
-* 28-Aug-1985 lmd	Inquire ikbd date and time; set system date and	:
-*			time from ikbd if reported month and day is	:
-*			nonzero.					:
-* 29-Aug-1985 lmd	Ikbd date/time hack didn't work because of an	:
-*			ikbd bug.  Ripped it out.  F'it.		:
-*  3-Sep-1985 lmd	Added 'scr_dump' vector (for foriegn printer    :
-*			drivers).  goo goo ga ga ga			:
-*  6-Sep-1985 lmd	Fixed "screwed-up-screen" problem, powerup in	:
-*			monochrome.					:
-*  6-Sep-1985 lmd	Fixed it again.  [well, not really]		:
-*  9-Sep-1985 lmd	Monochrome's "window of vulnerability" is longer:
-*			than color's -- have to wait 2 to 3 ms extra	:
-*			before changing hardware's shift-mode bit, or	:
-*			the screen gets screwed up.			:
-* 10-Sep-1985 lmd	Increase supstk size to 3K.			:
-* 11-Sep-1985 lmd	Force 'sshiftmd' to lowrez on system-reset.	:
-* 11-Sep-1985 lmd	Added patch area ($580..$7ff) and user-ram	:
-*			variables ($800..$83f).				:
-* 11-Sep-1985 lmd	Force 'vblsem' to zero before first wvbl().	:
-* 13-Sep-1985 lmd	Use Jim Tittsler's monomon setup code (oh well)	:
-*									:
-* 16-Oct-1985 lmd	Added vectoring to _prtblk() character output	:
-*			bindings.					:
-* 16-Oct-1985 lmd	Fixed bug in vbl(), not setting screen location	:
-*			correctly from BIOS variable.			:
-*									:
-* 12-Nov-1985 lmd	Fixed timing bug in PAL setup (PAL ROMS).	:
-*			Changed memory controller (memory sizing) to	:
-*			handle new (4002) memory controllers.		:
-*			Changed PATH back to its original state (with	:
-*			the path bug in).				:
-*									:
-* 16-Nov-1985 lmd	Resurrected RAM packages (soze we can install	:
-*			hard disk drivers and similar hacks).  We won't	:
-*			tell anybody about them yet...			:
-*									:
-* may-1-86		Fixed dma read code for reading multi harddisks	|
 *									*
-		text
 *************************************************************************
-
-
-
-
-
 
 *									:
 *	System Initialization for 520, 1040, MEGA STs			:
@@ -883,8 +177,9 @@ osconf		equ	%11001
 .endc
 .ifne TT
 .if TT
-.endif
 .endc
+.endif
+.endif
 .if (TT == 0)
 	.globl	_waketime		; alarm maintenance for STPAD
 .endif
@@ -1003,11 +298,6 @@ memmag3		equ	$5555aaaa	; validates 'memval3'
 bootmagic	equ	$1234		; magic checksum for boot sector
 rammagic	equ	$1357bd13	; validates 'ramtop'
 
-*---- Floppy state variables:
-dfused		equ	0		; nonzero: floppy has been accessed
-dcurtrack	equ	dfused+2	; current track#
-dseekrt		equ	dcurtrack+2	; floppy's seek-rate
-
 
 *-------------- Seriously bogus magic number:
 
@@ -1029,9 +319,6 @@ ca_name		equ	$14		; application name (NNNNNNNN.EEE\0)
 
 
 *------ Ram configuration equates
-*------ ROM addresses:
-romstart	equ $fa0000		; lowest ROM address
-romend		equ $ff0000		; first	byte not in ROM
 bank1		equ $200000		; address of 2Mb second	bank
 twomb		equ 1024*2048		; two megabytes
 one28		equ $20000		; 128K
@@ -1051,7 +338,8 @@ dbaseh		equ	$ffff8201	; display base high
 .ifne STPLUS+TT
 *--- ST PLUS shifter
 shiftmd		=	$ffff8260	; video	shift mode (resolution)
-* that the low bit of this register will always read as zero.
+
+.if TT
 ttcolor0	equ	$ffff8400	; TT background color reg
 .endc
 .endif
@@ -1061,19 +349,6 @@ ttcolor0	equ	$ffff8400	; TT background color reg
 * This register can be accessed as byte or word, and D.RENN assures me
 .endc
 * that the low bit of this register will always read as zero on STe,
-*--- DMA chip:
-diskctl		equ	$ffff8604	; disk controller data access
-fifo		equ	$ffff8606	; DMA mode control
-dmahigh		equ	$ffff8609	; DMA base high
-dmamid		equ	$ffff860b	; DMA base medium
-dmalow		equ	$ffff860d	; DMA base low
-
-*--- 1770 select values:
-cmdreg		equ	$80		; 1770/FIFO command register select
-trkreg		equ	$82		; 1770/FIFO track register select
-secreg		equ	$84		; 1770/FIFO sector register select
-datareg		equ	$86		; 1770/FIFO data register select
-
 * and the low three bits as zero on TT.
 dbasell		equ	$ffff820d	; addr of low byte of this reg
 dstride		equ	$ffff820f	; "offset to next line" in STe
@@ -1081,12 +356,6 @@ dstride		equ	$ffff820f	; "offset to next line" in STe
 *--- configuration switches (not on ST)
 conf_switches	equ	$ffff9200
 ttd_conf_switches equ	$ffff8000	; not used if not TT
-
-*------ Bits in "giporta":
-xrts	equ	8			; RTS output
-dtr	equ	$10			; DTR output
-strobe	equ	$20			; Centronics strobe output
-gpo	equ	$40			; "general purpose" output
 
 *--- GI ("psg") sound chip:
 giselect	equ	$ffff8800	; (W) sound chip register select
@@ -1352,11 +621,12 @@ user_vars:	ds.b	64		; 64 bytes for carts and things
 .if STPAD
 padmagic:	ds.l	1		; $01241960 for STPAD touch driver
 padstuff:	ds.l	10*4		; other pad variables (total 40 bytes)
+.endif
 .ifne TT
 the_env:	ds.b	20		; space for a small enviroment string
-_upref:		ds.w	1		; used in _dmaboot
 .endc
 
+defcookies:	ds.l	DEFCSIZE*2	; initial cookie jar
 _upref:		ds.w	1		; boot pref for _dmaboot
 .if TT
 ttmd:		ds.l	4		; the TT MD for fast RAM (see getmpb)
@@ -1465,6 +735,10 @@ reset1:
 	movec	d0,cacr			; invalidate & disable both caches
 
 	moveq.l	#0,d0
+	movec	d0,vbr			; zero vector-base register
+
+	pmove	tdis,tc			; clobber PMMU
+*	pmove	tdis,tt0
 *	pmove	tdis,tt1
 .ifeq systype-rom
 	dc.l	$f0390c00,tdis		; has bugs...
@@ -2107,12 +1381,26 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 * data cache) and a 68030 (which does).
 	clr.l	(a0)+			; ST machine
 .endc
+
 .ifne STPLUS
 	movec	d0,cacr		; (un-freeze data cache)
 	move.l	#$00010000,(a0)+	; STE video
+	move.l	#$00020000,(a0)+
+	move.l	#"_MCH",(a0)+
+	move.l	#$00020000,(a0)+
+.else
+	move.l	#$00010000,d0		; load d0 for normal STe
+* STPAD is one kind of STPLUS -- if we're that kind, use those values,
+
+	move.l	#mste,$8
+	move.l	#$00010001,(a0)+	; STe video w/minor 01 saying STPad.
+	move.l	#"_MCH",(a0)+
+mste:	move.l	a1,$8
+	clr.l	(a0)+
 	bra	cdone1
-	move.l	#$00010000,(a0)+	; STE machine
+
 .endc
+
 .ifne TT
 	move.l	#"_VDO",(a0)+
 	move.l	#$00020000,(a0)+	; TT video
@@ -2186,23 +1474,55 @@ gotem:	move.l	a1,$8
 * The low three bytes of the cookie is to be used by vendors who want to
 * identify their products; they should register their desires with somebody
 * (as of 4/25/91 it's Bill Rehbock).  "ATC" means Atari's 1772-clone that
+* runs reliably at the higher denisty.
 *
 * We're being cagey about this because we don't want to preannounce the
-* coprocessor; if found, the cookie value is 0000 0001.  
+* high-density floppy capability, and besides, we don't want people looking
 * at the switches directly if we can help it.  So, like DMASND, you get a
 * cookie based on a switch.
 *
 * In addition, if the switch is thrown, we set nospindelay so the floppy
 * BIOS knows you're using an Epson SMD-340 or something like it.  See
 * comments in flop.s for the rationale.
+*
+
+	btst	#$6,d0			; second switch thrown (read as 0)?
+	bne	nofdc			; no - don't even install the cookie.
+
+.globl dsb0
+	move.b	#$08,dsb0		; set this; see flop.s for more
+
+	move.l	#"_FDC",(a0)+		; install the cookie
+	move.l	#$01000000+"ATC",(a0)+	; $01 means 1.44MB; ATC means Atari's.
+
+nofdc:
+
+*
+* This is the end of the code that relies on d0 holding the value from the 
 * switches.
 *
 
-* 	0001 = SFP004 floating-point peripheral
+*
 * The FPU cookie: 0002 0000 on a TT if you have a 68881; can be changed 
-* 	0003 = 68882 definitely (currently not probed)
-* 	0004 = 68040's built-in FPU
-* 
+* to 0003 0000 by software if you know you have a 68882 and if you care.
+* The 68881 is probed regardless of what machine you're on.
+*
+* If not TT, this code catches bus error and probes for the SFP004
+* coprocessor; if found, the cookie value is 0001 0000.
+* If not found, the cookie is installed with value 0000 0000,
+* meaning no FPU.  This is to make it easy for software FPU emulators
+* to register themselves (see below).
+* All other bits and values are reserved.  It may be that other bits
+* will describe the presence of coprocessors with other CPID's.
+*
+* The low word of the _FPU cookie's value describes software floating
+* point which is installed.  Since there isn't any yet, this is
+* somewhat nebulous.  However, a zero means there is no software
+* support for line-F instructions, and the high bit of the low word
+* means whatever you've got is aware of having a 68040, so it will
+* use line-F instructions for those functions which are present in
+* that processor.
+* In addition, the next three bits (at least) describe the presence of
 * a 6888x coprocessor: a value of %001 means either 68881 or 68882,
 * %010 means 68881 explicitly, %011 means 68882 explicitly, and
 * %100 means the 68040's built-in floating-point hardware.
@@ -2213,7 +1533,7 @@ gotem:	move.l	a1,$8
 * no need for S/W emulation.  However, when you have the SFP004, you
 * might also have software that turns line-F instructions into the
 * corresponding SFP004 commands, and with a 68040, you might have
-* software that dealt with the missing FP instructions.
+* software that deals with the missing FP instructions.
 *	0001 = SFP004
 * This code always installs SOME cookie so software emulators can just
 * find the cookie & change it, rather than installing their own.
@@ -2221,8 +1541,6 @@ gotem:	move.l	a1,$8
 *	0005 = 68881 + SFP004
 *	0006 = 68882
 *	0007 = 68882 + SFP004
-.ifne TT
-.mc68881
 * probe for FPU: line-F exception means there is none.
 * Coprocessor violation does, too, but should "never happen."
 * However, it did in some machines, so here it is.  I think it
@@ -2233,37 +1551,37 @@ gotem:	move.l	a1,$8
 * instructions, and the high bit of the low word means whatever you've got
 * is aware of having a 68040, so it will use line-F instructions for those
 * functions which are present in that processor.
-	move.l	#$20000,(a0)+
+	move.l	#$00020000,(a0)+	; found 6888x: set %10 bit
 * 	LOW WORD
 * 
 * 	0000 = no software FPU emulation
-	clr.l	(a0)+			; FPU cookie zero means none found
+* 	other = Atari-assigned software version number.
 * 		High bit means S/W is 68040-FPU aware.
 *
 * Usually, the low word is zero when you have a 68881, because there's no
 * need for S/W emulation.  However, when you have the SFP004, you might
 * also have software that turns line-F instructions into the corresponding
-.else
 
+.ifeq TT
+* We only probe for SFP004 if you're not on a TT.
+* with the missing FP instructions.
 *
 * This code always installs SOME cookie so software emulators can just find
-	move.l	#fpuberr,$8		; catch bus error
+* the cookie & change it, rather than installing their own.
 *
-	move.l	#$00010000,(a0)+	; found it: cookie is 0001 0000
-	bra	fpudone
 
-fpuberr:
-	clr.l	(a0)+			; FPU cookie zero means none found
-fpudone:
+	move.l	#"_FPU",(a0)+		; always install SOME cookie
+
+* probe for FPU: line-F exception means there is none. Coprocessor
 * violation does, too, but should "never happen." However, it did in some
 * machines, so here it is.  I think it actually means there's something
 * wrong on the data bus...
-.endif
+.endc
 
 .ifne TT
 * If there's fast RAM, put the _FRB cookie in the cookie jar.
 * It points to 64K of space available for anybody to do copies
-* when attempting a Rwabs from or to fast RAM.
+* when attempting a Rwabs between TT RAM and an ACSI device.
 * Don't change this size: RAM-loaded drivers use the same buffer.
 	move.l	#nofpu,$2c
 	move.l	#nofpu,$34
@@ -2464,7 +1782,6 @@ scuberr:
 *
 * The STPAD part of this moved to the place where the sync mode and
 	bsr	noblank1		; wait until we're NOT in a vblank
-vwt_r:
 .endc
 
 .if STPAD
@@ -2665,8 +1982,28 @@ psdone:	add.l	d2,$16(sp)		; update PC for RTE
 	rte
 
 * jump here for priv violations which are not moves from sr, or mode 6.
+
 priv1:	move.l	(sp)+,a0
 	move.l	(sp)+,a1
+.ifne USEDB
+* initialize the remote debugger
+.globl _sinit
+.data
+stopmsg: dc.b	"RAM TOS and stub loaded",0
+.even
+.text
+	clr.l	-(sp)
+	jsr	_sinit
+	addq	#4,sp
+	pea	stopmsg
+	move.w	#$f000,-(sp)		; MSG_MSG
+	move.w	#$5,-(sp)		; message
+	move.w	#$b,-(sp)		; code $b for stub
+	trap	#14
+	add.w	#$a,sp
+nostop:
+.endc
+
 	movem.l	(sp)+,d0-d2
 .if M68030
 	jmp	_term			; jmp to bomb handler
@@ -2894,25 +2231,7 @@ dmab_to:
 * A simple backspace after the Nth one doesn't work because you may or may
 * not be on an N-column display, where the cursor is ALREADY on the
 * Nth one.  Sigh.
-** color cycling code: pulse with increasing blue (yellow to white)
-*
-*.ifne TT
-*	move.w	_frclock+2,d0		; get lo word of frame clock
-*	lsr.w	#2,d0			; divide by 4 ('prox 1 sec cycle)
-*	and.w	#$f,d0			; get just blue bits
-*	move.w	ttcolor0,d1		; get current color
-*	and.w	#$ff0,d1		; zero old blue bits
-*	or.w	d0,d1			; OR in new blue value
-*	move.w	d1,ttcolor0		; and write new color
-*.else
-*	move.w	_frclock+2,d0
-*	lsr.w	#3,d0			; divide by 8 ('prox 1 sec cycle)
-*	and.w	#$7,d0			; mask off just blue bits
-*	move.w	color0,d1
-*	and.w	#$ff0,d1
-*	or.w	d0,d1
-*	move.w	d1,color0
-*.endc
+* color cycling code goes here if you want any.
 
 	move.l	#$00010002,-(sp)
 	trap	#$d			; poll for char: Bconstat(2)
@@ -3215,7 +2534,7 @@ vbl11:	dbra	d7,vbl10		; loop for more	vectors
 v_read2:
 .endc
 
-*** non-STPLUS equivalent: just get the input from gpip
+*** non-DMASND equivalent: just get the input from gpip
 
 .ifeq DMASND
 	move.b	gpip,d1			; get "High Rez" input
@@ -3423,10 +2742,10 @@ _critich:
 *	6/8(sp) func#			6(usp) func#
 *	<frame word if longframe>
 *	2(sp) ret			2(ssp) ret
-	lsl.w	#2,d1			; turn d0 into longword index
+*	 (sp) SR			 (ssp) SR
 *
 .ifeq TT
-	move.l	d1,a0			; (quick and dirty test-for-negative)
+*		If the function number is invalid, RETURNS IT IN D0.
 *		This is to ensure that you can tell old ROMs from new ones:
 *		For the interrogative calls, the fn number must be used
 *		to signal the "old ROM" case.
@@ -3543,11 +2862,7 @@ trp13tab:
 
 *------ jump table for Atari BIOS extensions:
 trp14tab:
-.ifne TT
 .if (TT == 0)
-.else
-	dc.l	unimpl
-.endc
 	dc.w	65			; number of entry points
 .ifne TT
 	dc.w	96			; number of TT entry points
@@ -3650,35 +2965,27 @@ trp14tab:
 	dc.l	unimpl			; 77: assigned
 	dc.l	unimpl			; 78: assigned
 	dc.l	unimpl			; 79: assigned
+
+	dc.l	_EsetShift		; 80: TT shifter stuff
 	dc.l	_EgetShift		; 81
 	dc.l	_EsetBank		; 82
-.ifne TT
 	dc.l	_EsetColor		; 83
-.endc
 	dc.l	_EsetPalette		; 84
 	dc.l	_EgetPalette		; 85
 	dc.l	_EsetGray		; 86
-.ifne TT
 	dc.l	_EsetSmear		; 87
-.endc
 	dc.l	unimpl			; 88: assigned (more more VDI calls)
 	dc.l	unimpl			; 89: assigned
 
 	dc.l	unimpl			; 90: assigned
-.ifne TT
 	dc.l	unimpl			; 91: assigned
-.endc
 	dc.l	unimpl			; 92: assigned
 	dc.l	unimpl			; 93: assigned
 	dc.l	unimpl			; 94: assigned
 	dc.l	unimpl			; 95: assigned
-.ifne TT
 .endif
-.endc
 
 .if M68030
-.ifne TT
-.globl maptabsize, maptab
 *+
 * m030_rw: call rwabs vector, then clobber cache if it was a read.
 * This is a lose, but necessary for old drivers which don't know from caches.
@@ -3698,10 +3005,8 @@ m030_rw1:
 	jmp	b_exit			; continue exiting from BIOS
 .endif
 
-nomap:
-.endc
 *+
-	lsl.w	#2,d0			; turn into longword index
+* supexec - execute some code in supervisor mode
 *
 *-
 supexec:

@@ -308,12 +308,11 @@ ob_user(tree, obj, pt, spec, curr_state, new_state)
  *  Draw highlights around a rectangle depending on its state
  */
 VOID
-draw_hi(prect, state, clip, th, xobtype, icol)
+draw_hi(prect, state, clip, th, icol)
 REG GRECT   *prect;	/* object rectangle */
 WORD	    state;	/* NORMAL or SELECTED */
 WORD	    clip;	/* 1: set clipping rect to object itself */
 WORD	    th;		/* thickness of rectangle */
-WORD	    xobtype;	/* 3D extended object type */
 WORD	    icol;	/* interior color */
 {
     WORD	pts[12], col;
@@ -439,14 +438,14 @@ static WORD xor4tab[] = { BLACK, WHITE, GREEN, RED };
  * (used by just_draw() and ob_change())
  */
 WORD
-xor_ok(type, xtype, spec)
-WORD type, xtype;
+xor_ok(type, flags, spec)
+WORD type, flags;
 LONG spec;
 {
     WORD i, tcol, icol;
 
     if (type == G_STRING || type == G_TITLE || type == G_IBOX) return 1;
-    if (type == G_IMAGE || xtype == X_3DIND || xtype == X_3DACT) return 0;
+    if (type == G_IMAGE || (flags & IS3DOBJ)) return 0;
     if (gl_ws[13] <= 16) return 1;
 
 /* Get color word */
@@ -477,7 +476,7 @@ just_draw(tree, obj, sx, sy)
 	REG WORD		sx, sy;
 {
 	WORD		bcol, tcol, ipat, icol, tmode, th;
-	WORD		state, xobtype, obtype, len, flags;
+	WORD		state, obtype, len, flags;
 	WORD		tmpx, tmpy, tmpth, thick;
 	LONG		spec;
 	BYTE		ch;
@@ -490,9 +489,7 @@ just_draw(tree, obj, sx, sy)
 
 	pt = &t;
 
-	/* June 26 1992 - ml. */
-
-	ch = ob_sst(tree, obj, &spec, &state, &xobtype, &obtype, &flags, 
+	ch = ob_sst(tree, obj, &spec, &state, &obtype, &flags, 
 		pt, &th);
 
 	if ( (flags & HIDETREE) || (spec == -1L) )
@@ -506,7 +503,7 @@ just_draw(tree, obj, sx, sy)
 /*
  * Adjust 3d object extents & get color change/move text flags
  */
-	if (xobtype == X_3DIND || xobtype == X_3DACT)
+	if ( (flags & IS3DOBJ) )
 	{
 	    three_d = 1;		/* object is 3D */
 	    tmpx = ADJ3DPIX;
@@ -515,7 +512,7 @@ just_draw(tree, obj, sx, sy)
 	    pt->g_w += (tmpx << 1);
 	    pt->g_h += (tmpx << 1);
 
-	    if (xobtype == X_3DIND) {	/* if it's a 3D indicator */
+	    if ( (flags & IS3DACT) == 0) { /* if it's a 3D indicator */
 		mvtxt = ind3dtxt;
 		chcol = ind3dface;
 	    } else {			/* if it's a 3D activator */
@@ -527,7 +524,7 @@ just_draw(tree, obj, sx, sy)
 	{
 	/* For non-3d objects, force color change if XOR is not ok. */
 	    three_d = 0;
-	    chcol = !xor_ok(obtype, xobtype, spec);
+	    chcol = !xor_ok(obtype, flags, spec);
 	}
 
 						/* do trivial reject	*/
@@ -562,6 +559,46 @@ just_draw(tree, obj, sx, sy)
 	    case G_FTEXT:
 		  LBCOPY(&edblk, spec, sizeof(TEDINFO));
 		  gr_crack(edblk.te_color, &bcol, &tcol, &ipat, &icol, &tmode);
+	/* if it's a 3D background object, draw it in 3D color */
+	/* this can get complicated, because gr_text will always draw a white
+	 * background in replace mode. So we have to change TEXT objects
+	 * into BOXTEXT objects with the right color background and with
+	 * transparent text (and no borders)
+	 */
+		  if ( (flags & (IS3DOBJ|IS3DACT)) && icol == WHITE &&
+			 ipat == IP_HOLLOW )
+		  {
+		    ipat = IP_SOLID;
+		    switch (flags & (IS3DOBJ|IS3DACT))
+		    {
+		    case IS3DOBJ:
+		      icol = gl_indbutcol;
+		      break;
+		    case (IS3DOBJ|IS3DACT):
+		      icol = gl_actbutcol;
+		      break;
+		    case IS3DACT:
+		      icol = gl_alrtcol;
+		      /* fall through */
+		    default:	/* should never happen!! */
+		      break;
+		    }
+		    icol = gl_alrtcol;
+		    if (tmode == MD_REPLACE)
+		    {
+		      if (obtype == G_TEXT)
+		      {
+		        obtype = G_BOXTEXT;
+			tmpth = th = 0;
+		      }
+		      else if (obtype == G_FTEXT)
+		      {
+		        obtype = G_FBOXTEXT;
+			tmpth = th = 0;
+		      }
+		      tmode = MD_TRANS;
+		    }
+		  }
 		break;
 	  }
 						/* for all box types	*/
@@ -575,6 +612,26 @@ just_draw(tree, obj, sx, sy)
 	    case G_BOXCHAR:
 	    case G_IBOX:
 		gr_crack(LLOWD(spec), &bcol, &tcol, &ipat, &icol, &tmode);
+		if ( obtype != G_IBOX && ipat == IP_HOLLOW && icol == WHITE )
+		{
+		  switch (flags & (IS3DOBJ|IS3DACT))
+		  {
+		    case IS3DOBJ:
+		      icol = gl_indbutcol;
+		      ipat = IP_SOLID;
+		      break;
+		    case (IS3DOBJ|IS3DACT):
+		      icol = gl_actbutcol;
+		      ipat = IP_SOLID;
+		      break;
+		    case IS3DACT:
+		      icol = gl_alrtcol;
+		      ipat = IP_SOLID;
+		      /* fall through */
+		    default:
+		      break;
+		  }
+		}
 	    /* fall through */
 	    case G_BUTTON:
 		if (obtype == G_BUTTON)
@@ -584,7 +641,7 @@ just_draw(tree, obj, sx, sy)
 		  /* May 13 1992 - ml */
 		  if (three_d) {		/* 8/1/92 */
 		    ipat = IP_SOLID;
-		    if (xobtype == X_3DIND) {
+		    if ((flags & IS3DACT) == 0) {
 			icol = gl_indbutcol;
 		    } else {
 			icol = gl_actbutcol;
@@ -765,10 +822,31 @@ just_draw(tree, obj, sx, sy)
 	{
 	  if ( state & OUTLINED )
 	  {
-	      gsx_attr(FALSE, MD_REPLACE, BLACK);
-	      gr_box(pt->g_x-3, pt->g_y-3, pt->g_w+6, pt->g_h+6, 1);
-	      gsx_attr(FALSE, MD_REPLACE, WHITE);
-	      gr_box(pt->g_x-2, pt->g_y-2, pt->g_w+4, pt->g_h+4, 2);
+	      if ( (flags & (IS3DACT|IS3DOBJ)) != IS3DACT ) {
+		gsx_attr(FALSE, MD_REPLACE, BLACK);
+		gr_box(pt->g_x-3, pt->g_y-3, pt->g_w+6, pt->g_h+6, 1);
+		gsx_attr(FALSE, MD_REPLACE, WHITE);
+		gr_box(pt->g_x-2, pt->g_y-2, pt->g_w+4, pt->g_h+4, 2);
+	      }
+	      else
+	/* draw a 3D outline for 3D background objects: 1/18/93 ERS */
+	      {
+		gsx_attr(FALSE, MD_REPLACE, LBLACK);
+		gsx_cline(pt->g_x+pt->g_w+2, pt->g_y-3, pt->g_x+pt->g_w+2, pt->g_y+pt->g_h+2);
+		gsx_cline(pt->g_x+pt->g_w+1, pt->g_y-2, pt->g_x+pt->g_w+1, pt->g_y+pt->g_h+1);
+		gsx_cline(pt->g_x+pt->g_w, pt->g_y-1, pt->g_x+pt->g_w, pt->g_y+pt->g_h);
+		gsx_cline(pt->g_x-3, pt->g_y+pt->g_h+2, pt->g_x+pt->g_w+2, pt->g_y+pt->g_h+2);
+		gsx_cline(pt->g_x-2, pt->g_y+pt->g_h+1, pt->g_x+pt->g_w+2, pt->g_y+pt->g_h+1);
+		gsx_cline(pt->g_x-1, pt->g_y+pt->g_h, pt->g_x+pt->g_w+2, pt->g_y+pt->g_h);
+
+		gsx_attr(FALSE, MD_REPLACE, WHITE);
+		gsx_cline(pt->g_x-3, pt->g_y-3, pt->g_x+pt->g_w+2, pt->g_y-3);
+		gsx_cline(pt->g_x-3, pt->g_y-2, pt->g_x+pt->g_w+1, pt->g_y-2);
+		gsx_cline(pt->g_x-3, pt->g_y-1, pt->g_x+pt->g_w, pt->g_y-1);
+		gsx_cline(pt->g_x-3, pt->g_y-3, pt->g_x-3, pt->g_y+pt->g_h+2);
+		gsx_cline(pt->g_x-2, pt->g_y-3, pt->g_x-2, pt->g_y+pt->g_h+1);
+		gsx_cline(pt->g_x-1, pt->g_y-3, pt->g_x-1, pt->g_y+pt->g_h);
+	      }
 	  }
 
 	  if (th > 0)
@@ -803,7 +881,11 @@ just_draw(tree, obj, sx, sy)
 
 	  if ( state & DISABLED )
 	  {
-	    vsf_color(WHITE);
+	    if ((flags & (IS3DOBJ|IS3DACT)) == IS3DACT)
+	      vsf_color(gl_alrtcol);
+	    else
+	      vsf_color(WHITE);
+
 	    bb_fill(MD_TRANS, FIS_PATTERN, IP_4PATT, pt->g_x, pt->g_y,
 			 pt->g_w, pt->g_h);
 	  }
@@ -819,9 +901,9 @@ just_draw(tree, obj, sx, sy)
 
 	if (three_d) {
 	  if (state & SELECTED)
-	    draw_hi(&c, SELECTED, FALSE, thick, xobtype, icol);
+	    draw_hi(&c, SELECTED, FALSE, thick, icol);
 	  else
-	    draw_hi(&c, NORMAL, FALSE, thick, xobtype, icol);
+	    draw_hi(&c, NORMAL, FALSE, thick, icol);
 /**/
 	}
 
@@ -1102,12 +1184,12 @@ ob_change(tree, obj, new_state, redraw)
 {
 	WORD		flags, obtype, th, thick;
 	GRECT		t;
-	UWORD		curr_state,xobtype;
+	UWORD		curr_state;
 	LONG		spec;
 	REG GRECT	*pt;
 	pt = &t;
 	
-	ob_sst(tree, obj, &spec, &curr_state, &xobtype, &obtype, &flags, pt, &th);
+	ob_sst(tree, obj, &spec, &curr_state, &obtype, &flags, pt, &th);
 	thick = th;
 
 	if ( (curr_state == new_state) ||
@@ -1136,7 +1218,7 @@ ob_change(tree, obj, new_state, redraw)
 	     * the image must be redrawn by just_draw().  If they're selected,
 	     * just_draw() does the XOR box before redrawing the image.
 	     */
-	    WORD xok = xor_ok(obtype, xobtype, spec);
+	    WORD xok = xor_ok(obtype, flags, spec);
 		if ( xok || (obtype == G_IMAGE && !(new_state & SELECTED)) )
 		{
 		    bb_fill(MD_XOR, FIS_SOLID, IP_SOLID, pt->g_x+th, 
@@ -1268,7 +1350,7 @@ ob_gclip(tree, obj, pxoff, pyoff, pxcl, pycl, pwcl, phcl)
 {
 	GRECT	r;
 	LONG	spec;
-	WORD	state, xtype, type, flags, border;
+	WORD	state, type, flags, border;
 	WORD	x, y, off3d, offset;
 
 /*
@@ -1276,12 +1358,12 @@ ob_gclip(tree, obj, pxoff, pyoff, pxcl, pycl, pwcl, phcl)
  * NOTE: ob_sst() accounts for EXIT/DEFAULT button & G_TITLE outlines.
  */
 	ob_offset(tree, obj, &x, &y);
-	ob_sst(tree, obj, &spec, &state, &xtype, &type, &flags, &r, &border);
+	ob_sst(tree, obj, &spec, &state, &type, &flags, &r, &border);
 	*pxoff = r.g_x = x;
 	*pyoff = r.g_y = y;
 
 /* Get gr_inside() offset */
-	off3d = (xtype == X_3DIND || xtype == X_3DACT) ? ADJ3DPIX : 0;
+	off3d = (flags & IS3DOBJ) ? ADJ3DPIX : 0;
 
 	if (state & OUTLINED)
 	    offset = -ADJOUTLPIX - off3d;

@@ -336,6 +336,25 @@ uhex_dig(wd)
 *	indicates no message is there.
 */
 
+/*
+ * A horrible hack: Falcon TOS has a different menu setup than
+ * everyone else (including MultiTOS). In order to maintain
+ * compatibility, we re-arrange things when reading/writing
+ * .inf files. The table below gives the mapping from MultiTOS
+ * to Falcon TOS.
+ * ++ERS 1/8/93
+ */
+
+WORD inf_permute[MAXMENU+2] =
+{ 0, 1, 2, 3, 4,
+  5, 6, 7, 8, 9,
+  10, 11, 12, 13, 14,
+  15, 16, 17, 18, 19,
+  20, 21, 22, 23, 24,
+  26, 27, 28, -1, -1,
+  25
+};
+
 inf_scan( buffer )
 	BYTE	*buffer;
 {
@@ -371,13 +390,18 @@ inf_scan( buffer )
 	  	  mentable[j] = 0;
 					/* key board table	*/
 					/* read in key equivalent */
-	      	for ( j = 0; j < MAXMENU; j++ )
+/* use MAXMENU+2 instead of MAXMENU for compatibility with MultiTOS
+ * and other TOS's; that's also why we need to permute things
+ * (see table above)
+ */
+	      	for ( j = 0; j < MAXMENU+2; j++ )
 		{
 		  if ( *pcurr == '@' )
 		    break;
 
 		  pcurr = scan_2( pcurr, &envr );
-		  mentable[j] = envr;
+		  if (inf_permute[j] >= 0)
+		    mentable[inf_permute[j]] = envr;
 		}		
 	
 		break;
@@ -547,13 +571,14 @@ re_1:	    size1 = rom_ram( 3, afile, 0 );
 	shel_put( afile, INFSIZE );	/* copy to the aes buffer	*/
 
 	/* init default desktop and window color and pattern values	*/
+	/* if you change these, change the ones in geminit.c, too	*/
 
 	deskp[0] = 0x41;	/* 4 = dither, 1 = black */
-	deskp[1] = 0x43;	/* 7 = solid color, 3 = green */
-	deskp[2] = 0x43;
-	winp[0] = 0x40;
-	winp[1] = 0x40;
-	winp[2] = 0x40;
+	deskp[1] = 0x73;	/* 7 = solid color, 3 = green */
+	deskp[2] = 0x7D;	/* 7 = solid color, D = light cyan */
+	winp[0] = 0x70;
+	winp[1] = 0x70;
+	winp[2] = 0x70;
 
 	tt_color( TRUE );		/* stuff color into system var	*/
 
@@ -688,9 +713,17 @@ if_1:	  do1_alert( FCNOMEM );
 	*pcurr++ = 'K';
 	*pcurr++ = ' ';
 
-	for ( i = 0; i < MAXMENU; i++ )
-	  pcurr = save_2( pcurr, (UWORD)mentable[i] );
-
+/* Falcon TOS is different from all other TOSes in its menu structure
+ * so we permute when writing out the .INF and use MAXMENU+2 instead
+ * of MAXMENU
+ */
+	for ( i = 0; i < MAXMENU+2; i++ )
+	{
+	  if (inf_permute[i] < 0)
+	    pcurr = save_2( pcurr, (UWORD)0 );
+	  else
+	    pcurr = save_2( pcurr, (UWORD)mentable[inf_permute[i]] );
+	}
 	*pcurr++ = '@';
 	*pcurr++ = 0x0d;
 	*pcurr++ = 0x0a;

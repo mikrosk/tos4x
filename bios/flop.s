@@ -3,16 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/04 15:39:24 $
+* $Date: 88/04/05 17:45:52 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.5  88/04/05  17:45:52  apratt
+* Tested Flopwp call; it returns TRUE when there is no disk in the drive.
+* This can be overcome by doing a READ to make sure there *is* a disk
+* in the drive.  The read should come from GEMDOS (e.g. Fsfirst("A:\\*.*",-1))
+* rather than BIOS to be sure that media change is processed.
+*
 * Revision 1.4  88/04/04  15:39:24  apratt
 * Didn't do anything: don't know why it was locked.
-*
+* 
 * Revision 1.3  88/03/28  11:45:48  apratt
 * Added check-floppy-state Xbios call.  Can cause "insert other floppy"
 * message, so use this only when you would cause a swap anyway.
@@ -27,7 +33,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.4 $
+* $Revision: 1.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1162,10 +1168,10 @@ rate1:	move.w	dseekrt(a1),d0		; get the old rate
 	cmp.w	#-1,d1			; no change?
 
 _flopwp:
-	sub.w	#$c,sp		; "push" 3 dummy longs
+	sub.w	#$8,sp		; "push" 3 dummy longs
 	bsr	change		; get right disk in drive
 	beq	clrspinup
-	add.w	#$c,sp		; clean up stack
+	add.w	#$8,sp		; clean up stack
 	move.w	$4(sp),d0	; get (possibly new) dev number
 	and.w	#$1,d0		; keep only bit 0
 	lea	_wpstatus(a5),a0
@@ -1184,6 +1190,9 @@ _flopwp:
 
 	move.w	_wpstatus(a5),d0
 	or.w	d0,_wplatch(a5)	; (catch WP transitions)
+	move.b	(a0),d0		; reload the WP status as return value.
+	ext.w	d0
+	ext.l	d0
 	rts
 	tst.b	dspinflag(a1)		; return 0 or -1, not the flag itself.
 

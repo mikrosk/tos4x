@@ -1,185 +1,19 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.6 $	$Source: /u2/MRS/osrevisions/gemdos/fscl.c,v $
+* $Revision: 2.7 $	$Source: fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:40:45 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:29:54 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
-* Revision 2.6  90/08/03  13:40:45  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.5  90/05/21  12:52:12  apratt
-* Changed flush(): now only called when the buffer is valid & dirty.
-* (Also fixed a bug - bufl[buflist(n)] confused old Alcyon, and besides,
-* n was not getting each buffer's type.)
-* 
-* Added flushall(), called in ixclose, to flush all dirty buffers on all
-* drives.
-* 
-* Revision 2.4  90/04/24  10:59:14  apratt
-* Removed some conditional compilations: BIGPARTS, FASTCL, and BIGCL.
-* Those are always the case now.  Also FASTRAM is gone (see mem.c).
-* 
-* Revision 2.3  90/04/18  09:45:49  apratt
-* Fixed a bug in flush() reported by a user(!): the first pass
-* through the loop looked at the system variable space starting
-* with bufl[N] as if it were a BCB.  Worked only because b_link
-* is the first field in a BCB, and because the system variables
-* hardly ever (never?) added up to a BCB that met the qualifications
-* for writing.
-* 
-* Revision 2.2  89/04/17  17:13:58  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:18:28  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.22  88/11/18  15:07:40  apratt
-* Added line to invalidate a victim buffer.  Without this, a read error
-* when loading up the new contents of the buffer leaves the old one valid.
-* 
-* Revision 1.21  88/10/20  17:35:15  apratt
-* Fixed sign-extension bug which caused 12-bit FATs on disks
-* with >2048 clusters to fail.  Now 12-bit FATs work for up
-* to 4096 clusters, which is as it should be.
-* 
-* Revision 1.20  88/08/16  17:44:08  apratt
-* Add check: don't decrement diruse[i] past zero.  This blocks but
-* doesn't fix the diruse mismanagement bug.
-* 
-* Revision 1.19  88/08/08  17:41:40  apratt
-* Changed location of one brace in ifdefs in flush(), so vgrind would
-* not get confused.  NO CODE CHANGE.
-* 
-* Revision 1.18  88/07/12  16:01:06  apratt
-* Added CKMEDIA code to ckdrv() ... otherwise chdir, getdir, and some
-* other functions don't recognize media change.  This finally fixes
-* the last media-change bugaboo, I hope.
-* 
-* Revision 1.17  88/07/11  18:20:27  apratt
-* Fixed one line in getcl which seems to make 1K clusters work for
-* big partitions.
-* 
-* Revision 1.16  88/07/11  17:05:50  apratt
-* Added code which is compiled only if FASTCL is defined.  It speeds
-* up the two slowest FAT operations: find-first-free-cluster and
-* find-free-space.  Only works for 16-bit FATs; others still slow
-* (but, good God, not as slow as old TOS!).
-* 
-* Revision 1.15  88/07/11  16:48:03  apratt
-* Fixed FLUSHALL code so it doesn't flush RD sectors to "both FATS."
-* (Also, BIGPART in the log message below should be BIGPARTS.)
-* 
-* Revision 1.14  88/07/06  17:36:11  apratt
-* Added a macro for determining buffer list number from buffer type,
-* and new code (ifdef FLUSHALL) which writes all dirty buffers to a
-* drive when it flushes any of them (within one buffer list).  Fclose
-* still flushes all buffers on all drives.  No code change if you
-* don't define FLUSHALL.
-* 
-* Revision 1.13  88/07/06  15:10:13  apratt
-* Removed register argument declarations in xgetfree (old Alcyon
-* doesn't like them, even though in this case it worked).
-* 
-* Fixed an expression which revealed a compiler bug:
-* long x &= 0xffff; sign-extends 0xffff into -1L.  Now 32MB code
-* works with old compiler.  Works perfectly as far as I can tell.
-* 
-* Revision 1.12  88/06/30  13:21:30  apratt
-* Added BIGPART code for 32MB partitions.  Seems to work.
-* No code change if you don't define BIGPART.
-* 
-* Revision 1.11  88/06/13  15:23:38  apratt
-* Added final version of >2 sec/cl code... It gets included if you
-* define BIGCL.  Without BIGCL, there is **NO CODE CHANGE** but the
-* BIGCL code has been tested pretty well.
-* 
-* Revision 1.10  88/06/13  15:05:49  apratt
-* Header style change
-* 
-* Revision 1.9  88/05/31  12:27:29  apratt
-* Added a comment to permit >2 sectors/cluster, per comments by a
-* German developer (I forget his name).  *NO CODE CHANGE* -- just a
-* reminder if I ever want to fix this limitation.
-* 
-* Revision 1.8  88/05/02  15:03:05  apratt
-* Removed usr2xfr and xfr2usr routines; moved to rwa.s.
-* 
-* Revision 1.7  88/05/02  12:53:55  apratt
-* Removed invalidation in flush(), put it in usrio where it belongs.
-* Now data and subdirectory buffers, dirty or not, don't get invalidated
-* when they're flushed.  Usrio() still invalidates the buffers it
-* flushes, which is the only time it's necessary.
-* 
-* Revision 1.6  88/04/30  19:07:56  apratt
-* Reworked 12-bit fat code to get around a compiler bug: compiler did
-* word moves when assigning to *(char *)(&fatword).  Also, the last
-* cluster on the disk is handled correctly, unlike the previous rev (1.5).
-* 
-* Revision 1.5  88/04/29  17:34:00  apratt
-* Fixed yet another bug in getfat related to wflag... caused read-then-write
-* not to mark the FAT sector for writing.  VERY BAD BUG -- means you
-* can't use the TOS version that Slavik made on 4/29/88.  Sorry!
-* 
-* Revision 1.4  88/04/28  18:17:56  apratt
-* Use divmod rather than % and / before Getfat() (divmod now a macro).
-* Also fixed a bug in getfat which called getrec with wflag=1 always.
-* 
-* Revision 1.3  88/04/27  16:35:45  apratt
-* Added improved FAT code for 12-bit FATs, and streamlined the whole
-* getrec business (using macro Getfat and function getfat).
-* 
-* Revision 1.2  88/04/27  11:48:28  apratt
-* Backed out missing-two-cluster fix (made it dependent on
-* defining MISSING2CLFIX).
-* 
-* Revision 1.1  88/04/26  14:48:17  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.7  91/01/23  14:29:54  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
 
-/****************************************************************************\
-* 									     *
-* GEMDOS File System Cluster and Drive Handling				     *
-* (C)1986 Atari Corp.							     *
-* 									     *
-* ---- Edit history (reverse order, please): ------------------------------  *
-* 									     *
-* 20-Apr-1988 akp	Made bufl[0] the FAT *and* root dir, 1 is other.     *
-*			Also, flush doesn't invalidate buffers in list 0.    *
-*			(This is only #ifndef OLDBUF.)			     *
-* 05-Apr-1988 akp	Fixed "missing 2 clusters" bug -- limits were wrong  *
-*			because of the two non-entries in the FAT.	     *
-*			Fixes in both nextcl and xgetfree.		     *
-* 24-Mar-1988 akp	Removed checks on MGET because it panics.	     *
-* 17-Feb-1988 akp	Lintified.					     *
-* 03-Feb-1988 akp	Cleaned up REG declarations (no more q_p).	     *
-* 12-Jan-1988 akp	Removed panic messages (because MGET either works    *
-*			or panics itself).				     *
-* 13-Nov-1987 akp	Backed out media change: fatfingered other stuff.    *
-* 09-Nov-1987 akp	Added media change check in ckdrv. Shouldn't it have *
-*			been there all along? The comment about that fn	     *
-*			said it checked media change also, but it didn't!    *
-* 06-Nov-1987 akp	Added some REG declarations.			     *
-* 21-Oct-1987 akp	Lintified.					     *
-* 22-Sep-1987 akp	Added new cluster code for getcl and clfix.	     *
-*			Added initialization of m_fatrec in log().	     *
-* 17-Sep-1987 akp	Removed erroneous re-validation of buffers in flush. *
-*			The buffer argument to flush must be invalidated     *
-*			before flush returns if not a FAT buffer.	     *
-*			Added REG declarations to xfr2usr.                   *
-* 17-Jan-1986 lmd	Commented and prettified from Digital Research	     *
-* 			source code.					     *
-* 30-Jan-1986 lmd	Broken out from old FS.C			     *
-* 									     *
-\****************************************************************************/
-
 #include "fs.h"
-#include "gemerror.h"
-#include "fsdecl.h"
 
 /* 
  * macro to turn a buftyp into a buffer list number.
@@ -292,16 +126,14 @@ int drv;
  *  Flushing any buffer writes all buffers on that drive and that list.
  */
 
-flush(x_b)
-BCB *x_b;
+void
+flush(b)
+BCB *b;
 {
-  REG BCB *b;
   REG int n;
   REG int d;
   REG DMD *dm;
   int i;
-
-  b = x_b;
 
   dm = b->b_dm;
   n = b->b_buftyp;
@@ -348,6 +180,7 @@ BCB *x_b;
  *		break;    (back to "for each list")
  */
 
+void
 flushall()
 {
     REG BCB *b;
@@ -373,18 +206,17 @@ NOTE:	rwabs() is a macro that includes a longjmp() which is executed if the
 	error codes.
 */
 
-usrio(rwflg,num,x_strt,ubuf,dm)
+void
+usrio(rwflg,num,strt,ubuf,dm)
 int rwflg,num;
-int x_strt;
+int strt;
 char *ubuf;
 DMD *dm;
 {
 	REG BCB *b;
 	REG int d;
 	REG int end;
-	REG int strt;
 
-	strt = x_strt;
 	end = strt+num;
 	d = dm->m_drvnum;
 
@@ -403,26 +235,18 @@ DMD *dm;
 
 
 char
-*getrec(x_recn,x_dm,wrtflg)
-int x_recn;
-DMD *x_dm;
+*getrec(recn,dm,wrtflg)
+int recn;
+DMD *dm;
 int wrtflg;
 {
-	REG int recn;
-	REG DMD *dm;
 	REG BCB *b;
 	REG int n;
-	REG int cl;
 	REG int err;
 	BCB *p;
 	BCB *mtbuf;
 	REG BCB **q;
 	BCB **phdr;
-/*	long *scr;/**/
-/*	char *p_kbshift = *(char **)((*(long *)0x4f2)+0x24);/**/
-
-	recn = x_recn;
-	dm = x_dm;
 
 	/* put bcb management here */
 
@@ -449,8 +273,6 @@ int wrtflg;
 	    else n = 2;
 	}
 
-/*	scr = ((long *)0x3f8000) + n;/**/
-
 	mtbuf = 0;
 
 	/* CHANGED by AKP 4/88: bufl 0 is FAT/root dir, bufl 1 is other */
@@ -476,12 +298,7 @@ int wrtflg;
 		if (mtbuf) {
 			/* miss, but there's an empty */
 			b = mtbuf;
-/*			*scr = 0x0000ffffL;/**/
 		}
-/*		else {/**/
-/*			/* miss, need to select a victim */
-/*			*scr = 0x0000aaaaL;/**/
-/*		}/**/
 
 		/* need to find predecessor of mtbuf, or last guy */
 doio:		for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
@@ -503,7 +320,6 @@ doio:		for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
 	else {
 		/* cache hit */
 		/* use a buffer, but first validate media */
-/*		*scr = 0xffff0000L;/**/
 		if (err = trap13(9,b->b_bufdrv))
 			if (err == 1)
 				goto doio; /* media may be changed */
@@ -523,11 +339,6 @@ doio:		for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
 	if (wrtflg)
 		b->b_dirty = 1;
 
-/*	if (*p_kbshift & 0x10) {/**/
-/*		while (!(*p_kbshift & 0x02)) ;/**/
-/*		while (*p_kbshift & 0x02) ;/**/
-/*	}/**/
-/*	*scr = 0;/**/
 	return(b->b_bufr);
 }
 
@@ -583,14 +394,12 @@ int wflag;
 #define hibyte(w) (((w) >> 8) & 0xff)
 #define lobyte(w) ((w) & 0xff)
 
-clfix(x_cl,link,x_dm)
-int x_cl;
+void
+clfix(cl,link,dm)
+int cl;
 int link;
-DMD *x_dm;
+DMD *dm;
 {
-    REG int cl;
-    REG DMD *dm;
-
     /* used by m_16 only */
     int offset;
     REG unsigned int sector;
@@ -603,9 +412,6 @@ DMD *x_dm;
     unsigned fatword;
     REG char *fptr;	/* points to first byte of fatword */
     char *q;		/* points to buf[offset] once that's known */
-
-    cl = x_cl;
-    dm = x_dm;
 
     if (dm->m_16) {
 	/* compute byte offset into FAT */
@@ -621,7 +427,7 @@ DMD *x_dm;
 	return;
     }
     else {
-	fptr = &fatword;
+	fptr = (char *)(&fatword);
 	pos = (cl + (cl >> 1));
 
 	link = link & 0x0fff;
@@ -668,25 +474,19 @@ DMD *x_dm;
     }
 }
 
-getcl(x_cl,x_dm)
-int x_cl;
-DMD *x_dm;
+int
+getcl(cl,dm)
+int cl;
+DMD *dm;
 {
-    REG int cl;
-    REG DMD *dm;
-
     REG long pos;
     unsigned offset;
     REG unsigned int sector;
     REG char *buf;
 
-    unsigned fatword;
+    unsigned int fatword;
     REG char *fptr;	/* points to first byte of fatword */
     char *q;		/* points to buf[offset] when that's known */
-
-    cl = x_cl;
-    dm = x_dm;
-
 
     /*
      * RD clusters are in the range [XX..-1] wher XX is d_strtcl for RD.
@@ -711,7 +511,7 @@ DMD *x_dm;
 	return fatword;
     }
     else {
-	fptr = &fatword;
+	fptr = (char *)(&fatword);
     	pos = cl + (cl >> 1);
 	sector = divmod(&offset,pos,dm->m_rblog);
     	buf = Getfat(sector,dm,FALSE);
@@ -742,11 +542,11 @@ DMD *x_dm;
 
 /**********************************************************************/
 
-nextcl(x_p,wrtflg)
-OFD *x_p;
+int
+nextcl(p,wrtflg)
+OFD *p;
 int wrtflg;
 {
-	REG OFD *p;
 	REG DMD *dm;
 	REG int i;
 	REG int cl;
@@ -754,7 +554,6 @@ int wrtflg;
 	REG int rover;
 	REG int lastcl;
 
-	p = x_p;
 	cl = p->o_curcl;
 	dm = p->o_dmd;
 
@@ -850,9 +649,10 @@ retcl:	p->o_curcl = cl2;
  * Note that little-g getfat() is used, for low overhead.
  */
 
-fastcl(dm,x_lastcl,freeflag)
+int
+fastcl(dm,lastcl,freeflag)
 DMD *dm;
-int x_lastcl;
+int lastcl;
 int freeflag;
 {
     REG int *buf;
@@ -860,10 +660,7 @@ int freeflag;
     REG int clcount;
     REG int cl;
     REG int i;
-    REG int lastcl;
     REG int clpersec;	    /* clusters represented by each sector of FAT */
-
-    lastcl = x_lastcl;
 
     clpersec = dm->m_recsiz >> 1;
 
@@ -901,7 +698,7 @@ again:
     if (clcount < lastcl) {
 	i++;
 	cl = min(clpersec,lastcl-clcount);
-	buf = getfat(i,dm,FALSE);
+	buf = (int *)getfat(i,dm,FALSE);
 	goto again;
     }
 
@@ -911,14 +708,12 @@ again:
 }
 
 
-addit(x_p,siz,flg)
-OFD *x_p;
+void
+addit(p,siz,flg)
+OFD *p;
 long siz;
 int flg; /* update curbyt ? (yes if less than 1 cluster transferred) */
 {
-	REG OFD *p;
-
-	p = x_p;
 	p->o_bytnum += siz;
 
 	if (flg)
@@ -933,13 +728,13 @@ int flg; /* update curbyt ? (yes if less than 1 cluster transferred) */
 
 
 long
-xrw(wrtflg,x_p,len,ubufr,bufxfr)
-int wrtflg,(*bufxfr)();
-OFD *x_p;
+xrw(wrtflg,p,len,ubufr,bufxfr)
+int wrtflg;
+OFD *p;
 long len;
-char *ubufr;
+void *ubufr;
+void (*bufxfr)();
 {
-REG	OFD *p;
 	char *bufp;
 REG	DMD *dm;
 	int bytn,recn,rsiz,lenxfr,csiz,csizb,lentail,num;
@@ -949,8 +744,6 @@ REG	DMD *dm;
 REG	long rc;
 	long bytpos,lenrec,lenmid;
 	int hlen;
-
-	p = x_p;
 
 	/* determine "header" of request */
 
@@ -1079,16 +872,14 @@ exit:	newcl = TRUE;		/* AKP: set this just in case */
 */
 
 long
-ckdrv(x_d)
-int x_d;	/* has this drive been accessed, or had a media change */
+ckdrv(d)
+int d;		/* has this drive been accessed, or had a media change */
 {
-	REG int d;
 	REG int mask;
 	REG int i;
 	REG BPB *b;
 	long err;
 
-	d = x_d;
 	mask = 1 << d;
 
 	if (!(mask & drvsel))

@@ -1,124 +1,19 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.6 $	$Source: /u2/MRS/osrevisions/gemdos/sup.c,v $
+* $Revision: 2.7 $	$Source: sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:42:46 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
-* Revision 2.6  90/08/03  13:42:46  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.5  90/07/19  18:34:24  apratt
-* Removed xminalt; that's not how it's done any more.
-* 
-* 
-* Revision 2.4  90/04/24  11:06:10  apratt
-* Added xaddalt (0x14, Maddalt) and xminalt (0x15, Pminalt).
-* 
-* Revision 2.3  89/07/18  14:08:15  apratt
-* Added xfmalloc call as GEMDOS function code 0x44.
-* 
-* Revision 2.2  89/04/17  17:15:45  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:22:22  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.8  89/01/10  13:49:26  apratt
-* Removed restriction that Fwrite to stdout couldn't be >32Kchars.
-* Fread from stdin is still limited to 32Kchars (probably really 16K)
-* because cgets can't handle more than that.  *sigh*
-* 
-* Revision 1.7  88/10/20  17:30:58  apratt
-* domediach and endmediach used rc as an int, not a long.  Caused
-* all errors to come out as FFFF (the high word of an error code).
-* 
-* Revision 1.6  88/08/08  18:22:53  apratt
-* Fatfingered: dropped the leading / on a comment.
-* 
-* Revision 1.5  88/08/08  17:39:28  apratt
-* Indentation changes; NO CODE CHANGES
-* 
-* Revision 1.4  88/08/04  14:44:16  apratt
-* Syntactic change to a declaration.. Alcyon didn't catch it,
-* but any real compiler would have.  ** NO CODE CHANGE **
-* 
-* Revision 1.3  88/06/13  15:06:57  apratt
-* Header style change
-* 
-* Revision 1.2  88/04/28  18:19:10  apratt
-* Removed cause-media-change function because you can do it externally.
-* It can be re-included (as function number 0x56) by #defining XMEDIACH.
-* 
-* Revision 1.1  88/04/26  14:48:30  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.7  91/01/23  14:30:36  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
 
-/****************************************************************************\
-* 									     *
-* GEMDOS Supervisor Level						     *
-* (C)1986 Atari Corp.							     *
-* 									     *
-* ---- Edit history (reverse order, please): ------------------------------  *
-* 									     *
-* 20-Apr-1988 akp	Explicitly cleared rootpd for compatibility's sake.  *
-* 03-Mar-1988 akp	Changed the biosdev array to initialize 4 & 5, too.  *
-*			Removed ospool code, added call to xminit().	     *
-* 02-Mar-1988 akp	Fixed the fix to Cconis/os: return -1, not 0xff.     *
-* 19-Feb-1988 akp	Added cause-media-change function as number 0x50.    *
-* 17-Feb-1988 akp	Split media change handling out so it can be made    *
-*			a separate function.				     *
-* 03-Feb-1988 akp	Changed some register declarations.		     *
-* 12-Jan-1988 akp	Added code to make Cconws faster for files, and      *
-*			fixed Cconis/Cauxis when redirected from a file to   *
-*			give real status.				     *
-* 21-Dec-1987 akp	Added char callno; and callno++; to osif() for	     *
-*			DND tree pruning.				     *
-* 07-Dec-1987 akp	Removed Dsetdrv(2) in startup code.		     *
-* 02-Nov-1987 akp	Fixed redirection for Crawio: handle computation     *
-*			must be context sensitive for read or write.	     *
-* 21-Oct-1987 akp	Lintified osif (always return a value).		     *
-*			Also fixed offree (didn't work before AT ALL!).	     *
-* 29-Sep-1987 akp	Removed os pool allocation of root PD: add rootpd.   *
-* 17-Sep-1987 akp	Fixed redirection of output functions: was writing   *
-*			the high byte of the argument word, not low byte.    *
-* 15-Jan-1986 lmd	Commented and prettified from Digital Research	     *
-* 			source code.					     *
-* 									     *
-\****************************************************************************/
-
 #include "fs.h"
-#include "gemerror.h"
-
-extern long setjmp();
-
-extern FTAB sft[];
-extern PD *run;
-extern long x0term(),xterm(),conin(),tabout(),rawconio(),xsetblk(),
-		prt_line(),readline(),constat(),
-		xsetdrv(),xgetdrv(),xsetdta(),xgetdta(),xgetfree(),
-		xmkdir(),xrmdir(),xchdir(),xcreat(),xopen(),xclose(),
-		xread(),xwrite(),xunlink(),xlseek(),xchmod(),
-		xgetdir(),xmalloc(),xfmalloc(),xmfree(),xsfirst(),xsnext(),
-		xrename(),xdatime(),xexec(),xtabout(),xconin(),
-		xconstat(),xprt_line(),xtermres(),dup(),
-		xforce(), xauxin(), xauxout(), xprtout(),
-		x7in(), x8in(), xconostat(), xprtostat(),
-		xauxistat(), xauxostat(),
-		xgetdate(), xsetdate(), xgettime(), xsettime(),
-		log() /* ,xmediach() */ ,xaddalt();
-
-extern long trap13();
-extern DND *dirtbl[];
-extern DMD *drvtbl[];
-extern int errdrv;
-extern long rwerr;
-extern FTAB sft[];
-extern unsigned int time,date;
 
 extern char kbchar[3];	/* # of elements in typeahead buffer */
 extern long *remptr[3];	/* remove ptr from typeahead buffer */
@@ -127,11 +22,10 @@ extern long glbkbchar[3][KBBUFSZ];	/* typeahead buffer */
 
 static long domediach();
 
-int oscnt;
 long uptime;
 int msec;
 long errbuf[3];
-int nday[] = 
+char nday[] = 
 	/*0 J  F  M  A  M  J  J  A  S  O  N  D  */
 	{ 0,31,28,31,30,31,30,31,31,30,31,30,31 } ;
 
@@ -262,10 +156,6 @@ FND funcs[0x58] = {
 	&xrename,2,	&xdatime,1
 } ;
 
-extern BCB *bufl[2];
-extern long errbuf[3];
-extern int drvsel;
-
 PD rootpd;
 char callno;
 
@@ -275,6 +165,7 @@ char biosdev[NUMSTD] = { -1, -1, -2, -3, -1, -1 };
  * Initialize GEMDOS;
  * called early-on by the BIOS.
  */
+void
 cinit()
 {
 REG	PD *r;
@@ -288,7 +179,7 @@ REG	long *p;
 	/* clear the rootpd -- for compatibility with old ROMs which	*/
 	/* got it from ospool (and therefore got it clear).		*/
 
-	for (p = r, i = (sizeof(PD)/4); i; i--) {
+	for (p = (long *)r, i = (sizeof(PD)/4); i; i--) {
 		*p++ = 0;
 	}
 
@@ -305,6 +196,7 @@ REG	long *p;
 /*
  * Free a tree of DNDs.
  */
+void
 freetree(d)
 DND *d;
 {
@@ -325,6 +217,7 @@ REG	int i;
  * This function DIDN'T WORK AT ALL: q_d (dev being changed) was ignored,
  * and local variable 'DMD *d' was uninitialized but compared against!
  */
+void
 offree(d)
 DMD *d;
 {
@@ -360,12 +253,9 @@ int *pw;
     long rc,numl;
     FND *f;
 
-    extern DND *dirtbl[];
-
-
     callno++;			/* AKP: increment once per OS call */
-    oscnt = 0;
-restrt:	oscnt++;
+
+restrt:
     fn = pw[0];
 
     if (fn > 0x57)
@@ -487,11 +377,11 @@ rawout:			xwrite(h,1L,((char *)&pw[1])+1);
 	    h = pw[1];
 
 	if (h >= NUMSTD)
-	    numl = sft[h-NUMSTD].f_ofd;
+	    numl = (long)sft[h-NUMSTD].f_ofd;
 	else if (h >= 0)
 	{
 	    if ((h = run->p_uft[h]) > 0)
-		numl = sft[h-NUMSTD].f_ofd;
+		numl = (long)sft[h-NUMSTD].f_ofd;
 	    else
 		numl = h;
 	}
@@ -571,6 +461,7 @@ rawout:			xwrite(h,1L,((char *)&pw[1])+1);
  * called every so often by the BIOS's
  * timer interrupt handler.
  */
+void
 tikfrk(n)
 int n;
 {
@@ -691,7 +582,6 @@ long rc;
 	int i;
 	DND *dn;
 	BCB *bx;
-	BPB *b;
 	extern char diruse[];
 
 	/*
@@ -742,7 +632,7 @@ long rc;
 {
 	REG BPB *b;
 
-	b = getbpb(drv);
+	b = (BPB *)getbpb(drv);
 
 	if (!b)		/* wipe out drive bit */
 	{
@@ -752,4 +642,3 @@ long rc;
 	if ((log(b,drv))) return (ENSMEM);
 	return 0;
 }
-

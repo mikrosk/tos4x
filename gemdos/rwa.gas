@@ -1,84 +1,16 @@
 .super
 ***************************     RWA.S      ******************************
 *
-* $Revision: 2.9 $	$Source: rwa.s,v $
+* $Revision: 2.10 $	$Source: rwa.s,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/11/26 13:50:55 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:38:20 $    $Locker:  $
 * =======================================================================
 *
 * $Log: rwa.gas,v $
-* Revision 2.9  90/11/26  13:50:55  apratt
-* Made JUST_LONG come from switches.s rather than being built in.
-* 
-* Revision 2.8  90/09/14  13:58:39  apratt
-* Fixed a bug near _enter: when JUST_LONGFRAME was false, the code
-* checked BOTH 6(sp) and 8(sp) against $20 to see if it was a
-* Super() call.
-* 
-* Revision 2.7  90/08/03  13:42:32  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.6  90/07/19  17:16:32  apratt
-* Changed Super again so it doesn't clobber A1 *or* D1... Sigh.
-* 
-* Revision 2.5  90/07/18  15:22:50  apratt
-* Removed LONGFRAME conditional: all GEMDOSes are longframe-capable.
-* Added JUST_LONG, so TT GEMDOS doesn't bother checking.  Changed
-* for MAS, not AS68.
-* 
-* Fixed a bug in Super(0L) from Super mode.  Also, don't clobber A1 in a
-* Super(0L) call from user mode: Arctic Fox doesn't like it. I changed
-* it to clobber D1 instead, don't know who doesn't like that.
-* 
-* Revision 2.4  89/07/26  16:04:34  apratt
-* Changed clksync so it traps to BIOS rather than calling directly.
-* 
-* Revision 2.3  89/07/18  14:08:46  apratt
-* Added fix for _gouser so return value isn't just "accidentally" in d0.
-* See comments near __gouser for details.
-* 
-* Revision 2.2  89/04/17  17:15:30  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:21:54  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.5  89/02/06  12:00:49  apratt
-* Set LONGFRAME to 1 for running on any 680x0.  It's suboptimal for now,
-* but it works (even on TT!).
-* 
-* Revision 1.4  88/08/16  17:46:43  apratt
-* Moved uc() to here from fsmisc for space reasons.
-* 
-* Revision 1.3  88/06/13  15:12:14  apratt
-* Header style change
-* 
-* 
-* Revision 1.2  88/05/02  15:02:36  apratt
-* Added usr2xfr and xfr2usr routines in assembly for speed & size.
-* 
-* Revision 1.1  88/04/26  14:50:04  apratt
-* Version used 4/22/88 to make test ROMs
+* Revision 2.10  91/01/23  14:38:20  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
 *
 *************************************************************************
-
-*------------------------------------------------------------------------
-*									:
-*	GEMDOS assembler interface					:
-*	(C)1986 Atari Corp.						:
-*									:
-*----									:
-* 28-Mar-1988 akp	Changed bsr to jsr for clock routines.		:
-*			Folded lmul, ldiv into this file.		:
-* 03-Dec-1987 akp	Added _upd_tod to update BIOS time/date from	:
-*			GEMDOS's internal variables.  Called by		:
-*			Tsettime and Tgettime.				:
-*			Also added clksync, called by xterm().	        :
-* 23-Sep-1987 akp	Added trap14 just like trap13.			:
-* 15-Jan-1985 lmd	Prettified and commented from the original	:
-*			Digital Research source code.			:
-*									:
-*------------------------------------------------------------------------
 
 * this include file defines JUST_LONG, which controls whether to test
 * _longframe or just assume you're on a long-frame machine.
@@ -792,4 +724,3 @@ otime:		ds.l	1
 obdos:		ds.l	1
 
     .end
-

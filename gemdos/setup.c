@@ -1,47 +1,22 @@
 /*
 ***************************    SETUP.C     ******************************
 *
-* $Revision: 2.3 $	$Source: /u2/MRS/osrevisions/gemdos/setup.c,v $
+* $Revision: 2.4 $	$Source: setup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:42:43 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: setup.c,v $
-* Revision 2.3  90/08/03  13:42:43  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.2  89/04/17  17:15:41  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:22:14  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.3  88/12/01  16:34:09  apratt
-* Added new code #ifdef VARBUFS, not defined for TOS 1.4.
-* This code allows a variable number of GEMDOS sector buffers.
-* If this code is enabled, NBUFS MUST BE AT LEAST FOUR.
-* 
-* Revision 1.2  88/06/13  15:06:55  apratt
-* Header style change
-* 
-* Revision 1.1  88/04/26  14:48:29  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.4  91/01/23  14:30:36  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
-
-/************************************************************************
-* HISTORY:								*
-* 23-Dec-87: akp	Changed setup() to osi() to match the extern	*
-*			that BIOS startup.s calls.			*
-*									*
-************************************************************************/
 
 /*
  * Setup GEMDOS sector buffers.
  */
 #include "fs.h"
-#include "fsdecl.h"
 
 #ifdef VARBUFS
 
@@ -66,11 +41,10 @@ BCB bcbx[4];					/* bcb for each buffer */
 
 #endif
 
-extern BCB *bufl[2];
-
 /*
  * Initialize GEMDOS
  */
+void
 osi()
 {
 #ifdef VARBUFS

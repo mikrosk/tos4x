@@ -1,12 +1,15 @@
 /*
 ***************************    FSDECL.H    ******************************
 *
-* $Revision: 2.4 $	$Source: /u2/MRS/osrevisions/gemdos/fsdecl.h,v $
+* $Revision: 2.5 $	$Source: fsdecl.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:41:06 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:29:58 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdecl.h,v $
+* Revision 2.5  91/01/23  14:29:58  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 * Revision 2.4  90/08/03  13:41:06  apratt
 * TTOS FINAL RELEASE
 * 
@@ -38,9 +41,6 @@
  * declarations for fs*.c
  *
  */
-#ifdef ORPHAN
-extern DND *orphanDND;
-#endif ORPHAN
 
 extern PD *run;
 
@@ -60,93 +60,18 @@ extern char dots2[];
 extern unsigned int time;
 extern unsigned int date;
 extern BCB *bufl[];
-extern long errbuf[];
+extern long errbuf[3];
 extern FTAB sft[];
 extern DND *dirtbl[];
 extern char diruse[];
 extern DMD *drvtbl[16];
 
-/*
- * Function types
- *
- */
-DND	*dcrack();
-FCB	*dirinit();
-char	*dopath();
-DND	*findit();
-DMD	*getdmd();
-OFD	*getofd();
-char	*getrec();
-DND	*makdnd();
-OFD	*makofd();
-char	*packit();
-FCB	*scan();
-long	xgetdta();
-long	trap13();
-DND	*getbig();	/* memory allocator */
-MD	*getsmall();	/* memory allocator */
-long	xfmalloc();
-long	xmalloc();
-int	addit();
-int	builds();
-long	ckdrv();
-int	clfix();
-/* int	divmod(); /* made into a macro */
-long	dup();
-int	eordot();
-int	flush();
-int	getcl();
-int	getpath();
-long	ixclose();
-long	ixcreat();
-long	ixdel();
-int	ixdirdup();
-long	ixforce();
-long	ixlseek();
-long	ixopen();
-long	ixread();
-long	ixsfirst();
-long	ixwrite();
-long	log();
-int	log2();
-int	makbuf();
-long	makopn();
-int	match();
-int	nextcl();
-long	opnfil();
-int	syshnd();
-char	uc();
-int	usr2xfr();
-int	usrio();
-long	xchdir();
-long	xchmod();
-long	xclose();
-int	xcmps();
-long	xcreat();
-long	xforce();
-int	xfr2usr();
-long	xgetdir();
-long	xgetdrv();
-long	xgetfree();
-long	xgsdtof();
-long	xlseek();
-long	xmkdir();
-int	xmovs();
-long	xopen();
-long	xread();
-long	xrename();
-long	drename();
-long	xrmdir();
-long	xrw();
-long	xsetblk();
-long	xsetdrv();
-long	xsetdta();
-long	xsfirst();
-long	xsnext();
-long	xunlink();
-long	xwrite();
-long	xterm();
-long	xtermres();
-long	x0term();
-long	xtabout(), tabout();
+extern char diskbuf[];
+extern MPB pmd;
+extern char nday[];
 
+extern long glbkbchar[3][KBBUFSZ];
+extern char kbchar[3];
+extern long *insptr[3];
+extern long *remptr[3];
+extern int glbcolumn[3];

@@ -4,26 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/07/19 15:17:54 $
+* $Date: 90/07/19 18:52:11 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.53  90/07/19  18:52:11  apratt
+* Changed date to 7/19 and color to slightly yellow, pulsing from
+* full yellow to full white.  Added pulsing for non-TT, too.
+*
 * Revision 2.52  90/07/19  15:17:54  apratt
 * Moved TT screen base to phystop-screen_size-$100, so the low byte is
 * zero and programs which double buffer and write directly to the shifter
 * work.
-*
+* 
 * Moved the PMMU page tables into RAM at $700-$800, so they're protected
 * from user-mode access and less likely to be clobbered by programs that
 * assume they can take over the whole system.  However, they are not
 * protected from supervisor OR DMA access.
-*
+* 
 * Added better code to handle privilege violation when it's a move from
 * SR. See the label "priv" for details.
-*
+* 
 * Revision 2.51  90/07/19  14:55:04  apratt
 * Added ONLY_LONGFRAME code, which you set on TT to just assume
 * longframe.  
@@ -498,7 +502,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.52 $
+* $Revision: 2.53 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -587,12 +591,15 @@ date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .else
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$06291990	; TT date, $MMDDYYYY @check@
+date		equ	$07191990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010011011101 ; Jun 29, 1990
+dosdate		equ	%0001010011110011 ; Jul 19, 1990
+.endc
 
-bootcolor	equ	$f00		; change this each release
-
+.ifne TT
+bootcolor	equ	$ff9		; change this each release
+* variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
+bootcolor	equ	$fff		; white for production ROMs
 .endc
 
 *******************************************************************************
@@ -2951,16 +2958,24 @@ dmab_to:
 * A simple backspace after the Nth one doesn't work because you may or may
 * not be on an N-column display, where the cursor is ALREADY on the
 * Nth one.  Sigh.
-* color cycling code: pulse with increasing blue
+* color cycling code: pulse with increasing blue (yellow to white)
 
 .ifne TT
 	move.w	_frclock+2,d0		; get lo word of frame clock
 	lsr.w	#2,d0			; divide by 4 ('prox 1 sec cycle)
-	and.w	#$f,d0			; get just lo nybble
-	move.w	ttcolor0,d1
+	and.w	#$f,d0			; get just blue bits
+	move.w	ttcolor0,d1		; get current color
+	and.w	#$ff0,d1		; zero old blue bits
+	or.w	d0,d1			; OR in new blue value
+	move.w	d1,ttcolor0		; and write new color
+.else
+	move.w	_frclock+2,d0
+	lsr.w	#3,d0			; divide by 8 ('prox 1 sec cycle)
+	and.w	#$7,d0			; mask off just blue bits
+	move.w	color0,d1
 	and.w	#$ff0,d1
 	or.w	d0,d1
-	move.w	d1,ttcolor0
+	move.w	d1,color0
 .endc
 
 	move.l	#$00010002,-(sp)
@@ -2976,6 +2991,8 @@ nomt:
 	trap	#$d
 .ifne TT
 	move.w	#bootcolor,ttcolor0
+.else
+	move.w	#bootcolor,color0
 .endc
 * this is the end of the memory-test/shrinking bar sequence.  We check
 .ifne TT
@@ -3131,11 +3148,7 @@ _rts:	rts
 
 
 *+
-.ifeq TT
-	dc.w	$fff			; 0 white
-.else
-	dc.w	bootcolor		; 0 - boot color
-.endc
+* memchk - check pattern written to memory
 *	Passed:		d1.l = offset
 *			a0 = base of pattern ($1f8 bytes long)
 *			a4 -> return address

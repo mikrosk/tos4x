@@ -1,12 +1,15 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\sup.c,v $
+* $Revision: 2.12 $	$Source: e:/tos/gd2\RCS\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:47:08 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.12  1991/03/28  17:47:08  apratt
+* THIS VERSION WORKS! DESKTOP OPS WORK!
+*
 * Revision 2.11  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *

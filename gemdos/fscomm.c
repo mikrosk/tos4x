@@ -1,12 +1,15 @@
 /*
 ***************************    FSCOMM.C    ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\fscomm.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\rcs\fscomm.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:47:08 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscomm.c,v $
+* Revision 2.9  1991/03/28  17:47:08  apratt
+* THIS VERSION WORKS! DESKTOP OPS WORK!
+*
 * Revision 2.8  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *

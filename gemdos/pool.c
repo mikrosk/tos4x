@@ -1,12 +1,15 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\pool.c,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:47:08 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
+* Revision 2.14  1991/03/28  17:47:08  apratt
+* THIS VERSION WORKS! DESKTOP OPS WORK!
+*
 * Revision 2.13  1991/02/22  15:29:28  apratt
 * generic checkin
 *

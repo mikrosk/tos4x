@@ -3,19 +3,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/05/03 15:09:56 $
+* $Date: 88/05/05 13:41:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.11  88/05/05  13:41:04  apratt
+* Added clr.w _bootdev to startup sequence, to fix bootable hard disk
+* bug (when using ALT to avoid HD boot, A:\auto doesn't get executed).
+* This was because GEMDOS set the current drive based on _bootdev,
+* which wasn't getting cleared by anybody.
+*
 * Revision 1.10  88/05/03  15:09:56  apratt
 * Added comments as relates to the version number and problems with
 * First Byte's Kid series of software -- you get address error unless
 * the version number is even.  See comments above 'systype' for more
 * information.
-*
+* 
 * Revision 1.9  88/04/28  16:08:09  apratt
 * Backed out table entry for Flopwp XBIOS call. See flop.s for more.
 * 
@@ -54,7 +60,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.10 $
+* $Revision: 1.11 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -106,7 +112,7 @@ norway		=      12 ***DON'T  CHANGE***
 *
 *
 * The version number must be even.  This is because at least one line
-* be more than 3ffe bytes away, for the same reason (bus error when
+* of third-party software causes a move from 0 to a2, then a word read
 * from (a2) -- this causes address error unless the version number is even.
 * In addition, the target of the short branch at reseth must not 
 * be more than $3e bytes away, for the same reason (bus error when
@@ -1079,7 +1085,6 @@ clm_1:	movem.l	d0-d3,-(a0)		; ... work our way back
 	bne	clm_1			; (loop for more bytes)
  endc
 mt_pr:
-
  ifeq systype-rom
 *+
 *  Indicate that memory has successfully
@@ -1190,6 +1195,7 @@ usem:	move.l	4(a0),end_os		; init end-of-OS pointer
 	move.l	#savend,savptr(a5)	; register-save pointer for traps 13&14
 	move.l	#_rts,swv_vec(a5)	; ignore monitor changes for now
 	clr.l	_drvbits		; clobber "drive-alive" bits
+	clr.w	_bootdev		; clear this (NEW 5/5/88)
 *--- Prtblk vectors:
     ifeq systype-rom
 	bsr	copy_header		; kludge OS ROM header

@@ -1,23 +1,28 @@
 /*
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 88/04/22 15:30:11 $
+* $Date: 89/02/06 23:10:32 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 1.6  89/02/06  23:10:32  kbad
+* mediach() used to use the 200Hz timer for the grace period, now uses
+* the video frame counter (frclock).  This way, mediach() will work even
+* if the 200Hz timer is disabled.
+*
 * Revision 1.5  88/04/22  15:30:11  apratt
 * Went back to 5-sector FATs thanks to a bug in the dual-drive code
 * (that is, the logical A/B code for single-drive systems).  I don't
 * know what the bug is yet, but it causes big trouble with differing
 * FAT sizes.  This explains why PC disks don't always work on ST's.
 * 						-- Allan
-*
+* 
 * Revision 1.4  88/04/20  17:02:21  apratt
 * Added initializing bflags in getbpb to zero -- 12-bit FATs.
 * (Previously, this field went uninitialized... Just lucky, I guess.)
@@ -35,7 +40,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 1.5 $
+* $Revision: 1.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -52,6 +57,11 @@
  * (C)1985 Atari Corp.
  *
  *----
+ *  6-Feb-1989 kbad	Time mediach() grace period with video frames
+ *			rather than 200Hz clock.  If the 200Hz timer
+ *			got disabled, mediach() was always within the
+ *			grace period.  Basing both the floppy WP status
+ *			check and the access timer on Vblanks is safer.
  * 22-Apr-1988 akp	Changed back to 5 sec/FAT because of big bug
  *			in the dual-logical-to-lone-physycal mapping code.
  *			Haven't found the bug itself, but this sure
@@ -93,7 +103,11 @@
  *			BPB validation.  This is still a kludge.
  *
  */
-#define	MAXACCTIM	300L		/* 1.5seconds "free" time */
+
+
+#define	MAXACCTIM	82L	/* about 1.5 sec. "free" time... */
+				/* Since this is based on video frames, */
+				/* it varies with the monitor.  Oh well. */
 
 #define	READ	0
 #define	WRITE	1
@@ -204,7 +218,8 @@ extern WORD motoron;		/* motor-on status (for both drives) */
 /*
  * Other floppy variables:
  */
-extern long hz_200;		/* system timer tick */
+extern long hz_200;		/* system timer tick, for rand() */
+extern long frclock;		/* video frame counter, for mediach() */
 extern char diskbuf[];		/* disk buffer somewhere in BSS */
 extern int nflops;		/* number of active floppies {0,1,2} */
 extern long acctim[];		/* time of last floppy access */
@@ -349,7 +364,7 @@ WORD dev;
 
     if (*dm == CHANGED) return CHANGED;		/* always hack CHANGED	*/
     if (wplatch[dv]) *dm = UNSURE;		/* ==> UNSURE		*/
-    if ((hz_200 - acctim[dv]) < maxacctim)	/* SAFE if within time limit */
+    if ((frclock - acctim[dv]) < maxacctim)	/* SAFE if within time limit */
 	return SAFE;
     return *dm;					/* return UNSURE or SAFE */
 }

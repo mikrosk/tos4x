@@ -1,12 +1,15 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
+* $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 17:12:50 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/11/20 19:44:04 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.21  1991/11/20  19:44:04  apratt
+* Memory protection, first cut (no workee yet)
+*
 * Revision 2.20  1991/06/20  17:12:50  apratt
 * updates for new DB
 *
@@ -42,6 +45,7 @@
 #define FASTCLICK 17
 
 PD *run;
+int mem_initted;	/* if FALSE then xexec sets TRUE & calls init_t2 */
 
 /*
  * Common supervisor stack
@@ -252,6 +256,12 @@ char *v;		/* enviroment string (0, 3, 5, 7) */
 	int use;		/* type of RAM we decided to use for TPA (0 or 1) */
 	long fastmax, slowmax, minfast;
 	OFD **uftstart;
+
+	if (!mem_initted) {
+	    mem_initted = 1;
+	    DBCMD(1,"print call init_t2;_c");
+	    init_t2();
+	}
 
 	DBCMD(1,"_dopexec (wpeek (`a6 + 8)) (lpeek (`a6 + a)) "
 		   "(lpeek (`a6 + e)) (lpeek (`a6 + 12)) ;_c");

@@ -159,3 +159,9 @@ void x0term _P((void));
 void ixterm _P((PD *r));
 long xexec _P((int mode, char *s, char *t, char *v));
 long xpgmld _P((PRG *prg, int h, PD *lp));
+
+/* memprot.c */
+void init_tables _P((void *tptr, MPB *pmd));
+void init_t2 _P((void));
+void mark_region _P((MD *md, int valid));
+

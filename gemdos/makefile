@@ -1,11 +1,14 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\makefile.,v $
+# $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/06/03 15:29:50 $     $Locker:  $
+# $Author: apratt $ 	$Date: 1991/11/20 19:44:04 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.20  1991/11/20  19:44:04  apratt
+# Memory protection, first cut (no workee yet)
+#
 # Revision 2.19  1991/06/03  15:29:50  apratt
 # Changed to use fsstub, not fsstpar, the better to make available
 # to alpha testers who have only MIDI-port remote debugging, if any.
@@ -43,18 +46,20 @@ TMPDIR	=	m:
 .SUFFIXES: .o .oo .c .s .mac .gas
 
 # un-comment this whole section to compile with GCC
+MEMPROT=-DNO_MEMPROT=1
 CC=gcc
 CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
-	-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem
+	-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem $(MEMPROT)
 .s.o:
 	$(CC) -c $*.s
 
 # un-comment these lines if you want to use MAC to assemble GCC's output
 .c.o:
-	$(CC) $(CFLAGS) -S $*.c
-	emacs @gas2mac.rc $*.s 
-	mas -u $*.s
-	rm $*.s
+	$(CC) $(CFLAGS) -S -o temp.s $*.c
+	emacs @gas2mac.rc temp.s 
+	mas -u temp.s
+	mv temp.o $*.o
+	rm temp.s
 
 .mac.o:
 	mas -u $*.mac
@@ -70,15 +75,15 @@ all: gtest.prg dos.sys
 
 CFILES =	fscl.c fsdir.c fsfs.c fshand.c scan.c \
 		time.c panic.c mem.c pool.c sup.c con.c \
-		fsproc.c
+		fsproc.c memprot.c
 
 OFILES =	fscl.o fsdir.o fsfs.o fshand.o scan.o \
 		time.o panic.o mem.o pool.o sup.o con.o \
-		fsproc.o
+		fsproc.o memprot.o
 
 DS=dossys
 LDOBJS	=	$(DS)\self.o $(DS)\ld_dos.o $(DS)\clear.o $(DS)\clock.o \
-			$(DS)\announce.o $(DS)\fsstub.o
+			$(DS)\announce.o $(DS)\fsstpar.o
 
 dos.sys:	gemdos.o
 		mkvers $(DS)\announce.o

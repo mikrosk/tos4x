@@ -3,6 +3,7 @@
 ; replace :b with .b, etc.
 ; replace :4 with *4, etc. (scale in d0.size*scale)
 ; replace 0x with $
+; replace .lcomm with .common
 ; change jne to bne, etc., but this gives bbsr and bmp, so change them back.
 ; change sp@- to -(sp), 
 ; change .ascii to .dc.b
@@ -53,6 +54,8 @@ store-procedure gas2mac
   !force replace-string :4 *4
   beginning-of-file
   !force replace-string :8 *8
+  beginning-of-file
+  !force replace-string ".lcomm" ".comm"
   beginning-of-file
   !force replace-string "0x" "$"
   beginning-of-file

@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/24 17:23:15 $
+* $Date: 91/04/26 17:44:01 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.25  91/04/26  17:44:01  apratt
+* Added a drop-dead deselect timeout in Vblank after 5 seconds, motor-on or
+* not.  This way empty drives do get turned off.
+*
 * Revision 2.24  91/04/24  17:23:15  apratt
 * Added a new type of return from flopcmds, used only by go2track
 * and hence by its callers:  if you return with carry set, it means
@@ -19,7 +23,7 @@
 * go, do not retry at the other density.  This works WONDERS for
 * the "feel" of a system with no disk in the drive at boot time or
 * any other time.
-*
+* 
 * Revision 2.23  91/04/11  12:12:05  apratt
 * Changed MAXACSI for TT to 10MB, not 4MB.  Should it be 10 for STe?
 * 
@@ -178,7 +182,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.24 $
+* $Revision: 2.25 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1154,10 +1158,20 @@ tvr5:	subq.w	#1,retrycnt.w		;	to the current track...
 
 *+
 * _flopvbl - floppy vblank handler
+* Deselects floppies after the motor stops.
+*-
+_flopvbl:
+	lea	fifo,a6			; a6 -> fifo
+	st.b	_motoron.w		; assume motor is on
+	tst.w	flock.w			; floppies locked?
+	bne	fvblr			; (yes,	so don't touch them)
+
+.if STPAD
 	bsr	fdcprobe
 	beq	fvblr			; no floppies!
 .endif
 
+*------ write-protect monitor:
 	move.l	_frclock.w,d0		; check a drive every 8 jiffies
 	move.b	d0,d1			; (save jiffy count)
 	and.b	#7,d1			; time yet?
@@ -1248,13 +1262,24 @@ floplock:
 
 *--- pick a DSB:
 	lea	dsb0.w,a1
-* _acctim (last floppy access time) is used by rwabs:mediach() for a
-* grace period for media change.  Previously the 200Hz timer was used,
-* but this could cause problems (esp. in game s/w) if the 200Hz timer
-* is disabled.  Since floppy write protect status (used to set media state)
-* is checked by the floppy vblank handler, we now use the frame clock
-* (updated EVERY vblank) for _acctim.  890206 kbad
-* 
+	tst.w	cdev.w
+	beq	flock2
+	lea	dsb1.w,a1
+
+*--- recalibrate drive (if it needs it)
+flock2:	tst.w	dcurtrack(a1)		; if (curtrack < 0) recalibrate()
+	bpl	flockr
+
+	bsr	select			; select drive & side
+	clr.w	dcurtrack(a1)		; we're optimistic -- assume winnage
+	bsr	restore			; attempt restore
+	beq	flockr			; (it won)
+	moveq	#10,d7			; attempt seek to track 10
+	bsr	hseek1
+	bne	flock1			; (failed)
+	bsr	restore			; attempt restore again
+	beq	flockr			; (it won)
+flock1:	move.w	#recal,dcurtrack(a1)	; complete failure (what can we do?)
 flockr:	rts
 
 
@@ -1877,6 +1902,7 @@ rdfast:	cmp.l	#MAXACSI,8(sp)
 
 wrfast:	cmp.l	#MAXACSI,8(sp)
 	bcs	undone
+	bsr	getfrb
 	move.l	8(sp),a1		; src = user's buffer
 	move.l	_frb,a0			; dest = _FRB
 	move.l	a0,8(sp)		; actual DMA from _FRB

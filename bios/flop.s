@@ -4,17 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/22 17:50:49 $
+* $Date: 90/02/26 17:10:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.10  90/02/26  17:10:24  apratt
+* Removed all instruction-dependent timing loops.  The delay at reset1770
+* and rwdelay are done with a trick which assumes that Timer C is still
+* programmed the way BIOS programmed it.  It does NOT assume that
+* the interrupt is actually enabled or that the system interrupt handler
+* is handling it.  (This is in preparation for Mega STe with 16MHz CPU
+* but no extra MFP with its extra timers.)
+*
 * Revision 2.9  90/02/22  17:50:49  apratt
 * Worked around a MAS PC-relative bug, and added "and.w #3,d0" to
 * mask off the unwanted bits in denselect before using it.
-*
+* 
 * Revision 2.8  89/11/30  11:14:27  apratt
 * Removed a little hi-density debugging code I inadvertently left in.
 * 
@@ -97,7 +105,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.9 $
+* $Revision: 2.10 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1292,15 +1300,28 @@ flopcm:	bsr	wdiskct6		; write	command	(in d6)
 flopc1:	cmp.l	_hz_200.w,d7
 	blo	flopcto			; (yes,	reset and return failure)
 	btst.b	#5,gpip			; 1770 completion?
-.ifeq TT
-	move.w	#15,d7			; wait for 1770	to stop	convulsing
-r1770:	dbra	d7,r1770		; (short delay loop)
-.endc
 .ifne TT
 	bsr	rdiskct7		; return EQ + 1770 status in d7
 	clr.w	d6
 	rts
 flopcto:
+	bsr	reset1770		; bash controller
+	moveq	#0,d6			; and return NE and CS (empty)
+	subq	#1,d6			; set carry so we return NE and CS
+	rts
+
+
+.if STPAD
+*
+* STPAD-only routine to set high-density select bit in PSG (bit 7) based on
+* d0.w (zero: low density (clear the bit); nonzero: high density (set the
+* bit)).
+*
+
+r1770:	move.b	mfp+tadr,d1
+r1770a:	cmp.b	mfp+tadr,d1
+	bne	padhi1
+
 .endc
 	clr.b	d0			; clear the bit
 	bra	padden1
@@ -1390,10 +1411,16 @@ setporta:
 .ifne TT
 	move	sr,-(sp)		; save our IPL
 	or	#$0700,sr		; start	critical section
-.endc
-.ifeq TT
-	move.w	#$20,d0			; 0x20 seems about right...
-rwdly1:	dbra	d0,rwdly1		; busy-loop: give 1770 time to settle
+	move.b	giread,d1		; get current bits
+	move.b	d1,d2			; save old bits for caller
+	and.b	#$ff-7,d1		; strip	low three bits there
+	or.b	d0,d1			; or-in	our new	bits
+	move.b	d1,giwrite		; and write 'em	back out there
+rwd1:	move.b	mfp+tadr,d1
+rwd2:	cmp.b	mfp+tadr,d1
+	beq	rwd1			; wait for a change
+	dbra	d0,rwd2			; loop d0 times
+*+
 .endc
 	move.w	(sp)+,d0		; restore register
 *
@@ -1565,6 +1592,8 @@ getspinup:
 *	move.w	$4(sp),d0	; get (possibly new) dev number
 *	and.w	#$1,d0		; keep only bit 0
 *	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
+*	sne.b	d0		; d0 = $00 or $ff
+*
 *	move.w	_wpstatus.w,d0
 *	or.w	d0,_wplatch.w	; (catch WP transitions)
 *	move.b	(a0),d0		; reload the WP status as return value.
@@ -1586,7 +1615,7 @@ getspinup:
 *
 *	fmfast: (format) save & change dma address, set fastcnt to 1
 * (for copying the result list).
-rdfast:	cmp.l	#$01000000,8(sp)
+*
 *	vrfast: (verify) same as fmfast.
 * The common code which returns from all these services calls "unfast"
 	move.l	def_frb,8(sp)		; actual DMA to _FRB
@@ -1596,7 +1625,7 @@ rdfast:	cmp.l	#$01000000,8(sp)
 *
 * This code must not clobber d0, which may contain a return value
 * destined for the caller.
-wrfast:	cmp.l	#$01000000,8(sp)
+*
 * This code checks for an FRB cookie the first time it's needed.
 * back to the caller's level and returns e_error.
 	move.l	def_frb,a0		; dest = _FRB
@@ -1608,7 +1637,7 @@ MAXACSI	equ	$00A00000		; max addr for TT: 10MB.
 .else
 .if SPARROW
 MAXACSI equ	$00E00000		; max addr for Sparrow: 14MB.
-fmfast:	cmp.l	#$01000000,8(sp)
+.else
 MAXACSI	equ	$00400000		; max addr where ACSI DMA works
 .endif
 	move.l	def_frb,8(sp)		; actual DMA to _FRB

@@ -4,17 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/29 23:59:46 $
+* $Date: 1991/10/01 20:14:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.83  1991/09/29  23:59:46  apratt
-* Added hooks for _waketime XBIOS call in clock.s.  Also commented
-* out the code that does a RAM test when you use RAM TOS.
+* Revision 2.84  1991/10/01  20:14:24  apratt
+* Added code .if STPAD to run the AUTO folder on drive P after running
+* the one on bootdev.
 *
+* Added code .if STPAD to run the AUTO folder on drive P after running
+* the one on bootdev.
+*
+* Revision 2.83  1991/09/29  23:59:46  apratt
 * Added hooks for _waketime XBIOS call in clock.s.  Also commented
 * out the code that does a RAM test when you use RAM TOS.
 *
@@ -214,7 +218,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.83 $
+* $Revision: 2.84 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\startup.s,v $
@@ -2854,6 +2858,9 @@ norezchg:
 	lea.l	_term(PC),a0		; dest vector
 	add.l	d1,a0			; add the exception number (or 0)
 	add.l	d1,a0			; (twice: first ex number is 02)
+	lea.l	$8,a1			; start of places to check
+	move.w	#64-1,d0		; count
+bloop:
 	cmp.l	#coldboot,(a1)
 	bne	bloop1
 	move.l	a0,(a1)
@@ -4542,6 +4549,15 @@ _fastcpy:
 	move.l	8(sp),a1		; a1 -> dest
 	move.w	#63,d0			; d0 = move count (64*8 = 512)
 fast1:	move.b	(a0)+,(a1)+		; copy 8 bytes at a time
+	move.b	(a0)+,(a1)+		;	to minimize loop overhead
+	move.b	(a0)+,(a1)+
+	move.b	(a0)+,(a1)+
+	move.b	(a0)+,(a1)+
+	move.b	(a0)+,(a1)+
+	move.b	(a0)+,(a1)+
+	move.b	(a0)+,(a1)+
+	beq	autoq			; (no -- so punt)
+
 
 *+
 * Go through hard-disk initialization vector
@@ -4549,11 +4565,6 @@ fast1:	move.b	(a0)+,(a1)+		; copy 8 bytes at a time
 *-
 _hinit:	move.l	hdv_init,-(sp)
 	rts
-	move.l	_drvbits.w,d0		; d0 = active dev vector
-	move.w	_bootdev,d1		; d1 = dev# to exec from
-	btst	d1,d0			; is the dev alive?
-	beq	autoq			; (no -- so punt)
-
 
 
 autopath:	dc.b	'\AUTO\'
@@ -4576,7 +4587,24 @@ autofile:	dc.b	'*.PRG',0
 *
 * Uses:		everything
 *
+* New as of 8/91: if you hold down the CONTROL key when you boot, the AUTO
+* folder won't be run.  It is already the case that the ALT key inhibits
+* the hard disk driver from autobooting; the Control key means you get the
+* driver, but you don't get AUTO folder programs. The AES will also sense
+* the Control key and not load anything off disk: thus, if you have an AUTO
+* folder program, an accessory, a Desktop info file, or an AES auto-boot
+* application installed which causes your system to bomb, you can recover
+* by booting with the Control key down, then removing the offending
+* program/configuration.
+*-
 
+_auto:	move.l	#$000bffff,-(sp)
+	trap	#$d			; Kbshift(-1)
+	addq.l	#4,sp
+	btst	#2,d0			; test for control key
+	bne	autor			; bail out if control key is down
+
+* Don't do any auto folder if the boot device isn't in drvbits
 * (i.e. doesn't exist).  Moved from inside _auto1 so we could
 * call _auto1 from _autop.
 

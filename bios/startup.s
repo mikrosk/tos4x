@@ -3,20 +3,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/18 13:35:33 $
+* $Date: 89/09/21 13:40:41 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.31  89/09/21  13:40:41  apratt
+* The vbl part of Setscreen() copied the new palette to TT regs
+* rather than ST regs -- now it copies to the ST regs always.
+* This was a vestige of bit-shifting in software, now unnecessary.
+*
 * Revision 2.30  89/09/18  13:35:33  apratt
 * Removed LONGFRAME conditional assembly: now LONGFRAME is all there is.
 * Removed code which emulated STE color registers; it turns out
 * that the TT shifter's ST-compatible registers *are* like STE regs.
 * Added code to retry _dmaread if it returns a "retryable" error
 * (other than timeout).
-*
+* 
 * Revision 2.29  89/09/07  16:29:00  apratt
 * Changed date & dosdate and added 'check' to date lines.
 * 
@@ -325,7 +330,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.30 $
+* $Revision: 2.31 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -858,7 +863,6 @@ SPAR_CONF	equ	$ffff8006	; read here to auto-config
 shiftmd		equ	$ffff8260	; video	shift mode (resolution)
 SPAR_VMC	equ	$ffff82c0	; video master control
 .ifne TT
-ttcolor0	equ	$ffff8400	; color palette #0 for TT
 shiftmd		equ	$ffff8262	; TT shift mode (overrides above equ)
 .endc
 dbaseh		equ	$ffff8201	; display base high
@@ -2916,12 +2920,7 @@ swmon2:	move.b	d0,sshiftmd(a5)
 	tst.l	colorptr(a5)		; if(colorptr != NULL)....
 *--- low rez: switch to high if gpip%%7 == 0
 	move.l	colorptr(a5),a0		; a0 ->	user's color base
-.ifeq TT
 	lea	color0(a5),a1		; a1 ->	hardware palette base
-.endc
-.ifne TT
-	lea	ttcolor0(a5),a1		; a1 -> hardware palette base
-.endc
 	move.w	#16-1,d1		; d1 = count
 vbl2:	move.w	(a0)+,(a1)+		; load a palette
 * rez was low, but now there's a mono monitor! Go to high rez & bail out.

@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/02/25 17:25:33 $
+* $Date: 88/04/05 17:42:30 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.4  88/04/05  17:42:30  apratt
+* Fixed ctl-alt-delete sensing.  Produces a warm boot.
+*
 * Revision 1.3  88/02/25  17:25:33  apratt
 * Added keyboard reset on CONTROL-ALT-DELETE
-*
+* 
 * Revision 1.2  87/11/25  18:19:12  lozben
 * Added flags for new countries: Turkey, Finland, and Norway. Also added
 * new keyboard scan codes for Turkey and Norway
@@ -23,7 +26,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.3 $
+* $Revision: 1.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3097,7 +3100,7 @@ ari13	cmp.w	bufhead(a0),d1 ;head=tail?
 *	now test for the warm-boot combination ALT-CTRL-DELETE (AKP 2/88)
 	lsl.l	#$8,d0		;now do the shuffling to generate the new
 	lsr.w	#$8,d0		;improved conin format ($kkss00aa)
-	cmp.l	#$0c53007f,d0	;ctl-alt-delete value
+	cmp.l	#$0c53001f,d0	;ctl-alt-delete value
 	bne.s	nowarmboot
 	bra	reseth		;jump to reset the system (warm boot)
 	swap	d2		;get high word

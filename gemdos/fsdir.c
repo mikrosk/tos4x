@@ -1,12 +1,17 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/25 13:16:06 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/26 15:04:00 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.21  1991/06/26  15:04:00  apratt
+* Added code to set and check DTAs as invalid when
+* a search fails or is exhausted.  Fixed so a trailing
+* slash results in EFILNF not EBADRQ.
+*
 * Revision 2.20  1991/06/25  13:16:06  apratt
 * Changed FN_NORM etc to SCAN_NORM _DIR and _EARLY
 *
@@ -535,7 +540,11 @@ DTA *dta;
     long err;
     uint m = 0;
 
+    dta->dta_dev = -1;		/* first, mark as exhausted/invalid */
+
     if (err = fn2dir(&name,&dir,SCAN_EARLY)) return err;
+
+    if (!*name) return EFILNF;	/* trailing backslash - can't find no files */
 
     /* stuff the last part of the name and the attribs into an FCB */
     if (err = name2fcb(name,NULL,&fcb)) return err;
@@ -581,6 +590,9 @@ xsnext() /*+ search next, return into dta */
 
     dta = run->p_xdta;
 
+    /* if marked as exhausted/invalid, return error */
+    if (dta->dta_dev == -1) return EBADRQ;
+
     /* fill FCB with search info from DTA */
 
     if (ckdrv(dta->dta_dev)) return EDRIVE;
@@ -604,7 +616,10 @@ xsnext() /*+ search next, return into dta */
     while (1) {
 	err = dirnext(&dir,dmd);
 	if (err) {
-	    if (err == EFILNF) return ENMFIL;
+	    dta->dta_dev = -1;    /* mark as exhausted */
+	    if (err == EFILNF) {
+		return ENMFIL;
+	    }
 	    else return err;
 	}
 	pfcb = dir.dir_fcb;

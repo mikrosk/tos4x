@@ -418,7 +418,7 @@ MENU		*Menu;
  *         TRUE - returns the tree, parent, item and scroll status in Menu.
  */
 BOOLEAN
-mn_getmn( id, tree, item, itree, Menu )
+mn_getmn( id, tree, item, Menu )
 WORD		id;		/* Process id		      */
 OBJECT		*tree;		/* the tree we want to check  */
 WORD		item;		/* the menu item  for above   */

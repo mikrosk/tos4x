@@ -41,9 +41,9 @@ COUNTRY = usa
 	c068 m:\$*.i m:\$*.1 m:\$*.2 m:\$*.3 -f
 	c168 m:\$*.1 m:\$*.2 m:\$*.s
 	mac -6 m:\$*.s
-	del m:\$*.s m:\$*.i m:\$*.1 m:\$*.2 m:\$*.3
+	rm m:\$*.s m:\$*.i m:\$*.1 m:\$*.2 m:\$*.3
 	copy m:\$*.o $*.o
-	del m:\$*.o
+	rm m:\$*.o
 .c.oo:
 	cp68 $*.c m:\$*.i
 	c068 m:\$*.i m:\$*.1 m:\$*.2 m:\$*.3 -f
@@ -51,9 +51,9 @@ COUNTRY = usa
 	optimize m:\$*.s
 	mac -6 m:\$*.s
 #	as68 -l -u m:\$*.s
-	del m:\$*.s m:\$*.i m:\$*.1 m:\$*.2 m:\$*.3 $*.oo
+	rm m:\$*.s m:\$*.i m:\$*.1 m:\$*.2 m:\$*.3 $*.oo
 	copy m:\$*.o $*.oo
-	del m:\$*.o
+	rm m:\$*.o
 .s.o:
 	mas -us $*.s
 ##

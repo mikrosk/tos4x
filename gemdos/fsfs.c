@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
+* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.10  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.9  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -127,10 +130,10 @@ DIR *dir;
 
     fcb->f_attrib = attr | FA_ARCHIVE;
     for (i=10; i; fcb->f_fill[--i] = 0) ;
-    fcb->f_time = time;
-    swp68(time);
-    fcb->f_date = date;
-    swp68(date);
+    fcb->f_time = realtime;
+    swp68(fcb->f_time);
+    fcb->f_date = realdate;
+    swp68(fcb->f_date);
     fcb->f_clust = 0;
     fcb->f_fileln = 0;
     dirdirty(dir);
@@ -162,15 +165,15 @@ int mod;
  *
  *  ERROR CONSIDERATIONS:
  *  Since this function doesn't do any writes, it can't mangle the disk.
- *  You have to pre-allocate an OFD because you know you'll need one,
- *  and free it if you then need a DFD and can't get one, but that's
+ *  We allocate an OFD early because we know we'll need one,
+ *  and free it if we then need a DFD and can't get one, but that's
  *  all that can go wrong.
  */
 
 long
 ixopen(dir,mod)
 DIR *dir;
-int mod;
+uint mod;
 {
     FCB *fcb;
     int h;
@@ -178,10 +181,10 @@ int mod;
     OFD *ofd;
 
     /* fail if opening for mode other than zero and file is RO */
-    if ((mod > 0) && (dir->dir_fcb->f_attrib & FA_RO)) return EACCDN;
+    if (mod && (dir->dir_fcb->f_attrib & FA_RO)) return EACCDN;
 
     /* fail if there are no handles left */
-    if (h = sftprobe()) return ENHNDL;
+    if ((h = uftprobe()) < 0) return ENHNDL;
 
     /* get an OFD first, because we know we'll need one */
     /* and failure should get us out of here NOW. */
@@ -229,9 +232,7 @@ int mod;
 
     /* make handle h refer to this ofd and return h */
 
-    sft[h].f_ofd = ofd;
-    sft[h].f_own = run;
-
+    run->p_uft[h] = ofd;
     return h;
 }
 
@@ -269,7 +270,7 @@ char attr;			/* attribute byte */
     if (dfd = getdfd(&dir)) dfd->dfd_attrib = attr;
 
     dir.dir_fcb->f_attrib = attr;
-    dirdirty(dir);
+    dirdirty(&dir);
 
     return (unsigned long)attr;
 }
@@ -295,13 +296,14 @@ int *buf;			/* -> user buffer */
 int h;				/* file handle */
 int wrt;			/* 0:get, 1:set */
 {
+    OFD *ofd;
     DFD *dfd;
     int t[2];			/* buffer to hold user input for swapping */
 
-    h = syshnd(h);
-    if ((h < 0) || ofdisatty(sft[h].f_ofd)) return EIHNDL;
+    ofd = syshnd(h);
+    if (ofd == NULL || ofdisatty(ofd)) return EIHNDL;
   
-    dfd = sft[h].f_ofd->o_dfd;
+    dfd = ofd->o_dfd;
     if (!wrt) {
 	buf[0] = dfd->dfd_time;
 	buf[1] = dfd->dfd_date;
@@ -333,11 +335,11 @@ char *name;
 {
     DIR dir;
     long err;
-    FTAB *ftab;
+    OFD **uft, **uftend;
     OFD *ofd;
     DFD *dfd;
+    PD *pd, **pdend, **ppd;
     int youflag = 0;
-    int sftindex;
     int i;
 
     /* find normal files only, return any error */
@@ -351,25 +353,29 @@ char *name;
 
     /*
      * Refuse if the file is open by anybody else.  This involves
-     * scanning through the SFT looking for a DFD with a matching dev,
-     * dirrec, and diroffs.  We might visit a DFD more than once,
-     * but that's OK.  We look through SFT, not the linked list of
-     * dfd's, because we need the 'own' field in the SFT.
+     * looking first for a matching DFD, then exhaustively scanning
+     * p_uft for EACH PROCESS looking for entries which refer to OFD's
+     * which refer to this DFD.
      */
 
-    for (ftab = &sft[0]; ftab < &sft[OPNFILES]; ftab++) {
-	if (ftab->f_own) {
-	    ofd = ftab->f_ofd;
-	    if (!ofdisatty(ofd)) {
-		dfd = ofd->o_dfd;
-		if (dfd->dfd_dev == dir.dir_dev &&
-		    dfd->dfd_dirrec == dir.dir_recno &&
-		    dfd->dfd_diroffs == dir.dir_recoffs) {
-			/* same file */
-			if (ftab->f_own != run) return EACCDN;
-			else youflag = 1;
+    if (dfd = getdfd(&dir)) {
+	/* yes, *somebody* has this file open */
+	ppd = &pdtab[0];
+	pdend = &pdtab[NUMPDS];
+	while (ppd < pdend) {
+	    pd = *ppd;
+	    uft = &pd->p_uft[0];
+	    uftend = &pd->p_uft[pd->p_uftsize];
+	    while (uft < uftend) {
+		ofd = *uft;
+		if (ofd != NULL && !ofdisatty(ofd) && ofd->o_dfd == dfd) {
+		    /* got one! */
+		    if (pd == run) youflag = 1;
+		    else return EACCDN;
 		}
+		++uft;
 	    }
+	    ++ppd;
 	}
     }
 
@@ -378,60 +384,19 @@ char *name;
        case we have to call xclose for each time you have it open.  If
        any of these fails, we return the error code.  Hopefully, either
        the first one will fail or none of them will; otherwise, some of
-       your handles to the file are closed and some are not. 
-       The structure of this is as follows:
-
-	if (you have it open) {
-	    for (each slot in SFT) {
-		if (slot is valid) {
-		    if (!isatty(slot)) {
-			if (is the same file) {
-			    for (each std handle) {
-				if (this std handle referrs to the slot) {
-				    close the std handle (return errors)
-				    goto handle_is_closed;
-				}
-			    }
-			    (wasn't a std handle)
-			    close the handle (return errors)
-	handle_is_closed: ;
-	                }
-	            }
-	        }
-	    }
-	}
+       your handles to the file are closed and some are not.
      */
 	    
 
     if (youflag) {
-	/* for (each SFT slot) */
-	for (sftindex = 0, ftab = &sft[0]; 
-	     ftab < &sft[OPNFILES];
-	     ftab++, sftindex++) {
-		/* if (valid) */
-		if (ftab->f_own) {
-		    ofd = ftab->f_ofd;
-		    /* if (!isatty) */
-		    if (!ofdisatty(ofd)) {
-			/* if (is the same file) */
-			dfd = ofd->o_dfd;
-			if (dfd->dfd_dev == dir.dir_dev &&
-			    dfd->dfd_dirrec == dir.dir_recno &&
-			    dfd->dfd_diroffs == dir.dir_recoffs) {
-				/* close std if std, else close slot */
-				for (i=0; i<NUMSTD; i++) {
-				    if (run->p_uft[i] == sftindex) {
-					if (err = xclose(i)) return err;
-					goto handle_is_closed;
-				    }
-				}
-				/* wasn't a std handle */
-				if (err = xclose(sftindex)) return err;
-handle_is_closed:		;
-			}
-		    }
+    	for (i=0, uft = &run->p_uft[0], uftend = &run->p_uft[run->p_uftsize];
+	     uft < uftend;
+	     uft++, i++) {
+		ofd = *uft;
+		if (ofd != NULL && !ofdisatty(ofd) && ofd->o_dfd == dfd) {
+		    (void)xclose(i);
 		}
-	 }
+	}
     }
 
     /* hoo boy! Now nobody has the file open. Freshen bcb & fcb and nuke. */
@@ -553,7 +518,7 @@ char *p2;			/* new name */
 	if (err = name2fcb(p2,NULL,dir2.dir_fcb)) return err;
 	dirdirty(&dir2);
 
-	/* new file was (successfully?) created in dir2; remove from dir1 */
+	/* new file was created in dir2; remove from dir1 */
 	dir2dir(&dir1);
 	*dir1.dir_fcb->f_name = 0xe5;		/* erase old file */
 	dirdirty(&dir1);
@@ -579,6 +544,8 @@ char *p2;			/* new name */
 /*
  * xlseek: update the read-write pointer of a file.
  * Calls ixlseek on the OFD and new pointer location.
+ *
+ * For tty's, returns zero.  Some programs use this to determine isatty.
  */
 
 long
@@ -588,6 +555,7 @@ int h;
 int flg;
 {
     OFD *ofd;
+    DFD *dfd;
     uint new;
     uint old;
     uint clcount;
@@ -595,21 +563,22 @@ int flg;
     DMD *dmd;
     uint curcl;
 
-    if ((h = syshnd(h)) < 0) return EIHNDL;
-    ofd = sft[h].f_ofd;
-    if (ofdisatty(ofd)) return EIHNDL;
+    if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+    if (ofdisatty(ofd)) return 0;
+
+    dfd = ofd->o_dfd;
 
     if (flg == 2)
-	n += ofd->o_dfd->dfd_fileln;
+	n += dfd->dfd_fileln;
     else if (flg == 1)
 	n += ofd->o_bytnum;
     else if (flg)
 	return(EINVFN);
 
-    if (n > ofd->o_dfd->dfd_fileln || n < 0)
+    if (n > dfd->dfd_fileln || n < 0)
 	return(ERANGE);
 
-    dmd = &drvtbl[ofd->o_dfd->dfd_dev];
+    dmd = &drvtbl[dfd->dfd_dev];
 
     /* set OFD r/w pointer fields to the right values */
     if (!n) ofd->o_curcl = 0;
@@ -617,7 +586,7 @@ int flg;
 	new = n >> dmd->m_clblog;
 	old = ofd->o_bytnum >> dmd->m_clblog;
 	if (new < old) {
-	    curcl = ofd->o_dfd->dfd_strtcl;
+	    curcl = dfd->dfd_strtcl;
 	    clcount = new;
 	}
 	else {

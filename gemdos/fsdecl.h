@@ -1,12 +1,15 @@
 /*
 ***************************    FSDECL.H    ******************************
 *
-* $Revision: 2.7 $	$Source: e:/tos/gd2\RCS\fsdecl.h,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\fsdecl.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdecl.h,v $
+* Revision 2.8  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.7  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -35,13 +38,11 @@ extern uint drvsel;	/* mask of drives selected since power up */
 extern long rwerr;	/* hard error number currently in progress */
 extern uint errdrv;	/* drive on which error occurred */
 
-extern long negone;
-extern unsigned int time;
-extern unsigned int date;
+extern uint realtime;
+extern uint realdate;
 extern BCB *bufl[];
 extern uint bootdev;
 extern long errbuf[3];
-extern FTAB sft[];
 extern char diruse[];
 extern DMD drvtbl[16];
 
@@ -50,12 +51,10 @@ extern MPB pmd;
 extern char nday[];
 
 extern PD rootpd;
+extern OFD *rootuft[];
+extern PD *pdtab[];
+extern char biosdev[];
 
 DFD *dfd_head;
 OFD *ofd_head;
 
-extern long glbkbchar[3][KBBUFSZ];
-extern char kbchar[3];
-extern long *insptr[3];
-extern long *remptr[3];
-extern int glbcolumn[3];

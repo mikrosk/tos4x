@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.6 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
+* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.7  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.6  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -21,57 +24,53 @@
 
 #include "fs.h"
 
-/*
- * hand_init: initialize the handle system.
- */
-
-char biosdev[NUMSTD] = { -1, -1, -2, -3, -1, -1 };
-
-voidfn
-handinit()
-{
-    int i;
-    for (i=0; i<NUMSTD; i++) {
-	sft[i].f_own = &rootpd;
-	ofdmaketty(sft[i].f_ofd,biosdev[i]);
-    }
-}
-
+char biosdev[NUMSTD] = { 2, 2, 1, 0, 2, 2 };
 
 /*
- * return the index of an available slot in the SFT.
+ * return the index of an available slot in this user's UFT.
+ * Don't return one < NUMSTD.
  */
 
 int
-sftprobe()
+uftprobe()
 {
-    int i;
-    FTAB *fptr;
+    int i, size;
+    OFD **fptr;
 
-    for (i = 0, fptr = &sft[0]; i < OPNFILES; i++, fptr++)
-	if (!fptr->f_own)
-	    return i;
+    size = run->p_uftsize;
+    for (i = NUMSTD, fptr = &run->p_uft[NUMSTD];
+    	 i < size;
+    	 i++, fptr++) {
+	    if (*fptr == NULL) return i;
+    }
     return -1;
 }
 
 /*
- * Given a user handle number, return the slot number in SFT.
- * This includes turning negative user handles into the corresponding
- * positive one, and indirecting handles 0-NUMSTD through the PD.
+ * Given a handle number from the user, return something sensible.
  *
- * Returns -NUMBIOS for invalid handles, -ve for -ve input, or sft slot number.
+ * Old-style TTY device numbers -1 (CON:), -2 (AUX:), and -3 (PRN:)
+ * are turned into new-style device numbers (one's complement of
+ * the BIOS device number).
+ *
+ * INPUT			OUTPUT
+ * h <= -NUMBIOS		NULL
+ * -NUMBIOS < h < 0		(OFD *)((~(h+3)) << 1) (old->new TTY style)
+ * else				run->p_uft[h] (poss isatty or null)
+ *
+ * ...where run->p_uft[h] is an ofd: ofdisatty, real pointer, or NULL.
  */
-int
-syshnd(h)
+
+OFD
+*syshnd(h)
 int h;
 {
-	if (h <= -NUMBIOS || h > OPNFILES) 
-	    return -NUMBIOS;				/* too small/big */
-	if (h < 0) return -h;				/* BIOS dev */
-	if (h < NUMSTD) return run->p_uft[h];		/* PD indirect */
-	return h;					/* direct */
+	if (h <= -NUMBIOS || h >= run->p_uftsize)
+	    return NULL;			/* too small/big */
+	if (h < 0) return (OFD *)(~(h+3));	/* old-style BIOS dev */
+	return run->p_uft[h];
 }
-		
+
 /*
  * The idea of dup & force is that you might redirect and un-redirect
  * stdout as follows:
@@ -88,31 +87,33 @@ int h;
  *
  * Note: the Fclose of new_stdout could happen after the Fforce, too.
  * You do need as many closes as there are opens and dups.
+ *
+ * There are no restrictions on the handles you can dup or force any more.
  */
 
 /*
  * Duplicate handle.
  */
 long
-xdup(h)	/*+ h must be a standard handle (checked) */
+xdup(h)
 int h;
 {
 	int i;
-	FTAB *fptr;
+	OFD *ofd;
+	PD *_run = run;
 
-	if ((h<0) || (h >= NUMSTD))
-		return(EIHNDL);		/* only dup standard */
+	if ((h<0) ||
+	    (h >= _run->p_uftsize) ||
+	    ((ofd = _run->p_uft[h]) == NULL))
+		return(EIHNDL);
 
-	if ((i = sftprobe()) < 0) return (ENHNDL);
+	if ((i = uftprobe()) < 0) return ENHNDL;
 
-	fptr = &sft[i];
+	ofd = _run->p_uft[h];
+	_run->p_uft[i] = ofd;
 
-	/* get real slot number, fail if -ve */
-	if ((h = syshnd(h)) < 0) return EIHNDL;
-
-	fptr->f_own = run;
-	fptr->f_ofd = sft[h].f_ofd;
-	fptr->f_ofd->o_use++;		/* OFD used again now */
+	/* is there an equivalent to o_use++ for TTY's? */
+	if (!ofdisatty(ofd)) ofd->o_use++;	/* OFD used again now */
 
 	return(i);
 }
@@ -120,7 +121,7 @@ int h;
 
 /*
  * Force handle: force 'std' to be the same thing that 'h' is.
- * 'std' must be a standard handle [0-NUMSTD), h may not be.
+ * No restrictions on what handles you can force to what others.
  */
 long
 xforce(std,h)
@@ -130,57 +131,49 @@ int std,h;
 }
 
 /*
- * ixforce: called by xforce and pexec, takes the additional arg
- * of the PD in which the force takes place.  'h' is still
+ * ixforce: called by xforce and pexec, takes the additional arg:
+ * the PD in which the force takes place.  'dest' is in pd, 'src'
+ * is in run.
+ *
+ * You *can* Fforce(0,-1) to make stdout refer to CON: -- this is
+ * for compatibility (?).
  */
 long
-ixforce(std,h,p)	/* h   must NOT be a standard handle */
-PD *p;			/* std must	be a standard handle */
-int std;
-int h;
+ixforce(dest,src,pd)
+int dest;
+int src;
+PD *pd;
 {
-	int stdh;
 	long err;
+	PD *_run;
+	OFD *ofd;
 
-	if ((std < 0) || (std >= NUMSTD))
+	if ((dest < 0) || (dest >= pd->p_uftsize))
 		return(EIHNDL);
-	
-	if (h < NUMSTD || h > OPNFILES) {
-	    /* too small/big, or a BIOS handle, or a STD handle */
+
+	if (src < -NUMBIOS || src >= _run->p_uftsize) {
+	    /* too small/big */
 	    return EIHNDL;
 	}
-	if (sft[h].f_own == NULL) 
-	    return EIHNDL;		/* invalid handle */
 
-	/* close whatever 'std' points to already. */
-	/* Don't bother if being called by pexec, setting up a new PD. */
-	/* The syshnd call can't fail, since std is known to be legal. */
+	if (src >= 0) {
+	    ofd = _run->p_uft[src];
+	    if (ofd == NULL) return EIHNDL;
 
-	if (p == run) {
-	    stdh = syshnd(std);
-	    /* this assert will fail if sombody's monkeyed with your PD */
-	    ASSERT(stdh >= NUMSTD);
-	    if (sft[stdh].f_own != NULL && !ofdisatty(sft[stdh].f_ofd)) {
-		/* std really points to a file. Close it. */
-		/* If the close returns and error, God help you. */
-		if (err = xclose(std)) return err;
+
+	    if (pd == _run) {
+		/* close whatever 'dest' points to already, */
+		/* but only if not spawning a new process.  */
+
+		if (err = xclose(dest)) return err;
 	    }
-	}
-
-	if (h < 0) {
-	    /* Force std to be BIOS device h+3. */
-	    /* To do this we use a slot in SFT & point p_uft[std] at it. */
-	    stdh = sftprobe();
-	    sft[stdh].f_own = p;
-	    ofdmaketty(sft[stdh].f_ofd,h+3);
-	    p->p_uft[std] = stdh;
+	    /* now copy it over, and increase use count */
+	    pd->p_uft[dest] = ofd;
+	    ofd->o_use++;
 	}
 	else {
-	    /* Force std to be whatever h is */
-	    stdh = sftprobe();
-	    sft[stdh].f_own = p;
-	    sft[stdh].f_ofd = sft[h].f_ofd;
-	    p->p_uft[std] = stdh;
+	    /* is there an equivalent to o_use++ for TTY's? */
+	    pd->p_uft[dest] = ofdtty(src+3);
 	}
 	return E_OK;
 }
@@ -206,101 +199,74 @@ long
 xclose(h)
 int h;
 {
-	int realh;
-	OFD *fd;
-	long rc;
-	FTAB *fptr;
+	OFD *ofd;
+	PD *_run;
 
-	if (h <= -NUMBIOS) return EIHNDL;
-	if (h < 0) return(E_OK);	/* "close" a character device */
+    /* A while ago, I "guaranteed" that any close would flush all */
+    /* dirty sectors on all drives ... do that first. See xsync() */
 
-	realh = syshnd(h);
-	if (realh == -NUMBIOS) return EIHNDL;
-	if (sft[realh].f_own == NULL) return EIHNDL;	/* not open */
+    xsync();
 
-	/* note: anybody can close anybody else's handle; */
-	/* check would go here to restrict that.	  */
+    if (h < -NUMBIOS || h >= _run->p_uftsize) return EIHNDL;
+    if (h < 0) return E_OK;	    /* "close" an old-style TTY */
 
-	fptr = &sft[realh];
-	if (ofdisatty(fptr->f_ofd)) {
-	    /* close a char device; really do nothing */
-	    /* but see below: we reopen h onto BIOS dev if it's std */
-	}
-	else {
-	    /* close a file; return errors before doing side effects */
-	    if ((fd=fptr->f_ofd)->o_use == 1) {
-		/* the OFD use count would drop to zero */
-		if (fd->o_dfd->dfd_use == 1) {
-		    /* the DFD use count would drop to zero */
-		    if (rc = dfd_close(fd->o_dfd))	/* close the DFD */
-			return rc;
-		}
-		else --(fd->o_dfd->dfd_use);
-		if (rc = ofd_close(fd))			/* close the OFD */
-		    return rc;
+    if ((ofd = _run->p_uft[h]) == NULL) return EIHNDL;	/* not open */
+
+    /* mark as closed, but see below: h<NUMSTD gets reopened */
+    _run->p_uft[h] = NULL;
+
+    if (ofdisatty(ofd)) {
+	/* close a new-style char device; really do nothing for now,  */
+	/* but see below: we reopen h onto BIOS dev if it's a std hdl */
+    }
+    else {
+	/* close a file; really close it in spite of errors */
+	if ((--ofd->o_use) == 0) {
+	    if (--(ofd->o_dfd->dfd_use) == 0) {
+		freebig(ofd->o_dfd);
 	    }
-	    else --(fd->o_use);
-        }
-
-	if (h >= NUMSTD) {
-	    fptr->f_own = NULL;				/* free this slot */
-        }
-        else {
-	    /* h was a std handle; we need to reopen it on a char dev. */
-	    /* fptr points to a slot we can use. */
-	    fptr->f_own = run;
-	    fptr->f_ofd = sft[h].f_ofd;	    /* dup a low sft handle */
-
-	    /* I don't know if this is ever going to be necessary */
-	    if (!ofdisatty(fptr->f_ofd)) fptr->f_ofd->o_use++;
+	    freebig(ofd);
 	}
-	return E_OK;
+    }
+
+    /* now re-open the handle on its default BIOS device if < NUMSTD */
+    if (h < NUMSTD) {
+	/* h was a std handle; we need to reopen it on a char dev. */
+	_run->p_uft[h] = ofdtty(biosdev[h]);
+    }
+
+    return E_OK;
 }   
 
-/*
- * long dfd_close(dfd)
- *
- * Called only when the dfd's use count would reach zero.
- * Writes the dirty information if dirty, and frees the dfd.
- */
-
 long
-dfd_close(dfd)
-DFD *dfd;
+xsync()
 {
+	DFD *dfd;
 	DIR dir;
 	long err;
+	FCB *fcb;
 
-	if (dfd->dfd_dirty) {
+	/* update all dirty DFD's -- mark BCB's dirty so flushall writes them */
+	for (dfd = dfd_head; dfd; dfd = dfd->dfd_next) {
+	    if (dfd->dfd_dirty) {
 		dir.dir_dev = dfd->dfd_dev;
 		dir.dir_clust = dfd->dfd_dircl;
 		dir.dir_recno = dfd->dfd_dirrec;
 		dir.dir_recoffs = dfd->dfd_diroffs;
 		if (err = dir2dir(&dir)) return err;
-		dir.dir_fcb->f_attrib = dfd->dfd_attrib;
-		dir.dir_fcb->f_time = dfd->dfd_time;
-		dir.dir_fcb->f_date = dfd->dfd_date;
-		dir.dir_fcb->f_clust = dfd->dfd_strtcl;
-		dir.dir_fcb->f_fileln = dfd->dfd_fileln;
-		swp68l(dir.dir_fcb->f_fileln);
-		dirdirty(&dir);
+		fcb = dir.dir_fcb;
+		fcb->f_attrib = dfd->dfd_attrib;
+		fcb->f_time = dfd->dfd_time;
+		fcb->f_date = dfd->dfd_date;
+		fcb->f_clust = dfd->dfd_strtcl;
+		fcb->f_fileln = dfd->dfd_fileln;
+		swp68l(fcb->f_fileln);
+		dir.dir_bcb->b_dirty = 1;
+		dfd->dfd_dirty = 0;
+	    }
 	}
-	freebig(dfd);
-	return E_OK;
-}
 
-/*
- * long ofd_close(ofd)
- *
- * Called only when the ofd's use count would reach zero.
- * Frees the ofd.
- */
-
-long
-ofd_close(ofd)
-OFD *ofd;
-{
-	freebig(ofd);
+	flushall();
 	return E_OK;
 }
 
@@ -308,7 +274,6 @@ OFD *ofd;
  * long Fread(handle,count,buffer)
  *  read 'count' bytes from 'handle' to 'buffer'
  *
- * May be called with 'handle' -ve or referring through PD to a BIOS dev.
  * Calls cgets or xrw as appropriate.
  * Cuts the request down so it doesn't fall of EOF before calling xrw.
  */
@@ -319,24 +284,19 @@ int h;
 long len;
 void *ubufr;
 {
-	OFD *p;
+	OFD *ofd;
 	long maxlen;
 
-	if ((h = syshnd(h)) == -NUMBIOS) return EIHNDL;
+	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
-	if (h < 0) {
+	if (ofdisatty(ofd)) {
 	    if (len > 32767) len = 32767;
-	    return cgets(h+3,len,ubufr);
-	}
-	p = sft[h].f_ofd;
-	if (ofdisatty(p)) {
-	    if (len > 32767) len = 32767;
-	    return cgets(ofddevno(p),(int)len,ubufr);
+	    return cgets(ofddevno(ofd),len,ubufr);
 	}
 
-	if (len > (maxlen = (p->o_dfd->dfd_fileln - p->o_bytnum)))
+	if (len > (maxlen = (ofd->o_dfd->dfd_fileln - ofd->o_bytnum)))
 	    len = maxlen;
-	if (len) return xrw(0, p, len, ubufr, xfr2usr);
+	if (len) return xrw(0, ofd, len, ubufr, xfr2usr);
 	else return 0;
 }
 
@@ -355,48 +315,31 @@ int h;
 long len;
 void *ubufr;
 {
-	OFD	*p;
+	OFD	*ofd;
 	long err;
 
-	if ((h = syshnd(h)) == -NUMBIOS) return EIHNDL;
+	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
-	if (h < 0) return char_write(h+3,len,ubufr);
-	p = sft[h].f_ofd;
-	if (ofdisatty(p))
-	    return char_write(ofddevno(p),len,ubufr);
+	if (ofdisatty(ofd))
+	    return char_write(ofddevno(ofd),len,ubufr);
 #if RO_FACISM
-	if (!(p->o_flag & O_WRITE)) return EACCDN;
+	if (!(ofd->o_flag & O_WRITE)) return EACCDN;
 #endif
 
-	err = xrw(1,p,len,ubufr,usr2xfr);
+	err = xrw(1,ofd,len,ubufr,usr2xfr);
 
 	/* update date, time, and archive bit on writes which write   */
 	/* (this means a write which succeeds partway doesn't update) */
 	if (err > 0) {
-	    p->o_dfd->dfd_date = date;
-	    p->o_dfd->dfd_time = time;
-	    swp68(p->o_dfd->dfd_date);
-	    swp68(p->o_dfd->dfd_time);
-	    p->o_dfd->dfd_attrib |= FA_ARCHIVE;
-	    p->o_dfd->dfd_dirty = 1;
+	    dfd = ofd->o_dfd;
+	    dfd->dfd_date = realdate;
+	    dfd->dfd_time = realtime;
+	    swp68(dfd->dfd_date);
+	    swp68(dfd->dfd_time);
+	    dfd->dfd_attrib |= FA_ARCHIVE;
+	    dfd->dfd_dirty = 1;
 	}
 	return err;
-}
-
-long
-char_write(h,len,buf)
-int h;
-long len;
-char *buf;
-{
-    long orig_len = len;
-    if (h == 2) {
-	while (len--) tabout(h,*buf++);
-    }
-    else {
-	while (len--) bconout(h,*buf++);
-    }
-    return orig_len;
 }
 
 /*
@@ -404,11 +347,22 @@ char *buf;
  * Create `name' with the given name and attribute byte, and return a handle.
  * If the attribute includes read-only, then the (empty!) file is opened
  * for reading only (!).
+ *
+ * Creating a read-only file is actually useful: you can use it as a locking
+ * mechanism in a multi-tasking environment.
+ *
+ *	ACQUIRE LOCK: Fcreate("lock",FA_RO);
+ *
+ *	RELEASE LOCK: Fattrib("lock",1,0);	(make writable)
+ *	(and optionally Fdelete("lock");)
+ *
+ * The acquire operation will fail if the lock file exists, and succeed
+ * atomically if it doesn't.
  */
 long
 xcreat(name,attr)
 char *name;
-char attr;
+int attr;
 {
 	long err;
 	DIR dir;
@@ -470,16 +424,3 @@ xgetdrv()
 	return(run->p_curdrv);
 }
 
-/*
- *  Copy string `s' of length `n' to `d'.
- *
- *  This function is identical to xfr2usr.
- */
-voidfn
-xmovs(n, s, d)
-int n;
-void *s, *d;
-{
-  while (n--)
-    *(char *)d++ = *(char *)s++;
-}

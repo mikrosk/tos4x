@@ -1,12 +1,15 @@
 /*
 ***************************    FSCOMM.C    ******************************
 *
-* $Revision: 2.6 $	$Source: e:/tos/gd2\RCS\fscomm.c,v $
+* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\fscomm.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscomm.c,v $
+* Revision 2.7  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.6  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -32,15 +35,16 @@ uint logmsk[] = {
 
 long rwerr;		/* hard error number currently in progress */
 uint errdrv;		/* drive on which error occurred */
-uint time;		/* current time word */
-uint date;		/* current date word */
+uint realtime;		/* current time word */
+uint realdate;		/* current date word */
 PD rootpd;
+OFD *rootuft[OPNFILES];
+PD *pdtab[NUMPDS];
 PD *run;
 char callno;
 DFD *dfd_head;
 OFD *ofd_head;
 
-FTAB sft[OPNFILES];	/* system file table */
 DMD drvtbl[MAXDEVS];	/* drive media descriptor for each dev */
 
 long errbuf[3];

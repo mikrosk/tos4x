@@ -1,12 +1,15 @@
 /*
 ***************************     CON.C      ******************************
 *
-* $Revision: 2.7 $	$Source: e:/tos/gd2\RCS\con.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\con.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: con.c,v $
+* Revision 2.8  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.7  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -52,47 +55,173 @@ int glbcolumn[3];			/* column position */
 
 #define warmboot() xterm(-32)
 
-/* TOP LEVEL CALLS: call only when you know run->p_uft[x] is a BIOS dev */
+coninit()
+{
+	kbchar[0] = kbchar[1] = kbchar[2] = 0;
+	remptr[0] = insptr[0] = &(glbkbchar[0][0]);
+	remptr[1] = insptr[1] = &(glbkbchar[1][0]);
+	remptr[2] = insptr[2] = &(glbkbchar[2][0]);
+}
 
-/* Console Input Status */
+/* TOP-LEVEL CALLS */
+
+long
+xconout(ch)
+int ch;
+{
+	return _conout(1,ch);
+}
+
+long
+xauxout(ch)
+int ch;
+{
+	return _conout(2,ch);
+}
+
+long
+xprtout(ch)
+int ch;
+{
+	return _conout(3,ch);
+}
+
+long
+_conout(h,ch)
+int h, ch;
+{
+	OFD *ofd;
+	int dev;
+	char c;
+	long err;
+
+	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+	if (ofdisatty(ofd)) return bconout(ofddevno(ofd),ch);
+	c = ch;
+	if ((err = xwrite(h,1L,&c)) != 1) return err;
+	return E_OK;
+}
+
+long
+xconin()
+{
+	return _conin(COOKED|ECHO,0);
+}
+
+long
+xnecin()
+{
+	return _conin(COOKED|NOECHO,0);
+}
+
+long
+xauxin()
+{
+	return _conin(RAW|NOECHO,2);
+}
+
+long
+xrawio(ch)
+int ch;
+{
+	if (ch == 0x00ff) {
+		if (_istat(0)) return _conin(RAW|NOECHO,0);
+	}
+	else return _conout(1,ch);
+}
+
+_conin(mode,h)
+int mode;
+int h;
+{
+	OFD *ofd;
+	char c;
+	long err;
+
+	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+	if (ofdisatty(ofd)) return conin(mode,ofddevno(ofd));
+
+	if ((err = xread(h,1L,&c)) != 1) return err;
+	return c;
+}
+
+/*
+ * Cconws()
+ */
+long
+xconws(p)
+char *p;
+{
+	OFD *ofd;
+	long err;
+	long len;
+	char *p1;
+
+	if ((ofd = syshnd(1)) == NULL) return EIHNDL;
+	if (ofdisatty(ofd)) {
+		while (*p) _conout(0,*p++);
+		return E_OK;
+	}
+	else {
+		for (p1 = p; *p1++ ; ) ;
+		len = p1 - p;
+		if ((err = xwrite(1,len,p)) != len) return err;
+		return E_OK;
+	}
+}
+
+
 long
 xconstat()
 {
-	return(constat(run->p_uft[0]+3));
+	return _istat(0);
 }
 
-
-/* Console Output Status. */
 long
-xconostat()
+xauxis()
 {
-	return(bconostat(run->p_uft[1]+3));
+	return _istat(2);
 }
 
+_istat(h)
+int h;
+{
+	OFD *ofd;
+	char c;
 
-/* Printer Output Status. */
+	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+	if (ofdisatty(ofd)) return constat(ofddevno(ofd));
+
+	return (ofd->o_bytnum < ofd->o_dfd->dfd_fileln);
+}
+
 long
-xprtostat()
+xconos()
 {
-	return(bconostat(run->p_uft[3]+3));
+	return _ostat(1);
 }
 
-
-/* Auxillary Input Status. */
 long
-xauxistat()
+xprnos()
 {
-	return(constat(run->p_uft[2]+3));
+	return _ostat(3);
 }
 
-
-/* Auxillary Output Status. */
 long
-xauxostat()
+xauxos()
 {
-	return(bconostat(run->p_uft[2]+3));
+	return _ostat(2);
 }
 
+long
+_ostat(h)
+int h;
+{
+	OFD *ofd;
+	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+	if (ofdisatty(ofd)) return bconstat(ofddevno(ofd));
+	return 1;
+}
 
 /* LOWER-LEVEL CALLS */
 
@@ -217,19 +346,6 @@ int ch;
 
 
 /*
- * Console Output;
- * with tab expansion.
- * [is that a feature???]
- */
-long
-xtabout(ch)
-int ch;
-{
-	return tabout(run->p_uft[1]+3,ch & 0xff);
-}
-
-
-/*
  * Expand tabs to output device.
  * (WE DON'T NEED THIS).
  */
@@ -275,32 +391,6 @@ int ch;
 
 
 /*
- * Auxillary Output.
- */
-long
-xauxout(ch)
-int ch;
-{
-	return bconout(run->p_uft[2]+3,ch);
-}
-
-
-/*
- * Printer Output.
- *
- * Explicitly returns the return code from the BIOS, because BIOS
- * returns 0 for success, !0 for parallel port timeout.
- * ('return' keyword added 5/88 AKP)
- */
-long
-xprtout(ch)
-int ch;
-{
-	return bconout(run->p_uft[3]+3,ch);
-}
-
-
-/*
  * Get Character;
  * from a buffer, or the device itself.
  *
@@ -331,11 +421,10 @@ int h;
 
 
 /*
- * Direct Console Input;
- * no echoing.
+ * Crawcin()
  */
 long
-x7in()
+xrawcin()
 {
 	return(getch(run->p_uft[0]+3));
 }
@@ -348,81 +437,19 @@ x7in()
  * Calls conbrk in block mode.
  */
 long
-conin(h)
+conin(mode,h)
+int mode;
 int h;
 {
     REG long ch;
+
+	/* not really done yet */
+	1+;
 
     conbrk(h,1);
     conout( h,(int)(ch = getch(h)) );
     return(ch);
 }
-
-/*
- * Console Input.
- */
-long
-xconin()
-{
-	return(conin(run->p_uft[0]+3));
-}
-
-
-/*
- * Console Input;
- * without echo.
- */
-long
-x8in()
-{
-	REG int h;
-	REG long ch;
-
-	h = run->p_uft[0]+3;
-	conbrk(h,1);
-	ch = getch(h);
-	return(ch);
-}
-
-
-/*
- * Auxillary Input.
- */
-long
-xauxin()
-{
-	return(bconin(run->p_uft[2]+3));
-}
-
-
-/*
- * Raw Console Input and Output.
- */
-long
-rawconio(parm)
-int parm;
-{
-REG	int i;
-
-	if (parm == 0xFF) {
-		i = run->p_uft[0]+3;
-		return(constat(i) ? getch(i) : 0L);
-	}
-	return bconout(run->p_uft[1]+3, parm);
-}
-
-
-/*
- * Print String;
- * to terminating null.
- */
-long
-xprt_line(p)
-char *p;
-{
-	return prt_line(run->p_uft[1]+3,p);
-}
-
 
 /*
  * Print line.
@@ -502,10 +529,10 @@ int col;			/* starting console column	*/
 
 
 /*
- * Read Line from Console.
+ * Cconrs()
  */
 long
-readline(p)	/* function 10 */
+xconrs(p)	/* function 10 */
 char *p;	/* max length, return length, buffer space */
 {
 	p[1] = cgets(run->p_uft[0]+3,(((int) p[0]) & 0x0ff),&p[2]);
@@ -558,3 +585,21 @@ char *buf;
 	}
 getout:	return(retlen);
 }
+
+long
+char_write(tty,len,buf)
+int tty;
+long len;
+char *buf;
+{
+    long orig_len = len;
+    if (tty == 2) {
+	while (len--) tabout(tty,*buf++);
+    }
+    else {
+	while (len--) bconout(tty,*buf++);
+    }
+    return orig_len;
+}
+
+

@@ -13,7 +13,7 @@ char *argv[];
 
 	osi();
 
-	h = xcreat("m:\testfile",0);
+	h = xcreat("m:\\testfile",0);
 	xwrite(h,10,"now is the");
 	xclose(h);
 }
@@ -62,6 +62,10 @@ int code;
 
 BCB *bufl[2];
 
+/*
+ * slow, stupid clear, but it works for any length block
+ */
+
 voidfn
 clear(start,end)
 void *start, *end;
@@ -73,7 +77,7 @@ void *start, *end;
 
 void
 xfr2usr(n,s,d)
-long n;
+uint n;
 void *s, *d;
 {
 	char *s1 = s, *d1 = d;
@@ -82,7 +86,7 @@ void *s, *d;
 
 void
 usr2xfr(n,d,s)
-long n;
+uint n;
 void *d, *s;
 {
 	char *s1 = s, *d1 = d;
@@ -94,6 +98,33 @@ uint bootdev = 0;
 voidfn
 upd_tod()
 {
-	long x = (date << 16) | (time);
-	trap14(16,x);
+#if REAL
+	long x = (realdate << 16) | (realtime);
+	trap14(0x16,x);
+#endif
 }
+
+long
+cgets(h,len,buf)
+int h;
+long len;
+char *buf;
+{
+	return 0;
+}
+
+long
+char_write(h,len,buf)
+int h;
+long len;
+char *buf;
+{
+	while (len--) trap13(3,h,*buf++);	/* Bconout */
+	return E_OK;
+}
+
+void
+coninit()
+{
+}
+

@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.10  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.9  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -156,6 +159,7 @@ DMD *dmd;
     uint swapped_cl;
     char *buf, *src;
     uint count;
+    FCB *fcb;
 
     /* return now without doing anything if root dir */
     if (!dir->dir_clust) return len;
@@ -177,14 +181,14 @@ DMD *dmd;
     swapped_cl = dir->dir_clust;
     swp68(swapped_cl);
 
-    for (err = dirfirst(&dir2,dmd);
+    for (err = dirfirst(&dir2,dmd), fcb = dir2.dir_fcb;
 	 (!err && 
-	  dir2.dir_fcb->f_name[0] != 0 && 
-	  dir2.dir_fcb->f_name[0] != ERASED &&
-	  dir2.dir_fcb->f_clust != swapped_cl);
-	err = dirnext(&dir2,dmd)) /* empty */ ;
+	  fcb->f_name[0] != 0 && 
+	  fcb->f_name[0] != ERASED &&
+	  fcb->f_clust != swapped_cl);
+	err = dirnext(&dir2,dmd), fcb = dir2.dir_fcb) /* empty */ ;
 
-    if (dir2.dir_fcb->f_name[0] == 0 || err == ENMFIL) {
+    if (fcb->f_name[0] == 0 || err == ENMFIL) {
 	/* return ERROR if you fell off without finding the dir! */
 	/* it's not really an EINTRN since it's external */
 	return ERROR;
@@ -194,7 +198,7 @@ DMD *dmd;
     buf = *pbuf;
     *buf++ = SLASH;
     len--;
-    src = dir2.dir_fcb->f_name;
+    src = fcb->f_name;
 
     for (count = (len < 8 ? len : 8);
 	 count && *src != ' ';
@@ -206,7 +210,7 @@ DMD *dmd;
 	return 0;
     }
 
-    if (*buf != ' ') *buf++ = '.', --len;
+    if (*src != ' ') *buf++ = '.', --len;
 
     for (count = (len < 3 ? len : 3);
 	 count && *src != ' ';
@@ -269,8 +273,8 @@ char *s;
     fcb->f_name[1] = 0x20;
     fcb->f_attrib = FA_SUBDIR;
     for (i=10; i; fcb->f_fill[--i] = 0) ;
-    fcb->f_time = time;
-    fcb->f_date = date;
+    fcb->f_time = realtime;
+    fcb->f_date = realdate;
     fcb->f_clust = cl;
     fcb->f_fileln = 0;
 
@@ -316,10 +320,10 @@ char *s;
 
     fcb->f_attrib = FA_SUBDIR;
     for (i=10; i; fcb->f_fill[--i] = 0) ;
-    fcb->f_time = time;
-    swp68(time);
-    fcb->f_date = date;
-    swp68(date);
+    fcb->f_time = realtime;
+    swp68(fcb->f_time);
+    fcb->f_date = realdate;
+    swp68(fcb->f_date);
     fcb->f_fileln = 0;
 
     /* set the starting-cluster field of the entry */
@@ -362,6 +366,7 @@ char *p;
     uint cl;
     DMD *dmd;
     uint dev;
+    char c;
 
     if (err = fn2dir(&p,&dir,FN_NORM)) {
 	if (err == EFILNF) return EPTHNF;
@@ -390,9 +395,14 @@ char *p;
     if (err = dirnext(&dir2,dmd)) return err;
 
     /* see if there are any files in this dir (except . and ..) */
-    while (((err = dirnext(&dir2,dmd)) == 0) && dir2.dir_fcb->f_name[0] != 0) {
-	if (dir2.dir_fcb->f_name[0] != ERASED)
-	    return EACCDN;		/* not empty */
+    /* (this loop is structured this way for efficiency & clarity) */
+    /* (so don't give me any heat!) */
+
+    while (1) {
+	if ((err = dirnext(&dir2,dmd)) != 0) break;
+	c = dir2.dir_fcb->f_name[0];
+	if (!c) break;
+	if (c != ERASED) return EACCDN;
     }
 
     if (err && err != ENMFIL) return err;
@@ -471,6 +481,8 @@ xsnext() /*+ search next, return into dta */
     DTA *dta;
     DMD *dmd;
     long err;
+    FCB *pfcb;
+    char c;
 
     dta = run->p_xdta;
 
@@ -490,15 +502,21 @@ xsnext() /*+ search next, return into dta */
     dmd = &drvtbl[dir.dir_dev];
     dir2dir(&dir);
 
-    while (((err = dirnext(&dir,dmd)) == 0) && (dir.dir_fcb->f_name[0] != 0)) {
-	if ((dir.dir_fcb->f_name[0] != ERASED) && wmatch(&fcb,dir.dir_fcb)) {
-	    /* found a match */
+    /* this loop is structured this way for efficiency in */
+    /* the face of a compiler that doesn't seem to make the */
+    /* favorable assumptions that I would like. */
+
+    while (1) {
+	err = dirnext(&dir,dmd);
+	if (err) return err;	    /* includes ENMFIL */
+	pfcb = dir.dir_fcb;
+	c = pfcb->f_name[0];
+	if (c == 0) return ENMFIL;
+	if (c != ERASED && wmatch(&fcb,pfcb)) {
 	    filldta(dta,&dir);
 	    return E_OK;
 	}
     }
-    if (err) return err;
-    return ENMFIL;
 }
 
 voidfn
@@ -524,7 +542,7 @@ DIR *dir;
 	 count && *src != ' ';
 	 *buf++ = *src++, --count) /* empty */;
 
-    if (*buf != ' ') *buf++ = '.';
+    if (*src != ' ') *buf++ = '.';
 
     for (count = 3;
 	 count && *src != ' ';

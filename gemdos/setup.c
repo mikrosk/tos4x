@@ -1,12 +1,15 @@
 /*
 ***************************    SETUP.C     ******************************
 *
-* $Revision: 2.6 $	$Source: e:/tos/gd2\RCS\setup.c,v $
+* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\setup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: setup.c,v $
+* Revision 2.7  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.6  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -43,6 +46,11 @@ osi()
 {
 	BCB *b, *e1, *e2;
 	int i;
+	ulong datime;
+
+	datime = gettime();
+	xsettime((uint)(datime & 0xffff));
+	xsetdate((uint)(datime >> 16));
 
 	/*
 	 * Setup sector buffers (NBUFS of 'em)
@@ -74,26 +82,30 @@ osi()
 	(void)setexc(0x21,enter);
 
 #endif
+
+	/* set rootpd and fill it with important stuff */
+	run = &rootpd;
+	clear(run,run+1);
+	run->p_uft = rootuft;
+	run->p_uftsize = OPNFILES;
+	clear(&run->p_uft[0],&run->p_uft[run->p_uftsize]);
+	for (i=0; i<NUMSTD; i++) run->p_uft[i] = ofdtty(biosdev[i]);
+
+	/* clear the PD table, then add rootpd to it */
+	clear(&pdtab[0],&pdtab[NUMPDS]);
+	pdtab[0] = run;
+
 	(void)xsetdrv(bootdev);		/* Dsetdrv(boot dev) */
 
 	poolinit();
+#if REAL
 	xminit();
-	handinit();
-
-	run = &rootpd;
-
-	/* clear the rootpd -- for compatibility with old ROMs which	*/
-	/* got it from ospool (and therefore got it clear).		*/
-
-	clear(run,run+1);
+#endif
 
 	callno = 0;
 
 	/* init keyboard queues */
-	kbchar[0] = kbchar[1] = kbchar[2] = 0;
-	remptr[0] = insptr[0] = &(glbkbchar[0][0]);
-	remptr[1] = insptr[1] = &(glbkbchar[1][0]);
-	remptr[2] = insptr[2] = &(glbkbchar[2][0]);
+	coninit();
 }
 
 

@@ -1,12 +1,15 @@
 /*
 ***************************     TIME.C     ******************************
 *
-* $Revision: 2.6 $	$Source: e:/tos/gd2\RCS\time.c,v $
+* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\time.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: time.c,v $
+* Revision 2.7  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.6  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -27,7 +30,7 @@
 long
 xgetdate()
 {
-	return(date);
+	return(realdate);
 }
 
 
@@ -58,7 +61,7 @@ REG	int day;
 	else if (day > nday[curmo])
 		return (ERROR);
 
-	date = d;			/* ok, assign that value to date */
+	realdate = d;			/* ok, assign that value to date */
 	upd_tod();			/* update BIOS clock */
 	return (E_OK);
 }
@@ -70,7 +73,7 @@ REG	int day;
 long
 xgettime()
 {
-	return(time);
+	return(realtime);
 }
 
 
@@ -92,7 +95,7 @@ uint t;
 	if ((unsigned)(t & 0xf800) >= (unsigned)(24 << 11))
 	    return (ERROR);
 
-	time = t;
+	realtime = t;
 	upd_tod();			/* update BIOS clock */
 	return (E_OK);
 }

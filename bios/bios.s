@@ -3,17 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/19 14:15:55 $
+* $Date: 89/07/20 15:45:17 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.4  89/07/20  15:45:17  apratt
+* Added code to initialize TTMFP (to totally disabled) and make
+* its interrupt vectors start at $140, right after STMFP.
+*
 * Revision 2.3  89/07/19  14:15:55  apratt
 * Added TT flag, added call to ttwait in ikbdws, moved ringbel
 * so VDI's bsr to there is closer.  (VDI should really jsr.)
-*
+* 
 * Revision 2.2  89/07/11  11:27:27  apratt
 * I broke Rsconf in rev 2.1 (or possibly before).  Now it's fixed.
 * Previously you couldn't ever set RTS/CTS flow control, now you can.
@@ -114,7 +118,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.3 $
+* $Revision: 2.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -1467,6 +1471,18 @@ initmfp:
 
 	moveq	#$0,d0		;init to zero for clearing mfp
 	movep.l	d0,gpip(a0)	;clear gpip thru iera
+	movep.l	d0,ierb(a0)	;clear ierb thru isrb
+.ifne TT
+TT_mfp	equ	$fffffa81
+
+	lea	TT_mfp,a0	; init TT mfp
+	move.b	#$48,vr(a0)	;set mfp autovector and s-bit
+	bset.b	#2,aer(a0)	* NOTE: Trigger on Withdrawn CTS
+
+.if TT
+	lea	ttmfp,a0	; init TT mfp
+	moveq.l	#0,d0
+.endc
 * This must be initialized with a value other than one, so noblank
 * and noblank1 don't wait forever.  God help you if you program the
 * timer to a one, then call something which calls noblank!

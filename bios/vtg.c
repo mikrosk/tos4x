@@ -9,6 +9,8 @@
  *		made tables char-sized.
  */
 
+#define oldway 0	/* 1 = VsetMode does dev_init, 0 = not; 0 is preferred */
+
 /* Imports
  *=======================================================================
  */
@@ -583,7 +585,9 @@ WORD divsl_asr(long,long,long);
 				500000L, PALCLK*640L*2L, 6400000L };
 #define NTSCLK	3104L /* 32.21 MHz */
     static HTIMING htv_ntsc = { NTSCLK, 460500L, 174500L, 514500L, 700000L,
-				500000L, NTSCLK*640L*2L, 6355550L };
+				500000L, NTSCLK*640L*2L, 6369520L }; /* 6357110 */
+
+/* Line length for NTSC changed from 63.5555 us for hardware reasons */
 
 	if (mode & VGA)		t = &htv_vga;
 	else if (mode & PAL)	t = &htv_pal;
@@ -1025,8 +1029,13 @@ VsetMode( WORD mcode )
 	dovtg(modecode);
 	set_regs(modecode);
 
+#ifdef oldway
+/* this has been moved to setscreen(), because VsetMode isn't
+ * supposed to muck with line A at all
+ */
 	mode2sdef(modecode, &sdef);
 	dev_init(&sdef);
+#endif
     }
     return curmode;
 }
@@ -1047,7 +1056,7 @@ VgetMonitor( void )
 
 #define VSS_CLOCK   0x01
 #define VSS_VSYNC   0x02
-#define VSS_HSYNC   0x03
+#define VSS_HSYNC   0x04
 
 /* void VsetSync(WORD external)					XBIOS @90
  * ======================================================================
@@ -1056,17 +1065,30 @@ VgetMonitor( void )
 GLOBAL void
 VsetSync(WORD external)
 {
+	int temp;
+
     if (external & VSS_CLOCK)
 	*SYNCMODE |= 1;
     else *SYNCMODE &=~1;
 
+	/* The temp variable is used to correct some 
+	 * stupidity in the Lattice Optimizer. The Lattice
+	 * optimizer still does bit clear and bit set on 
+	 * hardware registers that we declare as volatile.
+	 * Damn! Between Richard and HiSoft, we need to 
+	 * kill someone.
+	 */
+
+	temp = *SP_Shift;
     if (external & VSS_VSYNC)
-	*SP_Shift |= 0x20;
-    else *SP_Shift &= ~0x20;
+		temp |= 0x20;
+    else temp &= ~0x20;
 
     if (external & VSS_HSYNC)
-	*SP_Shift |= 0x40;
-    else *SP_Shift &= ~0x40;
+	temp |= 0x40;
+    else temp &= ~0x40;
+
+	*SP_Shift = temp;
 }
 
 /* long VgetSize(WORD mode) 					XBIOS @91
@@ -1455,6 +1477,15 @@ vmode:		newmode = ValidMode(newmode);
     if (rez >= 0) *sshiftmd = rez;
 
     newmode = VsetMode(newmode);
+#ifndef oldway
+/* moved here from VsetMode */
+    if (rez >= 0)
+    {
+        mode2sdef(modecode, &sdef);
+	dev_init(&sdef);
+    }
+#endif
+
     if (newmode == 88)
     {
     /* If !Sparrow, set hardware shiftmd and reinit VDI */

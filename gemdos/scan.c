@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.6 $	$Source: e:/tos/gd2\rcs\scan.c,v $
+* $Revision: 1.7 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.7  1991/03/13  17:51:44  apratt
+* Added a debugging message on a new level at _dirnext.
+*
 * Revision 1.6  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *
@@ -324,6 +327,9 @@ DMD *dmd;
     uint xcl, curcl;
 
     /* you only call this if you fell off the end of this record */
+
+    DBCMD(0x20,
+	"print _dirnext dir: (lpeek (+ `a6 8)) dmd: (lpeek (+ `a6 c));_c");
 	"print -n (DMD) ; dmd lpeek(a6 + c);_c");
 
     curcl = dir->dir_curcl;

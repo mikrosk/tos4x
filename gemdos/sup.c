@@ -1,12 +1,16 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\sup.c,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/03 00:14:20 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/29 14:21:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.15  1991/05/29  14:21:06  apratt
+* Added &ni for Flock, for future reference.  Made NFUNCS a constant
+* derived from the size of the function-pointer array.
+*
 * Revision 2.14  1991/05/03  00:14:20  apratt
 * Folded setup.c into this file.  Added an array telling how many
 * words of arguments each call has, so we don't copy too many.  Turns
@@ -220,15 +224,19 @@ static long (*funcs[])() = {
 	/* 0x50 */
 	&xmediach,	&ni,		&ni,		&ni,
 	&ni,		&ni,		&xrename,	&xdatime,
+	&ni,		&ni,		&ni,		&ni,
+	&ni /* Flock */
 };
 
-unsigned char funcwords[] = {
+#define NFUNCS (sizeof funcs / sizeof (long (*)()))
+
+unsigned char funcwords[NFUNCS] = {
     0, 0, 1, 0, 1, 1, 1, 0, 0, 2, 2, 0, 0, 0, 1, 0,
     0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0,
     0, 3, 0, 0, 0, 0, 3, 0, 0, 2, 2, 2, 3, 3, 1, 5,
     5, 2, 4, 4, 3, 1, 2, 3, 2, 2, 5, 7, 1, 0, 3, 0,
-    1, 0, 0, 0, 0, 0, 5, 4
+    1, 0, 0, 0, 0, 0, 5, 4, 0, 0, 0, 0, 6
 };
 
 /*
@@ -249,7 +257,7 @@ int *pw;
 restrt:
     *(&fn) = *(&pw[0]);	/* take addr so these are not put in regs */
 
-    if (fn >= (sizeof funcs / sizeof (long (*)())))
+    if (fn >= NFUNCS)
 	return(EINVFN);
 
     if (rc = setjmp(errbuf)) {

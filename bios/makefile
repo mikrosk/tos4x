@@ -1,6 +1,16 @@
+########################### BIOS MAKEFILE  ##############################
 #
-# $Header: /u2/MRS/osrevisions/aes/foo,v 1.4 89/01/23 12:18:41 kbad Exp $
+#  $Revision: 2.1 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+# =======================================================================
+#  $Author: kbad $	$Date: 89/02/22 20:45:37 $     $Locker:  $
+# =======================================================================
 #
+#  $Log: makefile,v $
+#  Revision 2.1  89/02/22  20:45:37  kbad
+#  *** TOS 1.4  FINAL RELEASE VERSION ***
+#
+#
+#########################################################################
 # Author Slavik Lozben
 # This makefile builds the bios object files
 #
@@ -12,15 +22,26 @@
 TMPDIR	=	m:
 .SUFFIXES: .o .c .s
 .s.o:
-	as68 -s $(TMPDIR)\ -f $(TMPDIR)\ -l -u $*.s
+	cp $*.s $(TMPDIR)\$*.s
+	pushd .
+	cd $(TMPDIR)
+	as68 -l -u $*.s
+	popd
+	mv $(TMPDIR)\$*.o .
+	rm $(TMPDIR)\$*.s
+
 .c.o:
-	cp68 $*.c $(TMPDIR)\$*.i
-	c068 $(TMPDIR)\$*.i $(TMPDIR)\$*.1 $(TMPDIR)\$*.2 $(TMPDIR)$*.3 -f
-	c168 $(TMPDIR)\$*.1 $(TMPDIR)\$*.2 $*.s
-	rm $(TMPDIR)\$*.*
+	cp $*.c $(TMPDIR)
+	pushd .
+	cd $(TMPDIR)
+	cp68 $*.c $*.i
+	c068 $*.i $*.1 $*.2 $*.3 -f
+	c168 $*.1 $*.2 $*.s
 	optimize $*.s
-	as68 -s $(TMPDIR)\ -f $(TMPDIR)\ -l -u $*.s
-	rm $*.s
+	as68 -l -u $*.s
+	popd
+	mv $(TMPDIR)\$*.o .
+	rm $(TMPDIR)\$*.[c|i|1|2|3|s]
 #
 ################################################################
 

@@ -118,24 +118,24 @@
 
 #define FAILDESK 21  /* Alert String */
 
-#define IMAGE1   0   /* Freies Icon */
+#define NOTEBB   0   /* Freies Icon */
 
-#define IMAGE2   1   /* Freies Icon */
+#define QUESBB   1   /* Freies Icon */
 
-#define IMAGE3   2   /* Freies Icon */
+#define STOPBB   2   /* Freies Icon */
 
-#define IMAGE4   3   /* Freies Icon */
+#define MICE0    3   /* Freies Icon */
 
-#define IMAGE5   4   /* Freies Icon */
+#define MICE1    4   /* Freies Icon */
 
-#define IMAGE6   5   /* Freies Icon */
+#define MICE2    5   /* Freies Icon */
 
-#define IMAGE7   6   /* Freies Icon */
+#define MICE3    6   /* Freies Icon */
 
-#define IMAGE8   7   /* Freies Icon */
+#define MICE4    7   /* Freies Icon */
 
-#define IMAGE9   8   /* Freies Icon */
+#define MICE5    8   /* Freies Icon */
 
-#define IMAGE10  9   /* Freies Icon */
+#define MICE6    9   /* Freies Icon */
 
-#define IMAGE11  10  /* Freies Icon */
+#define MICE7    10  /* Freies Icon */

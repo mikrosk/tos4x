@@ -4,30 +4,43 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/07/19 14:55:04 $
+* $Date: 90/07/19 15:17:54 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.52  90/07/19  15:17:54  apratt
+* Moved TT screen base to phystop-screen_size-$100, so the low byte is
+* zero and programs which double buffer and write directly to the shifter
+* work.
+*
+* Moved the PMMU page tables into RAM at $700-$800, so they're protected
+* from user-mode access and less likely to be clobbered by programs that
+* assume they can take over the whole system.  However, they are not
+* protected from supervisor OR DMA access.
+*
+* Added better code to handle privilege violation when it's a move from
+* SR. See the label "priv" for details.
+*
 * Revision 2.51  90/07/19  14:55:04  apratt
 * Added ONLY_LONGFRAME code, which you set on TT to just assume
 * longframe.  
-*
+* 
 * Removed VBLQ1ST; now VBLQ is always first.  
-*
+* 
 * Added pulsing boot colors. 
-*
+* 
 * Removed frestore of null state: it is not necessary and it was before
 * we checked for the existence of the 881.  Catch coprocessor violation
 * in the FPU probe; this "shouldn't happen." 
-*
+* 
 * Made ttwait/ttdelay use timer C of TTMFP because leaving Timer A free
 * is nicer: Timer A doesn't shade a control register with another timer. 
-*
+* 
 * Moved TT screen base to phystop
-*
+* 
 * Revision 2.50  90/06/18  16:36:11  apratt
 * Changed date to 6/16/90, boot color to dark blue  (n.b. was a sky blue
 * before; "blue" isn't descriptive enough).
@@ -485,7 +498,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.51 $
+* $Revision: 2.52 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $

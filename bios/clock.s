@@ -4,22 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/15 15:31:13 $
+* $Date: 1991/09/06 14:50:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.12  1991/09/06  14:50:56  apratt
+* Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
+*
 * Revision 2.11  91/08/15  15:31:13  apratt
 * Added code to write GEMDOS' idea of _date and _time every time _getclock is
 * called (for either clock chip).  This lets you update those variables
 * without doing Settime(Gettime()), which would cause the RTC to lose between
 * zero and two seconds each time.
-*
+* 
 * Fixed the STPAD case where the reset register and test register weren't
 * being initialized properly.
-*
+* 
+* 
 * Revision 2.10  91/08/05  15:13:11  apratt
 * Added support for STPAD: took out the test (the Ricoh chip is ALWAYS
 * there), disabled the 1Hz and 16Hz wave outputs, and changed other code to
@@ -74,10 +78,10 @@
 *
 * =======================================================================
 *
-* $Revision: 2.11 $
+* $Revision: 2.12 $
 * =======================================================================
 *
-* $Source: /u2/MRS/osrevisions/bios/clock.s,v $
+* $Source: e:/tos/bios\RCS\clock.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -107,7 +111,7 @@
 	.globl	_getclock	; getclock() BIOS call
 	.globl	_date,_time	; GEMDOS date and time variables
 
-.ifeq TT
+.if !TT
 
 *
 * STPAD doesn't really probe for the clock chip: there is always one. The
@@ -207,7 +211,7 @@ iclfai:	rts
 *
 
 clktest:
-.ifne STPAD
+.if STPAD
 	move.w	#RTCBASE,a0		; fulfill return requirement
 	move.b	#0,RTTEST(a0)		; clobber test register
 	move.b	#%1100,RTRES(a0)	; and turn off periodic outputs
@@ -478,6 +482,8 @@ read2:	.ds.b	READS
 
 .else
 
+*
+* This is the TT branch of the main "if" in this file.
 *
 * Clock chip in the TT is the Motorola MC146818A
 *
@@ -831,5 +837,5 @@ nvmcl:	move.b	d1,(a1)
 	dbra	d2,nvmcl
 	rts			; return checksum in d0
 
-.endc
+.endif
 

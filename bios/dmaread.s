@@ -4,17 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/21 11:18:56 $
+* $Date: 1991/09/06 14:50:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.19  1991/09/06  14:50:56  apratt
+* Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
+*
 * Revision 1.18  91/08/21  11:18:56  apratt
 * Fixed two oopses: iderdy is now consistently _iderdy,
 * and undev is outside IDEAT conditionals.
-*
+* 
 * Revision 1.17  91/08/20  13:22:25  minna
 * Added iderdy() to test if IDE drive is ready before 
 * it's being talked to.  If the drive does not become
@@ -96,10 +99,10 @@
 *
 * =======================================================================
 *
-* $Revision: 1.18 $
+* $Revision: 1.19 $
 * =======================================================================
 *
-* $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
+* $Source: e:/tos/bios\RCS\dmaread.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -230,10 +233,10 @@ _cmdblk:	ds.b	10	; command block
 rwflag:		ds.b	1	; 0: read	1: write
 .even
 
-.ifne IDE_AT
+.if IDE_AT
 sbuf:		ds.l	129	; scratch buffer (must be on long word
 				;	boundary)
-.endc
+.endif
 
 .even
 
@@ -270,21 +273,21 @@ _dmawrite:
 	move.w	#WRITE,d1		; d1 = opcode for WRITE
 	
 dmarw:
-.ifne IDE_AT
+.if IDE_AT
 	cmpi.w	#MAXAT,$e(sp)		; unit# > IDE-AT unit# 16-17?
 .else
-.ifne SCSI
+.if SCSI
 	cmpi.w	#MAXSCSI,$e(sp)		; unit# > SCSI unit# 8-15?
 .else
 	cmpi.w	#MAXACSI,$e(sp)		; unit# > ACSI unit# 0-7?
-.endc
-.endc
+.endif
+.endif
 	bhi	undev			; if so, return unknow device
 
-.ifne IDE_AT
+.if IDE_AT
 	cmp.w	#MAXSCSI,$e(sp)		; an IDE-AT unit?
 	bhi	at			; if so, talk IDE-AT
-.endc
+.endif
 					; else talk ACSI or SCSI
 	lea	_cmdblk,a0		; a0 -> beginning of command block
 	move.b	d1,(a0)+		; byte 0 = opcode
@@ -306,7 +309,7 @@ dmarw:
 	bra	rw1
 rw0:	bsr	_dowcmd			; send a write data command
 
-.ifne IDE_AT
+.if IDE_AT
 	bra	rw1			; branch will take place for non-IDE
 					;	drives
 *
@@ -366,16 +369,16 @@ atrw:	lea	sbuf,a0			; a0 -> drive parameters
 	bra.b	at2
 at1:	bsr	_atwrite		; write sectors
 at2:	adda	#16,sp			; clean up stack
-.endc	
+.endif	
 rw1:	
-.ifne	SCSI
+.if	SCSI
 	move.w	sr,-(sp)		; go to IPL 7
 	ori	#$700,sr		; no interrupts right now please
 	movec	cacr,d1			; d1 = (cache control register)
 	ori.w	#$0808,d1		; dump both the I and D cache
 	movec	d1,cacr			; update cache control register
 	move.w	(sp)+,sr		; restore interrupt state
-.endc
+.endif
 	tst.w	d0			; successful?
 	ble.b	rwend			; if no error or timed-out, return
 					; else
@@ -404,12 +407,12 @@ undev:	moveq	#EUNDEV,d0
 ;	a0.l = buffer address
 ;-
 _dorcmd:
-.ifne SCSI
+.if SCSI
 	cmp.w	#MAXACSI,d0		; unit# > ACSI unit# 0 - 7?
 	bls.b	rcacsi			; if not, it's an ACSI device
 	bsr	_rcvscsi		; else, it's a SCSI device
 	rts
-.endc
+.endif
 rcacsi:	bsr	_rcvacsi		; it's an ACSI device
 	rts
 
@@ -424,12 +427,12 @@ rcacsi:	bsr	_rcvacsi		; it's an ACSI device
 ;	a0.l = buffer address
 ;-
 _dowcmd:
-.ifne	SCSI
+.if	SCSI
 	cmp.w	#MAXACSI,d0		; unit# > ACSI unit# 0 - 7?
 	bls.b	wracsi			; if not, it's an ACSI device
 	bsr	_wrtscsi		; else, it's a SCSI device
 	rts
-.endc
+.endif
 wracsi:	bsr	_wrtacsi		; it's an ACSI device
 	rts
 
@@ -506,14 +509,14 @@ _endcmd:
 	bsr	_fdone			; wait for operation complete
 	bmi	endce			; (timed-out, so complain)
 
-.ifne	SCSI				; dump D cache
+.if	SCSI				; dump D cache
 	move.w	sr,-(sp)		; go to IPL 7
 	ori.w	#$700,sr		; no interrupts right now kudasai
 	movec	cacr,d0			; d0 = (cache control register)
 	ori.w	#$800,d0		; dump the D cache
 	movec	d0,cacr			; update cache control register
 	move.w	(sp)+,sr		; restore interrupt state
-.endc
+.endif
 
 	move.w	d1,WDL
 	move.w	WDC,d0			; get the result
@@ -722,7 +725,7 @@ rstdelay:
 	rts
 
 
-.ifne	SCSI
+.if	SCSI
 
 ;+++++++++++++++++++++++++++++++;
 ;				;
@@ -1055,11 +1058,11 @@ setscltmout:
 	add.l	(a0),d1		; d0 = curr time + # clicks to wait
 	rts
 
-.endc
+.endif
 
 
 
-.ifne IDE_AT
+.if IDE_AT
 
 ;+++++++++++++++++++++++++++++++;
 ;				;
@@ -1350,6 +1353,6 @@ ir0:	btst.b	#6,ATASR	; is drive ready?
 ir1:	moveq	#1,d0		; else, drive is ready
 	rts
 	rts
-.endc
+
 
 

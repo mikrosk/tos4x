@@ -3,18 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/08 17:45:24 $
+* $Date: 88/04/22 13:07:53 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.8  88/04/22  13:07:53  apratt
+* Fixed dmahi to dmahigh in dmaread (slip of the finger...)
+*
 * Revision 1.7  88/04/08  17:45:24  apratt
 * Backed out reset bail-out vector fix -- leave it broken.  The workaround
 * is to return to the reset code via "jmp $24(a6)" rather than
 * with "jmp (a6)" as advertised.  THE RESET CODE CAN'T CHANGE thanks to this.
-*
+* 
 * Revision 1.6  88/04/05  17:47:50  apratt
 * Changed Flopwp call to Xbios $29 because of internal versions of AKP's
 * debugger, which uses $28.  Must keep Xbios $11 unused.
@@ -42,7 +45,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.7 $
+* $Revision: 1.8 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1606,7 +1609,7 @@ dmr_lp:	move.l	(a0)+,d0	; get next command byte
 	move.b	dmalow,d1
 	cmp.b	_dskbufp+3,d1
 	bne.s	dmr_r		; success if changed.
-	move.b	dmahi,d1
+	move.b	dmahigh,d1
 	cmp.b	_dskbufp+1,d1
 	bne.s	dmr_r		; success if changed, else fall through.
 

@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\mem.c,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.14  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.13  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -254,7 +257,7 @@ REG int fval;
  * Shrink an allocated block.
  */
 long
-xsetblk(n,blk,len)
+xmshrink(n,blk,len)
 int n;
 void *blk;
 long len;

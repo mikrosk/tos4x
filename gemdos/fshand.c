@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.9 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
+* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.10  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.9  1991/02/22  15:29:28  apratt
 * generic checkin
 *
@@ -176,25 +179,28 @@ PD *pd;
 	    return EIHNDL;
 	}
 
-	if (src >= 0) {
+	if (src == dest) return EBADRQ;		/* can't Fforce(0,0)! */
+
+	if (src < 0) {
+	    ofd = ofdtty(src+3);
+	}
+	else {
 	    ofd = _run->p_uft[src];
-	    if (ofd == NULL) return EIHNDL;
+	    if (ofd == NULL) return EIHNDL;	/* src is closed! */
 
 
-	    if (pd == _run) {
+	    if (pd == _run && _run->p_uft[dest]) {
 		/* close whatever 'dest' points to already, */
-		/* but only if not spawning a new process.  */
+		/* but only if not spawning a new process,  */
+		/* and it points to SOMETHING.		    */
 
 		if (err = xclose(dest)) return err;
 	    }
-	    /* now copy it over, and increase use count */
-	    pd->p_uft[dest] = ofd;
-	    ofd->o_use++;
 	}
-	else {
-	    /* is there an equivalent to o_use++ for TTY's? */
-	    pd->p_uft[dest] = ofdtty(src+3);
-	}
+	/* now copy it over, and increase use count */
+	/* is there an equivalent to o_use++ for TTY's? */
+	pd->p_uft[dest] = ofd;
+	if (!ofdisatty(ofd)) ofd->o_use++;
 	return E_OK;
 }
 
@@ -219,9 +225,9 @@ long
 xclose(h)
 int h;
 {
-    OFD *ofd, *pofd, **qofd;
+    OFD *ofd;
     PD *_run = run;
-    DFD *dfd, *pdfd, **qdfd;
+    DFD *dfd;
 
     DBCMD(1,"print xclose (wpeek (+ `a6 8));_c");
 
@@ -253,37 +259,30 @@ int h;
     }
     else {
 	/*
-	 * Decrement use counts, free blocks.  This would be a lot cleaner
-	 * if the ofd_head and dfd_head lists were maintained differently,
-	 * like doubly-linked or in rings or pseudo-rings where the "next"
-	 * field is first and points to the list header rather than being
-	 * null.  The casts would get hairy, though.
+	 * Decrement use counts, free blocks.
 	 */
-	if ((--ofd->o_use) == 0) {
+	if (--ofd->o_use == 0) {
 	    DBCMD(8,"print ofd->o_use dropped to 0;_c");
 	    dfd = ofd->o_dfd;
-	    if (--(dfd->dfd_use) == 0) {
+	    if (--dfd->dfd_use == 0) {
 		DBCMD(8,"print dfd->d_use dropped to 0;_c");
 		/* unlink this DFD from dfd_head */
-		for (pdfd = *(qdfd = &dfd_head);
-		     pdfd != dfd;
-		     pdfd = *(qdfd = &pdfd->dfd_next)) {
-			if (!pdfd) {
-			    DBCMD(-1,"print xclose panic: dfd not on list");
-			    Panic();
-			}
+		if (dfd->dfd_prev) {
+		    dfd->dfd_prev->dfd_next = dfd->dfd_next;
 		}
-		*qdfd = pdfd->dfd_next;
-		freebig(ofd->o_dfd);
+		else dfd_head = dfd->dfd_next;
+		if (dfd->dfd_next) {
+		    dfd->dfd_next->dfd_prev = dfd->dfd_prev;
+		}
+		freebig(dfd);
 	    }
 	    /* unlink this block from ofd_head */
-	    for (pofd = *(qofd = &ofd_head);
-		 pofd != ofd;
-		 pofd = *(qofd = &pofd->o_next)) {
-		    if (!pofd) {
-			DBCMD(-1,"print xclose panic: ofd not on list");
-			Panic();
-		    }
+	    if (ofd->o_prev) {
+		ofd->o_prev->o_next = ofd->o_next;
+	    }
+	    else ofd_head = ofd->o_next;
+	    if (ofd->o_next) {
+		ofd->o_next->o_prev = ofd->o_prev;
 	    }
 	    freebig(ofd);
 	}
@@ -299,6 +298,60 @@ int h;
     DBCMD(8,"print end of xclose:;uft (lpeek .run);_c");
     return E_OK;
 }   
+
+/*
+ * Free open files on a drive.  Part of the media-change procedure.
+ * Frees open files without flushing them or making anything dirty.
+ */
+void
+offree(dev)
+uint dev;
+{
+    OFD *ofd;
+    DFD *dfd;
+    PD *pd, **ppd;
+    OFD **uft, **uftend;
+    
+
+    for (pd = *(ppd = &pdtab[0]); ppd < &pdtab[NUMPDS]; pd = *(++ppd)) {
+	if (pd) {
+	    uft = &pd->p_uft[0];
+	    uftend = &pd->p_uft[pd->p_uftsize];
+	    while (uft < uftend) {
+		ofd = *uft;
+		if (ofd != NULL &&
+		    !ofdisatty(ofd) &&
+		    ofd->o_dfd->dfd_dev == dev) {
+			/* got one; unlink & free the ofd */
+			*uft = NULL;
+			if (--ofd->o_use == 0) {
+			    dfd = ofd->o_dfd;
+			    if (--dfd->dfd_use == 0) {
+				/* unlink & free the DFD */
+				if (dfd->dfd_prev) {
+				    dfd->dfd_prev->dfd_next = dfd->dfd_next;
+				}
+				else dfd_head = dfd->dfd_next;
+				if (dfd->dfd_next) {
+				    dfd->dfd_next->dfd_prev = dfd->dfd_prev;
+				}
+				freebig(dfd);
+			    }
+			    /* unlink & free the OFD */
+			    if (ofd->o_prev) {
+				ofd->o_prev->o_next = ofd->o_prev;
+			    }
+			    else ofd_head = ofd->o_next;
+			    if (ofd->o_next) {
+				ofd->o_next->o_prev = ofd->o_prev;
+			    }
+			    freebig(ofd);
+			}
+		}
+	    }
+	}
+    }
+}
 
 long
 xsync()
@@ -347,7 +400,6 @@ long len;
 void *ubufr;
 {
 	OFD *ofd;
-	long maxlen;
 
 	DBCMD(1,"print xread (wpeek (+ `a6 8)) (lpeek (+ `a6 a)) "
 		"(lpeek (+ `a6 e));_c");
@@ -355,9 +407,20 @@ void *ubufr;
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
 	if (ofdisatty(ofd)) {
-	    if (len > 32767) len = 32767;
 	    return cgets(ofddevno(ofd),len,ubufr);
 	}
+	return ixread(ofd,len,ubufr);
+}
+
+/* ixread split out of read because some console routines use it. */
+
+long
+ixread(ofd,len,ubufr)
+OFD *ofd;
+long len;
+void *ubufr;
+{
+	long maxlen;
 
 	if (len > (maxlen = (ofd->o_dfd->dfd_fileln - ofd->o_bytnum)))
 	    len = maxlen;
@@ -381,8 +444,6 @@ long len;
 void *ubufr;
 {
 	OFD *ofd;
-	long err;
-	DFD *dfd;
 
 	DBCMD(1,"print xwrite (wpeek (+ `a6 8)) (lpeek (+ `a6 a)) "
 		"(lpeek (+ `a6 e));_c");
@@ -391,6 +452,21 @@ void *ubufr;
 	if (!len) return 0;
 	if (ofdisatty(ofd))
 	    return char_write(ofddevno(ofd),len,ubufr);
+
+	return ixwrite(ofd,len,ubufr);
+}
+
+/* ixwrite split out because console routines use it */
+
+long
+ixwrite(ofd,len,ubufr)
+OFD *ofd;
+long len;
+void *ubufr;
+{
+	long err;
+	DFD *dfd;
+
 #if RO_FACISM
 	if (!(ofd->o_flag & O_WRITE)) return EACCDN;
 #endif
@@ -441,6 +517,10 @@ int attr;
 	/* deny creates of subdirs; also of labels with any other bit set */
 	if ((attr & FA_SUBDIR) || ((attr & FA_LABEL) && (attr != FA_LABEL)))
 		return EBADRQ;
+
+	/* ttyopen returns -1 if NOT a TTY name, else opens it */
+	if ((err = ttyopen(name)) != -1) return err;
+
 	if (err = ixcreat(name, attr, &dir)) return err;
 	return ixopen(&dir,((attr & FA_RO) ? 0 : 2));
 }
@@ -458,12 +538,67 @@ int mod;
     long err;
 
     DBCMD(1,"print xopen -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c));_c");
+
+    /* ttyopen returns -1 if NOT a tty name, else opens it */
+    if ((err = ttyopen(name)) != -1) return err;
+
     /* find the file */
     err = fn2dir(&name,&dir,FN_NORM);
     if (err) return err;
+    else if (dir.dir_fcb->f_attrib & FA_SUBDIR) return EACCDN;
 
     return ixopen(&dir,mod);
 }
+
+/*
+ * ttyopen: if the name matches a TTY name, create an entry in your user
+ * file table holding a "pointer" which ofdisatty and return the handle
+ * number. Else return -1.
+ */
+
+const struct ttyn {
+    const char ttyname[3];
+    const char ttynum;
+} ttynames[] = {
+    { "CON", 2 },
+    { "con", 2 },
+    { "AUX", 1 },
+    { "aux", 1 },
+    { "PRN", 0 },
+    { "prn", 0 }
+};
+
+long
+ttyopen(name)
+char *name;
+{
+    const struct ttyn *ttyp;
+    const char *p1, *p2;
+    int i;
+
+    /* fail if name doesnt match XXX:\0 pattern */
+    p1 = name;
+    if (!*p1++ || !*p1++ || !*p1++ || *p1++ != ':' || *p1) {
+	return -1;
+    }
+
+    ttyp = &ttynames[0];
+    i = (sizeof(ttynames) / sizeof(struct ttyn));
+    while (i--) {
+	p1 = name;
+	p2 = &ttyp->ttyname[0];
+	if (*p1++ == *p2++ && 
+	    *p1++ == *p2++ &&
+	    *p1++ == *p2++) {
+		if ((i = uftprobe()) == -1) return ENHNDL;
+		run->p_uft[i] = ofdtty(ttyp->ttynum);
+		return i;
+	}
+	ttyp++;
+    }
+    return -1;
+}
+		
 
 /*
  * ixopen: given a DIR entry, open the file.
@@ -521,14 +656,14 @@ uint mod;
 	dfd->dfd_use = 0;
 	dfd->dfd_dirty = 0;
 
-	/* link it in */
+	/* link it in to dfd_head */
 	dfd->dfd_next = dfd_head;
+	dfd->dfd_prev = 0;
+	if (dfd_head) dfd_head->dfd_prev = dfd;
 	dfd_head = dfd;
     }
 
     /* fill in the OFD */
-    ofd->o_next = ofd_head;
-    ofd_head = ofd;
     ofd->o_mode = mod;
     ofd->o_curcl = 0;	/* flag meaning r/w clust info uninitialized */
     ofd->o_currec = 0;
@@ -537,6 +672,12 @@ uint mod;
     ofd->o_use = 1;
     ofd->o_dfd = dfd;
     dfd->dfd_use++;
+
+    /* link it in to ofd_head */
+    ofd->o_next = ofd_head;
+    ofd->o_prev = 0;
+    if (ofd_head) ofd_head->o_prev = ofd;
+    ofd_head = ofd;
 
     /* make handle h refer to this ofd and return h */
 
@@ -560,6 +701,24 @@ int h;
 int flg;
 {
     OFD *ofd;
+
+    DBCMD(1,"print xlseek (lpeek (+ `a6 8)) (wpeek (+ `a6 c)) "
+	    "(wpeek (+ `a6 e));_c");
+
+    if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+    if (ofdisatty(ofd)) return 0;
+
+    return ixlseek(n,ofd,flg);
+}
+
+/* ixlseek split out from above because console I/O uses it */
+
+long
+ixlseek(n,ofd,flg)
+long n;
+OFD *ofd;
+int flg;
+{
     DFD *dfd;
     uint new;
     uint old;
@@ -567,12 +726,6 @@ int flg;
     uint rec;
     DMD *dmd;
     uint curcl;
-
-    DBCMD(1,"print xlseek (lpeek (+ `a6 8)) (wpeek (+ `a6 c)) "
-	    "(wpeek (+ `a6 e));_c");
-
-    if ((ofd = syshnd(h)) == NULL) return EIHNDL;
-    if (ofdisatty(ofd)) return 0;
 
     dfd = ofd->o_dfd;
 
@@ -727,5 +880,24 @@ xgetdrv()
 {
 	DBCMD(1,"print xgetdrv;_c");
 	return(run->p_curdrv);
+}
+
+/*
+ * Return GEMDOS version number.
+ */
+long
+xgetver()
+{
+	return(VERS_NUM);
+}
+
+/*
+ * Function Not Implemented;
+ * return "Invalid Function Number."
+ */
+long
+ni()
+{
+	return(EINVFN);
 }
 

@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.5 $	$Source: e:/tos/gd2\rcs\scan.c,v $
+* $Revision: 1.6 $	$Source: e:/tos/gd2\rcs\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.6  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 1.5  1991/02/22  15:29:28  apratt
 * generic checkin
 *
@@ -162,6 +165,7 @@ int flags;
     uint dev;
     uint cl;
     char c;
+    int haswild = 0;
 
     int dotflag = (flags == FN_DOTSOK);
     int earlyflag = (flags == FN_EARLY);
@@ -194,11 +198,13 @@ int flags;
 
 	/*
 	 * Find the end of name (SLASH or null byte) and scan the directory
-	 * dev/cl for that name. While you're at it, reject wildcards.
+	 * dev/cl for that name. While you're at it, flag wildcards. We
+	 * don't actually bail out here because it might be the last
+	 * component and earlyflag might be set.
 	 */
 	for (end = name; *end && *end != SLASH; ++end) {
 	    if (*end == '?' || *end == '*')
-		return EBADRQ;
+		haswild = 1;
 	}
 
 	/* empty component? */
@@ -206,7 +212,7 @@ int flags;
 
 	/*
 	 * if name is last component, bail out here if earlyflag is set or
-	 * if name is "." or ".." and they are not allowed.
+	 * if name is "." or ".." and they are not allowed, or haswild.
 	 */
 
 	if (!*end) {
@@ -214,8 +220,7 @@ int flags;
 		*pname = name;
 		return E_OK;
 	    }
-	    if (!dotflag && isdots(name))
-		return EBADRQ;
+	    if ((!dotflag && isdots(name)) || haswild) return EBADRQ;
 	}
 
 	/* build an FCB from the name */
@@ -447,7 +452,7 @@ FCB *fcb;
     return 0;
 }
 
-    char *f = pat->f_name;
+int
 wmatch(pat,fcb)
 FCB *pat;
 FCB *fcb;
@@ -469,7 +474,7 @@ FCB *fcb;
      * A saner approach is to use the SUBDIR, HIDDEN, and SYSTEM bits only
      * in the zero-or-any-bit-match test, but this might just be too much
      * incompatibility.
-	if (*p != '?' && *p != *f) return 0;
+     */
 
     if (!(((fcb->f_attrib == 0) && (pat->f_attrib != FA_LABEL)) ||
 	(fcb->f_attrib & pat->f_attrib))) return 0;

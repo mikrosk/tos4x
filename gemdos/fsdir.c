@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
+* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.13  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.12  1991/02/22  15:29:28  apratt
 * generic checkin
 *
@@ -68,27 +71,35 @@ long
 xchdir(p)
 char *p;
 {
-    int drv = run->p_curdrv;
+    int drv;
     DIR dir;
     long err;
+    uint cltemp;
+    char *ptemp = p;
 
-    if (!*p) return 0;	/* Dsetpath("") is a no-op */
-    if (*(p+1) == ':') {
+    if (!*ptemp) return 0;	/* Dsetpath("") is a no-op */
+    if (*(ptemp+1) == ':') {
 	/* drive spec */
-	drv = uc(*p) - 'A';
+	if (*(ptemp+2) == '\0') return E_OK;	/* Dsetpath("c:") is no-op */
+	drv = uc(*ptemp) - 'A';
 	if (drv < 0 || drv >= MAXDEVS) return EDRIVE;
-	p += 2;
+	ptemp += 2;
     }
-    if (!*p) return E_OK;	/* Dsetpath("") or "c:" is a no-op */
-    if (*p == SLASH && !*(p+1)) {
-	/* set something to the root directory; can't fail */
+    else drv = run->p_curdrv;
+
+    if (*ptemp == SLASH && !*(ptemp+1)) {
+	/* set a drive to its root directory; can't fail */
 	run->p_curdir[drv] = 0;
 	return E_OK;
     }
 
     if (err = fn2dir(&p,&dir,FN_DOTSOK)) return err;
+    if (!(dir.dir_fcb->f_attrib & FA_SUBDIR)) return EACCDN;
 
-    run->p_curdir[drv] = dir.dir_clust;
+    cltemp = dir.dir_fcb->f_clust;
+    swp68(cltemp);
+    run->p_curdir[drv] = cltemp;
+
     return E_OK;
 }
 
@@ -203,22 +214,15 @@ DMD *dmd;
     len--;
     src = fcb->f_name;
 
-    for (count = (len < 8 ? len : 8);
-	 count && *src != ' ';
-	 *buf++ = *src++, --len, --count) /* empty */;
-
-    if (!len) {
-	/* null-terminate & return -- buffer too small */
-	*buf = 0;
-	return 0;
+    count = (len < 8 ? len : 8);
+    while (((*buf++ = *src++) != ' ') && (len--, count--)) /* empty */ ;
+    src = &fcb->f_name[8];
+    if (*src != ' ') {
+	*(buf-1) = '.';
+	count = (len < 3 ? len : 3);
+	while (((*buf++ = *src++) != ' ') && (len--, count--)) /* empty */ ;
     }
-
-    if (*src != ' ') *buf++ = '.', --len;
-
-    for (count = (len < 3 ? len : 3);
-	 count && *src != ' ';
-	 *buf++ = *src++, --len, --count) /* empty */;
-    *buf = 0;
+    *(buf-1) = '\0';
     return len;
 }
 
@@ -448,6 +452,7 @@ xsfirst(name,att)
 char *name;
 int att;
 {
+    att |= FA_RO | FA_ARCHIVE;
     return(ixsfirst(name,att,(DTA *)run->p_xdta));
 }
 
@@ -559,16 +564,20 @@ DIR *dir;
     src = dir->dir_fcb->f_name;
     buf = dta->fname;
 
-    for (count = 8;
-	 count && *src != ' ';
-	 *buf++ = *src++, --count) /* empty */;
+    /* this loop always moves one byte too many, but that's never bad. */
+    count = 8;
+    while (((*buf++ = *src++) != ' ') && count--) /* empty */ ;
 
-    if (*src != ' ') *buf++ = '.';
+    /* advance src to ext part of name */
+    src = &dir->dir_fcb->f_name[8];
+    if (*src != ' ') {
+	*(buf-1) = '.';
 
-    for (count = 3;
-	 count && *src != ' ';
-	 *buf++ = *src++, --count) /* empty */;
-    *buf = 0;
+	/* this loop always moves one byte too many, but that's never bad. */
+	count = 3;
+	while (((*buf++ = *src++) != ' ') && count--) /* empty */ ;
+    }
+    *(buf-1) = '\0';
 
     fcb = dir->dir_fcb;
 

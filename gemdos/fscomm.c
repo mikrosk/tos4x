@@ -1,12 +1,15 @@
 /*
 ***************************    FSCOMM.C    ******************************
 *
-* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\fscomm.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\fscomm.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscomm.c,v $
+* Revision 2.8  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.7  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -41,13 +44,12 @@ PD rootpd;
 OFD *rootuft[OPNFILES];
 PD *pdtab[NUMPDS];
 PD *run;
-char callno;
 DFD *dfd_head;
 OFD *ofd_head;
 
 DMD drvtbl[MAXDEVS];	/* drive media descriptor for each dev */
 
-long errbuf[3];
+jmp_buf errbuf;
 
 uint drvsel;
 

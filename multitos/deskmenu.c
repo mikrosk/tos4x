@@ -19,7 +19,8 @@
 /*	Changed 2 uses of WINICON to SMILEY     02/28/93 C.Gee		*/
 /*	These two are TREES called by get_tree().			*/	
 /*	Changed v_hardcopy() to d_v_hardcopy()  03/31/93 C.Gee		*/
-
+/*	Replaced the hardcoded keyboard tables with BIOS calls 5/3/93 ERS */
+/*	Add window iconifying.			05/04/93 H.Krober	*/
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -69,50 +70,6 @@ EXTERN	WORD	d_multi;
 WORD	icn_whandle;
 WORD	d_exit;		/* desktop exit flag	*/
 BYTE	mentable[MAXMENU];
-WORD	*keytable;
-WORD	*contable;
-
-/*	Alternate keys table	*/
-
-/*	USA|UK|SPAIN|ITALY|SWEDEN	*/
-WORD	key1table[] = { 0x1e00, 0x3000, 0x2e00, 0x2000, 0x1200, 0x2100, 0x2200,
-			0x2300, 0x1700, 0x2400, 0x2500, 0x2600, 0x3200, 0x3100,
-			0x1800, 0x1900, 0x1000, 0x1300, 0x1f00, 0x1400, 0x1600,
-			0x2f00, 0x1100, 0x2d00, 0x1500, 0x2c00, 0 };
-
-/*	GERMANY|SWISSFRE|SWISSGER	*/
-WORD	key2table[] = { 0x1e00, 0x3000, 0x2e00, 0x2000, 0x1200, 0x2100, 0x2200,
-			0x2300, 0x1700, 0x2400, 0x2500, 0x2600, 0x3200, 0x3100,
-			0x1800, 0x1900, 0x1000, 0x1300, 0x1f00, 0x1400, 0x1600,
-			0x2f00, 0x1100, 0x2d00, 0x2c00, 0x1500, 0 };
-
-/*	FRENCH				*/
-WORD	key3table[] = { 0x1000, 0x3000, 0x2e00, 0x2000, 0x1200, 0x2100, 0x2200,
-			0x2300, 0x1700, 0x2400, 0x2500, 0x2600, 0x2700, 0x3100,
-			0x1800, 0x1900, 0x1e00, 0x1300, 0x1f00, 0x1400, 0x1600,
-			0x2f00, 0x2c00, 0x2d00, 0x1500, 0x1100, 0 };
-
-
-/*	Control keys table	*/
-
-/*	USA|UK|SPAIN|ITALY|SWEDEN	*/
-WORD	con1table[] = {0x1e01, 0x3002, 0x2e03, 0x2004, 0x1205, 0x2106, 0x2207,
-		       0x2308, 0x1709, 0x240a, 0x250b, 0x260c, 0x320d, 0x310e,
-		       0x180f, 0x1910, 0x1011, 0x1312, 0x1f13, 0x1414, 0x1615,
-		       0x2f16, 0x1117, 0x2d18, 0x1519, 0x2c1a, 0 };
-
-/*	GERMANY|SWISSFRE|SWISSGER 	*/
-WORD	con2table[] = { 0x1e01, 0x3002, 0x2e03, 0x2004, 0x1205, 0x2106, 0x2207,
-			0x2308, 0x1709, 0x240a, 0x250b, 0x260c, 0x320d, 0x310e,
-			0x180f, 0x1910, 0x1011, 0x1312, 0x1f13, 0x1414, 0x1615,
-			0x2f16, 0x1117, 0x2d18, 0x2c19, 0x151a, 0 };
-
-/*	FRENCH			*/
-WORD	con3table[] = { 0x1001, 0x3002, 0x2e03, 0x2004, 0x1205, 0x2106, 0x2207,
-			0x2308, 0x1709, 0x240a, 0x250b, 0x260c, 0x270d, 0x310e,
-			0x180f, 0x1910, 0x1e11, 0x1312, 0x1f13, 0x1414, 0x1615,
-			0x2f16, 0x2c17, 0x2d18, 0x1519, 0x111a, 0 };
-
 /*	Arrow keys table	*/
 WORD	arrowtab[] = { 0x4d36, 0x5032, 0x4838, 0x4b34, 0x4800, 0x5000, 0x4d00,
 		       0x4b00, 0 };
@@ -134,12 +91,6 @@ WORD	tb3[MAXMENU] = { OPENITEM, SHOWITEM, SEAMENU,  DELMENU,  NEWFITEM,
 			 IDSKITEM, IAPPITEM, INSDISK,  REMVICON, PREFITEM, 
 			 READINF,  MEMMENU,  SAVEITEM, PRINTITE, BITBLT,
 			 VIDITEM };
-
-/*	Alternate Number Table	*/
-
-#if 0	/* no longer used: ++ERS 2/17/93 */
-WORD	altnum[] = { 0x7800, 0x7900, 0x7a00, 0x7c00, 0x7d00, 0x7b00, 0 };
-#endif
 
 WORD	o_status;	/* for o_select	*/
 WINDOW	*o_win;
@@ -208,6 +159,44 @@ loop_find( input, table, index )
 	return( FALSE );  
 }
 
+/* find the control or alternate key corresponding
+ * to the given VDI keycode. Puts the capital letter
+ * version of the key into *index, and returns
+ *   0 -- if no alt or control key is found
+ *   1 -- if a control key was found
+ *   2 -- if an alt key was found
+ * E.g. if the VDI keycode corresponds to ALT-A,
+ * then *index is set to 'A', and 2 is returned.
+ * Only ALT+letter and CONTROL+letter combinations are
+ * checked for here.
+ */
+	WORD
+key_find( keycode, index )
+	WORD keycode;
+	WORD *index;
+{
+	BYTE *capstab;
+	WORD scancode;
+	BYTE letter;
+
+/* get the Caps Lock table from the BIOS */
+ 	capstab = *( ((char **)Keytbl(-1L, -1L, -1L)) + 2 );
+	scancode = (keycode & 0x7f00) >> 8;
+	letter = capstab[scancode];
+	if (letter < 'A' || letter > 'Z')
+	  return 0; /* not a letter at all */
+	if ((keycode & 0x00ff) == (letter & 0x1f))
+	{
+	  *index = letter;
+	  return 1;		/* control+letter */
+	}
+	if ((keycode & 0x00ff) == 0)
+	{
+	  *index = letter;
+	  return 2;		/* alt+letter */
+	}
+	return 0;
+}
 
 	VOID
 men_ienable( obj, which, enable )
@@ -230,12 +219,20 @@ menu_verify( VOID )
 	REG 	WORD	i;
 	WORD	type;
 	BYTE	*str;
+	WINDOW	*wp;
+
 			/* If there is a window opened/closed	*/
 
         o_select();	/* check to see if there is anything selected */
 	x_select();
 
 	enable = ( winhead->w_id == -1 ) ? FALSE : TRUE;	
+
+	if (enable) {
+		wp = get_top();
+		if (wp && wp->w_iconified == TRUE)
+			enable = FALSE;
+	}
 
 	i = 0;	
 	while( tb1[i] )
@@ -267,6 +264,7 @@ menu_verify( VOID )
 	  if ( w_gnext() )
 	    enable = TRUE;
 
+	  men_ienable( menu_addr, CLSWITEM, TRUE ); /* +++ 5/5/93 HMK */
  	  men_ienable( menu_addr, SEAMENU, TRUE );
  	  men_ienable( menu_addr, SHOWITEM, TRUE );
 	}
@@ -287,7 +285,7 @@ sel_all( VOID )
 	REG WORD	i;
 	BYTE		buffer[14];
 
-	if ( win = w_gfirst() )
+	if ( (win = w_gfirst()) != 0 && !(win->w_iconified) )
 	{
 	  clr_dicons( );
           dir = ( DIR *)win->w_memory;
@@ -314,34 +312,10 @@ hd_keybd( key, keystate )
 	REG WORD	item;
 	WORD		msgbuff[8];
 	BYTE		buffer[14];
-	WORD		i;
+	WORD		i, ctrl;
 	APP		*app;
 	WORD		x,y,w,h;
 	ICONBLK		*iblk;
-
-	switch( st_keybd )
-	{
-	  case 1:
-	  case 7:
-	  case 8:
-	    keytable = key2table;
-	    contable = con2table;
-	    break;
-	  case 2:
-	    keytable = key3table;
-	    contable = con3table;
-	    break;
-	  case 0:	/* usa */
-	  case 3:	/* uk	*/
-	  case 4:	/* spain */
-	  case 5:	/* italy */
-   	  case 6:	/* sweden */
-	  default:
-	    keytable = key1table;
-	    contable = con1table;
-	    break;	    				
-	}
-
 
 	if ( app = app_key( key ) )
 	{
@@ -408,53 +382,34 @@ hd_keybd( key, keystate )
 	  }
 	}
 
- #if 0
- /* commented out 2/17/93 by ERS, for 2 reasons: (1) to
-  * save a bit of space, and (2) because using an ALT key
-  * to select the current resolution produced a bogus
-  * error message. We're concentrating on F
-  * and this code never did work on Falcon, so it isn't
-  * worth the hassle to maintain it.
-  */
-					/* 7/16/92 */
-	if ( ( gl_vdo & HIGHWORD ) <= TT )
-	{
-	  if ( loop_find( key, altnum, &i ) )
-	  {
-	    if ( restable[i] )
-	    {
-	      if ( desk_chres( i + 1, 0 ) )
-	        d_exit = L_CHGRES;
-
-	      return;
-	    }
-	  }
-	}
-#endif
-					/* open a disk drive	*/
-	if ( loop_find( key, keytable, &i ) )
+	ctrl = key_find( key, &i );
+	if ( ctrl == 2 )	/* ALT+key pressed */
 	{
 	  if ( win )
 	    clr_xwin( win, TRUE );
 hx_1:	  strcpy( wildext, buffer );
-	  buffer[0] = i + 'A';	
+	  buffer[0] = i;	
 	  open_disk( 0, buffer, TRUE );
 	  return;
 	}
 
-	if ( loop_find( key, contable, &i ) )
+	if ( ctrl == 1 )	/* control key pressed */
 	{
-	  if ( ch_drive( i + 'A' ) )
+	  if ( ch_drive( i ) )
 	  {
 	    if ( win )	/* replace top window	*/
 	    {		
 	      strcpy( win->w_path, win->w_buf );
 	      strcpy( g_name( win->w_path ), buffer );
 	      strcpy( wildext, win->w_path );
-	      win->w_path[0] = i + 'A';
+	      win->w_path[0] = i;
 	      rep_path( buffer, win->w_path );	
 	      if ( !up_win( win, FALSE ) )
 	        strcpy( win->w_buf, win->w_path );
+	      if (win->w_iconified) {	/* +++ HMK 5/5/93   */	
+		set_wiconname(win); 	/* change icon name */
+		do_redraw( win->w_id, &win->w_work, 0 );
+	      }
 	      return;
 	    }
 	    else	/* open a window	*/	
@@ -853,8 +808,12 @@ do_file( msgbuff )
 	BYTE		buf2[14];
 	BYTE		*str;
 	BYTE		*str1;
+	WORD		topwicon;
 
 	win = get_top();
+
+	if (win)			/* is top window iconified? */
+	  topwicon = win->w_iconified;	/* +++ HMK 5/5/93 */
 
 	switch( msgbuff )
 	{
@@ -910,12 +869,12 @@ do_file( msgbuff )
 	    break;
 
 	  case NEWFITEM:
-	    if ( win )
+	    if ( win && !topwicon )
 	      newfolder( win );	  	
 	    break;
 		
 	  case CLSFITEM:
-	    if ( win )
+	    if ( win && !topwicon )
 	      close_path( win );	/* close one path	*/
 	    break;
 		
@@ -932,7 +891,7 @@ do_file( msgbuff )
 	    break;
 
 	  case EXTMENU:
-	    if ( win )
+	    if ( win && !topwicon )
 	      foption( win );
 
 	    break;
@@ -1080,8 +1039,13 @@ hd_window( msgbuff )
 	      if ( winhead != win )	/* if not already on top in my list */
 	        clr_allwin();
 	      wind_set( handle, WF_TOP, 0, 0, 0, 0 );
-	      make_top( win );
-
+	      if (!win->w_iconified)	/* only top the window if it isn't iconified */
+	      	make_top( win );
+	      /* fall through */
+	    case WM_ONTOP:
+	      desk_mice( M_ON );
+	      desk_mice( ARROW );
+	      v_show_c( 0 );	/* really make sure the mouse is on */
 	      break;
 
 	    case WM_BOTTOMED:
@@ -1106,21 +1070,47 @@ hd_window( msgbuff )
 	      break;
 
 	    case WM_MOVED:		/* set the current x,y,w,h	*/
-	      do_xyfix( (GRECT *)&msgbuff[4] );
-	      wind_set( handle, WF_CURRXYWH, msgbuff[4], msgbuff[5], 
-			msgbuff[6], msgbuff[7] );
+	      if (!win->w_iconified) {
+		      do_xyfix( (GRECT *)&msgbuff[4] );
+		      wind_set( handle, WF_CURRXYWH, msgbuff[4], msgbuff[5], 
+				msgbuff[6], msgbuff[7] );
 
 					/* set the position offset	*/
-	      obj[0].ob_x += msgbuff[4] - win->w_sizes.g_x;
-	      obj[0].ob_y += msgbuff[5] - win->w_sizes.g_y;
-	      rc_copy( (WORD *)pc, (WORD *)&win->w_sizes );
+		      obj[0].ob_x += msgbuff[4] - win->w_sizes.g_x;
+		      obj[0].ob_y += msgbuff[5] - win->w_sizes.g_y;
 
-	      wind_get( handle, WF_WORKXYWH, &msgbuff[4], &msgbuff[5], 
-			&msgbuff[6], &msgbuff[7] );
+		      rc_copy( (WORD *)pc, (WORD *)&win->w_sizes );
+		      rc_copy( (WORD *)pc, (WORD *)&win->w_normsizes );
 
-	      rc_copy( (WORD *)pc, (WORD *)&win->w_work );
-	      break;	
-	
+		      wind_get( handle, WF_WORKXYWH, &msgbuff[4], &msgbuff[5], 
+				&msgbuff[6], &msgbuff[7] );
+
+	      	     rc_copy( (WORD *)pc, (WORD *)&win->w_work );
+	      } else { /* when window is iconified, we do other stuff */
+		       /* since now win->w_icnobj is drawn instead of */
+		       /* win->w_obj.				      */
+		      wind_set( handle, WF_CURRXYWH, msgbuff[4], msgbuff[5], 
+				msgbuff[6], msgbuff[7] );
+		      rc_copy( (WORD *)pc, (WORD *)&win->w_sizes );
+	     	      	
+		      wind_get( handle, WF_WORKXYWH, &msgbuff[4], &msgbuff[5], 
+				&msgbuff[6], &msgbuff[7] );
+
+	      	      rc_copy( (WORD *)pc, (WORD *)&win->w_work );
+		      win->w_icnobj[0].ob_x = msgbuff[4];
+		      win->w_icnobj[0].ob_y = msgbuff[5];
+
+	      }
+	      break;
+
+	    case WM_ICONIFIED:		/* make icon window */
+	      iconify_window(handle, pc);
+	      break;
+		
+	    case WM_UNICONIFIED: /* bring window back to its original state */
+	      uniconify_window(handle, pc);
+	      break;
+
 	    case WM_FULLED:
 	      wind_get( handle, WF_CURRXYWH, &msgbuff[4], &msgbuff[5],
 	                &msgbuff[6], &msgbuff[7] );
@@ -1159,6 +1149,7 @@ hd_window( msgbuff )
 		dodraw = TRUE;
 
 	      rc_copy( (WORD *)pc, (WORD *)&win->w_sizes );
+	      rc_copy( (WORD *)pc, (WORD *)&win->w_normsizes );
 
       	      wind_get( handle, WF_WORKXYWH, &obj->ob_x, &obj->ob_y,
 			&obj->ob_width, &obj->ob_height );
@@ -1229,11 +1220,7 @@ hd_msg( msgbuff )
 	    if ( msgbuff[3] )
 	      d_exit = L_CHGRES;
 	    else
-#if 0
-	      form_alert( 1, "[1][ Resolution change failed! ][ OK ]" );
-#else
 	      do1_alert( NORESCHG ); /* ++ERS 12/15/92 */
-#endif
 	    break;
 #if 0
 	  case DK_INFLOAD:	/* read inf file */
@@ -1293,13 +1280,6 @@ actions( VOID )
 			      &kreturn,
 			      &clicks );
 
-#ifdef DEBUGGING
-if (!d_multi) {
-Debug1(currpd->p_name);
-Debug1(" desktop woke up\r\n");
-}
-#endif
-
 	/* Don't change the following order, the wind_update call is selective */
 
 	  if ( event & MU_MESAG )
@@ -1338,27 +1318,25 @@ Debug1(" desktop woke up\r\n");
 av_mem( VOID )
 {
   if (!d_multi) {
-	REG BYTE	*start;
+	BYTE		*start;
 	REG BYTE	*addr;
 	REG BYTE	**new;
 	LONG		total,size;
 	
 	total = 0L;
 	start = (BYTE*)0;
+	new = &start;
 
 	while( TRUE )
 	{
 	  size = Mxalloc( 0xFFFFFFFFL, 3 );
 	  if ( size >= 4L )
 	  {
-	    addr = Mxalloc( size, 3 );
+	    addr = (BYTE *)Mxalloc( size, 3 );
 	    total += size;
-	    if ( !start )
-	      start = addr;
-	    else
-	      *new = addr;
+	    *new = addr;
 
-	    new = addr;	    
+	    new = (BYTE **)addr;
 	  }
 	  else
 	  {
@@ -1370,13 +1348,13 @@ av_mem( VOID )
 
 	if ( start )
 	{
-	  new = start;
+	  new = (BYTE **)start;
 
 	  while( new )
 	  {
 	    addr = *new;
 	    Mfree( new );
-	    new = addr;	
+	    new = (BYTE **)addr;	
 	  }
 	}
 

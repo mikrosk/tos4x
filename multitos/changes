@@ -1,3 +1,118 @@
+Changes made 5/11/93:
+
+desk*.c: ++hmk
+	Allow desktop windows to be iconified.
+gemwmlib.c: ++hmk
+	New wmset and wmget modes to iconify windows.
+gemsigna.c: ++hmk
+	More iconified window support.
+gemctrl.c: ++hmk
+	Window manager support for iconified windows.
+gemoblib.c: ++hmk
+	Fixed the drawing of text inside 3D boxes.
+gem*.rsc:
+	Made all the alert boxes use color icons, instead of black and
+	white images.
+
+Changes made 5/07/93:
+
+gemfmalt.c:
+	Calculated icon height and width based on the real height and
+	width of icons, instead of hard-coding it to 4.
+
+Changes made 5/06/93:
+
+desk*.rsc:
+	Added memory limit popup to the "Install Application" dialog.
+	Went through and cleaned up the resource files to make sure
+	they all agreed (they had drifted out of sync).
+
+Changes made 5/05/93:
+
+deskdefi.h,deskapp.c,deskinf.c:
+	Added memory limits to the application structure.
+desk*.rsc,desktop.c:
+	Made the "Desktop info..." dialog box report the TOS or MultiTOS
+	version number.
+
+Changes made 5/04/93:
+
+deskwin.c:
+	Bug fix in do_blit: windows weren't blitted left properly,
+	because of a typo.
+gemwmlib.c:
+	Fixed the bottom window bar to look OK when there are arrows but
+	no slider.
+gemaplib.c:
+	Extended appl_getinfo to return lots more stuff about the OS.
+
+Changes made 5/03/93:
+
+deskmenu.c:
+	Used the XBIOS keyboard tables for determining control and alternate
+	key presses, rather than hard-coding tables into the desktop.
+deskmenu.c:
+	The desktop now forces the mouse to be on and in an arrow shape
+	whenever one of its windows is on top.
+
+Changes made 4/30/93:
+
+gemoblib.c:
+	Made the color icon code allocate 1 big block of memory instead of
+	lots of small ones (a big win with memory protection).
+gem*.rsc:
+	Fixed the critical error alerts so that the "Cancel" button
+	always appears on the right, like all our other alerts do.
+desk*.inf:
+	Made TT medium the default resolution instead of ST high.
+
+Changes made 4/29/93:
+
+mn_menu.c: ++cjg
+	Fixed the calculation for finding maximum menu height.
+gembind.c: ++cjg
+	Allow the "About..." menu item to be manipulated with menu_text
+	and menu_ienable.
+gemflag.c,gemsigna.c: ++cjg
+	Fixed a problem with wind_update(BEG_MCTRL) (if the mouse entered
+	the menu bar the AES would still send a message to the screen
+	manager, even though someone else had mouse control).
+gemctrl.c,gemmnlib.c: ++hmk
+	Fixed up menu_bar call so that applications can disable (i.e.
+	remove) their menus under MultiTOS.
+gemdisp.c:
+	Send a WM_ONTOP message to the application which is put on top
+	after a swap_next() operation (e.g. if another application
+	exits).
+gemctrl.c:
+	Made it possible to select an application from the desk menu
+	even if it is not responding to WM_TOPPED messages.
+gemwmlib.c:
+	Fixed the WF_BOTTOM code so that setting a window to the bottom
+	forces a redraw of all window parts, not just the name.
+gemshlib.c:
+	Added a check so that accessories can only be launched from the
+	desktop in single-tasking mode.
+desk*.inf:
+	Added the '#A ' line needed to get accessory launching.
+gemwmlib.c:
+	Made changing the default window colors also change the colors
+	of existing windows (as long as those existing windows were
+	using the default colors).
+
+Changes made 4/28/93:
+
+gemctrl.c:
+	Made the screen manager use objc_xfind in place of objc_find.
+deskopen.c,deskmenu.c:
+	Made the desktop iconify windows upon receipt of a WM_ICONIFIED
+	message; added iconifier gadgets to windows.
+gembind.c,gemoblib.c:
+	Provided a new objc_xfind call that does what objc_find does in
+	Falcon TOS (i.e. uses the whole object area), and made objc_find
+	look only on the insides of objects (as it did in previous TOS
+	versions).
+
 Changes made 4/23/93:
 
 desk*.rsc:

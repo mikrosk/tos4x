@@ -298,12 +298,13 @@ i_find( mx, my, winout, item, type )
 	REG WINDOW	*win;
 	REG WORD	which;
 	REG WORD	handle;		/* ++ERS 1/11/93 */
+	WORD		icon, dummy;
  
 	win = w_gfirst();
 
 	while( win )		
 	{				/* inside a window boundary	*/
-	  if ( inside( mx, my, &win->w_sizes ) )
+	  if ( !(win->w_iconified) && inside( mx, my, &win->w_sizes ) )
 	  {				
 	    *winout = win;
 	    *type = WINICON;

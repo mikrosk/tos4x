@@ -112,6 +112,7 @@ portab.h
 romcart.c
 rslib.h
 signal.h
+softload.h
 traps.s
 utility.c
 vdidefs.h

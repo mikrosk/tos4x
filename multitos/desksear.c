@@ -162,6 +162,14 @@ sea_file( filename )
 
 	    if ( change )
 	    {
+	      if (win->w_iconified) {
+		GRECT pc;		/* open iconified window */
+		
+		wind_get(win->w_id, WF_UNICONIFY, /* get old size */
+			&pc.g_x, &pc.g_y, &pc.g_w, &pc.g_h);
+		uniconify_window(win->w_id, &pc);
+	      }
+
 	      pos_item( win, newi );
 	      goto s_ex2;
 	    }		

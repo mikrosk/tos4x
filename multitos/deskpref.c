@@ -135,6 +135,9 @@ c_2:
 	  {
 	    if ( win->w_obj )	/* fixed 6/24/92 */	
 	      win->w_obj[0].ob_spec = windspec;
+	    if ( win->w_icnobj )	/* +++ HMK 5/6/93 */	
+	      win->w_icnobj[0].ob_spec = windspec;
+
 	    win = (WINDOW *) win->w_next;
 	  }
 

@@ -8,6 +8,7 @@
 /************************************************************************/
 
 #include "portab.h"
+#include "machine.h"
 #include "obdefs.h"
 #include "deskdefi.h"
 #include "deskwin.h"
@@ -133,6 +134,9 @@ hd_button( WORD clicks, WORD kstate, WORD mx, WORD my )
 
 	   if ( type == WINICON )	/* window objects	*/
 	   {
+	     if (win->w_iconified)
+	        return;
+
 	     clr_dicons( );		/* clean up desktop icons */
 
 	     if ( ( x_win ) && ( x_win != win ) )
@@ -206,9 +210,9 @@ a_1:
 	  x_select();
 
 	  if ( clicks == 2 ) {		/* double clicks	*/
-	    if (!d_multi)	/* maybe not only in single tasking mode??? */
-	    	clr_allwin();
 	    open_item( item, type, win );
+	    /*if (!d_multi)*/	/* maybe not only in single tasking mode??? */
+	    	clr_allwin();	/* deselect icon */
 	  } else				/* button still down	*/
  	    hd_down( item, type, win );
 

@@ -136,6 +136,7 @@ typedef	struct	app
 	BYTE	a_doc[14];	/* doc name	*/
 	WORD	a_pref;		/* launch pref	set dir etc */	
 	UWORD	a_key;		/* key definition	*/
+	LONG	a_limit;	/* max. memory to allow */
 	BYTE	a_argu[ARGULEN];
 	BYTE	*a_next;	/* app pointer	*/
 } APP;

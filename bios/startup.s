@@ -1,18 +1,21 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/29 21:40:50 $
+* $Date: 89/07/31 12:08:51 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.17  89/07/31  12:08:51  apratt
+* Added .globl clrcache directive.
+*
 * Revision 2.16  89/07/29  21:40:50  kbad
 * Put the reset back at reseth.  It was a gratuitous incomprattibility.
-*
+* 
 * Revision 2.15  89/07/28  20:59:12  apratt
 * Changed delay for DMA command bytes and data to count time from
 * power on, not from when we started looking.  This makes warm boots
@@ -264,7 +267,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.16 $
+* $Revision: 2.17 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -645,6 +648,7 @@ osconf		equ	%11001
 	.globl	_dskbufp		; pointer to some space for disk I/O
 	.globl	seekrate		; default floppy seek rate
 	.globl _fverify			; nonzero: verify on floppy write
+	.globl _drvbits			; long bitmap of block devices
 
 	.globl	kcl_hook		; hook for keyclick sound
 .if TT

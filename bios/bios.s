@@ -4,13 +4,16 @@
 * $Author: unknown $
 * =======================================================================
 *
-* $Date: 1992/05/18 23:07:12 $
+* $Date: 1992/05/20 22:10:16 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.49  1992/05/20  22:10:16  unknown
+* Added some comments to the keyboard BIOS
+*
 * Revision 2.48  1992/05/18  23:07:12  unknown
 * Set M68030 if (SPARROW | TT) -- all Sparrow is 68030
 *
@@ -142,7 +145,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.48 $
+* $Revision: 2.49 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\RCS\bios.s,v $
@@ -4410,18 +4413,35 @@ ari9:	cmpi.b	#$3A,d0		;CAPS LOCK
 ari9a:	bchg	#KBCL,d1	;toggle CAPS LOCK state
 ari10:	move.b	d1,kbshift.w	;restore new kbshift.w value
 	rts			;ignore CAPS LOCK break
+
+
+********************
+*
+* The key is not a make or break of a modifier like alt and caps-lock.
+*
+
 ari11:	btst.l	#7,d0		;make or break?
 	bne.b	ari12		;break
 
+********************
+*
 * key make code: Set up key repeat
 * If already some key repeating, stop only when THAT KEY comes up.
 * When any key goes down, start the cdelay1/cdelay2 repeat cycle over for it.
 * (This is a change from 11/20 and 4/22: they didn't repeat that second key.)
+*
 
 	move.b	d0,keyrep.w	;save for repeat purpose
 	move.b	cdelay1,kdelay1.w
 	move.b	cdelay2,kdelay2.w
 	bra.b	ari16
+
+********************
+*
+* Key break code; stop repeating if it's the break for the key that
+* was repeating.  Then handle break codes for the Insert and Home keys,
+* which behave like mouse buttons.
+*
 
 ari12:	move.b	d0,d1		; d1 = make code corresponding to d0
 	bclr.l	#7,d1
@@ -4436,9 +4456,15 @@ ari12:	move.b	d0,d1		; d1 = make code corresponding to d0
 ari18:	cmpi.b	#$c7,d0		;is it a "home" break-code?
 	beq.b	ari18a		;yes...allow it to pass
 	cmpi.b	#$d2,d0		;is it a "insert" break-code?
-	bne	ari14		;no...regular break junk...
+	bne	ari14		;no...regular break junk...just rts
 ari18a:	btst.b	#KBALT,kbshift.w ;early "ALT" test to prevent double "nulls"
-	beq	ari14		;no ALT...so exit now...
+	beq	ari14		;no ALT...so just rts now...
+
+********************
+*
+* Make code for a normal key or a mouse-spoofing key.
+* Give keyclick, translate the key into a longword that goes into kbufrec.
+*
 
 ari16:	btst.b	#0,conterm.w
 	beq.b	ari16a		;no click please!

@@ -4,19 +4,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/20 11:47:17 $
+* $Date: 91/08/20 12:27:51 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.76  91/08/20  12:27:51  apratt
+* STylus buttons are found at $D00004, not $D00006.  Documentation error.
+*
+* Revision 2.76  91/08/20  12:27:51  apratt
+* STylus buttons are found at $D00004, not $D00006.  Documentation error.
+* 
 * Revision 2.75  91/08/20  11:47:17  apratt
 * Changes for STPAD: clear the conversion-done interrupt during startup,
 * vector NMI to RTE because when it happens, Pterm is always the wrong thing
-* to do, and check for a stylus-button-click to abort the 80-second timeout
-* (because STylus has no keyboard to use for aborting this timeout).
-*
 * to do, and check for a stylus-button-click to abort the 80-second timeout
 * (because STylus has no keyboard to use for aborting this timeout).
 * 
@@ -152,7 +155,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.75 $
+* $Revision: 2.76 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -3044,7 +3047,7 @@ dmab_sp:
 	addq.l	#4,sp
 .ifne STPAD
 	move.w	#' ',4(sp)
-	move.w	$d00006,d0
+
 	move.w	#27,4(sp)
 	bne	dmab_abrt		; yes, abort
 .endc

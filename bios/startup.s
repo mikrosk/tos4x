@@ -4,25 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/16 16:50:17 $
+* $Date: 90/02/22 17:51:41 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.40  90/02/22  17:51:41  apratt
+* Changed bootup BG color from yellow to magenta.  Added moveq #0,d0
+* to clear screen so it doesn't turn green.  Removed twin color
+* tables: $f is full-magnitude on STe and TT, and eq to $7 on ST.
+*
 * Revision 2.39  90/02/16  16:50:17  apratt
 * Fixed an oops in the startup code which made RAM TOSes not work. Also,
 * initialize ssp to its ultimate destination (_supstk+supsiz) rather than
 * $8000 at reset4.  Also, after reset4, changed to clear from the start
 * of the BSS which needs clearing (that is, endosbss) to the true end of
 * the BSS: endaesbss in ROM systems, ostext in RAM.
-*
+* 
 * Default boot-up rez code changed: if no mono detect, ST LOW; else
 * ST HIGH or TT HIGH as appropriate.
-*
+* 
 * MMU code works, and is now enabled.
-*
+* 
 * Revision 2.38  90/02/02  14:17:54  apratt
 * Reordered entire startup sequence to improve clarity and
 * function.  Cold boot for TT is defined as "ttscu1 bit 0 is clear."
@@ -389,7 +394,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.39 $
+* $Revision: 2.40 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1790,9 +1795,10 @@ nodmasnd:
 *  This has to run after clearing BSS memory.
 *-
 
- .ifne STPLUS+TT
+.ifne STPLUS+TT
 	move.b	_v_bas_ad+3.w,dbasell	; load lo byte addr
- .endc
+.endc
+*+
 *  Setup display base,
 *  clear display memory.
 *
@@ -2784,37 +2790,16 @@ ca_2:	tst.l	(a0)			; test link address
 ca_r:	rts
 
 
+unimpl:
+_rts:	rts
 
-.ifeq STPLUS
 
+*+
 .ifeq TT
-colors:	dc.w	$777			; 0 white
+	dc.w	$fff			; 0 white
+.else
+	dc.w	$f0f			; 0 magenta (so you can tell)
 .endc
-.ifne TT
-colors:	dc.w	$770			; 0 yellow (says, "newer than blue!")
-.endc
-	dc.w	$700			; 1 red
-	dc.w	$070			; 2 green
-	dc.w	$770			; 3 yellow
-	dc.w	$007			; 4 blue
-	dc.w	$707			; 5 magenta
-	dc.w	$077			; 6 cyan
-	dc.w	$555			; 7 "low white"
-	dc.w	$333			; 8 grey
-	dc.w	$733			; 9 light red
-	dc.w	$373			; 10 light green
-	dc.w	$773			; 11 light yellow
-	dc.w	$337			; 12 light blue
-	dc.w	$737			; 13 light magenta
-	dc.w	$377			; 14 light cyan
-	dc.w	$000			; 15 black
-.endc
-
-.ifne STPLUS
-
-* full-magnitude colors for STPLUS palette means 'f' not 7
-
-colors:	dc.w	$fff			; 0 white
 *	Passed:		d1.l = offset
 *			a0 = base of pattern ($1f8 bytes long)
 *			a4 -> return address
@@ -2830,8 +2815,6 @@ memchk:
 	add.l	d1,a0			; a0 ->	memory to check
 	clr.w	d0			; zap pattern seed
 	lea	$1f8(a0),a1		; a1 ->	ending address
-
-.endc
 memchk1: cmp.w	(a0)+,d0		; match?
 	bne	memchkr			; (no -- return	NE)
 	add.w	#$fa54,d0		; yes -- bump pattern

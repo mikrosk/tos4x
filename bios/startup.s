@@ -4,20 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/19 16:00:50 $
+* $Date: 90/04/30 18:44:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.46  90/04/30  18:44:45  apratt
+* Changed Getmpb call to conform to new GEMDOS style: one MD for both
+* ST RAM and alternative RAM, with the low bit of the block start address
+* nonzero for alt. RAM.
+*
+* Noblank and noblank1 clobber Timer B always, so it doesn't survive a rez
+* change ever -- see comments there.
+*
+* Added nvmaccess call to XBIOS list ($2e).  It's implemented in clock.s.
+*
 * Revision 2.45  90/03/19  16:00:50  apratt
 * Changed TT to TT+STPLUS w.r.t. SCU: catch & ignore bus errors in the
 * init code for SCU so it runs on either STe or Mega STe.
-*
+* 
 * Fixed the out-of-range check for Bcon* functions: was (devno > maxdev)
 * but is now (devno >= maxdev).
-*
+* 
 * Revision 2.44  90/03/02  17:45:44  apratt
 * This rev is the source for the 3/1/90 ROM.
 * 
@@ -432,7 +442,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.45 $
+* $Revision: 2.46 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -521,9 +531,9 @@ date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .else
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$03011990	; TT date, $MMDDYYYY @check@
+date		equ	$04271990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010001100001 ; Mar 1, 1990
+dosdate		equ	%0001010010011011 ; April 27, 1990
 .endc
 
 *******************************************************************************
@@ -775,17 +785,27 @@ osconf		equ	%11001
 	.globl	seekrate		; default floppy seek rate
 	.globl _fverify			; nonzero: verify on floppy write
 	.globl _drvbits			; long bitmap of block devices
-	.globl	def_frb			; default _FRB value for flop.s
-
+	.globl	conterm			; console/vt52 bits
 
 	.globl	_hinit			; go through hdv_init
 	.globl	kcl_hook		; hook for keyclick sound
+.ifeq systype-rom
+	.globl	_p_cookie		; pointer to cookie jar
+.ifne TT
+
+.endc
+.endc
+.if (TT == 0)
+	.globl	_waketime		; alarm maintenance for STPAD
+	.globl	_bconmap		; (soon-obsolete) XBIOS call
+.endif
 .if TT
 	.globl	NVMaccess		; read/write/init non-volatile RAM
 .endif
 	.globl	osconf			; equate imported from BIOS.S
 	.globl	_bconmap		; (soon-obsolete) XBIOS call
 	.globl	endos, the_magic	; ashes of the build process
+	.globl	NVMaccess		; read/write/init non-volatile RAM
 	.globl	_dmaread,_dmawrite	; for booting
 
 	.globl	_date,_time		; GEMDOS date and time
@@ -1049,10 +1069,13 @@ keybd	equ	keyctl+2		; keyboard data
 .endc
 midictl	equ	$fffffc06		; MIDI ACIA control
 .ifne TT+STPLUS
-ttvmeintmsk	equ	$ffff8e0d	; "vme" int mask in SCU
-ttsysintmsk	equ	$ffff8e01	; "st" int mask in SCU	
-ttscu1		equ	$ffff8e09	; general-purpose register 1
-ttscu2		equ	$ffff8e0b	; general-purpose register 2
+
+
+*--- DMA SOUND AND MicroWire REGISTERS
+dmasndc	equ	$ffff8900
+mwdata	equ	$ffff8922
+mwmask	equ	$ffff8924
+
 .endc
 *--- SCU REGISTERS: interrupt mask, interrupt state, and two gp regs
 .ifne TT
@@ -1225,7 +1248,10 @@ user_vars:	ds.b	64		; 64 bytes for carts and things
 .if STPAD
 padmagic:	ds.l	1		; $01241960 for STPAD touch driver
 padstuff:	ds.l	10*4		; other pad variables (total 40 bytes)
-def_frb:	ds.l	1		; copy of value of _FRB cookie
+.ifne TT
+the_env:	ds.b	20		; space for a small enviroment string
+.endc
+
 _upref:		ds.w	1		; boot pref for _dmaboot
 .if TT
 ttmd:		ds.l	4		; the TT MD for fast RAM (see getmpb)
@@ -2046,7 +2072,6 @@ gotem:	move.l	a1,$8
 * when attempting a Rwabs from or to fast RAM.
 * Don't change this size: RAM-loaded drivers use the same buffer.
 	move.l	#nofpu,$2c
-	clr.l	def_frb			; default to zero
 	move.l	#nofpu,$34
 	fmove.l	fp0,d0			; test a simple FPU inst.
 	move.l	#$00020000,(a0)+	; found 6888x: set %10 bit 
@@ -2060,7 +2085,6 @@ fpudone:
 	move.l	a3,sp
 
 * What the heck - probe for SFP004 whether or not you're a TT.
-	move.l	d0,def_frb.w		; write so flop.s can find it
 
 	move.l	$8,a1			; save bus error vector
 	move.l	sp,a2			; and SP for cleaning up later
@@ -2175,8 +2199,8 @@ sei3:	move.l	#_rte,(a1)+		; point interrupt at RTE
 	lea	_vbl_list.w,a0		; a0 -> default list of vbl locs
 	move.l	a0,_vblqueue.w		; install ptr to them
 	move.w	#dnvbls-1,d0		; clear vbl vectors
-	move.b	#$40,ttvmeintmsk	; enable int priority 6
-	move.b	#$14,ttsysintmsk	; enable int priorities 2, 4
+	dbra	d0,avbl
+
 *  vectors have been moved into RAM to make it possible
 *  to efficiently intercept them later on.
 *
@@ -2242,11 +2266,10 @@ scuberr:
 * when on a TT).
 .ifeq TT
 * As of 5/14/91, TT's with color monitors boot in TT MED, which makes it
-* is call noblank, which returns when it's sure we are NOT in a vblank.
-* THEN we can change modes.  (Note: noblank clobbers d0.)
+* look less like a toy machine with only 40 columns.
+*
 * The STPAD part of this moved to the place where the sync mode and
-	lea	vwt_r(pc),a6		; a6 -> ret addr
-	bra	noblank			; wait until we're NOT in a vblank
+	bsr	noblank1		; wait until we're NOT in a vblank
 vwt_r:
 .endc
 
@@ -2886,7 +2909,7 @@ _rts:	rts
 .ifeq TT
 	dc.w	$fff			; 0 white
 .else
-	dc.w	$f0f			; 0 magenta (so you can tell)
+	dc.w	$730			; 0 orange - 4/27 version
 .endc
 *	Passed:		d1.l = offset
 *			a0 = base of pattern ($1f8 bytes long)
@@ -3021,12 +3044,14 @@ v_read2:
 ***
 *** STPAD doesn't have any of this cruft - you can't change monitors!
 ***
+*** SPARROW doesn't have it either - burn 'em out!
+***
+
+.if (STPAD == 0) & (SPARROW == 0)
+
+	move.b	gpip,d1			; get "High Rez" input
 .ifeq TT
-* For ST, this code calls noblank to wait until vblank is over before 
-* changing mode.  Otherwise the monochrome shifter can be 16 bits off.
-	lea.l	v_ret,a6		; this is noblank's return PC reg
-	bra	noblank			; returns when NOT in vblank
-v_ret:	move.b	#2,d0			; set mode 2 (high rez)
+	beq	v_readdone		; don't have it; d1 is right.
 
 	move.w	sr,-(sp)
 .endc
@@ -3198,15 +3223,16 @@ _critic:
 *	N(sp) args			N(usp) args
 *	6/8(sp) func#			6(usp) func#
 *	<frame word if longframe>
-	lsl.w	#2,d0			; turn d0 into longword index
-	move.l	(a0,d0.w),d0		; get pointer to function handler
+*	2(sp) ret			2(ssp) ret
+	lsl.w	#2,d1			; turn d0 into longword index
+*
 .ifeq TT
-	move.l	d0,a0			; (quick and dirty test-for-negative)
+	move.l	d1,a0			; (quick and dirty test-for-negative)
 *		This is to ensure that you can tell old ROMs from new ones:
 *		For the interrogative calls, the fn number must be used
 *		to signal the "old ROM" case.
-	bclr.l	#0,d0			; clear & test odd bit
-	move.l	d0,a0			; doesn't affect ccr!
+*
+* Uses:		d0-d2/a0-a2
 * Keeps:	C registers
 .endc
 * Notes:	BIOS traps are re-entrant to 'nlevels' (declared near the
@@ -3322,9 +3348,9 @@ trp14tab:
 .else
 	dc.l	unimpl
 .endc
-	dc.l	unimpl			; 45: unused (0x2d)
-	dc.l	unimpl			; 46: unused
-	dc.l	unimpl			; 47: unused
+	dc.w	65			; number of entry points
+	dc.w	96			; number of TT entry points
+	dc.l	unimpl			; 47: unused ($2f)
 	dc.l	_setcolor		; 7: set single color
 	dc.l	_floprd			; 8: read floppy sector(s)
 	dc.l	_flopwr			; 9: write floppy sector
@@ -3545,6 +3571,11 @@ nomap:	lsl.w	#2,d0			; turn into longword index
 *
 * No range checking is performed.  If a bogus device number
 * is passed to the BIOS' character I/O handler, the system
+* will crash or become funky duex.
+*
+* BIG BUG: ikbd and midi output status are reversed.  Sorry, kids.
+* For compatibility, we won't fix it.  (But we should!)
+*
 * Bconmap initialization (mapinit), called by initmfp, (re-)writes
 * the second column of this table.
 *
@@ -3553,7 +3584,7 @@ CHRDEVTAB:
 tconstat: dc.l _rts,auxistat,constat,midstat,_rts,_rts,_rts,_rts
 tconin:	  dc.l _lstin,auxin,conin,midin,_rts,_rts,_rts,_rts
 tcostat:  dc.l _lstostat,_auxostat,conoutst,ikbdost,midiost,_rts,_rts,_rts
-	move.l	a1,8(a0)		; mp_rover = &themd;
+tconout:  dc.l _lstout,_auxout,conout,midiwc,ikbdwc,_asc_out,_rts,_rts
 
 
 
@@ -3562,6 +3593,24 @@ tcostat:  dc.l _lstostat,_auxostat,conoutst,ikbdost,midiost,_rts,_rts,_rts
 * Passed:	nothing
 * Returns:	D0.L = a bit vector of live (rwabs'able) block devices
 *
+*-
+.ifne TT
+	move.l	_drvbits.w,d0
+	rts
+
+*+
+* _shift - get/set keyboard shift state
+* Synopsis:	LONG _shift(bits)
+*		WORD bits
+*
+* Returns:	D0.B = shift/alt/ctl/shift' bits
+*
+* Note:		Since the shift bits are changed at interrupt
+*		level, any set from a get of the shift state
+*		must be done as a critical section.
+*
+*-
+.endc
 	moveq	#0,d0
 	move.b	kbshift.w,d0
 	move.w	4(sp),d1
@@ -4163,24 +4212,32 @@ ptype:
 *  Uses:	d0
 	dc.b	-1			; [epson color dot]
 * Noblank1 is the same thing, but returns via RTS.
-*
-* Serious flaw! If somebody has programmed Timer B with a value of '1'
-* the data register will never change!
+
+*--- parameter storage for printScreen:
+	.bss
+prtargs:
+p_blkptr:	ds.l	1		; -> bitmap to print
+p_offset:	ds.w	1		; offset on page
+p_width:	ds.w	1		; width and height
+p_height:	ds.w	1
+p_left:		ds.w	1		; left & right leading
+p_right:	ds.w	1
 *-
 
 *
-	move.b	#$10,tbcr		; halt the timer
+	move.b	#$00,tbcr		; halt the timer
+	clr.b	tbdr			; load a zero there
 	move.b	#$08,tbcr		; start timer B in event-count mode
-	move.b	tbdr,d0			; get contents of data reg
-tb_1:	cmp.b	tbdr,d0			; changed yet?
+tb_1:	tst.b	tbdr			; changed yet?
 	beq	tb_1			; (not yet)
 	jmp	(a6)			; return
 * around VBLANK.  THEORY 3 most clearly states "it's safe just after
 * get DE's, because if you get (a rising edge of) DE then you know you're
-	move.b	#$10,tbcr		; halt the timer
+	bclr	#0,iera			; disable Timer B's interrupt
+	move.b	#$00,tbcr		; halt the timer
+	clr.b	tbdr			; load a zero there
 	move.b	#$08,tbcr		; start timer B in event-count mode
-	move.b	tbdr,d0			; get contents of data reg
-tb_2:	cmp.b	tbdr,d0			; changed yet?
+tb_2:	tst.b	tbdr			; changed yet?
 	beq	tb_2			; (not yet)
 	rts				; return
 

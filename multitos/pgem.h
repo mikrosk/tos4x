@@ -226,11 +226,9 @@ BYTE	*fs_back( REG BYTE *pstr );
 
 WORD	fs_input( BYTE *pipath, LONG pisel, WORD *pbutton, BYTE *lstring );
 
-WORD	r_dir( BYTE *path, BYTE *select, REG UWORD *count );
+WORD	r_dir( BYTE *path, BYTE *select, REG UWORD *count, WORD mask_flag );
 
-WORD	r_files( BYTE *path, BYTE *select, WORD *count, REG BYTE *filename );
-
-/*VOID	r_sort( REG FSTRUCT **buffer, WORD count );*/
+WORD	r_files( BYTE *path, BYTE *select, WORD *count, REG BYTE *filename, WORD mask_flag );
 
 VOID	r_sfiles( UWORD index, UWORD ratio );
 
@@ -243,11 +241,6 @@ VOID	FXWait( VOID );
 VOID	FXSelect( OBJECT *tree, WORD obj );
 
 VOID	FXDeselect( OBJECT *tree, WORD obj );
-
-VOID	X_Deselect( OBJECT *tree, WORD obj );
-
-
-
 
 
 /* FILE: GEMGRLIB.C
@@ -485,7 +478,7 @@ WORD	find_pos( REG BYTE *str, REG WORD pos );
 
 VOID	pxl_rect( REG LONG tree, REG WORD obj, WORD ch_pos, REG GRECT *pt, TEDINFO *edblk );
 
-VOID	curfld( LONG tree, WORD obj, WORD new_pos, WORD dist, TEDINFO *edblk );
+VOID	curfld( OBJECT *tree, WORD obj, WORD new_pos, WORD dist, TEDINFO *edblk );
 
 WORD	instr( REG BYTE chr, REG BYTE *str );
 
@@ -953,6 +946,11 @@ VOID	w_hideparts(WINDOW *wp);
 
 VOID	w_tooldraw(WINDOW *wp, WORD obj, GRECT *pc);
 
+BYTE	*allocIcnslots(VOID);
+VOID	freeIcnslots(BYTE *);
+WORD	findIcnslot(BYTE *, BYTE *, WORD *, WORD *, BYTE *);
+VOID	retIcnslot(BYTE *, BYTE *, BYTE *);
+
 
 /* FILE: MN_EVENT.C
  * --------------------------------------------------------------------
@@ -1070,7 +1068,7 @@ VOID	RestoreMenu( REG MENU_PTR MenuPtr );
 
 VOID 	AdjustMenuPosition( REG MENU_PTR MenuPtr, WORD xpos, WORD ypos,
 			    GRECT *rect, BOOLEAN Horizontal_Flag,
-			    BOOLEAN Vertical_Flag );
+			    BOOLEAN Vertical_Flag, BOOLEAN SkipFlag );
 
 VOID	MenuScrollAdjust( REG MENU_PTR MenuPtr, WORD start_obj );
 

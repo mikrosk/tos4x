@@ -1136,6 +1136,7 @@ alloc_obj( mode, win )
 	/*
  	 *	Allocate memory for objedct tree in iconified state
 	 */
+	VOID
 alloc_icnobj(win, icn)
 WINDOW	*win;
 WORD	icn;
@@ -1173,7 +1174,7 @@ WORD	icn;
 		objc_add(win->w_icnobj, 0, 1);
 	} else {
 		do1_alert( NOWINMEM );
-		return( FALSE );
+		return;
 	}
 }
 
@@ -1915,9 +1916,15 @@ alliconify_windows(handle, pc)
 {
 	GRECT	pt;
 	WINDOW	*win;
+	WORD	slot, d;
 
 	if ( !( win = get_win( handle ) ) )
 	    return;		/* illegal window handle */
+
+#if 0
+	wind_get(handle, WF_ICONSLOT, &slot, &d, &d, &d);
+	wind_set(handle, WF_ICONSLOT, -1, d, d, d);
+#endif
 
 	last_win = win;
 	
@@ -1926,9 +1933,10 @@ alliconify_windows(handle, pc)
 	else
 		rc_copy((WORD*) &winpd[MAXWIN].w_sizes, (WORD*) &pt);
 
+#if 0
 	form_dial(FMD_SHRINK, pt.g_x, pt.g_y, pt.g_w, pt.g_h,
 		win->w_work.g_x, win->w_work.g_y, win->w_work.g_w, win->w_work.g_h);
-
+#endif
 	for (win = w_gfirst(); win; win = w_gnext()) {
 		clr_xwin(win, FALSE); 			/* deselect everything 	*/	
 		wind_close(win->w_id);			/* close window	 	*/
@@ -1940,8 +1948,12 @@ alliconify_windows(handle, pc)
 
 	if (!win_alliconified) {
 		wind_set(win->w_id, WF_ICONIFY, pc->g_x, pc->g_y, pc->g_w, pc->g_h); 
+		wind_open(win->w_id, -1, -1, -1, -1); /* open in icon slot */
+#if 0
 		wind_open(win->w_id, pc->g_x, pc->g_y, pc->g_w, pc->g_h);
 
+		wind_set(win->w_id, WF_ICONSLOT, slot, d, d, d);
+#endif
 		rc_copy( (WORD *)pc, (WORD *)&win->w_sizes );					
 		wind_get(win->w_id, WF_WORKXYWH, &pc->g_x, &pc->g_y, &pc->g_w, &pc->g_h);
 
@@ -1961,6 +1973,7 @@ alliconify_windows(handle, pc)
 	x_select();
 }
 
+	VOID
 alluniconify_windows(handle, pc)
 	WORD		handle;
 	REG GRECT	*pc;		/* ignored */
@@ -1982,6 +1995,9 @@ alluniconify_windows(handle, pc)
 		win->w_work.g_h, last_win->w_work.g_x, last_win->w_work.g_y, 
 		last_win->w_work.g_w, last_win->w_work.g_h);
 
+
+	wind_close(handle);		/* close "All Iconified" window		*/
+
 	for (i = 0, win = winhead; win; win = (WINDOW *) win->w_next) {
 		if (win->w_saveid != -1)
 			warray[i++] = win;	/* get right order 		*/		
@@ -1990,14 +2006,29 @@ alluniconify_windows(handle, pc)
 	for (j = i - 1; j >= 0; j--) {		/* open windows again 		*/
 		win = warray[j];
 		win->w_id = win->w_saveid;	/* restore w_id			*/
-		wind_open(win->w_id, win->w_sizes.g_x, win->w_sizes.g_y, 
-			win->w_sizes.g_w, win->w_sizes.g_h);
+		if (win->w_iconified) {	
+			wind_open(win->w_id, -1, -1, -1, -1); /* ?????? */
+			wind_get(win->w_id, WF_WORKXYWH, &pc->g_x, &pc->g_y, 
+				&pc->g_w, &pc->g_h);
+			rc_copy( (WORD *)pc, (WORD *)&win->w_work );
+		      win->w_icnobj[0].ob_x = win->w_work.g_x;
+		      win->w_icnobj[0].ob_y = win->w_work.g_y;
+  			wind_get(win->w_id, WF_CURRXYWH, 
+				&win->w_sizes.g_x, &win->w_sizes.g_y, 
+				&win->w_sizes.g_w, &win->w_sizes.g_h);
+		} else {
+			wind_open(win->w_id, 
+				win->w_sizes.g_x, win->w_sizes.g_y, 
+			      	win->w_sizes.g_w, win->w_sizes.g_h);
+		}
 		view_fixmode(win);	/* Make sure items show up correctly,   */
 		view_adjust(win);	/* necessary because user could have    */
 					/* changed something in the Index menu. */
 		win->w_saveid = -1;
  	}	
+#if 0
 	wind_close(handle);		/* close "All Iconified" window		*/
+#endif
 	win_alliconified = FALSE;
 	make_top(win);
 }
@@ -2017,16 +2048,17 @@ set_winfont(ted, n)
 	
 
 	if (win_font == 0) {
-		font = GDOS_BITM;	/* SYSTEM FONT */
+		font = GDOS_MBITM;	/* SYSTEM FONT */
 		fontid = d_fontlst[win_font].fnt_id;
 		fontsize = win_fsize;
 	} else {
 		fontid = d_fontlst[win_font].fnt_id;
 		fontsize = win_fsize;
 		if (d_fontlst[win_font].fnt_type)
-			font = GDOS_MONO;	/* SPEEDO MONO */
+			font = GDOS_MONO;	/* SPEEDO MONO 			 */
 		else
-			font = GDOS_BITM;	/* GDOS BITMAP */
+			font = GDOS_MBITM;	/* GDOS MONO BITMAP 		 */
+						/* always Mono, always Coca~Cola */
 	}
 	for (i = 0; i < n; i++) {	/* change all TEDINFOs */
 		ted->te_font = font;		
@@ -2047,6 +2079,7 @@ set_winfont(ted, n)
 	if (font == GDOS_MONO) {		/* MONO SPACED */
 		d_vqt_width('M', &win_wchar, &dummy, &dummy);
 	}
+
 	d_v_setfont(attrib[0]); /* restore system font & size */
 	d_vst_height(attrib[7], &dummy, &dummy, &dummy, &dummy);
 }

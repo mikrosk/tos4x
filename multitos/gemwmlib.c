@@ -34,7 +34,12 @@
 /*								*/
 /*	Added WF_FTOOLBAR and WF_NTOOLBAR to get the rect list  */
 /*	for the TOOLBAR area.		  C.Gee     06/01/93    */
-
+/*								*/
+/*	Fixed bug with slider pos. in wind_set(WF_UNICONIFY,..	*/
+/*					H. Krober   07/15/93	*/
+/*								*/
+/*	Add support for icon tiling	H. Krober   07/19/93    */
+/*								*/
 /*	MultiTOS window library is written by Minna Lai		
 *	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -81,6 +86,10 @@ EXTERN GRECT	gl_rscreen;
 EXTERN GRECT	gl_offscreen;
 EXTERN WORD	gl_nplanes;
 
+EXTERN BYTE	*icnslots;		/* for icon slot management	*/
+EXTERN BYTE	currIcnmax;		/* see gemctrl.c		*/
+
+
 WORD	deskwind;		/* Background 0 window handle	*/
 WORD	phanwind;		/* phantom window handle	*/
 
@@ -98,8 +107,6 @@ MEMHDR	*rmhead, *rmtail;	/* rect lists memory linked list */
 GLOBAL	WORD	gl_newid;	/* process id that owns the background	*/
 GLOBAL	OBJECT	*gl_wtree;	/* points to default window background	*/
 GLOBAL	OBJECT	w_tree;		/* default window background structure	*/
-
-
 
 /*
  * Search for the window structure that corresponds to the
@@ -297,8 +304,8 @@ wm_init()
     REG	WORD	i;	/* counter */
     WORD numcolors;
 
-    numcolors = (gl_nplanes < 2) ? 2 : 16;
- 
+    numcolors = (gl_nplanes < 4) ? 2 : 16;
+
     for (i = 0; i < MAXOBJ; i++) {
     	if (numcolors < 16)
 		wtcolor[i] = wbcolor[i] = 0x1101;
@@ -605,6 +612,8 @@ wm_create( kind, rect )
 	}
     }
     wp->iconflag = FALSE;
+    wp->iconslot = (BYTE) -1;
+
     w_rect(&(wp->icon), 0, 0, 0, 0);
     wp->savekind = 0;
 
@@ -624,6 +633,10 @@ wm_create( kind, rect )
  *	     - returns FALSE (0) if given handle is invalid,
  *	       or if window has already been opened.
  *	     - returns TRUE (1) if everything is fine.
+ * +++ 7/19/93 HMK
+ * if the window has the iconified flag set and x, y, width  and height are
+ * -1, -1, -1, -1, an icon slot will be used!!
+
  */
 	WORD
 wmopen(handle, rect)
@@ -651,6 +664,29 @@ wmopen(handle, rect)
       wmclose( phanwind );
 
     wp = srchwp( handle );
+	
+
+    if (wp->iconflag && (rect->g_x == -1) && (rect->g_y == -1)) {
+	WORD set;
+						/* use icon slot */
+	set = TRUE;
+	if (icnslots == NULL)  			/* +++ 7/18/93 */
+		set = FALSE ;
+	else if (findIcnslot(icnslots, &currIcnmax, &rect->g_x, &rect->g_y, 
+	&wp->iconslot) == FALSE )
+		set = FALSE;
+		
+	if (!set) {
+		rect->g_y = gl_rfull.g_y + gl_rfull.g_h - WINICON_H - 1;
+		rect->g_x = 0;
+	}
+
+    }
+    if (wp->iconflag && (rect->g_w == -1) && (rect->g_h == -1)) {
+	rect->g_w = WINICON_W;
+	rect->g_h = WINICON_H;
+    }
+
 				/* check the minimun size */
     wm_min( wp, &w, &h );
 
@@ -677,6 +713,10 @@ wmopen(handle, rect)
  *	     - returns FALSE (0) if given handle is invalid,
  *	       or if window has already been opened.
  *	     - returns TRUE (1) if everything is fine.
+ *
+ * +++ 7/19/93 HMK
+ * if the window has the iconified flag set and x, y, width  and height are
+ * -1, -1, -1, -1, an icon slot will be used!!
  */
 	WORD
 wm_open(handle, rect)
@@ -717,6 +757,11 @@ wmclose( handle )
 	w_rect(&(wp->curr), 0, 0, 0, 0);  /* reset current coords and work area coords */
 
     	*(GRECT *)&(wp->obj[W_WORK].ob_x) = wp->curr;
+
+#if 0
+	if (wp->iconflag) 
+#endif
+		retIcnslot(icnslots, &wp->iconslot, &currIcnmax);
 
 	wp->status.opened = FALSE;	/* remember that window has been closed */
 
@@ -1091,7 +1136,7 @@ wg_1:
 		wp->fxywh = wp->nxywh = ( RLIST *)NULLPTR;
 	    }
 	    /* generate new list */
-	    if (wp->fxywh = genrlist(handle, WF_WORKXYWH)) {
+	    if (wp->fxywh = genrlist(handle, area)) {
 	    	wp->nxywh = (wp->fxywh)->rnext;
 		*r = (wp->fxywh)->rect;
 	    } else {
@@ -1175,6 +1220,11 @@ wg_1:
 	    r = (GRECT *)ow;	/* window's size when not iconified */
 	    *r = wp->icon;
 	    break;
+#if 0
+	case WF_ICONSLOT:
+	   ow[0] = wp->iconslot;
+	   break;
+#endif
 	case WF_TOOLBAR:	/* Get Tree for the ToolBar cjg 05/26/93 */
 	     *(LONG *)ow = ( LONG )wp->ad_tools;
 	     break;
@@ -1245,9 +1295,14 @@ wmset(handle, field, iw)
 		w_clipdraw( wp, W_INFO, ( GRECT *)NULLPTR);
 	    }
 	    break;
+#if 0
+	  case WF_ICONSLOT:
+	    wp->iconslot = iw[0];
+	    break;
+#endif
 	  case WF_UNICONIFYXYWH: /* set size which will be send when */
 	    rect = *(GRECT *)iw; /* a WM_UNICONIFY message occurs    */
-	    w_adjust(wp, &rect, FALSE);
+	    w_adjust(wp, &rect, FALSE); 
 	    rc_copy(&rect, &wp->icon);
 	    break;
 
@@ -1294,7 +1349,14 @@ currxywh:
                  rect.g_h = h;
 	    }
 	
-	    w_adjust(wp, &rect, FALSE);
+	    w_adjust(wp, &rect, FALSE);  
+					 /* above fct. messes up sliders, so */
+	    if (field == WF_UNICONIFY) { /* restore slider pos. HMK 7/15/93  */
+		    if (wp->kind & HSLIDE)
+			    w_setslide( wp, WF_HSLIDE );
+		    if (wp->kind & VSLIDE)
+			    w_setslide( wp, WF_VSLIDE );
+	    }
 
 	    if (wp->status.opened) {
 		/* send redraw message to opened windows which */
@@ -1338,7 +1400,13 @@ currxywh:
 			   * of the toolbar.
 			   */
 			   if( rect1.g_w > rect.g_w ) {
+			      WORD x, y;
+#if 0
 			      ob_actxywh( ( LONG )wp->ad_tools, ROOT, &trect );
+#else
+			      ob_gclip((LONG)wp->ad_tools, ROOT, &x, &y,
+				&trect.g_x, &trect.g_y, &trect.g_w, &trect.g_h); 
+#endif
 
 			      trect.g_w = ( rect1.g_w - rect.g_w + SHADOW +
 					  (( trect.g_x - rect.g_x ) << 2 ));
@@ -1816,7 +1884,13 @@ wm_min( wp, ow, oh )
      * cjg 05/27/93
      */
     if( wp->ad_tools && !wp->iconflag ) {
+      WORD x, y;
+#if 0
       ob_actxywh( ( LONG )wp->ad_tools, ROOT, &rclip );
+#else
+      ob_gclip((LONG)wp->ad_tools, ROOT, &x, &y,
+	&rclip.g_x, &rclip.g_y, &rclip.g_w, &rclip.g_h);
+#endif
       h1 += rclip.g_h;
     }
 
@@ -3195,3 +3269,113 @@ w_tooldraw(wp, obj, pc)
 	delrect( ( RLIST *)0L, ( BYTE *)rlist );
 }
           
+
+/*
+ *	Icon Slot Manager
+ *	+++ HMK 7/18/93
+ */
+
+BYTE *allocIcnslots()
+{
+	REG BYTE *ip, *p;
+	REG WORD i;
+	WORD	 size;
+
+
+Debug1("gl_rfull.g_w="); Ndebug1((LONG)gl_rfull.g_w);
+Debug1("gl_rfull.g_h="); Ndebug1((LONG)gl_rfull.g_h);
+
+	size = (gl_rfull.g_w / WINICON_W) * (gl_rfull.g_h / WINICON_H);
+
+	ip = p = (BYTE *) dos_xalloc((LONG) size, 3);
+
+	for (i = 0; i < size; i++)
+		*p++ = 0;
+
+	return ip;
+}
+
+	VOID
+freeIcnslots(ip)
+	BYTE	*ip;
+{
+	if (ip != NULL)
+		dos_free((LONG)ip);
+}
+
+	WORD
+findIcnslot(slots, curr_icnmax, x, y, slotnr)
+	REG BYTE *slots;
+	BYTE	 *curr_icnmax;
+	WORD	 *x, *y;
+	BYTE	 *slotnr;
+{
+	REG WORD i, c, r;
+	WORD	 rows, cols;
+
+	rows = gl_rfull.g_h / WINICON_H;
+	cols = gl_rfull.g_w / WINICON_W;
+
+Debug1("find: rows="); Ndebug1((LONG) rows);
+Debug1("find: cols="); Ndebug1((LONG) cols);
+
+	do {
+		for (r = rows - 1; r >= 0; r--) {
+			for (c = 0; c < cols; c++) {
+				i = (r * cols) + c;
+				if ((slots[i] <= *curr_icnmax) && 
+				    (slots[i] < 127)) {
+					slots[i] += 1;
+					*x = c * WINICON_W;
+					*y = ((r+1) * WINICON_H) - gl_rfull.g_y;
+					*slotnr = (BYTE) i;
+Debug1("slot nr="); Ndebug1((LONG) i);
+Debug1("row="); Ndebug1((LONG) r);
+Debug1("col="); Ndebug1((LONG) c);
+Debug1("x="); Ndebug1((LONG) *x);
+Debug1("y="); Ndebug1((LONG) *y);
+Debug1("curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
+					return TRUE;
+				}
+			}
+		}
+		(*curr_icnmax)++;
+	} while (*curr_icnmax < 127);
+	
+	return FALSE;
+}
+
+	VOID
+retIcnslot(slots, slotnr, curr_icnmax)
+	BYTE	*slots;
+	BYTE	*slotnr;
+	BYTE	*curr_icnmax;
+{
+	WORD		flag;
+	REG WORD	i, n;
+	WORD		rows, cols;
+
+Debug1("ret: slotnr="); Ndebug1((LONG) *slotnr);
+
+	if (*slotnr == (BYTE) -1)
+		return;
+
+	slots[*slotnr] -= 1;
+	*slotnr = (BYTE) -1;
+
+	rows = gl_rfull.g_h / WINICON_H;
+	cols = gl_rfull.g_w / WINICON_W;
+	
+Debug1("ret: before curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
+	n = rows * cols;
+	flag = TRUE;
+	for (i = 0; i < n; i++, slots++) {
+		if (*slots >= *curr_icnmax)
+			flag = FALSE;	 
+	}
+	if (flag)
+		(*curr_icnmax)--;
+
+	Debug1("ret: after curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
+}
+

@@ -71,7 +71,7 @@
 #define LFARROW 0x0200
 #define RTARROW 0x0400
 #define HSLIDE  0x0800
-#define SMALLER 0x1000
+#define SMALLER 0x2000		/* changed from 1000 to 2000 because of PC GEM*/
 						/* wind_create flags	*/
 #define WC_BORDER 	0
 #define WC_WORK   	1
@@ -103,6 +103,7 @@
 #define WF_ICONIFY	26
 #define WF_UNICONIFY	27
 #define WF_UNICONIFYXYWH 28
+#define WF_ICONSLOT	29
 #define WF_TOOLBAR	30
 #define WF_FTOOLBAR	31
 #define	WF_NTOOLBAR	32
@@ -265,6 +266,7 @@ typedef	struct	window {
     UWORD   kind;		/* flag for components of window */
     UWORD   savekind;		/* saved flags for iconified windows */
     UWORD   iconflag;		/* if TRUE, window is iconified */
+    BYTE    iconslot;		/* slot# for iconified window, used in gemctrl */
     OBJECT  *aesobj;		/* for use in AES */
     OBJECT  obj[MAXOBJ];	/* definition of each object */
     WORD    tcolor[MAXOBJ];	/* object colors if window is topped */

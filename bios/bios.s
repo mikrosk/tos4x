@@ -4,13 +4,18 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/15 14:08:24 $
+* $Date: 1991/10/22 19:25:30 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.40  1991/10/22  19:25:30  apratt
+* Added a moveq to pre-clear d0 in the Midi Bconin code.  Until now,
+* Bconin on MIDI always returned $FFFFFFxx.  Sadly this didn't make it
+* into 3.06 or 2.06.  Sigh.
+*
 * Revision 2.39  1991/10/15  14:08:24  apratt
 * Changed Bioskeys so it does something else, too: it nukes
 * key repeat.  In the first place, there was no way to do this
@@ -105,7 +110,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.39 $
+* $Revision: 2.40 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\bios.s,v $
@@ -1108,6 +1113,7 @@ midin:
 *	check for wrap of pointer
 
 	addq.w	#1,d1		;i=h+1
+	cmp.w	bufsize(a0),d1	;? i>= current bufsiz?
 	bcs.b	mwi1		;no...
 	moveq	#$0,d1		;wrap pointer
 mwi1:	move.l	bufptr(a0),a1	;get base address of buffer

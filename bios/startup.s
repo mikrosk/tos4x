@@ -4,18 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/22 16:43:29 $
+* $Date: 89/10/03 12:41:40 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.33  89/10/03  12:41:40  apratt
+* Added VBLQ1ST switch (in *this* file, not switches.s) which, when
+* nonzero, moves the VBL queue processing to the beginning of
+* the VBLANK handler, not the end.  VDI likes this so it has more
+* time to draw the mouse before the beam starts painting it.
+* (This was MOVEVBL, then removed, and now it's back.)
+*
 * Revision 2.32  89/09/22  16:43:29  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
 * require Alcyon's AS68 assembler.
-*
+* 
 * Revision 2.31  89/09/21  13:40:41  apratt
 * The vbl part of Setscreen() copied the new palette to TT regs
 * rather than ST regs -- now it copies to the ST regs always.
@@ -336,7 +343,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.32 $
+* $Revision: 2.33 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -414,7 +421,10 @@ DMASND		equ	1
 DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
-**** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
+* set VBLQ1ST if you want the VBL queue to be processed as the first
+* thing in VBLANK.
+
+VBLQ1ST		equ	1
 
 .ifeq TT
 version		equ	$0106		; version number *MUST BE EVEN*
@@ -2742,7 +2752,7 @@ memchk:
 .endc
 memchk1: cmp.w	(a0)+,d0		; match?
 	bne	memchkr			; (no -- return	NE)
-* hbl - force caller to IPL
+	add.w	#$fa54,d0		; yes -- bump pattern
 	cmp.l	a0,a1			; matched entire pattern?
 	bne	memchk1			; (no)
 memchkr: jmp	(a4)			; "return" to caller
@@ -2776,6 +2786,20 @@ val_mr:	jmp	(a6)			; return EQ/NE
 
 colors:
 	dc.w	bootcolor		; 0 - boot color (white in production)
+.ifne VBLQ1ST
+	dc.w	$f00			; 1 red
+	dc.w	$0f0			; 2 green
+	dc.w	$ff0			; 3 yellow
+	dc.w	$00f			; 4 blue
+	dc.w	$f0f			; 5 magenta
+	dc.w	$0ff			; 6 cyan
+	dc.w	$555			; 7 "low white"
+	dc.w	$333			; 8 grey
+	dc.w	$f33			; 9 light red
+	dc.w	$3f3			; 10 light green
+	dc.w	$ff3			; 11 light yellow
+	dc.w	$33f			; 12 light blue
+.endc
 	dc.w	$f3f			; 13 light magenta
 	dc.w	$3ff			; 14 light cyan
 *** ST PLUS:
@@ -2795,8 +2819,6 @@ colors:
 *
 *-
 hbl:	move.w	d0,-(sp)		; save d0
-*** (note: the move from shiftmd is inside the conditional so the conditional
-*** doesn't end with a label, which is a no-no in old as68)
 hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
  .ifne DMASND
 *-
@@ -2821,16 +2843,16 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	beq	v_read2
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
 v_read2:
-	move.b	shiftmd,d0		; get current rez
  .endc
 
 *** non-STPLUS equivalent: just get the input from gpip
 
  .ifeq DMASND
 	move.b	gpip,d1			; get "High Rez" input
-	move.b	shiftmd,d0		; get current rez
  .endc
 
+*** When DMASND is TRUE:
+*** If DMA sound is active, the MONOMON line is inverted (that is,
 .ifeq TT
 ***	READ sound status (to d0)
 ***	READ gpip (to d1)
@@ -2911,11 +2933,12 @@ swmon1:	btst.l	#7,d1			; bit is 1 when no mono
 	beq	swmon3			; no change (still highrez)
 	move.b	defshiftmd.w,d0		; get preferred rez
 .if (TT == 0)
+.ifeq VBLQ1ST
 *------	Call deferred interrupt	vectors:
 	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
 	beq	vbl12			; (punt	if no vectors)
 	subq.l	#1,d7			; turn into DBRA count
-	move.l	_vblqueue,a0		; a0 ->	vectors
+	move.l	_vblqueue.w,a0		; a0 ->	vectors
 vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	cmp.l	#0,a1			; if(a1	== NULL) continue;
 	beq	vbl11
@@ -2923,7 +2946,7 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	jsr	(a1)			; call routine
 	movem.l	(sp)+,d7/a0		; restore registers
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
-
+.endc
 
 	cmp.b	#2,d0			; if high-rez, then force low rez
 	blt	swmon2			; (low or med rez)

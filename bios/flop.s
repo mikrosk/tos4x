@@ -4,20 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/05 15:13:36 $
+* $Date: 91/08/15 15:31:18 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.30  91/08/15  15:31:18  apratt
+* In STPAD, do a better "ram test" on the registers in the 1772 before
+* deciding that it's there.  If you just write a value to one register, then
+* read it back, it's possible you'll read what you wrote because of signal
+* persistence, not because the 1772 is there.  So instead we write -1 to trkreg,
+* 0 to secreg, then read them back in order.
+*
 * Revision 2.29  91/08/05  15:13:36  apratt
 * Removed nospindelay global; now spin delay is the first byte of the field
 * of the DSB. It has to be first because startup.s sets it for drive 0 when
 * the high-density switch is thrown.  It gets ORed into the appropriate
 * commands, so its value is the bit to set.  Floprate(drv,-2) sets, -3
 * clears, and -4 probes the current setting of that bit.
-*
+* 
 * Revision 2.28  91/06/13  16:27:09  apratt
 * removed tmpdma -- left over from something, took up 4 bytes in BSS and four
 * in ROM for a clr.b instruction.
@@ -207,7 +214,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.29 $
+* $Revision: 2.30 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -475,7 +482,7 @@ gpip	equ	mfp+1			; general purpose I/O
 *	 $0(sp)	return address
 *
 .ifne STPAD
-	move.l	a6,-(sp)
+*		NE if initialization failed (no drive attached).
 *
 * This call didn't save any regs before! Now it saves the Alcyon C regs.
 * (Feb '91)
@@ -488,20 +495,20 @@ _flopini:
 	lea	dsb1,a1
 
 fi_1:	move.w	seekrate,dseekrt(a1)	; setup default seek rate
+.if HI_DEN
+	move.w	#3,ddenflags(a1)	; and default density (high)
+.endif
 	moveq	#e_error,d0		; (default error)
 	clr.w	dcurtrack(a1)		; fake clean drive
 	clr.w	fastcnt			; this has to go here somewhere!
 
-	move.w	#trkreg,(a6)
-	moveq.l	#-1,d7
-	bsr	wdiskctl		; write FF to trkreg
-	move.w	#trkreg,(a6)
-	bsr	rdiskctl		; read it back
-	cmp.b	#$ff,d0
-	bne	noflop
-	move.l	a1,sp			; restore - no bus errors
-	move.l	a0,$8
-	move.l	(sp)+,a6
+	move.w	#recal,dcurtrack(a1)	; default = recal drive (it's dirty)
+
+.if STPAD
+	bsr	fdcprobe
+	beq	init_noflops		; done initializing if no floppies
+.endc
+
 .endc
 	bsr	select			; select drive and side
 
@@ -536,7 +543,7 @@ i1:	rts
 *
 * entry point for read, write, format, and verify to call when there are
 * NO floppies.  This is before regs were saved or anything else.
-	move.l	(sp)+,a6	; restore saved a6
+*
 
 noflop1:
 	moveq	#e_nready,d0

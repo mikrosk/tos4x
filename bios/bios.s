@@ -3,17 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/12/13 16:12:13 $
+* $Date: 88/12/21 12:15:42 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.19  88/12/21  12:15:42  apratt
+* Added comments around the ctl-alt-delete reset code, and saved 1 word
+* nearby.  Big deal.
+*
 * Revision 1.18  88/12/13  16:12:13  apratt
 * Added (a5) to lots of otherwise-long accesses, both to low RAM and
 * high I/O space.
-*
+* 
 * Revision 1.17  88/11/18  11:04:15  apratt
 * Documented with comments the fact that kstate is now officially
 * fixed just after ikbdsys (which is to say, after the end of
@@ -85,7 +89,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.18 $
+* $Revision: 1.19 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3365,11 +3369,17 @@ mauskey1:
 *
 	lea.l	cstart(PC),a0
 	move.w	#$f,d0			; move 64 bytes (should be enough)
-	move.l	#$8,a1
+	move.w	#$8,a1
 rloop:	move.l	(a0)+,(a1)+
 	dbra	d0,rloop
 	clr.l	a5
 	jmp	$8(a5)
+.text
+* this code is copied to address $8, and jumped to with a5 == 0.
+* it runs at IPL 7.  It sets the bus error vector and clears RAM
+* until it gets a bus error, then jumps to the reset vector,
+* found at address $4.  If it's more than 64 bytes long, you'll
+* have to change d0 above.
 .endif
 cstart:
 	lea.l	berr(PC),a0

@@ -3,16 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/03/28 11:46:47 $
+* $Date: 88/03/31 15:58:23 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.5  88/03/31  15:58:23  apratt
+* Fixed reset bailout vector so it leaves the right number in a6.
+* If (a6) == $9bcd you have buggy ROMs -- return via jmp'ing to $24(a6).
+* Else you have new ROMs -- return via jmp'ing to (a6)
+*
+* Also fixed some bsr's to jsr's so gemdos can be far away from here.
+*
 * Revision 1.4  88/03/28  11:46:47  apratt
 * Added Flopwp call (Xbios call $28).  Actual code is in flop.s
-*
+* 
 * Revision 1.3  88/03/18  16:16:59  apratt
 * Added code to dmaread: retry the read if the first one succeeds (status
 * code 0 (no error)) but the DMA counter hasn't changed.
@@ -27,7 +34,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.4 $
+* $Revision: 1.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -308,6 +315,7 @@ osconf		equ	%10111
 
 
 
+*									:
 *	System Initialization for 520, 1040, MEGA STs			:
 *	Copyright 1984, 1985, 1986, 1987, 1988, 1989, 1990  Atari Corp.	:
 *	All Rights Reserved.						:
@@ -845,7 +853,7 @@ reset2:	clr.l	a5			; quick zeropage
 *
 * Also read the STylus button register & don't jump through resvector
 * if both buttons are down.  Well, there's no STylus so this is moot.
-	lea	reset2(pc),a6		; a6 ->	return address
+	lea	reset3(pc),a6		; a6 ->	return address FIXED by AKP
 * There is new code elsewhere that makes this less important: bus error etc.
  endc
 
@@ -856,6 +864,9 @@ reset2:	clr.l	a5			; quick zeropage
 	move.w	$d00004,d0
 	and.b	#%00000110,d0		; test for both STylus buttons
 	bne	resv1			; if either is up, don't clobber
+* The first instruction here MUST NOT BE CLR.L A6.  Use NOP if you have to.
+* This is because of the old bug in the reset vector code above.
+*
 	cmp.l	#resmagic,resvalid.w	; is resvalid the magic	number?
 reset3:	lea	giselect,a0		; a0 -> giselect, giwrite-2
 	move.l	resvector.w,d0		; d0 = reset bailout vector
@@ -1335,10 +1346,10 @@ psdone:	add.l	d2,$16(sp)		; update PC for RTE
 	rte
 
 * jump here for priv violations which are not moves from sr, or mode 6.
-	bsr	_osi			; initialize DOS
+priv1:	move.l	(sp)+,a0
 	move.l	(sp)+,a1
 	movem.l	(sp)+,d0-d2
-	bsr	_iclock			; initialize clock chip
+.if M68030
 *
 
 .if crcstride == 4
@@ -1791,7 +1802,7 @@ swmon2:	move.b	d0,sshiftmd(a5)		; set shadow & hardware shift-mode
 .if (TT == 0)
 	and.b	#3,d0			; strip bucky bits
 	cmp.b	#2,d0			; low or high rez?
-	bsr	blink			; blink cursor
+	cmp.b	#6,d0			; high rez?
 	beq	swmon1			; (high)
 .endif
 	clr.l	a5			; a5 -> zero page
@@ -2846,18 +2857,18 @@ copy_header:
 	lea	hdrcopy,a1		; a1 -> RAM destination
 	moveq	#sizeof_hdr-1,d0	; size of OS header - 1
 cph1:	move.b	(a0,d0.w),(a1,d0.w)	; copy header to RAM
-	bsr	_TEST_BLT		; test for blit chip
+	dbra	d0,cph1
 
 	move.w	cphjmp(pc),-6(a1)	; craft JMP instr
 	move.l	4(a1),-4(a1)		; put addr of JMP into instr
 	move.w	cphbra(pc),(a1)		; craft BRA back to JMP
-	bsr	_GETBLT			; get current blit mode
+	move.w	$1e(a1),$1c(a1)		; copy offending datestamp
 
 	move.l	a1,_sysbase		; _sysbase -> patched OS header
 	bmi.s	Bmd_1			; (don't set if mode is negative)
 
 cphjmp:	jmp	0
-	bsr	_SETBLT			; set blit mode
+cphbra:	bra	cphjmp
 .endif
 
 

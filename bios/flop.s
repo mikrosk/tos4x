@@ -1,22 +1,26 @@
 ******************* Revision Control System *****************************
 *
-* $Author: lozben $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 87/11/20 14:23:48 $
+* $Date: 88/03/25 11:49:50 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.2  88/03/25  11:49:50  apratt
+* This version has more index information per Intel controller spec
+* in the format-track code.  THIS IS UNTESTED AND MIGHT NOT WORK.
+*
 * Revision 1.1  87/11/20  14:23:48  lozben
 * Initial revision
-*
+* 
 *
 * =======================================================================
 *
-* $Revision: 1.1 $
+* $Revision: 1.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -470,6 +474,26 @@ _flopfmt:
 	move.w	#e_write,def_error(a5)	; set default error number
 	move.l	cdma(a5),a2		; a2 ->	prototyping area
 	move.l	skewtbl(a5),a3		; a3 -> skewtbl (if nesssary!)
+	tst.b	_iamanst
+	bne	noden1
+	
+	move.w	#80-1,d1		; 80 x $4e as GAP 4a
+	move.w	#$4e,d0
+	bsr	wmult
+
+	move.w	#12-1,d1		; 12 x $00 as sync
+	clr.w	d0
+	bsr	wmult
+
+	move.b	#$f6,d0			; 3 x $C2 as IAM preamble
+	move.b	d0,(a2)+
+	move.b	d0,(a2)+
+	move.b	d0,(a2)+
+
+	move.b	#$fc,(a2)+		; 1 x $fc as IAM
+
+	move.w	#1,csect.w		; starting sector# = 1
+	bsr	verify1			; verify sectors
 	move.w	#60-1,d1		; 60 x $4e (track leadin)
 	move.b	#$4e,d0
 * Returns:	NE on failure, EQ on success

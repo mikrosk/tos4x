@@ -4,13 +4,16 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/28 08:25:20 $
+* $Date: 1992/02/28 08:31:20 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.47  1992/02/28  08:31:20  apratt
+* Changed coldboot so it works for Sparrow.
+*
 * Revision 2.46  1992/02/28  08:25:20  apratt
 * Changed TT to M68030 in some places, where it's really CPU dependency we're
 * talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
@@ -134,7 +137,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.46 $
+* $Revision: 2.47 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\RCS\bios.s,v $

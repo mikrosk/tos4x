@@ -3,16 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/18 14:31:51 $
+* $Date: 89/08/30 15:56:23 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.4  89/08/30  15:56:23  apratt
+* Added code to handle floppy I/O with fast RAM.  Calls to ??fast
+* either do a pre-copy and change the buffer address on the stack,
+* or they set up a post-copy using fastbuf and fastcnt.  unfast handles
+* the post-copy, called at the common floppy return point unlok1.
+*
 * Revision 2.3  89/08/18  14:31:51  apratt
 * Added some calls to clrcache -- putting it at RWABS isn't good enough.
-*
+* 
 * Revision 2.2  89/07/19  14:22:09  apratt
 * Changed all timeouts to use 200Hz, added TT flag, when set,
 * short delays use ttwait rather than instruction loops.
@@ -71,7 +77,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.3 $
+* $Revision: 2.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -167,6 +173,7 @@ tcdr		equ	$fffffa00+$23
 	.globl	_nflops			; number of floppy drives attached
 .ifne TT
 	.globl	seekrate		; default floppy seek rate
+	.globl	def_frb
 .endc
 	.globl	_iamanst		; byte: true if we're on an ST
 	.globl	clrcache		; clear i & d caches on TT
@@ -271,6 +278,9 @@ gpip	equ	mfp+1			; general purpose I/O
 	bne	fi_nok			; (failed: drive unusable)
 
 .if STPAD
+.ifne TT
+
+.endc
 *
 * init_noflops: this is where we go when we detect that there really are no
 * floppies attached to an STBOOK at init time.  Rwabs.c calls init twice,
@@ -304,6 +314,9 @@ fdcprobe:
 	move.w	#secreg,(a6)
 	bsr	rdiskctl		; read it back
 	move.b	d0,d1			; save it for a little bit
+.ifne TT
+	bne	noflop			; nope - no floppies
+.endc
 	move.w	#secreg,(a6)
 	bsr	rdiskctl		; read secreg back
 	subq.w	#1,flock.w		; un-lock the bus
@@ -402,6 +415,9 @@ frd5:	subq.w	#1,retrycnt.w		; drop retry count
 *
 *-
 err_bits:
+.ifne TT
+	moveq	#e_wp,d1		; write protect?
+.endc
 	btst	#6,d0
 	bne	eb1
 
@@ -489,6 +505,9 @@ fwr4:	move.w	#$180,(a6)		; get 1770 status
 	add.l	#$200,cdma.w		; and DMA pointer for next sector
 	bra	fwr1a			; write next (no seek)
 
+.ifne TT
+fwre:	cmp.w	#midretry,retrycnt.w	; re-seek head in "middle" retry
+.endc
 	bne	fwr5			; (not middle retry)
 fwre1:	bsr	reseek			; home head and	seek
 	move.w	$e(sp),spt(a5)		; save sectors-per-track
@@ -687,6 +706,9 @@ oterr:	moveq	#1,d7			; return NE (error status)
 *--- use skew table passed in to us
 	beq	end_track		; this way out
 
+.ifne TT
+	move.w	d3,d6
+.endc
 	add.w	d6,d6			; work index
 	move.w	(a3,d6.w),d4		; d4 = a skew table entry
 	addq.w	#1,d3			; inc skew table index in this case
@@ -935,6 +957,9 @@ flopfail:
 	moveq	#m_unsure,d0		; disk change mode = UNSURE
 	movem.l	regsave(a5),d3-d7/a3-a6	; restore C registers
 	move.w	curr_err.w,d0		; get current error number
+.ifne TT
+	ext.l	d0			; extend to long
+.endc
 	bra	unlok1			; clobber floppy lock & return
 
 *+
@@ -1312,6 +1337,83 @@ clrspinup:
 getspinup:
 .if HI_DEN
 	tst.b	dspinflag(a1)		; return 0 or -1, not the flag itself.
+.ifne TT
+
+	sne	d0
+	ext.w	d0
+	ext.l	d0
+.else
+	moveq.l	#0,d0
+.endif
+	rts
+
+*+
+* Flopwp - check write-protect mode of a disk
+* This can cause the "insert disk X" message.
+*
+* Usage: Flopwp(devno)
+* Returns 1 if the WP state of the indicated drive is TRUE (proteted).
+*
+* Needs to call "change" with a slightly funny stack frame.
+*
+* The code to check WP state is stolen from flopvbl.
+*-
+*
+*_flopwp:
+*	sub.w	#$8,sp		; "push" 3 dummy longs
+*	bsr	change		; get right disk in drive
+*				; this can change the devno on the stack!
+*	add.w	#$8,sp		; clean up stack
+*	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
+*	move.w	_wpstatus.w,d0
+*	or.w	d0,_wplatch.w	; (catch WP transitions)
+*	move.b	(a0),d0		; reload the WP status as return value.
+	clr.w	fastcnt			; make sure it's zero for next time
+* code to handle fast vs slow ram:
+	move.l	def_frb,a1
+unmove:	asl.w	#5,d1			; d1 is now number of 16's of longs
+*	Else...
+*
+*	rdfast: change the buffer pointer on the stack to point to 
+* _FRB, set fastbuf to the old buffer pointer, set fastcnt to the 
+* sector count.
+*
+*	wrfast: copy from the original buffer address to _FRB
+* buffer and change the buffer pointer.  Clear fastcnt (no tail copy).
+*
+*	fmfast: (format) save & change dma address, set fastcnt to 1
+* (for copying the result list).
+rdfast:	cmp.l	#$01000000,8(sp)
+*	vrfast: (verify) same as fmfast.
+* The common code which returns from all these services calls "unfast"
+	move.l	def_frb,8(sp)		; actual DMA to _FRB
+* that many sectors are copied from _FRB to fastbuf.  Unfast does not
+* use d0.  Unfast pre-clears fastcnt for the next Flop call.  Flopini
+* clears it to begin with.
+*
+* This code must not clobber d0, which may contain a return value
+* destined for the caller.
+wrfast:	cmp.l	#$01000000,8(sp)
+* This code checks for an FRB cookie the first time it's needed.
+* back to the caller's level and returns e_error.
+	move.l	def_frb,a0		; dest = _FRB
+* RAM can be added after boot time.)
+*
+
+.if TT
+MAXACSI	equ	$00A00000		; max addr for TT: 10MB.
+.else
+.if SPARROW
+MAXACSI equ	$00E00000		; max addr for Sparrow: 14MB.
+fmfast:	cmp.l	#$01000000,8(sp)
+MAXACSI	equ	$00400000		; max addr where ACSI DMA works
+.endif
+	move.l	def_frb,8(sp)		; actual DMA to _FRB
+unfast:
+	move.w	fastcnt,d1
+	beq	undone
+.endc
+	rts
 
 * wrfast - the buffer address is at 8(sp), count at $18(sp)
 * Change the pointer and do the copy.
@@ -1340,6 +1442,11 @@ tmpdma:		ds.l	1		; temp for hardware DMA image
 *
 * routine to get the _FRB cookie if there is one (see cookie jar spec)
 *
+	move.l	_p_cookie,a0		; no; get base of cookie jar
+.ifne TT
+	beq	getf2			; yow! no cookie jar! bail out.
+getf1:	tst.l	(a0)			; end of cookie jar?
+.endc
 	beq	getf2			; yes, die horribly
 	cmp.l	#"_FRB",(a0)+		; no; match our cookie?
 	beq	getfdone		; yes, copy ptr & return

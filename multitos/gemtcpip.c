@@ -7,19 +7,20 @@
 *	Atari (U.S.) Corp
 *	All Rights Reserved
 *	-----------------------------------------------------------
+*
+*	02/12/93	cjg	Converted to Lattice C 5.51
+*	02/22/93	cjg	Force the use of prototypes
 */	
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "aesmint.h"
 
 EXTERN	PD	*currpd;
 EXTERN	WORD	spdid;		/* wm_update owner	*/
-EXTERN	PD	*idtopd();
 
 #define	IP_OK		 0
 #define IP_LOCK		-1	/* Sender is locking the screen resource	*/

@@ -1,17 +1,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/large.s,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/large.s,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: large.s,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
-# Revision 1.1  1993/02/24  23:52:46  ersmith
-# 1 meg floppy MultiTOS
-#
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.2  89/04/26  18:28:54  mui
 * TT
 * 
@@ -60,7 +63,7 @@ w	equ $18
 h	equ $1a
 
 _reverse:
- 	move.l	d3,-(sp)		; Save d3 since we clobber it
+ 	movem.l	d2-d3,-(sp)		; Save d3 since we clobber it
 	move.w	8(sp),d3		; d3 = source
 	clr.w	d1			; target bit position
 	clr.w	d0			; target
@@ -72,7 +75,7 @@ dobit:
 nextbit:
 	addq	#1,d1			; Update target bit position
 	dbra	d2,dobit		; Dbra updates source bit position
-	move.l	(sp)+,d3		; Restore d3
+	movem.l	(sp)+,d2-d3		; Restore d3
 	rts
 
 * void expand_data(saddr, daddr, mask, splanes, dplanes, w, h)
@@ -89,7 +92,7 @@ nextbit:
 * stack offsets after link:
 _expand_data:
 	link	a6,#0
-	movem.l	d4-d7/a4-a5,-(sp)
+	movem.l	d2-d7/a2-a5,-(sp)
 
 	movem.w	splanes(a6),d4-d7
 	asr.w	#3,d6		; plane_size = w/8 * h
@@ -157,7 +160,7 @@ plp:	move.w	(a0)+,d0
 	dbra	d1,plp
 	dbra	d5,pixpac
 
-ret:	movem.l	(sp)+,d4-d7/a4-a5
+ret:	movem.l	(sp)+,d2-d7/a2-a5
 	unlk	 a6
 	rts
 
@@ -410,8 +413,8 @@ La16:
 	move.l	d7,_ldivr
 	move.l	d5,d0
 La1:
-	tst.l	(sp)+
-	movem.l	(sp)+,d3-d7
+	movem.l	(sp)+,d2-d7
+	tst.l	d2
 	unlk	a6
 	rts
 

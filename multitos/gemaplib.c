@@ -10,6 +10,8 @@
 /*	Fix at ap_trecd to fix the length  4/5/90	D.Mui		*/
 /*	Change at appl_exit	11/16/90 - 12/18/90	D.Mui		*/
 /*	Change at ap_rdwr for Mint OS	7/23/91		D.Mui		*/
+/*	Convert to Lattice C 5.51	2/25/93		C.Gee		*/
+/*	Force the use of prototypes					*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -26,33 +28,18 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <dispvars.h>
-#include <aesmint.h>
-#include <signal.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "aesmint.h"
+#include "signal.h"
 
 #define TCHNG 0
 #define BCHNG 1
 #define MCHNG 2
 #define KCHNG 3
-
-EXTERN	WORD		w_tophandle();
-EXTERN	BYTE		*scasb();
-EXTERN	VOID		pdterm();
-EXTERN	PD		*systopd();
-EXTERN	BYTE		*rs_str();
-EXTERN	PD		*idtopd();
-EXTERN	PD		*fpdnm();
-EXTERN	WORD		tchange();
-EXTERN	WORD		bchange();
-EXTERN	WORD		mchange();
-EXTERN	WORD		kchange();
-EXTERN	WORD		justretf();
 
 EXTERN	WORD		spdid;
 EXTERN	WORD		cpdid;
@@ -140,9 +127,9 @@ ap_search( mode, name, type, paesid )
 	LONG	*l1;
 	WORD	*w1;	
 	PD	*p;
-	WORD	id;
 
-	w1 = l1 = pcrys_blk->cb_pglobal;
+	w1 = (WORD *)pcrys_blk->cb_pglobal;
+	l1 = (LONG *)pcrys_blk->cb_pglobal;
 	
 /*	p = (PD*)0;	*/
 
@@ -231,7 +218,7 @@ ap_init( pglobal )
 
 	LWSET(pglobal+4, currpd->p_pid);
 	LWSET(pglobal+20, gl_nplanes);
-	LLSET(pglobal+22, currpd);
+	LLSET(pglobal+22, (LONG)currpd);
 					/* Max character height	*/
 	LWSET(pglobal+26, gl_ws.ws_chmaxh );
 					/* Min character height	*/
@@ -267,7 +254,7 @@ ap_exit( p, pcrys_blk )
 
 	swap_next( p, FALSE );	
 
-	l1 = pcrys_blk->cb_pglobal;
+	l1 =(LONG *) pcrys_blk->cb_pglobal;
 	
 	l1[0] = 0x0L;	/* erase aes signature */
 	return( TRUE );
@@ -287,8 +274,8 @@ ap_term( id )
 	{
 	  if ( !(p->p_type & AESSYSTEM) && ( p->p_state != PS_DEAD ) )
 	  {
-	    i = (UWORD)(p->p_sysid);	  
-	    forkq( pdterm, i << 16 );
+	    i = (LONG)(p->p_sysid);	  
+	    forkq( ( WORD(*)())pdterm, i << 16L );
 /*	    if ( p == currpd )
 	      p->p_state = PS_DEAD;
 */
@@ -332,7 +319,7 @@ rd_inmsg( length, buffer )
 	{
 	  if ( !rd_mymsg( buffer ) )
 	  {
-	    if ( !rd_wmmsg( currpd, buffer ) )
+	    if ( !rd_wmmsg( currpd, ( WORD *)buffer ) )
 	      return( FALSE );
 	  }
 	  return( TRUE );
@@ -392,7 +379,7 @@ a_1:
 	    l.qpb_cnt = length;
 	    l.qpb_buf = pbuff;
 
-	    msk = iasync( code, &l );
+	    msk = iasync( code, ( LONG )&l );
 
 	    if ( msk == -1 )
 	      return( TRUE );
@@ -425,7 +412,7 @@ rd_mymsg( buffer )
 	  Debug7( "Rd_mymsg buffer is " );
 	  Ndebug7( buffer );
 	  Ndebug7( &currpd->p_message[1] );
-	  LBCOPY( buffer, &currpd->p_message[1], EV_BUFSIZE ); 
+	  LBCOPY( buffer, ( BYTE *)&currpd->p_message[1], EV_BUFSIZE ); 
 	  currpd->p_message[0] = 0;	/* message is sent	*/
 	  return( TRUE );
 	}
@@ -449,8 +436,8 @@ ap_find( pname )
 	if ( !pname )
 	  return( currpd->p_pid );	
 
-	loword = (long)pname & 0x0000FFFFL;
-	hiword = ( (long)pname & 0xFFFF0000L ) >> 16;
+	loword = (WORD)((long)pname & 0x0000FFFFL);
+	hiword = (WORD)(( (long)pname & 0xFFFF0000L ) >> 16);
 
 	if ( hiword == 0xFFFF )		/* Look for AES Id */
 	{
@@ -492,7 +479,7 @@ ap_tplay(pbuff, length, scale)
 	FPD		f;
 	LONG		ad_f;
 
-	ad_f = &f;
+	ad_f = (LONG)(&f);
 
 	Syield();			/* dispatch everybody	*/
 
@@ -501,7 +488,7 @@ ap_tplay(pbuff, length, scale)
 	for(i=0; i<length; i++)
 	{
 						/* get an event to play	*/
-	  LBCOPY(ad_f, pbuff, sizeof(FPD));
+	  LBCOPY( ( BYTE *)ad_f, ( BYTE *)pbuff, sizeof(FPD));
 	  pbuff += sizeof(FPD);
 						/* convert it to machine*/
 						/*   specific form	*/
@@ -516,21 +503,21 @@ ap_tplay(pbuff, length, scale)
 	    case MCHNG:
 	        if (!gl_play)	/* diconnect the cursor from VDI	*/
 		{		/* until the playing is done		*/
-		  i_lptr1( justretf, 0x0 );	
-	  	  gsx_ncode(CUR_VECX, 0x0L);
-	  	  m_lptr2( &drwaddr );	
-		  i_lptr1( justretf, 0x0 );	/* not interrupt of mouse */
-		  gsx_ncode(MOT_VECX, 0x0L);    /* movement		  */
-		  m_lptr2( &gl_store );
+		  i_lptr1( (LONG)justretf );
+	  	  gsx_ncode(CUR_VECX, 0x0, 0x0 );
+	  	  m_lptr2( ( LONG )&drwaddr );	
+		  i_lptr1( (LONG)justretf );	/* not interrupt of mouse */
+		  gsx_ncode(MOT_VECX, 0x0, 0x0 );    /* movement		  */
+		  m_lptr2( ( LONG )&gl_store );
 		}
-		f.f_code = &mchange;
+		f.f_code = ( WORD(*)())&mchange;
 		gl_play = TRUE;	      
 		break;
 	    case BCHNG:
-		f.f_code = &bchange;
+		f.f_code = ( WORD(*)())&bchange;
 		break;
 	    case KCHNG:
-		f.f_code = &kchange;
+		f.f_code = ( WORD(*)())&kchange;
 		break;
 	  }
 						/* play it		*/
@@ -545,9 +532,9 @@ ap_tplay(pbuff, length, scale)
 	if (gl_play)				/* connect back the mouse */
 	{
 	  i_lptr1( drwaddr );	
-	  gsx_ncode(CUR_VECX, 0x0L);
-	  i_lptr1( gl_store, 0x0 );	
-	  gsx_ncode(MOT_VECX, 0x0L);
+	  gsx_ncode(CUR_VECX, 0x0, 0x0 );
+	  i_lptr1( (LONG)gl_store );	
+	  gsx_ncode(MOT_VECX, 0x0, 0x0 );
 	  gl_play = FALSE;
 	}
 
@@ -591,18 +578,18 @@ ap_trecd(pbuff, length)
 	for(i=0; i<length; i++)
 	{
 	  code = 0x0L;
-	  trash = LLGET(pbuff);
-	  if(trash == &tchange)
+	  trash = (BYTE *)(LLGET(pbuff));
+	  if(trash == (BYTE *)(&tchange))
 	  {
 	    code = TCHNG;		/*    WORD is changed to LONG	*/
 /*	    LLSET(pbuff+sizeof(LONG *), LLGET(pbuff+sizeof(LONG *)) * 
 			gl_ticktime);	*/
 	  }
-	  if(trash == &mchange)
+	  if(trash == (BYTE *)(&mchange))
 	    code = MCHNG;
-	  if(trash == &kchange)
+	  if(trash == (BYTE *)(&kchange))
 	    code = KCHNG;
-	  if(trash == &bchange)
+	  if(trash == (BYTE *)(&bchange))
 	    code = BCHNG;
 	  LLSET(pbuff, code);
 	  pbuff += sizeof(FPD);

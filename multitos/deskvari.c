@@ -7,12 +7,11 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <osbind.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "osbind.h"
 
 BYTE	dr[32];		/* drives flag			*/	
 WORD	p_timedate;	/* preserve time and date	*/

@@ -6,14 +6,16 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+/*#include "gemlib.h"*/
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 EXTERN	BYTE	*scasb();
 EXTERN	WORD	font_save;
@@ -23,11 +25,10 @@ EXTERN	BYTE	*g_name();
 
 /*	Find the application's icon type	*/
 
-	APP
-*app_icon( name, type, icon )
-	REG BYTE	*name;
-	WORD	type;		/* looking for same type	*/
-	WORD	*icon;		/* icon number			*/
+APP *
+app_icon( REG BYTE *name, WORD type, WORD *icon )
+/* looking for same type	*/
+/* icon number			*/
 {
 	REG APP		*app;
 
@@ -67,7 +68,7 @@ EXTERN	BYTE	*g_name();
 	      }
 	    }
 	  }
-	  app = app->a_next;
+	  app = (APP *)app->a_next;			/* JTT - (APP *) */
 	}/* while     */
 
 	return( app );
@@ -75,41 +76,39 @@ EXTERN	BYTE	*g_name();
 
 
 /*	Free an application node	*/
-
-	VOID	
-app_free( app )
-	REG APP	*app;
+VOID	
+app_free( REG APP *app )
 {
 	REG APP	*list;
 
 	if ( app == applist )
-	  applist = app->a_next;
+	  applist = (APP *)app->a_next;
 	else
 	{
 	  list = applist;
 
 	  while( list )
 	  {
-	    if ( list->a_next == app )
+	    if ( (APP *)list->a_next == app )
 	    {
 	      list->a_next = app->a_next;	
 	      break;
 	    }
 	
-	    list = list->a_next;
+	    list = (APP *)list->a_next;
 	  }
 	}
 
 	lp_collect();
-	app->a_next = appfree;
+	(APP *)app->a_next = appfree;
 	appfree = app;
 }
 
 
 /*	Allocation an anode	*/
 
-	APP
-*app_alloc()
+APP *
+app_alloc( VOID )
 {
 	REG APP	*list;
 
@@ -119,8 +118,8 @@ again:
 	if ( appfree )
 	{
 	  list = appfree;
-	  appfree = appfree->a_next;
-	  list->a_next = applist;
+	  appfree = (APP *)appfree->a_next;
+	  (APP *)list->a_next = applist;
 	  applist = list;
 	  list->a_doc[0] = 0;
 	  list->a_argu[0] = 0;
@@ -141,10 +140,9 @@ again:
 
 /*	Find the actual application type	*/
 
-	APP
-*app_xtype( name, install )
-	REG BYTE	*name;
-	WORD	*install;	/* application installed	*/
+APP *
+app_xtype( REG BYTE *name, WORD *install )
+/* application installed	*/
 {
 	REG APP		*app;
 	APP		*markapp;
@@ -179,7 +177,7 @@ again:
 	    }
 	  }
 x_p1:
-	  app = app->a_next;
+	  app = (APP *)app->a_next;
 
 	}/* while     */
 
@@ -187,10 +185,8 @@ x_p1:
 } 
 
 
-	WORD
-x_wildcmp( source, dest )
-	BYTE	*source;
-	BYTE	*dest;
+WORD
+x_wildcmp( BYTE *source, BYTE *dest )
 {
 	if ( *source )
 	{
@@ -207,9 +203,8 @@ WORD	ftab[] = { 0,   F1,  F2,  F3,  F4,  F5,  F6,  F7,  F8,  F9, F10,
 
 /*	Find the key that matches the application	*/
 	
-	APP
-*app_key( key )
-	WORD	key;
+APP *
+app_key( WORD key )
 {
 	REG APP	*app;
 
@@ -220,7 +215,7 @@ WORD	ftab[] = { 0,   F1,  F2,  F3,  F4,  F5,  F6,  F7,  F8,  F9, F10,
 	   if ( ftab[app->a_key] == key )
 	      return( app );
 
-	  app = app->a_next;
+	  app = (APP *)app->a_next;
 	}
 
 	return( (APP*)0 );

@@ -12,26 +12,16 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <osbind.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <error.h>
-#include <extern.h>
-
-EXTERN	BYTE	*get_fstring();
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
-EXTERN	APP	*app_icon();
-EXTERN	BYTE	*r_slash();
-EXTERN	BYTE	*scasb();
-EXTERN	OBJECT	*get_tree();
-EXTERN	WINDOW	*w_gfirst();
-EXTERN	BYTE	*bldstring();
-EXTERN	BYTE	*strcpy();
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "osbind.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "error.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 #define CTLC 	3
 
@@ -72,7 +62,7 @@ pri_win( )
 {
 	REG WINDOW	*win;
 	REG WORD	serial;
-	WORD		max,i,type;
+	WORD		max,i;
 	DIR		*dir;
 	BYTE		buffer[80];
 	BYTE		buf1[10];
@@ -83,9 +73,9 @@ pri_win( )
 	  desk_mice( HOURGLASS );
 
 	  serial = ( trap14( 0x21, 0xFFFF ) & 0x10 ) ? TRUE : FALSE; 	
-	  dir = win->w_memory;
+	  dir = (DIR *)win->w_memory;
 	  max = win->w_items;
-	  sizes = 0;
+	  sizes = 0L;
 
 	  if ( !pri_str( serial, Nextline ) )
 	    goto pri_end;
@@ -108,7 +98,8 @@ pri_win( )
 	  *( (WORD *) &buf1[4] ) = (WORD)win->w_items;
 
 	 merge_str( strcpy( Nextline, buffer ) - 1, 
-		    get_fstring( ( win->w_items == 1 ) ? ISTR : ISTRS ), buf1 );
+		    get_fstring( ( win->w_items == 1 ) ? ISTR : ISTRS ),
+		    (UWORD *)buf1 );
 
 	  strcat( "\014", buffer );	  
 	  pri_str( serial, buffer );
@@ -125,9 +116,8 @@ newfolder( win )
 	REG	WINDOW	*win;
 {
 	BYTE		namenew[14];
-	BYTE		nameold[14];
 	BYTE		name[14];
-	WORD		i,ret,update;
+	WORD		ret,update;
 	REG OBJECT	*obj;
 	BYTE		buf[2];
 
@@ -147,12 +137,12 @@ newfolder( win )
 	{
 	  update = FALSE;
 	  name[0] = 0;
-	  inf_sset( obj, MKNAME, name );
-	  dr_dial_w( ADMKDBOX, FALSE );		/* draw the box		*/
+	  inf_sset( (LONG)obj, MKNAME, name );
+	  dr_dial_w( ADMKDBOX, FALSE, 0 );		/* draw the box		*/
 	  if ( xform_do( obj, 0 ) == MKCNCL )
 	    break;
 
-	  inf_sget( obj, MKNAME, name );
+	  inf_sget( (LONG)obj, MKNAME, name );
 	  unfmt_str( name, namenew );
  	  if ( !namenew[0] )		/* no name	*/
 	    break;
@@ -170,14 +160,14 @@ newfolder( win )
 	    {
 	      buf[0] = win->w_buf[0];
 	      buf[1] = 0;
-	      fill_string( buf, STDISKFULL );
+	      fill_string( buf, STDISKFU );
 	    }
 	
 	    break;
 	  }
 	  else			/* file exists	*/
 	  {	
-	    if ( do1_alert( STFOEXIST ) == 2 )
+	    if ( do1_alert( STFOEXIS ) == 2 )
 	      break;
 	    else	
 	      continue;		/* retry	*/
@@ -221,7 +211,7 @@ sort_file( win, mode )
 	REG DIR		*dir1;
 	BYTE		*ps1,*ps2;
 	
-	dir = win->w_memory;
+	dir = (DIR *)win->w_memory;
 	n = win->w_items;
 
 	for( gap = n/2; gap > 0; gap /=2 )
@@ -306,7 +296,7 @@ ss_2:	      buff = dir[j];
 /*	Set up all the files pointer 	*/
 /*	Scroll up or down		*/
 
-	WORD
+	VOID
 set_newview( index, win )
 	WORD	index;
 	REG WINDOW	*win;
@@ -317,6 +307,7 @@ set_newview( index, win )
 		OBJECT	*obj1;
 		WORD	len,type;
 		BYTE	*text;
+		WORD	temp;
 
 	obj = win->w_obj;	/* get all the icons source	*/
 	obj->ob_next = 0xFFFF;
@@ -335,12 +326,12 @@ set_newview( index, win )
 
 	obj++;		/* points to the rigth object	*/
 
-	dir = win->w_memory;
+	dir = (DIR *)win->w_memory;
 
 	vicons = win->w_vicons + 1;
 
-	obj1 = get_tree( TEXTLINES );
-	len = strlen( ( (TEDINFO*)(obj1[TSTYLE].ob_spec) )->te_ptext );
+	obj1 = get_tree( TEXTLINE );
+	len = strlen( (BYTE *)( (TEDINFO*)(obj1[TSTYLE].ob_spec) )->te_ptext );
 	text = win->w_text;
 
 	for( k = 1, i = index; ( ( i < items ) && ( k < vicons ) ); 
@@ -350,8 +341,9 @@ set_newview( index, win )
 	  {
 	    app_icon( &dir[i].d_name[0], ( dir[i].d_att & 0x10 ) ? FOLDER : -1, &type );
 	    cp_iblk( type, (CICONBLK*)(obj->ob_spec) );
-    	    ((CICONBLK*)(obj->ob_spec))->monoblk.ib_char[1] = 0;		
-	    ((CICONBLK*)(obj->ob_spec))->monoblk.ib_ptext = &dir[i].d_name[0];
+	    temp = ((CICONBLK*)(obj->ob_spec))->monoblk.ib_char & 0xFF00;
+    	    ((CICONBLK*)(obj->ob_spec))->monoblk.ib_char = temp | 0;		
+	    ((CICONBLK*)(obj->ob_spec))->monoblk.ib_ptext = (LONG)&dir[i].d_name[0];
 	  }
 	  else
 	  {
@@ -361,7 +353,7 @@ set_newview( index, win )
 	  }
 	  
 	  obj->ob_flags &= ~HIDETREE;
-	  obj->ob_states = dir[i].d_state;
+	  obj->ob_state = dir[i].d_state;
 	  obj->ob_next = k+1;
 
 	}/* for loop	*/
@@ -393,8 +385,8 @@ read_files( win, attr )
 	BYTE		*path;
 	WORD		ret,i;
 	
-	items = 0;
-	sizes = 0;
+	items = 0L;
+	sizes = 0L;
 
 	Fsetdta( &dtabuf );		/* set dta buffer	*/
 	
@@ -415,7 +407,7 @@ read_files( win, attr )
 	rep_path( getall, path );	/* search everything	*/
 	
 	if ( path[0] == 'c' )
-	  ret = !cart_sfirst( &dtabuf );
+	  ret = !cart_sfirst( (BYTE *)&dtabuf, 0 /* dummy */ );
 	else
 	  ret = Fsfirst( path, 0x31 );	/* Error 	*/
 	
@@ -437,7 +429,7 @@ read_files( win, attr )
 	if ( ret == EFILNF )		/* file not found	*/
 	  goto r_2;
 
-	addr = Malloc( 0xFFFFFFFFL ); /* we should have memory*/
+	addr = (DIR *)(Malloc( 0xFFFFFFFFL )); /* we should have memory*/
 
 	if ( !addr )			/* No memory		*/
 	{
@@ -448,7 +440,7 @@ read_files( win, attr )
 					/* How many files we can store*/
 	volume = ((LONG) addr) / (LONG)(sizeof( DIR ));
 
-	if ( !( addr = Malloc( addr ) ) )
+	if ( !( addr = (DIR *)(Malloc( (LONG)addr ) ) ) )
 	  goto r_1;
 
 	win->w_memory = (BYTE*)addr;
@@ -478,7 +470,7 @@ read_files( win, attr )
 
 	  if ( items <= volume )
 	  {
-	    dtabuf.dirfile.d_order = items;
+	    dtabuf.dirfile.d_order = (WORD)items;
 	    dtabuf.dirfile.d_state = NORMAL;
 	    *addr++ = dtabuf.dirfile;	  
 	    sizes += dtabuf.dirfile.d_size;

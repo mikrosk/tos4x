@@ -1,5 +1,8 @@
 /*	AESMINT.H		7/15/91 - 9/10/91	D.Mui		*/
 
+#ifndef _AESMINT_H_
+#define _AESMINT_H_
+
 EXTERN	LONG	trap();
 
 #define	Syield()		trap(0xff)
@@ -43,3 +46,5 @@ EXTERN	LONG	trap();
 #define Dos_tab()		trap(-1)
 #define Bios_tab()		bios(-1)
 #define Xbios_tab()		xbios(-1)
+
+#endif

@@ -3,6 +3,7 @@
 /*	the app 		3/3/92			D.Mui		*/
 /*	Change all the iconblk to ciconblk	7/11/92	D.Mui		*/
 /*	Change at ins_wicon and ins_icons	7/11/92	D.Mui		*/
+/*	Convert to Lattice C 5.51		2/18/93 C.Gee		*/
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -10,15 +11,16 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <osbind.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <extern.h>
-#include <error.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "osbind.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "extern.h"
+#include "error.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 EXTERN	BYTE	*get_fstring();
 EXTERN	BYTE	*r_slash();
@@ -69,8 +71,7 @@ cp_iblk( number, dest_ciblk )
 	  iblk = (ICONBLK*)(obj->ob_spec);
 	  dest_ciblk->monoblk.ib_pmask = iblk->ib_pmask;
 	  dest_ciblk->monoblk.ib_pdata = iblk->ib_pdata;
-	  dest_ciblk->monoblk.ib_char[0] = iblk->ib_char[0];
-	  dest_ciblk->monoblk.ib_char[1] = iblk->ib_char[1];
+	  dest_ciblk->monoblk.ib_char = iblk->ib_char;
 	  dest_ciblk->monoblk.ib_xchar = iblk->ib_xchar;
 	  dest_ciblk->monoblk.ib_ychar = iblk->ib_ychar;
 	  dest_ciblk->mainlist = (CICON*)0;
@@ -80,8 +81,7 @@ cp_iblk( number, dest_ciblk )
 	  ciblk =(CICONBLK*)(obj->ob_spec);
 	  dest_ciblk->monoblk.ib_pmask = ciblk->monoblk.ib_pmask;
 	  dest_ciblk->monoblk.ib_pdata = ciblk->monoblk.ib_pdata;
-	  dest_ciblk->monoblk.ib_char[0] = ciblk->monoblk.ib_char[0];
-	  dest_ciblk->monoblk.ib_char[1] = ciblk->monoblk.ib_char[1];
+	  dest_ciblk->monoblk.ib_char = ciblk->monoblk.ib_char;
 	  dest_ciblk->monoblk.ib_xchar = ciblk->monoblk.ib_xchar;
 	  dest_ciblk->monoblk.ib_ychar = ciblk->monoblk.ib_ychar;
 	  dest_ciblk->mainlist = ciblk->mainlist;	
@@ -95,7 +95,7 @@ cp_iblk( number, dest_ciblk )
 /*	Remove desktop icons	*/
 
 	VOID
-rm_icons()
+rm_icons( VOID )
 {
 	REG OBJECT	*obj;
 	REG WORD	i;
@@ -129,7 +129,7 @@ rm_icons()
 /*	Install desktop icons		*/
 
 	VOID
-ins_icons( )
+ins_icons( VOID )
 {
 	REG OBJECT	*obj;
 	REG CICONBLK	*iblk;
@@ -144,6 +144,7 @@ ins_icons( )
 	GRECT		pt;
 	WORD		mk_x, mk_y, mk_buttons, mk_kstate;
 	LONG		saveptr;
+	WORD		temp;
 
 	quit = FALSE;
 	xitem = item = o_item;
@@ -158,15 +159,15 @@ ins_icons( )
 	{
 	  obj[IICON].ob_type = G_CICON;	/* 7/11/92 */
 	  ciblk.monoblk = *(ICONBLK*)(obj[IICON].ob_spec);
-	  obj[IICON].ob_spec = &ciblk;
+	  obj[IICON].ob_spec = ( LONG )&ciblk;
 	  iblk = (CICONBLK*)(obj[IICON].ob_spec);
 	  redraw = FALSE;
 	  
 	  if ( o_status )			/* an icon is selected	*/
 	  {
 	    type = backid[item].i_type;	  
-	    strcpy( (CICONBLK*)(obj1[item].ob_spec)->monoblk.ib_ptext, buffer );
-	    buf1[0] = idbuffer[0] = backid[item].i_cicon.monoblk.ib_char[1];
+	    strcpy( (BYTE *)((CICONBLK*)(obj1[item].ob_spec))->monoblk.ib_ptext, buffer );
+	    buf1[0] = idbuffer[0] = (BYTE)backid[item].i_cicon.monoblk.ib_char;
 	    icon = backid[item].i_icon;
 	    if ( icon >= numicon )
 	      icon = numicon - 1;
@@ -213,12 +214,12 @@ ins_icons( )
 
 	  cp_iblk( icon, iblk );
 
-	  iblk->monoblk.ib_char[1] = 0;
+	  iblk->monoblk.ib_char = iblk->monoblk.ib_char & 0xFF00;
 
-	  inf_sset( obj, DRLABEL, buffer );
-	  inf_sset( obj, DRID, idbuffer );
+	  inf_sset( (LONG)obj, DRLABEL, buffer );
+	  inf_sset( (LONG)obj, DRID, idbuffer );
 
-in_5:	  dr_dial_w( ADINSDIS, FALSE );
+in_5:	  dr_dial_w( ADINSDIS, FALSE, 0 /*dummy */ );
 	
 in_2:	  ret = xform_do( obj, 0 );
 	
@@ -247,8 +248,9 @@ cg_2:
 in_3:
 	      XSelect( obj, ret );	/* cjg 08/06/92 */
 	      cp_iblk( icon, iblk );
-	      iblk->monoblk.ib_char[1] = 0;
-	      objc_draw( obj, IBOX, 1, full.x, full.y, full.w, full.h  );
+	      iblk->monoblk.ib_char = iblk->monoblk.ib_char & 0xFF00;
+	      objc_draw( (LONG)obj, IBOX, 1, full.g_x, full.g_y, full.g_w,
+			 full.g_h  );
 	      cl_delay();
 
 	      /* cjg 08/06/92 */
@@ -276,14 +278,14 @@ in_3:
 	  if ( ret == DRCNCL )		/* cancel		*/
 	    goto in_1;
 					/* this is install	*/
-	  inf_sget( obj, DRID, idbuffer );
+	  inf_sget( (LONG)obj, DRID, idbuffer );
 
 	  if ( idbuffer[0] != 'c' )
 	    idbuffer[0] = toupper( idbuffer[0] );
 
 	  if ( driver )			/* driver type	*/
 	  {				/* drive icon	*/
-	    if ( !( which = inf_gindex( obj, IDRIVE, 3 ) ) ) /* driver type */
+	    if ( !( which = inf_gindex( (LONG)obj, IDRIVE, 3 ) ) ) /* driver type */
 	    {
 	      if ( ( !idbuffer[0] ) || ( idbuffer[0] == ' ' ) )
 	      {
@@ -315,33 +317,40 @@ in_4:	  redraw = TRUE;		/* user selected OK	*/
 	  cp_iblk( icon, iblk );
 	  backid[item].i_icon = icon;
 
-	  strcpy( (CICONBLK*)(obj[DRLABEL].ob_spec)->monoblk.te_ptext, 
-		  iblk->monoblk.ib_ptext );
+/*	  strcpy( (( ICONBLK )((CICONBLK*)(obj[DRLABEL].ob_spec))->monoblk).te_ptext, - by I don't know who */
+
+/*	  cjg 03/03/93
+	  strcpy((BYTE *)((CICONBLK*)(obj[DRLABEL].ob_spec))->monoblk.ib_ptext, 
+		  (BYTE *)iblk->monoblk.ib_ptext );
+*/
+	  strcpy( ( BYTE *)(( TEDINFO *)(obj[ DRLABEL ].ob_spec ))->te_ptext,
+		  ( BYTE *)iblk->monoblk.ib_ptext );
 
 	  if ( driver )
 	  {
 	    if ( !which )		/* Disk Drive	*/
 	    {
 	      type = DISK;
-	      iblk->monoblk.ib_char[1] = idbuffer[0];
+	      temp = iblk->monoblk.ib_char & 0xFF00;
+	      iblk->monoblk.ib_char = temp | idbuffer[0];
 	    }
 	    else
 	    {
 	      type = ( which == 1 ) ? TRASHCAN : PRINTER;
-	      iblk->monoblk.ib_char[1] = 0;	
+	      iblk->monoblk.ib_char = iblk->monoblk.ib_char & 0xFF00;	
 	    }
 	  }
 	  else
-	    iblk->monoblk.ib_char[1] = 0;
+	    iblk->monoblk.ib_char = iblk->monoblk.ib_char & 0xFF00;
 
 	  backid[item].i_type = type;
 in_1:
 	  if ( redraw )
 	  {
-	    pt.x = obj1[0].ob_x + obj1[item].ob_x;
-	    pt.y = obj1[0].ob_y + obj1[item].ob_y;
-            pt.w = obj1[item].ob_width;
-            pt.h = obj1[item].ob_height;
+	    pt.g_x = obj1[0].ob_x + obj1[item].ob_x;
+	    pt.g_y = obj1[0].ob_y + obj1[item].ob_y;
+            pt.g_w = obj1[item].ob_width;
+            pt.g_h = obj1[item].ob_height;
 	    do_redraw( 0, &pt, 0 );
 	  }
 
@@ -369,12 +378,12 @@ in_1:
 /*	Install window icons	*/
 
 	VOID
-ins_wicon( )
+ins_wicon( VOID )
 {
 	REG 	APP	*app;
 	REG 	OBJECT	*obj;
 	WORD		ret,limit,index,quit,itype;
-	WORD		type,install,pref,status;
+	WORD		type,pref,status;
 	CICONBLK	*iblk;
 	CICONBLK	ciblk;
 	BYTE		buffer[14];
@@ -395,9 +404,9 @@ ins_wicon( )
 	{			/* 7/11/92 */
 	  obj[WICON].ob_type = G_CICON;
 	  ciblk.monoblk = *(ICONBLK*)(obj[WICON].ob_spec);
-	  obj[WICON].ob_spec = &ciblk;
+	  obj[WICON].ob_spec = ( LONG )&ciblk;
 	  iblk = (CICONBLK*)(obj[WICON].ob_spec);
-	  inf_sset( obj, WNAME, Nostr );
+	  inf_sset( (LONG)obj, WNAME, Nostr );
 	  obj[WFOLDER].ob_state = NORMAL;
 	  obj[WNONE].ob_state = SELECTED;
 	  obj[WFOLDER].ob_flags = SELECTABLE|RBUTTON|IS3DOBJ|IS3DACT;
@@ -436,14 +445,14 @@ ins_wicon( )
 	  }
 
 	  cp_iblk( index, iblk );
-	  iblk->monoblk.ib_char[1] = 0;
+	  iblk->monoblk.ib_char = iblk->monoblk.ib_char & 0xFF00;
 
-	  dr_dial_w( INWICON, FALSE );
+	  dr_dial_w( INWICON, FALSE, 0 /*dummy */ );
 
 	  while( TRUE )
 	  {
 	    ret = xform_do( obj, 0 );
-	    inf_sget( obj, WNAME, buf2 );
+	    inf_sget( (LONG)obj, WNAME, buf2 );
 	    unfmt_str( buf2, buffer );
 
 	    if ( obj[WNONE].ob_state & SELECTED )
@@ -473,8 +482,9 @@ cg_4:
 k_1:
 	        XSelect( obj, ret );
 	        cp_iblk( index, iblk );
-	        iblk->monoblk.ib_char[1] = 0;
-	        objc_draw( obj, WBOX, 1, full.x, full.y, full.w, full.h );
+	        iblk->monoblk.ib_char = iblk->monoblk.ib_char & 0xFF00;
+	        objc_draw( (LONG)obj, WBOX, 1, full.g_x, full.g_y, full.g_w,
+		 full.g_h );
 		cl_delay();
 
 		/* cjg 08/06/92 */
@@ -516,7 +526,7 @@ k_1:
 		      break;
 		    }
 		  }
-		  app = app->a_next;
+		  app = ( APP *)app->a_next;
 	        }
 
 	        if ( !app )		/* Not found	*/
@@ -535,7 +545,7 @@ k_1:
 		      if ( strcmp( buffer, app->a_doc ) )
 		        break;		/* found it	*/
 		    }
-		    app = app->a_next;
+		    app = ( APP *)app->a_next;
 		  }
  		
 		  if ( !app )		/* Not find		*/
@@ -585,7 +595,7 @@ k_1:
 /*	Install all the available drives	*/
 
 	VOID
-ins_drive()
+ins_drive( VOID )
 {
 	REG WORD	i,id;
 	WORD		install,free;
@@ -606,7 +616,7 @@ ins_drive()
 	{
 	  if ( ( !( obj[i].ob_flags & HIDETREE ) ) && ( backid[i].i_type == DISK ) )
 	  {
-	    id = backid[i].i_cicon.monoblk.ib_char[1];
+	    id = (BYTE)backid[i].i_cicon.monoblk.ib_char;
 	    if ( ( id <= '`' ) && ( id >= 'A' ) )
 	    {
 	      dr[id - 'A'] = 1;
@@ -653,7 +663,7 @@ ins_drive()
 /*	Delay the icon scrolling	*/
 
 	VOID
-cl_delay()
+cl_delay( VOID )
 {
 	WORD	i;
 

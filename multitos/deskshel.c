@@ -11,23 +11,17 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <error.h>
-#include <extern.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "error.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
-EXTERN	BYTE	*bld_par();
-EXTERN	BYTE	*r_slash();
-EXTERN	BYTE	*g_name();
-EXTERN	APP	*app_xtype();
-EXTERN	BYTE	toupper();
-EXTERN	BYTE	*scasb();
-EXTERN	OBJECT	*get_tree();
 EXTERN	WORD	d_exit;
 
 EXTERN	WORD	s_defdir;
@@ -36,7 +30,6 @@ EXTERN	WINDOW	*x_win;
 EXTERN	WORD	x_type;
 
 EXTERN	WORD	sh_iscart;
-EXTERN	BYTE	*strcpy();
 EXTERN	WORD	global[];
 
 BYTE	SHPRINT[] = "SHPRINT=";
@@ -49,7 +42,7 @@ ch_tail( command, argu, tail )
 {
 	if ( ( strlen( command ) + strlen( argu ) + 2 ) >= PATHLEN )
 	{
-	  tail[0] = 0xFF;	
+	  tail[0] = (BYTE) 0xFF;	
 /*	  tail[1] = 0;		*/
 /*	  do1_alert( FCNOMEM );	*/
 	}
@@ -73,13 +66,13 @@ show_file( file )
 	WORD	x,ret;
 	BYTE	*tail,*bptr;
 
-	shel_envrn( &bptr, SHSHOW );
+	shel_envrn( (LONG)&bptr, (LONG)SHSHOW );
 	if ( bptr )
 	{
 	  if ( tail = bld_par(1,1) )
 	  {
-	    if ( !( ret = shel_write( 0, 0, 1, bptr, tail ) ) )
-	      fill_string( bptr, FTOLAUNCH );
+	    if ( !( ret = shel_write( 0, 0, 1,(LONG) bptr, (LONG)tail ) ) )
+	      fill_string( bptr, FTOLAUNC );/* was FTOLAUNCH, changed for LC*/
 	    free( tail );
 	    if ( ret )
 	      return;		
@@ -89,22 +82,22 @@ show_file( file )
 	menu_bar( menu_addr, FALSE );
 	v_hide_c( );
 	v_enter_cur( );	
-	vq_chcell( &d_nrows, &x );
+	vq_chcells( &d_nrows, &x );
 	d_nrows--;
 	showfile( file, FALSE );		
 	v_exit_cur( );
 	v_show_c( 0 );
 	menu_bar( menu_addr, TRUE );	
-	form_dial( FMD_FINISH, 0, 0, 0, 0, full.x, full.y, full.w, full.h );
-	wait_msg( -1 );
+	form_dial( FMD_FINISH,0,0,0,0,full.g_x,full.g_y,full.g_w,full.g_h );
+	wait_msg( -1, (OBJECT *)0L );
 }
 
 
 	VOID
 pr_setup( )
 {
-	inf_sset( get_tree( PRINTFIL ), PFILE, Nostr );
-	dr_dial_w( PRINTFIL, FALSE );
+	inf_sset( (LONG)get_tree( PRINTFIL ), PFILE, Nostr );
+	dr_dial_w( PRINTFIL, FALSE, 0 /* dummy */ );
 }
 
 
@@ -133,18 +126,18 @@ printit( str )
 {
 	BYTE	*bptr;
 
-	shel_envrn( &bptr, SHPRINT );	/* user defined print program */
+	shel_envrn((LONG)&bptr,(LONG)SHPRINT );	/* user defined print program */
 	if ( bptr )
 	{
 	  if ( !m_sfirst( bptr, 0x31 ) )
 	  {
 	    if ( ch_tail( str, Nostr, comtail ) )
-	      if ( shel_write( 0, 0, 1, bptr, comtail ) )
-		return;
+	      if ( shel_write( 0, 0, 1,(LONG)bptr,(LONG)comtail ) )
+		return( 0 );
 	  }
 	  else
-	    fill_string( bptr, FTOLAUNCH );			
-	}
+	    fill_string( bptr, FTOLAUNC ); /* was FTOLAUNCH, changed for LC */
+	}	
 
 	pr_setup();
 	aprint( str );
@@ -164,7 +157,7 @@ print_file( )
 
 	ret1 = build_rect( background, &pt, d_xywh[6], d_xywh[9] );
 
-	shel_envrn( &bptr, SHPRINT );
+	shel_envrn( (LONG)&bptr, (LONG)SHPRINT );
 
 	if ( bptr )
 	{
@@ -172,8 +165,8 @@ print_file( )
 	  {
 	    if ( tail = bld_par(1,1) )
 	    {
-	      if ( !( ret = shel_write( 0, 0, 1, bptr, tail ) ) )
-	        fill_string( bptr, FTOLAUNCH );
+	      if ( !( ret = shel_write( 0, 0, 1,(LONG)bptr,(LONG)tail ) ) )
+	        fill_string( bptr, FTOLAUNC); /* was FTOLAUNCH, changed LC */
 
 	      free( tail );	
 	      if ( ret )
@@ -236,10 +229,10 @@ launch_pref()
 	BYTE	*ptr, *progname;
 
 	obj = get_tree( DLAUNCH );
-	inf_sset( obj, RUNNAME, Nostr );
+	inf_sset( (LONG)obj, RUNNAME, Nostr );
 	if ( fmdodraw( DLAUNCH, 0 ) == LAUNCHOK )
 	{
-	  inf_sget( obj, RUNNAME, path1 );
+	  inf_sget( (LONG)obj, RUNNAME, path1 );
 	  if ( path1[0] )
 	  {
 	    graphic = ( obj[LGRAPHIC].ob_state & SELECTED ) ? TRUE : FALSE;
@@ -256,11 +249,11 @@ launch_pref()
 	    progname = path1;
 	    if ( path1[1] == ':' )
 	      path1[0] = toupper( path1[0] );
-	    else if (path1[0] != '\\') {
+ 	    else if (path1[0] != '\\') {
 /* ERS (12/8/92): if no path or drive is given, look for
  * the file in the current directory
  */
-		if (winhead && winhead->w_id != -1)
+ 		if (winhead && winhead->w_id != -1)
 		{
 		  strcpy( winhead->w_path, path2 );
 		  ptr = r_slash( path2 );
@@ -294,7 +287,7 @@ set_dir( path )
 	ret = TRUE;
 
 	if ( path[0] == '\\' )		/* at the current root	*/
-	  ret = Dsetpath( bckslsh );
+	  ret = (WORD) Dsetpath( bckslsh );
 	else
 	{				/* there is drive id	*/
 	  if ( path[1] == ':' )
@@ -304,11 +297,11 @@ set_dir( path )
 	      Dsetdrv( (WORD)( toupper( path[0] ) - 'A') );
 	      ptr = r_slash( path );
 	      if ( &path[2] == ptr )
-	        ret = Dsetpath( bckslsh );
+	        ret = (WORD) Dsetpath( bckslsh );
 	      else
 	      {
 	        *ptr = 0;
-	        ret = Dsetpath( &path[2] );
+	        ret = (WORD) Dsetpath( &path[2] );
 	        *ptr = '\\';	
 	      }
 	    }
@@ -333,10 +326,14 @@ exec_file( infile, win, item, intail )
 {
 	REG APP	*app;
 	WORD	type,install,graphic,code;
-	WORD	dofull,setdir,which,id;		
+	WORD	dofull,setdir,which;		
 	OBJECT	*obj;
 	BYTE	*tail,*file,*newtail;
+
+#if 0 /* NOT USED: */
+	WORD	id;
 	BYTE	*bptr;
+#endif
 
 	app = app_xtype( infile, &install );
 	type = app->a_type;
@@ -416,12 +413,12 @@ exec_file( infile, win, item, intail )
 	    obj = get_tree( ADOPENAP );
 	    tail = g_name( file );
 	    xinf_sset( obj, APPLNAME, tail );
-	    inf_sset( obj, APPLPARM, app->a_argu );
+	    inf_sset( (LONG)obj, APPLPARM, app->a_argu );
 	     
 	    if ( fmdodraw( ADOPENAP, 0 ) == APPLCNCL )
 	      goto e_3;
 
-	    tail = (TEDINFO*)(obj[APPLPARM].ob_spec)->te_ptext;
+	    tail = (BYTE *) ((TEDINFO*)(obj[APPLPARM].ob_spec))->te_ptext;
 
 	    if ( !newtail )
 	    {
@@ -509,9 +506,9 @@ run_it( file, tail, graphic, setdir, code )
 
 	code |= 0x0400;
 
-	ptrs[0] = file;		/* file name */
-	ptrs[3] = g_buffer;	/* default directory */
+	ptrs[0] = (LONG) file;		/* file name */
+	ptrs[3] = (LONG) g_buffer;	/* default directory */
 
-	if ( !shel_write( code, graphic, 1, &ptrs[0], tail ) )
-	  fill_string( file, FTOLAUNCH );
+	if ( !shel_write( code, graphic, 1,(LONG)&ptrs[0],(LONG)tail ) )
+	  fill_string( file, FTOLAUNC ); /* was FTOLAUNCH, changed for LC */
 }

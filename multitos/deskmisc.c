@@ -1,6 +1,7 @@
 /*	DESKMISC.C		3/16/89	- 9/13/89	Derek Mui	*/
 /*	Change chk_par		9/25/89			D.Mui		*/
 /*	Fix at fill_string to take out control character	7/9/91	*/
+/*	Convert to Lattice C 5.51	2/18/93		C.Gee		*/
 	
 
 /************************************************************************/
@@ -9,22 +10,19 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <gemdefs.h>
-#include <deskwin.h>
-#include <deskusa.h>
-#include <message.h>
-#include <osbind.h>
-#include <error.h>
-#include <extern.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+/*#include "gemdefs.h"*/
+#include "deskwin.h"
+#include "deskusa.h"
+#include "message.h"
+#include "osbind.h"
+#include "error.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
-EXTERN	BYTE		*strcpy();
-EXTERN	BYTE		*strscn();
-EXTERN	WINDOW		*w_gfirst();
-EXTERN	WINDOW		*w_gnext();
-EXTERN	BYTE		*r_slash();
 
 EXTERN	UWORD		st_dchar;
 EXTERN	WORD		st_date;
@@ -42,7 +40,7 @@ EXTERN	OBJECT		*menu_addr;
  * Deselect an object and redraw - use the flag to redraw in case
  * the area to redraw needs to be bigger.( ie: SHADOWED )
  */
-WORD
+VOID
 XDeselect( tree, obj )
 OBJECT *tree;
 WORD   obj;
@@ -54,9 +52,9 @@ WORD   obj;
        {
          tree[ obj ].ob_state &= ~SELECTED;
          trect = *(GRECT *)&tree[(obj)].ob_x;
-	 objc_gclip( tree, obj, &dummy, &dummy, &trect.x, &trect.y, 
-		   &trect.w, &trect.h );
-         objc_draw( tree, obj, MAX_DEPTH, trect.x, trect.y, trect.w, trect.h );
+	 objc_gclip( tree, obj, &dummy, &dummy, &trect.g_x, &trect.g_y, 
+		   &trect.g_w, &trect.g_h );
+         objc_draw((LONG)tree,obj,MAX_DEPTH,trect.g_x,trect.g_y,trect.g_w,trect.g_h );
        }
 }
 
@@ -76,7 +74,7 @@ m_objdraw( obj, which, start, x, y, w, h )
 	WORD	which,start,x,y,w,h;
 {
 	wind_update(1);
-	objc_draw( obj, which, start, x, y, w, h );
+	objc_draw( (LONG)obj, which, start, x, y, w, h );
 	wind_update(0);
 }
 
@@ -117,7 +115,7 @@ wait_msg( handle, obj )
 	  switch( msgbuff[0] )
 	  {
 	    case MN_SELECTED:
-	      menu_tnormal( menu_addr, msgbuff[3], 1 );
+	      menu_tnormal( (LONG)menu_addr, msgbuff[3], 1 );
 	      break;	
 
 	    case WM_TOPPED:	/* don't allow other window to go on top */
@@ -128,7 +126,7 @@ wait_msg( handle, obj )
 	 
 	      break;
 
-	    case WM_CLOSED:
+	    case WM_CLOSE:
 	      if ( msgbuff[3] == handle )
 		return( msgbuff[0] );
 
@@ -228,7 +226,7 @@ hit_disk( drive )
 {
 	OBJECT	*obj;
 
-	rsrc_gaddr( R_TREE, item, &obj );
+	rsrc_gaddr( R_TREE, item, (LONG *)&obj );
 	return( obj );
 }
 
@@ -239,7 +237,7 @@ hit_disk( drive )
 {
 	BYTE	*str;
 
-	rsrc_gaddr( R_STRING, item, &str );
+	rsrc_gaddr( R_STRING, item, (LONG *)&str );
 	return( str );
 }
 
@@ -250,7 +248,7 @@ hit_disk( drive )
 {
 	BYTE	**str;
 
-	rsrc_gaddr( R_FRSTR, item, &str );
+	rsrc_gaddr( R_FRSTR, item, (LONG *)&str );
 	return( *str );
 }
 
@@ -264,7 +262,7 @@ hit_disk( drive )
 	DIR	*dir;
 
 	j = win->w_srtitem + item - 1;
-	dir = win->w_memory;
+	dir = ( DIR *)win->w_memory;
 	return( &dir[j] );
 }
 
@@ -314,7 +312,7 @@ in_parent( obj, child )
 {
 	return( inside( obj[child].ob_x + obj[0].ob_x, 
 		        obj[child].ob_y + obj[0].ob_y,
-		        &obj[0].ob_x ) );	
+		        (GRECT *)&obj[0].ob_x ) );	
 }
 
 
@@ -327,7 +325,7 @@ xinf_sset( obj, item, buf1 )
 	BYTE	buf2[20];
 
 	fmt_str( buf1, buf2 );
-	inf_sset( obj, item, buf2 );
+	inf_sset( (LONG)obj, item, buf2 );
 }
 
 
@@ -335,7 +333,7 @@ xinf_sset( obj, item, buf1 )
 desk_mice( state )
 	WORD	state;
 {
-	graf_mouse( state, (BYTE*)0 );
+	graf_mouse( state, 0L );
 }
 
 
@@ -349,8 +347,8 @@ draw_fld( obj, which )
 	GRECT	t;
 	WORD	x,y;
 
-	objc_gclip( obj, which, &x, &y, &t.x, &t.y, &t.w, &t.h );
-	objc_draw( obj, which, 0, t.x, t.y, t.w, t.h );
+	objc_gclip( obj, which, &x, &y, &t.g_x, &t.g_y, &t.g_w, &t.g_h );
+	objc_draw( (LONG)obj, which, 0, t.g_x, t.g_y, t.g_w, t.g_h );
 }
 
 
@@ -370,9 +368,9 @@ w_draw_fld( handle, obj, which )
 	}	
 	else
 	{
-	  rc_copy( &obj[which].ob_x, &t ); 
-	  objc_offset( obj, which, &t.x, &t.y );
-	  draw_loop( handle, obj, which, 0, t.x, t.y, t.w, t.h );
+	  rc_copy( &obj[which].ob_x, (WORD *)&t ); 
+	  objc_offset( obj, which, &t.g_x, &t.g_y );
+	  draw_loop( handle, obj, which, 0, t.g_x, t.g_y, t.g_w, t.g_h );
 	  return( wait_msg( handle, obj ) );
 	}
 }
@@ -389,9 +387,9 @@ getcookie( cookie, p_value )
 
 	status = FALSE;	
 
-	old = Super( 0x0L );
+	old = ( BYTE *)Super( 0x0L );
 
-	if ( cookjar = *(LONG*)(0x5a0) )
+	if ( cookjar = ( LONG *)( *(LONG*)(0x5a0)) )
 	{
 	  while( *cookjar )
 	  {
@@ -424,9 +422,9 @@ f_str( obj, item, value )
 	BYTE	*chrptr;
 
 	lbintoas( value, buffer );	
-	len1 = (TEDINFO*)(obj[item].ob_spec)->te_txtlen;
+	len1 = ((TEDINFO*)(obj[item].ob_spec))->te_txtlen;
 	len1 -= 1;
-	chrptr = (TEDINFO*)(obj[item].ob_spec)->te_ptext;
+	chrptr = ( BYTE *)((TEDINFO*)(obj[item].ob_spec))->te_ptext;
 	bfill( len1, ' ', chrptr );
 	len2 = strlen( buffer );
 	strcpy( buffer, chrptr + (LONG)( len1 - len2 ) );
@@ -493,9 +491,9 @@ do_finish( item )
 {
 	GRECT	pt;
 
-	form_center( get_tree( item ), &pt.x, &pt.y, &pt.w, &pt.h );
-	form_dial( FMD_FINISH, 0, 0, 0, 0, pt.x, pt.y, pt.w, pt.h );
-	wait_msg( -1 );	
+	form_center( get_tree( item ), &pt.g_x, &pt.g_y, &pt.g_w, &pt.g_h );
+	form_dial( FMD_FINISH, 0, 0, 0, 0, pt.g_x, pt.g_y, pt.g_w, pt.g_h );
+	wait_msg( -1, (OBJECT *)0L );	
 }
 
 
@@ -523,7 +521,7 @@ fmdodraw( item, which )
 
 	wind_update( 1 );
 	obj = get_tree( item );
-	dr_dial_w( item, FALSE );
+	dr_dial_w( item, FALSE, 0 /* dummy */ );
 	ret = xform_do( obj, which );
 	do_finish( item );
 	wind_update( 0 );
@@ -627,11 +625,11 @@ do_alert( button, item )
 }
 
 
-	VOID
+	WORD
 do1_alert( item )
 	WORD	item;
 {
-	do_alert( 1, item );
+	return( do_alert( 1, item ));
 }
 
 
@@ -640,8 +638,8 @@ rc_center( rec1, rec2 )
 	GRECT	*rec1;
 	GRECT	*rec2;
 {
-	rec2->x = rec1->x + ( rec1->w / 2 );
-	rec2->y = rec1->y + ( rec1->h / 2 );
+	rec2->g_x = rec1->g_x + ( rec1->g_w / 2 );
+	rec2->g_y = rec1->g_y + ( rec1->g_h / 2 );
 }
 
 
@@ -766,7 +764,7 @@ fmt_date(date, pdate)
 	REG BYTE	*src;
 	BYTE		buf[14];
 	REG WORD	i;
-	WORD		t,len;
+	WORD		len;
 	BYTE		*buffer;
 
 	buffer = buf;
@@ -937,7 +935,7 @@ fill_string( string, item )
 	    ptr1++;
 	}
 
-	merge_str( g_buffer, get_string( item ), &ptr );
+	merge_str( g_buffer, get_string( item ), (UWORD *)&ptr );
   	return( form_alert( 1, g_buffer ) );	
 }
 

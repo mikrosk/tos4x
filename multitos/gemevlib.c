@@ -2,17 +2,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/gemevlib.c,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemevlib.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: gemevlib.c,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.2  89/04/26  18:22:19  mui
 * TT
 * 
@@ -39,6 +42,8 @@
 /*	Take out g_wsend			1/9/91	D.Mui		*/
 /*	Change at ev_block for Mint OS	7/23/91		D.Mui		*/
 /*	Change at every functions who make ev_block call 7/23/91 D.Mui	*/
+/*	Convert to Lattice C 5.51			 2/17/93 C.Gee  */
+/*	Force the use of prototypes			 2/24/93 C.Gee  */
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -56,20 +61,13 @@
 *	-------------------------------------------------------------
 */
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "pgem.h"
+#include "pmisc.h"
+
+#include "machine.h"
+#include "dispvars.h"
+#include "aesmint.h"
 						/* in ASYNC88.C		*/
-EXTERN	EVB	*eret();
-EXTERN	EVSPEC	iasync();
-EXTERN	EVSPEC	acancel();
-EXTERN	UWORD	aret();
-EXTERN	EVSPEC	mwait();
-EXTERN	PD	*ch_mowner();
 
 EXTERN	WORD	cu_xrat, cu_yrat;
 EXTERN	WORD	kstate;
@@ -128,7 +126,7 @@ ev_rets( rets )
 *	Wait for a key to be ready at the keyboard and return it. 
 */
 	UWORD
-ev_keybd()
+ev_keybd( VOID )
 {
 	EVB	*e;
 
@@ -183,7 +181,7 @@ ev_mouse( pmo, rets )
 {
 /*	EVB		*e;	*/
 
-	if ( ev_block( AMOUSE, pmo ) )
+	if ( ev_block( AMOUSE, ( LONG )pmo ) )
 	{
 	  ev_rets( &rets[0] );
 	  return( TRUE );
@@ -220,7 +218,7 @@ ev_mesag( pbuff )
 ev_timer( count )
 	LONG		count;
 {
-	count = count / gl_ticktime;
+	count = count /(LONG) gl_ticktime;
 	if ( count )
 	{
 	  if ( !ev_block( ADELAY, count ) )
@@ -236,13 +234,13 @@ ev_timer( count )
 ev_mchk(pmo)
 	REG MOBLK		*pmo;
 { 
-	if ( pmo->m_out != inside( cu_xrat, cu_yrat, &pmo->m_x ) )
+	if ( pmo->m_out != inside( cu_xrat, cu_yrat, ( GRECT *)&pmo->m_x ) )
 	  return( TRUE );
 	else
 	  return( FALSE );
 
 	if ( ( currpd == gl_mowner ) && 
-	     ( pmo->m_out != inside( cu_xrat, cu_yrat, &pmo->m_x) ) )
+	     ( pmo->m_out != inside( cu_xrat, cu_yrat, ( GRECT *)&pmo->m_x) ) )
 	  return( TRUE );
 	else
 	  return( FALSE );
@@ -323,13 +321,13 @@ check_event( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	  {
 	    Debug7( "1 Check ev_mesag address is\r\n" );
 	    Ndebug7( mebuff );
-	    ev_mesag( mebuff );
+	    ev_mesag( ( BYTE *)mebuff );
 	    what |= MU_MESAG;
 	  }
 	  else
 	  {
 	    Debug7( "2 Check rd_inmsg\r\n" );
-	    if ( rd_inmsg( EV_BUFSIZE, mebuff ) )
+	    if ( rd_inmsg( EV_BUFSIZE, ( BYTE *)mebuff ) )
 	      what |= MU_MESAG;
   	  }
 	}
@@ -340,7 +338,7 @@ check_event( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	{
 	  if ( flags & MU_TIMER )
 	  {				/* if timer zero */
-	    tmcount = tmcount / gl_ticktime;
+	    tmcount = tmcount / (LONG)gl_ticktime;
 
 	    if ( !tmcount ) 	
 	      what |= MU_TIMER;
@@ -398,13 +396,13 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 					/* quick check timer	*/
 	if ( flags & MU_TIMER ) 
 	{
-	  tmcount /= gl_ticktime;
+	  tmcount /= (LONG)gl_ticktime;
 	  if ( !( tmcount ) )
 	  {
 	    if ( currpd->p_state == PS_RUN )
 	      what |= MU_TIMER;
 	    else
-	      tmcount = gl_ticktime;
+	      tmcount = (LONG)gl_ticktime;
 	  }
 	}
 
@@ -420,17 +418,17 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	    wmask |= xbumsk = iasync( AXBUTTON, buparm ); 
 					
 	  if (flags & MU_M1)			/* wait for mouse rect.	*/
-	    wmask |= m1msk = iasync( AMOUSE, pmo1 ); 
+	    wmask |= m1msk = iasync( AMOUSE, ( LONG )pmo1 ); 
 					
 	  if (flags & MU_M2)			/* wait for mouse rect.	*/
-	    wmask |= m2msk = iasync( AMOUSE, pmo2 ); 
+	    wmask |= m2msk = iasync( AMOUSE, ( LONG )pmo2 ); 
 
 	  if (flags & MU_MESAG)			/* wait for message	*/
 	  {
 	    m.qpb_pid = currpd->p_pid;
 	    m.qpb_cnt = EV_BUFSIZE;
-	    m.qpb_buf = mebuff;
-	    wmask |= qrmsk = iasync( AQRD, &m );
+	    m.qpb_buf = ( BYTE *)mebuff;
+	    wmask |= qrmsk = iasync( AQRD, ( LONG )&m );
 	  }
 					
 	  if ( flags & MU_TIMER )		/* wait for timer	*/

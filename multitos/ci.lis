@@ -4,7 +4,8 @@ aestrap.s
 apgrlib.c
 apgsxif.c
 changes
-compiler.h
+ci.lis
+cp.lis
 crysbind.h
 ctrlbind.c
 deskact.c
@@ -24,7 +25,6 @@ deskmem.c
 deskmenu.c
 deskmisc.c
 deskmn.c
-deskobde.h
 deskopen.c
 deskpref.c
 desksear.c
@@ -54,7 +54,6 @@ gembase.c
 gembind.c
 gemcli.c
 gemctrl.c
-gemdefs.h
 gemdisp.c
 gemdos.h
 gemevlib.c
@@ -87,7 +86,8 @@ interrup.s
 kballoc.c
 large.s
 machine.h
-makeprg
+makefile
+makeci.csh
 mediach.s
 message.h
 mintbind.h
@@ -104,7 +104,11 @@ obdefs.h
 objaddr.h
 olddesk.h
 osbind.h
+pboth.h
+pdesk.h
 pdstruct.h
+pgem.h
+pmisc.h
 portab.h
 romcart.c
 rslib.h

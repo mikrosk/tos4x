@@ -1,5 +1,7 @@
 /*	GEMPD.C			9/25/90			D.Mui		*/
 /*	Change at get_pd	9/25/90			D.Mui		*/
+/*	Convert to Lattice C 5.51	02/16/93	C.Gee		*/
+/*	Force the use of prototypes	02/23/93	C.Gee		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -16,16 +18,14 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "aesmint.h"
 
-EXTERN	BYTE	*dos_xalloc();
+
 
 EXTERN	OBJECT	*gl_wtree;
 EXTERN	PD	*alr;
@@ -116,7 +116,7 @@ facc( which )
 /*	Free all the PDs		*/
 
 	VOID
-freepds()
+freepds( VOID )
 {
 	REG PD	*p;
 	PD	*p1;
@@ -126,7 +126,7 @@ freepds()
 	while( p )
 	{
 	  p1 = p->p_thread;
-	  dos_free( p );
+	  dos_free( ( LONG )p );
 	  p = p1;
 	}
 }
@@ -162,7 +162,7 @@ free_pd( p )
 
 	  Debug7( p->p_name );
 	  Debug7( "'s pd is freed\r\n" );
-	  dos_free( p );
+	  dos_free( ( LONG )p );
 	}
 }
 
@@ -174,22 +174,22 @@ p_nameit(p, pname)
 	PD		*p;
 	BYTE		*pname;
 {
-	WORD i;
-	BYTE c;
-
+ 	WORD i;
+ 	BYTE c;
+ 
 	bfill(PSNAME, ' ',  &p->p_name[0]);
 #if 0
 	strscn( pname, &p->p_name[0], '.' );
 #else
 	/* someone could send us a longer name! */
-	/* ++ERS 2/11/93 */
-
-	for (i = 0; i < PSNAME; i++)
-	{
-	  c = *pname++;
-	  if (c == '.' || c == 0) break;
-	  p->p_name[i] = c;
-	}
+ 	/* ++ERS 2/11/93 */
+ 
+ 	for (i = 0; i < PSNAME; i++)
+ 	{
+ 	  c = *pname++;
+ 	  if (c == '.' || c == 0) break;
+ 	  p->p_name[i] = c;
+ 	}
 #endif
 }
 
@@ -202,17 +202,17 @@ p_nameit(p, pname)
 	BYTE	*name;
 	WORD	type;
 {
-	PD		*p,*p2;
+	PD		*p;
 	REG PD		*p1;
 
-	if ( p1 = dos_xalloc( (LONG)sizeof( PD ), 0x23 ) )	/* alloc memory	*/
+	if ( p1 = ( PD *)dos_xalloc( (LONG)sizeof( PD ), 0x23 ) )	/* alloc memory	*/
 	{
-	  bfill( sizeof( PD ), 0 , p1 );	/* clean up	*/
+	  bfill( sizeof( PD ), 0 , ( BYTE *)p1 );	/* clean up	*/
 	  					/* initalize it	*/
 	  p1->p_qaddr = &p1->p_queue[0];
 	  p1->p_qindex = 0;
 	  p1->p_uda = &p1->p_udarea;
-	  p1->p_uda->u_spsuper = &p1->p_udarea.u_supstk;
+	  p1->p_uda->u_spsuper = ( BYTE *)&p1->p_udarea.u_supstk;
 	  p1->p_uda->u_insuper = 1;
 
 	  p_nameit( p1, name );
@@ -225,7 +225,7 @@ p_nameit(p, pname)
 	  p1->p_prvstate = p1->p_state;
 	  p1->p_mouse.mokind = gl_mkind;
 	  p1->p_mouse.moform = gl_cmform;
-	  p1->p_newdesk = gl_wtree;
+	  p1->p_newdesk = ( BYTE *)gl_wtree;
 	  p1->p_newroot = 0;
 	  p1->p_prgname[0] = ' ';	/* name for the menu bar	*/
 	  p1->p_prgname[1] = ' ';
@@ -238,7 +238,7 @@ p_nameit(p, pname)
 #if 0
 	  strcpy( name, &p1->p_prgname[2] );
 #else
-	  nstrcpy( name, &p1->p_prgname[2], 13 );
+ 	  nstrcpy( name, &p1->p_prgname[2], 13 );
 #endif
 	  Debug7( p1->p_name );
 	  Debug7( "allocated at " );
@@ -302,11 +302,13 @@ p_nameit(p, pname)
 	PD
 *pstart( px, pcode, ldaddr )
 	REG PD		*px;
-	WORD		(*pcode)();	/* first line of code	*/
+	WORD		(*pcode)( PD *, BYTE * );	/* first line of code	*/
 	BYTE		*ldaddr;	/* load address		*/
 {
 	px->p_textaddr = ldaddr;
 	px->p_sysid = (*pcode)( px, ldaddr );
+
+	return( px );
 }
 
 

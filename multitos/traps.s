@@ -34,16 +34,21 @@ _kickit:
 *****************************************
 *	AES function to call GEMDOS	*
 *****************************************
-
+* For the three trap calls, we now save d2 and a2, since Lattice does
+* not preserve them.
+* DLF/CJG	3/2/93
+*
 * The safe way to do this is as follows:
 
 _trap:
+	movem.l	d2/a2,-(sp)
 	clr.w	_DOS_AX
-	movem.l	4(sp),d0-d2/a0-a2
+	movem.l	12(sp),d0-d2/a0-a2
 	movem.l	d0-d2/a0-a2,-(sp)
 	trap	#1
 	add.l	#24,sp
 	move.w	d0,_DOS_AX
+	movem.l	(sp)+,d2/a2
 	rts
 
 
@@ -52,17 +57,21 @@ _trap:
 *********************************
 
 _trap13:
-	movem.l	4(sp),d0-d2/a0-a2
+	movem.l	d2/a2,-(sp)
+	movem.l	12(sp),d0-d2/a0-a2
 	movem.l	d0-d2/a0-a2,-(sp)
 	trap	#13
 	add.l	#24,sp
+	movem.l	(sp)+,d2/a2
 	rts
 
 _trap14:
-	movem.l	4(sp),d0-d2/a0-a2
+	movem.l	d2/a2,-(sp)
+	movem.l	12(sp),d0-d2/a0-a2
 	movem.l	d0-d2/a0-a2,-(sp)
 	trap	#14
 	add.l	#24,sp
+	movem.l	(sp)+,d2/a2
 	rts
 
 

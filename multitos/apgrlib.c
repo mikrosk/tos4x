@@ -11,25 +11,19 @@
 *	-------------------------------------------------------------
 */
 
-#include <portab.h>
-#include <machine.h>
-#include <obdefs.h>
-#include <vdidefs.h>
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "vdidefs.h"
 
-
-EXTERN VOID	gsx_blt();
-EXTERN VOID	gsx_moff();
-EXTERN VOID	gsx_mon();
-EXTERN VOID	gsx_tcalc();
-EXTERN VOID	gsx_tblt();
-EXTERN VOID	gsx_sclip();
-EXTERN VOID	gsx_gclip();
+#include "pgem.h"
+#include "pmisc.h"
 
 EXTERN WORD	gl_width;
 EXTERN WORD	gl_height;
 EXTERN WORD	intin[];
 
-
+VOID
 gr_inside(pt, th)
 REG	GRECT		*pt;
 REG	WORD		th;
@@ -122,7 +116,7 @@ gr_gtext(just, font, ptext, pt, tmode)
 						/* figure out where &	*/
 						/*   how to put out	*/
 						/*   the text		*/
-	rc_copy(pt, &t);
+	rc_copy((WORD *)pt, (WORD *)&t);
 	numchs = gr_just(just, font, ptext, t.g_w, t.g_h, &t);
 	if (numchs > 0)
 	  gsx_tblt(font, t.g_x, t.g_y, numchs);
@@ -227,7 +221,7 @@ gr_box(x, y, w, h, th)
 {
 	GRECT		t, n;
 
-	r_set(&t, x, y, w, h);
+	r_set((WORD *)&t, x, y, w, h);
 	if (th != 0)
 	{
 	  if (th < 0)
@@ -236,7 +230,7 @@ gr_box(x, y, w, h, th)
 	  do
 	  {
 	    th += (th > 0) ? -1 : 1;
-	    rc_copy(&t, &n);
+	    rc_copy((WORD *)&t, (WORD *)&n);
 	    gr_inside(&n, th);
 	    gsx_box(&n);
 	  } while (th != 0);

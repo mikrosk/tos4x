@@ -1,6 +1,9 @@
 /*	WINDLIB.H	1991				Minna Lai		*/
 /*	Edited 		9/21/92				D.Mui			*/ 
 
+#ifndef _WINDLIB_H_
+#define _WINDLIB_H_
+
 #define WS_FULL 0
 #define WS_CURR 1
 #define WS_PREV 2
@@ -119,4 +122,6 @@
 #define WA_RTPAGE 	5
 #define WA_LFLINE 	6
 #define WA_RTLINE 	7
+
+#endif
 

@@ -15,10 +15,10 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
+#include "machine.h"
 
 GLOBAL	PD	*rlr;		/* processes ready to run list		*/
 GLOBAL	PD	*drl;		/* processes' event is satisfied and 	*/

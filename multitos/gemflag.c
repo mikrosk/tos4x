@@ -2,17 +2,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/gemflag.c,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemflag.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: gemflag.c,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.2  89/04/26  18:22:31  mui
 * TT
 * 
@@ -31,6 +34,8 @@
 /*	Fix at unsync	3/7/88			D.Mui			*/
 /*	Moved wm_update and wm_new to here 	2/26/91	D.Mui		*/
 /*	Change at take_ownership		4/23/91	D.Mui		*/	
+/*	Convert to Lattice C 5.51		2/17/93 C.Gee		*/
+/*	Force the use of prototypes		2/24/93	C.Gee		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -47,18 +52,13 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "aesmint.h"
 
-EXTERN	PD	*idtopd();
-EXTERN	VOID	evinsert();
-EXTERN	VOID	zombie();
 
 EXTERN	WORD	aesid;
 EXTERN	WORD	gl_smid;
@@ -132,7 +132,7 @@ take_ownership( ownit )
 /*	Wake up the screen waiting process	*/
 
 	VOID
-unsync()
+unsync( VOID )
 {
 	PD	*p;
 	
@@ -153,7 +153,7 @@ unsync()
 /*	Release the window control and let the sleeping process awake	*/
 
 	WORD
-nosync( )
+nosync( VOID )
 {
 	if ( currpd->p_wmtas )
 	  currpd->p_wmtas--;

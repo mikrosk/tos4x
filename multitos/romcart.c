@@ -1,45 +1,65 @@
 /*
-*************************************************************************
-*			Revision Control System
-* =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/romcart.c,v $
-* =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
-* =======================================================================
-*  $Log: romcart.c,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
-*
+ *************************************************************************
+ *			Revision Control System
+ * =======================================================================
+ *  $Revision: 1.3 $	$Source: f:\multitos/RCS/romcart.c,v $
+ * =======================================================================
+ *  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
+ * =======================================================================
+ *  $Log: romcart.c,v $
+ *  Revision 1.3  1993/03/10  20:12:42  ersmith
+ *  Lattice port
+ *
+ *
  * Revision 1.1  1993/02/24  23:52:46  ersmith
  * 1 meg floppy MultiTOS
  *
-* Revision 2.2  89/04/26  18:30:35  mui
-* TT
-* 
-* Revision 2.1  89/02/22  05:32:18  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.1  88/06/02  12:36:19  lozben
-* Initial revision
-* 
-*************************************************************************
-*/
-/*	ROMCART.C		2/26/85 - 04/14/85	Lowell Webster	*/
-/*	remove cart_start	06/10/85		Mike Schmal	*/
-/*	Fix the cart_exe	07/09/85		Derek Mui	*/
-/*	Fix the cart_app	3/21/86			Derek Mui	*/
-/*	Added sh_rom at cart_find	3/21/86		Derek Mui	*/
-/*	Comment out cart_app	7/2/86			Derek Mui	*/
-/*	Take out sh_rom		7/2/86			Derek Mui	*/
-/*	Clean up		1/21/88			D.Mui		*/
-/*	Added c_sfirst()	6/18/90			D.Mui		*/
+ * Revision 1.0  1993/02/03  21:26:46  ersmith
+ * MultiTOS version 1.0
+ *
+ * Revision 2.2  89/04/26  18:30:35  mui
+ * TT
+ * 
+ * Revision 2.1  89/02/22  05:32:18  kbad
+ * *** TOS 1.4  FINAL RELEASE VERSION ***
+ * 
+ * Revision 1.1  88/06/02  12:36:19  lozben
+ * Initial revision
+ * 
+ *	ROMCART.C		2/26/85 - 04/14/85	Lowell Webster	
+ *	remove cart_start	06/10/85		Mike Schmal	
+ *	Fix the cart_exe	07/09/85		Derek Mui	
+ *	Fix the cart_app	3/21/86			Derek Mui	
+ *	Added sh_rom at cart_find	3/21/86		Derek Mui	
+ *	Comment out cart_app	7/2/86			Derek Mui	
+ *	Take out sh_rom		7/2/86			Derek Mui	
+ *	Clean up		1/21/88			D.Mui		
+ *	Added c_sfirst()	6/18/90			D.Mui		
+ *									
+ *	Converted to Lattice C 5.51	2/16/93		C.Gee		
+ *	Force the use of prototypes	2/19/93		C.Gee		
+ *	WARNING - See ld_acc() and its use of get_pd()
+ *************************************************************************
+ */
+
+/* INCLUDES
+ * =======================================================================
+ */
+#include "pgem.h"
+#include "pmisc.h"
+
+#include "machine.h"
+#include "pdstruct.h"
+#include "gemdos.h"
 
 
-#include <portab.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <gemdos.h>
+BYTE	*g2_name( BYTE *file );
 
+
+
+/* DEFINES
+ * =======================================================================
+ */
 #define CART_BASE 0xFA0000L
 #define CART_START 0xFA0004L
 #define CART_MAGIC 0xABCDEF42L
@@ -47,18 +67,22 @@
 #define CA_ISPARM 0x80000000L
 #define TEXTBASE 8
 
-EXTERN BYTE	*dos_exec();
-EXTERN WORD	wildcmp();
-EXTERN PD	*pstart();
-EXTERN PD	*get_pd();
+
+
+/* EXTERNS
+ * =======================================================================
+ */
 EXTERN WORD	DOS_AX;
-EXTERN BYTE	*g_name();
 EXTERN BYTE	dtabuf[];	/* dta buffer	*/
-
-
 EXTERN BYTE	*runacc;
 
 
+
+
+
+/* STRUCTURES
+ * =======================================================================
+ */
 #define CARTNODE struct cartnode
 CARTNODE
 {
@@ -71,22 +95,27 @@ CARTNODE
 	BYTE		c_name[14];
 };
 
+
+CARTNODE *cart_find( WORD fill );
 GLOBAL CARTNODE		*cart_ptr;
 GLOBAL BYTE		*cart_dta;
 
 
-
-cart_init()
+/* FUNCTIONS
+ * =======================================================================
+ */
+	WORD
+cart_init( VOID )
 {
 	cart_ptr = ((CARTNODE *)CART_BASE);
-	if (cart_ptr->c_next == CART_MAGIC )
+	if (cart_ptr->c_next == ( CARTNODE *)CART_MAGIC )
 	{
 	  cart_ptr = ((CARTNODE *)CART_START);
 	  return(TRUE);
 	}
 	else
 	{
-	  cart_ptr = NULLPTR;
+	  cart_ptr = ( CARTNODE *)NULLPTR;
 	  return(FALSE);
 	}
 }
@@ -106,13 +135,13 @@ cart_init()
 	    pdta = cart_dta;
 	    bfill(42,NULL, &pdta[0]);		/* zero it out	*/
 	    pdta[21] = F_RDONLY;		/* fill time,date,size,name */
-   	    LBCOPY( &pdta[22], &cart_ptr->c_time, 21 );	
+   	    LBCOPY( &pdta[22], ( BYTE *)&cart_ptr->c_time, 21 );	
 	  }
 	  pcart = cart_ptr;
 	  cart_ptr = cart_ptr->c_next;		/* point to next	*/
 	  return(pcart);
 	}
-	return(NULLPTR);
+	return( ( CARTNODE *)NULLPTR );
 }
 
 
@@ -127,7 +156,7 @@ cart_sfirst(pdta, attr)
 }
 
 	WORD
-cart_snext()
+cart_snext( VOID )
 {
 	if (cart_find(TRUE))
 	  return(TRUE);
@@ -138,8 +167,8 @@ cart_snext()
 	}
 }
 
-	WORD
-ld_cartacc()
+	VOID
+ld_cartacc( VOID )
 {
 	REG BYTE		*psp;
 	REG CARTNODE		*pcart;
@@ -151,12 +180,21 @@ ld_cartacc()
 	{
 	  if ( wildcmp( "*.ACC", &pcart->c_name[0]) )
 	  {
-	    if ( p = get_pd() )			/* create PD	*/
+
+ 	    /* WARNING - this was...			CJG 02/19/93 
+	     *  if ( p = get_pd() )
+	     * This is supposed to be a cartridge accessory SO.....
+	     */
+
+	    if ( p = get_pd( &pcart->c_name[0], AESACC ) )		/* create PD	*/
 	    {
-	      psp = dos_exec("", 5, "");	/* create psp	*/
-	      LLSET(&psp[TEXTBASE], pcart->c_code);
+
+	      psp = ( BYTE *)dos_exec( ( LONG )0L, 5, ( LONG )0L);
+
+	      LLSET(&psp[TEXTBASE], ( LONG )pcart->c_code);
 						/* go for it	*/
-	      pstart(p, runacc, psp, (BYTE*)0, (BYTE*)0, 0 );	
+/*	      pstart(p, runacc, psp, (BYTE*)0, (BYTE*)0, 0 );	*/
+	      pstart(p, ( WORD(*)())runacc, psp );	/* CJG 02/19/93 */
 	    }
 	    else
 	    {
@@ -181,11 +219,12 @@ cart_exec(pcmd, ptail)
 	  if ( strcmp(pcmd, &pcart->c_name[0]) )
 	    break;
 	}
-	psp = dos_exec( "", 5, ptail);
-	LLSET(&psp[TEXTBASE], pcart->c_code);
-	dos_exec( "", 4, psp);
+	psp = ( BYTE *)dos_exec( ( LONG)"", 5, ( LONG )ptail);
+
+	LLSET(&psp[TEXTBASE], ( LONG )pcart->c_code);
+	dos_exec( ( LONG )"", 4, ( LONG )psp);
 	dos_free( *(LONG*)(&psp[0x2c]) );
-	dos_free(psp);
+	dos_free( ( LONG )psp );
 	return(TRUE);
 }
 
@@ -197,7 +236,7 @@ c_sfirst( path )
 	BYTE		*file;
 	CARTNODE	*pcart;
  
-	file = g_name( path );
+	file = g2_name( path );
 	cart_init();
 	while ( pcart = cart_find(FALSE) )
 	{
@@ -206,4 +245,20 @@ c_sfirst( path )
 	}
 
 	return( FALSE );
+}
+
+
+
+
+	BYTE
+*g2_name( file )
+	BYTE	*file;
+{	
+	BYTE	*tail;
+
+	tail = r_slash( file );
+	if ( *tail == '\\' )
+	  tail++;
+	
+	return( tail );
 }

@@ -1,33 +1,41 @@
-/*	DESKACT.C		5/31/89 - 6/19/89	Derek Mui	*/
-/*	Take out vdi_handle from vdi calls	6/28/89			*/
-/*	Fix hd_down, it needs to update menu	7/3/90	D.Mui		*/
-/*	Modifying hd_down	7/8/90			D.Mui		*/
-/*	Add blt_par to handle multiple parameters	2/19/91	D.Mui	*/
-/*	Fix hd_down for mouse is moving too fast  4/17/91	D.Mui	*/
-/*	Fix at file_op to check for destination drive	4/18/91	D.Mui	*/
-/*	Fix at file_op to do update for all affected windows 4/18/91	*/ 
-/*	gh_init allocates 10K of buffer		3/3/92			*/
-/*	Change all the iconblk to ciconblk	7/11/92	D.Mui		*/
-/*	Add new drag and drop code		12/14/92 Eric Smith	*/
+/* deskact.c
+ * ======================================================================
+ * New Desktop for Atari ST/TT computers.
+ * ½ 1989-93 Atari Corporation
+ * ======================================================================
+ * 930209	towns		started conversion to LC5
+ * 921214	esmith		Add new drag and drop code.
+ * 920711	dmui		change all the iconblk to ciconblk
+ * 920303	dmui		gh_init allocates 10K of buffer
+ * 910418	dmui		fix at file_op to do update for all affected
+ *						windows. Also did fix at file_op to check for
+ *						destination drive.
+ * 910417	dmui		fix hd_down for mouse is moving too fast.
+ * 910219	dmui		Add bit_par to handle multiple parameters
+ * 900708	dmui		Modified hd_down
+ * 900703	dmui		fix hd_down, it needs to update menu.
+ * 890628	dmui		take out vdi_handle from VDI calls.
+ * 890531	dmui		file created.
+ */	
 
-/************************************************************************/
-/*	New Desktop for Atari ST/TT Computer				*/
-/*	Atari Corp							*/
-/*	Copyright 1989,1990 	All Rights Reserved			*/
-/************************************************************************/
-
-#include <compiler.h>
-#include <machine.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
+/* Include files */
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "gemdefs.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
 #include "message.h"
 #include "mintbind.h"
 
+#include "pdesk.h"			/* Prototypes */
+#include "pmisc.h"
+
+#ifdef NEVER
+/* -- External Function declarations -- */
 EXTERN	BYTE	*r_slash();
 EXTERN	BYTE	*get_fstring();
 EXTERN	WORD	strlen();
@@ -37,13 +45,15 @@ EXTERN	BYTE	*g_name();
 EXTERN	BYTE	*strcpy();
 EXTERN	BYTE	*lp_fill();
 EXTERN	WINDOW	*get_win();
-EXTERN	APP	*app_icon();
+EXTERN	APP		*app_icon();
 EXTERN	OBJECT	*get_tree();
 EXTERN	WORD	in_parent();
-EXTERN	APP	*app_xtype();
-EXTERN	DIR	*get_dir();
+EXTERN	APP		*app_xtype();
+EXTERN	DIR		*get_dir();
 EXTERN	BYTE	*put_name();
+#endif
 
+/* -- External global variables -- */
 EXTERN	WORD	desk_id;
 EXTERN	WORD	d_display;
 EXTERN	WORD	f_rename;
@@ -53,7 +63,7 @@ EXTERN	WORD	d_dir;
 EXTERN	WINDOW	*x_win;
 EXTERN	WORD	x_type;
 
-WORD	back_update;			/* update background	*/
+WORD	back_update;					/* update background	*/
 BYTE	scapath[] = "?:\\CLIPBRD\\";	/* default clip board path */
 BYTE	DESKCOPY[] = "DESKCOPY=";
 
@@ -62,54 +72,53 @@ BYTE	DESKCOPY[] = "DESKCOPY=";
 /*	empty byte at the head of the buffer, otherwise the parameters at the	*/
 /*	head. Otherwise, the parameters start from the very first byte.		*/
 
-	BYTE	
-*bld_par( full, style )
-	WORD	full,style;
+BYTE	
+*bld_par( WORD full, WORD style )
 {
 	REG BYTE	*addr;
-	BYTE		*str,*ret;
-	WORD		status,type;
+	BYTE		*str, *ret;
+	WORD		status, type;
 	UWORD		len;
 
 	ret = (BYTE*)0;
 	
 	if ( status = x_first( &str, &type ) )
 	{
-	  len = style ? 1 : 0;		/* Number of byte to increase	*/
-	  while( status )
-	  {
-	    len += strlen( str ) + 1;	/* string and space */
-	    status = x_next( &str, &type );
-	  }
+		len = style ? 1 : 0;		/* Number of byte to increase	*/
+		while( status )
+		{
+			len += strlen( str ) + 1;	/* string and space */
+			status = x_next( &str, &type );
+		}
+		
+		if ( addr = ret = malloc( (LONG)(len + 2) ) )
+		{
+			if ( style )
+			{
+				addr[0] = (BYTE) 0xFF;
+				addr++;
+			}
+			
+			status = x_first( &str, &type );
 
-	  if ( addr = ret = malloc( (LONG)(len + 2) ) )
-	  {
-	    if ( style )
-	    {
-	      addr[0] = 0xFF;
-	      addr++;
-	    }
+			while( status )
+			{
+				if ( (type == DISK) || (type == XDIR) || (type == FOLDER) ||
+					( type == SUBDIR ) )
+					*(r_slash( str ) + 1) = 0;
+				else 
+					if ( !full )		/* file name only	*/
+						str = g_name( str );	
 
-	    status = x_first( &str, &type );
-
-	    while( status )
-	    {
-	      if ( ( type == DISK ) || ( type == XDIR ) || ( type == FOLDER ) || 
-		   ( type == SUBDIR ) )
-		*(r_slash( str ) + 1) = 0;
-	      else 	
-	        if ( !full )		/* file name only	*/
-		  str = g_name( str );	
-
-	      addr = strcpy( str, addr ) - 1;
-	      *addr++ = ' ';
-	      status = x_next( &str, &type );
-	    }
-	    addr--;
-	    *addr = 0;
-	  }	 
+				addr = strcpy( str, addr ) - 1;
+				*addr++ = ' ';
+				status = x_next( &str, &type );
+			}
+			addr--;
+			*addr = 0;
+		}	 
 	}
-
+	
 	Debug1( "The bld_par is " );
 	Debug1( ret );
 	Debug1( "\r\n" );
@@ -120,14 +129,12 @@ BYTE	DESKCOPY[] = "DESKCOPY=";
 #if 0
 /*	Build an input parameter block		*/
 
-	BYTE	
-*blt_argvs( file, full )
-	BYTE	*file;
-	WORD	full;
+BYTE	
+*blt_argvs( BYTE *file, WORD full )
 {
 	REG BYTE	*addr;
-	BYTE		*str,*ret;
-	WORD		status,type;
+	BYTE		*str, *ret;
+	WORD		status, type;
 	UWORD		len;
 
 	ret = (BYTE*)0;
@@ -136,31 +143,30 @@ BYTE	DESKCOPY[] = "DESKCOPY=";
 
 	if ( status = x_first( &str, &type ) )
 	{
-	  while( status )
-	  {
-	    len += strlen( str ) + 1;	/* add the 0 */
-	    status = x_next( &str, &type );
-	  }
+		while( status )
+		{
+			len += strlen( str ) + 1;	/* add the 0 */
+			status = x_next( &str, &type );
+		}
 					/* ARGV=\0	*/
-	  addr = ret = malloc( (LONG)(len + 7) );
+		addr = ret = malloc( (LONG)(len + 7) );
 
-	  if ( addr )
-	  {
-	    addr = strcpy( "ARGV=", addr );
-	    addr = strcpy( file, addr );	
-	    status = x_first( &str, &type );
+		if ( addr )
+		{
+			addr = strcpy( "ARGV=", addr );
+			addr = strcpy( file, addr );	
+			status = x_first( &str, &type );
 
-	    while( status )
-	    {
-	      if ( !full )		/* file name only	*/
-		str = g_name( str );	
-	      addr = strcpy( str, addr );
-	      status = x_next( &str, &type );
-	    }
-	    *addr = 0;
-	  }	 
+			while( status )
+			{
+				if ( !full )		/* file name only	*/
+					str = g_name( str );	
+				addr = strcpy( str, addr );
+				status = x_next( &str, &type );
+			}
+			*addr = 0;
+		}	 
 	}
-
 	return( ret );
 }
 #endif
@@ -170,83 +176,73 @@ BYTE	DESKCOPY[] = "DESKCOPY=";
 /*	Check what kind of object is executable	*/
 /*	Return TRUE if it is 			*/
 
-	WORD
-ch_obj( mx, my, win, item, type )
-	WORD		mx,my;
-	WINDOW		**win;
-	WORD		*item;	
-	WORD		*type;
+WORD
+ch_obj( WORD mx, WORD my, WINDOW **win, WORD *item, WORD *type )
 {
 	REG WORD	i;
-	DIR		*dir;
+	DIR			*dir;
 	WORD		install;
-	APP		*app;
+	APP			*app;
 	BYTE		*str;
 
 	if ( i_find( mx, my, win, item, type ) )
 	{
-	  i = *item;
-	  if ( i )		/* if there is object	*/
-	  {
-	    if ( *type == DESKICON )
-	    {
-	      if ( backid[i].i_type == XFILE )
-	      {
-		str = backid[i].i_path;
-	        goto ch_1;
-	      }
+		i = *item;
+		if ( i )		/* if there is object	*/
+		{
+			if ( *type == DESKICON )
+			{
+				if ( backid[i].i_type == XFILE )
+				{
+					str = backid[i].i_path;
+					goto ch_1;
+				}
   
-	      return( TRUE );
-	    }
-	    else
-	    {
-	       dir = get_dir( *win, i );
-	       if ( dir->d_att & SUBDIR )	/* dir is OK	*/
-	         return( TRUE );		     
+				return( TRUE );
+			} else {
+				dir = get_dir( *win, i );
+				if ( dir->d_att & SUBDIR )	/* dir is OK	*/
+					return( TRUE );		     
 
-	       str = put_name( *win, dir->d_name );
+				str = put_name( *win, dir->d_name );
 						/* check file type	*/
-ch_1:	       app = app_xtype( str, &install );
+ch_1:			app = app_xtype( str, &install );
 
-	       if ( !install )
-	       { 
-	         switch ( app->a_type )		/* executable is OK	*/
-	         {
-	           case TOS:
-	           case TTP:
-	           case PRG:
-	           case PTP:
-	           case APPS:
-		     return( TRUE );
-		 }
-	       }  
-	    }/* window object	*/
-	  }/* if object		*/
+				if ( !install )
+				{ 
+					switch ( app->a_type )		/* executable is OK	*/
+					{
+						case TOS:
+						case TTP:
+						case PRG:
+						case PTP:
+						case APPS: return( TRUE );
+					}
+				}  
+			}/* window object	*/
+		}/* if object		*/
 	}/* if found something	*/
-	
 	return( FALSE );
 }
 
 /*	Change for UNDO key	*/
 
-	WORD
-ch_undo()
+WORD
+ch_undo( void )
 {
-	if ( ( Bconstat( 2 ) ) && 
-	     ( Bconin( 2 ) == 0x00610000L ) &&
-	     ( do1_alert( ABORTCON ) == 1 ) )
-	  return( FALSE );
+	/* If there is an UNDO key and the user wants to abort, return FALSE */
+	if ((Bconstat(2)) && (Bconin(2)==0x00610000L) && (do1_alert(ABORTCON)==1))
+		return( FALSE );
 
+	/* Otherwise, return TRUE */
 	return( TRUE ); 
 }
 
 
 /*	Perform a file operation	*/
 
-	VOID
-file_op( dest, mode )
-	BYTE	*dest;
-	WORD	mode;
+VOID
+file_op( BYTE *dest, WORD mode )
 {
 	REG OBJECT	*obj;
 	REG WORD	ret;
@@ -260,19 +256,16 @@ file_op( dest, mode )
 	BYTE		*which,*tail,*bptr,*addr;
 	BYTE		tailbuf[30];
 
-					/* get the key state */
-
+	/* get the key state */
 	graf_mkstate( &item, &item, &item, &keydown );
+	
 	f_rename = ( keydown & ALTER ) ? TRUE : FALSE;
 
 	if ( !x_first( &source, &type ) )
-	  return;
+		return;
 
 	if ( mode != OP_DELETE )
-	{
-	  if ( !ch_drive( *dest ) )
-	    return;	
-	}
+		if ( !ch_drive( *dest ) )	return;	
 
 	d_display = TRUE;
 	back_update = FALSE;
@@ -288,122 +281,111 @@ file_op( dest, mode )
 	
 	switch( mode )
 	{
-	  case OP_DELETE:
-	    *bptr++ = 'd';
-	    which = get_fstring( DELSTR );
-	    obj[CDDRIVE].ob_flags |= HIDETREE;
-	    obj[DATEBOX].ob_flags |= HIDETREE;
-	    if ( !cdele_save )
-	      d_display = FALSE;	
-
-	    break;
-
-	  case OP_COPY:
-	    *bptr++ = 'c';	
-	    if ( ! ( keydown & K_CTRL ) )	/* control key down?	*/
-	    {
-	      if ( f_rename )
-	      { 
-		bptr++;	
-		*bptr++ = '-';
-		*bptr++ = 'R';
-	      }
-
-	      which = get_fstring( ( f_rename ) ? CRENSTR : CPYSTR );
-	      if ( !ccopy_save )
-	        d_display = FALSE;
-
-	      break;
- 	    }
-	   		
-	  case OP_MOVE:
-	    *bptr++ = 'm';
-	    mode = OP_MOVE;
-	    if ( f_rename )
-	    { 
-	      bptr++;		
-	      *bptr++ = '-';
-	      *bptr++ = 'R';
-	    }
-
-	    which = get_fstring( ( f_rename ) ? MRENSTR : MOVESTR );
-	    if ( ( !ccopy_save ) && ( !cdele_save ) )
-	      d_display = FALSE;
-
-	    break;
-	}
+		case OP_DELETE:	*bptr++ = 'd';
+						which = get_fstring( DELSTR );
+						obj[CDDRIVE].ob_flags |= HIDETREE;
+						obj[DATEBOX].ob_flags |= HIDETREE;
+						if( !cdele_save )
+							d_display = FALSE;	
+						break;
+		case OP_COPY:	*bptr++ = 'c';	
+						if ( ! ( keydown & K_CTRL ) )	/* control key down? */
+						{
+							if ( f_rename )
+							{ 
+								bptr++;	
+								*bptr++ = '-';
+								*bptr++ = 'R';
+							}
+							which = get_fstring( ( f_rename ) ? CRENSTR : CPYSTR );
+							if ( !ccopy_save )
+								d_display = FALSE;
+							break;
+ 						}
+		case OP_MOVE:	*bptr++ = 'm';
+						mode = OP_MOVE;
+						if ( f_rename )
+						{ 
+							bptr++;		
+							*bptr++ = '-';
+							*bptr++ = 'R';
+						}
+						which = get_fstring( ( f_rename ) ? MRENSTR : MOVESTR );
+						if ( ( !ccopy_save ) && ( !cdele_save ) )
+							d_display = FALSE;
+						break;
+	} /* End of switch statement */
 
 	/* Set the option parameters  */
-
 	bptr++;
 	*bptr++ = '-';
 	*bptr++ = ( ccopy_save ) ? 'A' : 'B';
+	
 	bptr++;
 	*bptr++ = '-';
 	*bptr++ = ( cdele_save ) ? 'C' : 'D';
+	
 	bptr++;
 	*bptr++ = '-';
 	*bptr++ = ( write_save ) ? 'E' : 'F';
+	
 	bptr++;
 	*bptr = 0;
 	
 	/* Search for program that want to do file operation	*/
-
-	shel_envrn( &bptr, DESKCOPY );
-
-	if ( bptr )
-	{			/* build file names */
-	  if ( tail = bld_par(1,1) )
-	  {
-	    len = strlen( &tailbuf[1] ) + strlen( &tail[1] ) + strlen( dest );	
-	    if ( addr = malloc((LONG)len + 2) )
-	    {
-	      addr[0] = 0xFF;	
-	      strcpy( &tailbuf[1], &addr[1] );
-	      strcat( &tail[1], &addr[1] );
-	      strcat( " ", &addr[1] );
-	      strcat( dest, &addr[1] );			
-	      if ( !( ret = shel_write( 0, 0, 1, bptr, addr ) ) )
-	        fill_string( bptr, FTOLAUNCH );
-	      free( addr );	
-	    }	
-	    else
-	      ret = FALSE;	
-
-	    free( tail );	
-	    if ( ret )	/* OK */
-	      return;	
+	(VOID) shel_envrn( (LONG) &bptr, (LONG) DESKCOPY );
 	
-	  }/* No expanded tail */
+	/* build file names */
+	if ( bptr )
+	{			
+		if ( tail = bld_par(1,1) )
+		{
+			len = strlen( &tailbuf[1] ) + strlen( &tail[1] ) + strlen( dest );	
+			if ( addr = malloc((LONG)len + 2L) )
+			{
+				addr[0] = (BYTE) 0xFF;	
+				strcpy( &tailbuf[1], &addr[1] );
+				strcat( &tail[1], &addr[1] );
+				strcat( " ", &addr[1] );
+				strcat( dest, &addr[1] );			
+				if ( !( ret = shel_write( 0, 0, 1, (LONG)bptr, (LONG)addr ) ) )
+					fill_string( bptr, FTOLAUNC ); /* @LC5@ */
+				free( addr );	
+			} else	ret = FALSE;	
+
+			free( tail );	
+			if ( ret )	return;		/* OK */
+		}/* No expanded tail */
+	
 	}/* Otherwise, do it the old way */
-
 	build_rect( background, &pt, d_xywh[6], d_xywh[9] );
-
-	if ( !dofiles( source, dest, OP_COUNT, &ndir, &nfile, &nsize, type, TRUE, -1 ) )
+	
+	if (!dofiles( source,dest,OP_COUNT, &ndir,&nfile,&nsize,type,TRUE,-1))
 	{
 	  do1_alert( STBADCOP );
 	  return;
 	}
 
 	ndir += d_dir;		/* count also the number of dir in window */
-	(TEDINFO*)(obj[TITLE].ob_spec)->te_ptext = which;
+	((TEDINFO*)(obj[TITLE].ob_spec))->te_ptext = (long)which;
 	f_str( obj, NUMDIR, ndir );
 	f_str( obj, NUMFILE, nfile );
 	obj[HIDECBOX].ob_flags |= HIDETREE;
-	inf_sset( obj, CSDRIVE, Nostr );
+	inf_sset( (LONG)obj, CSDRIVE, Nostr );
 	buffer[0] = *dest;
-	inf_sset( obj, CDDRIVE, buffer );
+	inf_sset( (LONG)obj, CDDRIVE, buffer );
+
 	if (d_display)
 	  obj[CHBOX1].ob_flags &= ~HIDETREE;
 	else
 	  obj[CHBOX1].ob_flags |= HIDETREE;
 
-					/* draw the box		*/
+	/* draw the box		*/
 
 #ifdef WINDOWED_DIALOGS
-	handle = dr_dial_w( CPBOX, TRUE, MOVE|NAME|CLOSE );	
+  	handle = dr_dial_w( CPBOX, TRUE, MOVE|NAME|CLOSE );	
 #else
-	handle = dr_dial_w( CPBOX, FALSE, 0);
+ 	handle = dr_dial_w( CPBOX, FALSE, 0);
 #endif
 	if ( d_display )
 	  item = form_do( obj, 0 ) & 0x7FFF;
@@ -413,136 +395,125 @@ file_op( dest, mode )
 	p_timedate = ( obj[PYES].ob_state & SELECTED ) ? TRUE : FALSE;
 	d_display = TRUE;
 
-        if ( item == OKCP )
+    if ( item == OKCP )
 	{
-	  obj[HIDECBOX].ob_flags &= ~HIDETREE;
-	  bfill( 32, 0, dr );
-	  x_first( &source, &type );
-	  ret = dofiles( source, dest, mode, &ndir, &nfile, &nsize, type, TRUE, handle );
+		obj[HIDECBOX].ob_flags &= ~HIDETREE;
+		bfill( 32, 0, dr );
+		x_first( &source, &type );
+		ret = dofiles(source,dest,mode,&ndir,&nfile,&nsize,type,TRUE,handle );
 	}
 
 	obj[item].ob_state = NORMAL;
-	if (handle < 0)
-		do_finish( CPBOX );
-	else {
-		wind_close( handle );
-		wind_delete( handle );	/* ++ERS 1/08/93 */
-	}
+ 	if (handle < 0)
+ 		do_finish( CPBOX );
+ 	else {
+ 		wind_close( handle );
+ 		wind_delete( handle );	/* ++ERS 1/08/93 */
+ 	}
 
 	if ( ( item == OKCP ) && ( ret ) )
 	{
-	  for ( i = 0; i < 32; i++ )	/* update all the affected window */
-	  {	  
-	     if ( dr[i] )
-	     {
-	       buffer[0] = i + 'A';
-	       up_2allwin( buffer );
-             }
-	  } 
+		/* 32 below is the number of drives. */
+		for ( i = 0; i < 32; i++ )	/* update all the affected window */
+		{	  
+			if ( dr[i] )
+			{
+				buffer[0] = i + 'A';
+				up_2allwin( buffer );
+			}
+		} 
+		
+		if ( back_update )		/* clean up the memory	*/
+		{		
+			lp_collect();
+			if ( mode == OP_DELETE )	/* full screen		*/
+				rc_copy( (WORD *)&full, (WORD *)&pt );
+		}
 
-	  if ( back_update )		/* clean up the memory	*/
-	  {		
-	    lp_collect();
-	    if ( mode == OP_DELETE )	/* full screen		*/
-	      rc_copy( &full, &pt );
-	  }
+		if ( x_type == WINICON )	/* update source window	*/
+		{
+			i = x_win->w_path[0] - 'A';
+			if ( !dr[i] )		/* if it is not updated yet	*/	
+				up_2( x_win );
+		}
 
-	  if ( x_type == WINICON )	/* update source window	*/
-	  {
-	    i = x_win->w_path[0] - 'A';
-	    if ( !dr[i] )		/* if it is not updated yet	*/	
-	      up_2( x_win );
-	  }
-
-	  do_redraw( 0, &pt, 0 );
+		do_redraw( 0, &pt, 0 );
  	}
 }
 
 
 /*	Build a rectangle that can hold all the selected icons	*/
 
-	WORD	
-build_rect( obj, rect, w, h )
-	REG OBJECT	*obj;
-	REG GRECT	*rect;
-	WORD	w,h;
+WORD	
+build_rect( REG OBJECT *obj, REG GRECT *rect, WORD w, WORD h )
 {
 	REG WORD	i;
 	REG WORD	minx,miny;
 	REG WORD	maxx,maxy;
 	WORD		found;
 
-	minx = full.x + full.w;
-	miny = full.y + full.h;
+	minx = full.g_x + full.g_w;
+	miny = full.g_y + full.g_h;
 	maxx = 0;
 	maxy = 0;
 	found = FALSE;
 
 	for ( i = 1; i <= obj[0].ob_tail; i++ )
 	{
-	  if ( ( obj[i].ob_state & SELECTED ) && ( in_parent( obj, i ) ) )
-	  {
-	    found = TRUE;
+		if ((obj[i].ob_state & SELECTED) && (in_parent(obj,i)))
+		{
+			found = TRUE;
 		
-	    if ( minx > obj[i].ob_x )
-	      minx = obj[i].ob_x;
+			if ( minx > obj[i].ob_x )
+				minx = obj[i].ob_x;
 	 
-	    if ( miny > obj[i].ob_y )
-	      miny = obj[i].ob_y;
+			if ( miny > obj[i].ob_y )
+				miny = obj[i].ob_y;
+			
+			if ( obj[i].ob_x > maxx )
+				maxx = obj[i].ob_x;
 
-	    if ( obj[i].ob_x > maxx )
-	      maxx = obj[i].ob_x;
-
-	    if ( obj[i].ob_y > maxy )
-	      maxy = obj[i].ob_y;
-	  }
+			if ( obj[i].ob_y > maxy )
+				maxy = obj[i].ob_y;
+		}
 	}
 
 	if ( found )
 	{
-	  rect->x = minx + obj[0].ob_x;
-	  rect->y = miny + obj[0].ob_y;
-	  rect->w = maxx - minx + w;
-	  rect->h = maxy - miny + h;
+		rect->g_x = minx + obj[0].ob_x;
+		rect->g_y = miny + obj[0].ob_y;
+		rect->g_w = maxx - minx + w;
+		rect->g_h = maxy - miny + h;
+	} else {
+	  rect->g_x = 0;
+	  rect->g_y = 0;
+	  rect->g_w = 0;
+	  rect->g_h = 0;
 	}
-	else
-	{
-	  rect->x = 0;
-	  rect->y = 0;
-	  rect->w = 0;
-	  rect->h = 0;
-	}
-
 	return( found );
 }
 
 
 /*	Check whose is inside the rect and select the object	*/
-
-	VOID
-chk_rect( win, rect, id )
-	REG WINDOW	*win;
-	GRECT		*rect;
-	WORD		id;
+VOID
+chk_rect( REG WINDOW *win, GRECT *rect, WORD id )
 {
 	REG OBJECT	*obj;
  	REG WORD	i;
 	REG WORD	minx,miny,maxx,maxy;
-	WORD		limit,orgx,orgy,select;
+	WORD		/*limit,*/orgx,orgy,select;
 	GRECT		pt;
 	WORD		doit;
-	DIR		*dir;
+	DIR			*dir;
 	
 	if ( win )
 	{
-	  rc_intersect( &win->w_work, rect );
-	  doit = TRUE;
-	  obj = win->w_obj;
-	}
-	else
-	{
-	  obj = background;
-	  doit = FALSE;
+		rc_intersect( &win->w_work, rect );
+		doit = TRUE;
+		obj = win->w_obj;
+	} else {
+		obj = background;
+		doit = FALSE;
 	}
 
 	orgx = obj[0].ob_x;
@@ -556,53 +527,51 @@ chk_rect( win, rect, id )
 	
 	for ( i = 1; i <= obj[0].ob_tail; i++ )
 	{
-	   if ( !(obj[i].ob_flags & HIDETREE) )
-	   {
-	     rc_copy( &obj[i].ob_x, &pt );
-	     pt.x += orgx;
-	     pt.y += orgy;
-	     if ( rc_intersect( rect, &pt ) )
-	     {
-	       if ( minx > obj[i].ob_x )
-	         minx = obj[i].ob_x;
+		if ( !(obj[i].ob_flags & HIDETREE) )
+		{
+			rc_copy( &obj[i].ob_x, (WORD *)&pt );
+			pt.g_x += orgx;
+			pt.g_y += orgy;
+			if ( rc_intersect( rect, &pt ) )
+			{
+				if ( minx > obj[i].ob_x )
+					minx = obj[i].ob_x;
 	 
-	       if ( miny > obj[i].ob_y )
-	         miny = obj[i].ob_y;
+				if ( miny > obj[i].ob_y )
+					miny = obj[i].ob_y;
 
-	       if ( obj[i].ob_x > maxx )
-	         maxx = obj[i].ob_x;
+				if ( obj[i].ob_x > maxx )
+					maxx = obj[i].ob_x;
 
-	       if ( obj[i].ob_y > maxy )
-	         maxy = obj[i].ob_y;
+				if ( obj[i].ob_y > maxy )
+					maxy = obj[i].ob_y;
 
-	       obj[i].ob_state ^= SELECTED;		 
+				obj[i].ob_state ^= SELECTED;		 
 
-	       if ( doit )
-	       {
-		 dir = get_dir( win, i );
-		 dir->d_state ^= SELECTED;
-	       }
-	       select = TRUE;
-	     }
-	   }
+				if ( doit )
+				{
+					dir = get_dir( win, i );
+					dir->d_state ^= SELECTED;
+				}
+				select = TRUE;
+			}
+		}
 	}
 
 	if ( select )
 	{
-	  pt.w = maxx - minx + obj[1].ob_width;
-	  pt.h = maxy - miny + obj[1].ob_height;
-	  pt.x = minx + obj[0].ob_x;
-	  pt.y = miny + obj[0].ob_y;
-	  do_redraw( id, &pt, 0 );
+		pt.g_w = maxx - minx + obj[1].ob_width;
+		pt.g_h = maxy - miny + obj[1].ob_height;
+		pt.g_x = minx + obj[0].ob_x;
+		pt.g_y = miny + obj[0].ob_y;
+		do_redraw( id, &pt, 0 );
 	}
 }
 
-
 /*	Draw a box	*/
 
-	VOID
-frame( x1, y1, x2, y2 )
-	WORD	x1,y1,x2,y2;
+VOID
+frame( WORD x1, WORD y1, WORD x2, WORD y2 )
 {
 	WORD	points[10];
 
@@ -619,10 +588,8 @@ frame( x1, y1, x2, y2 )
 
 /*	Draw a box and wait for button to go up		*/
 
-	VOID
-r_box( id, win )
-	WORD	id;
-	WINDOW	*win;
+VOID
+r_box( WORD id, WINDOW *win )
 {
 	REG WORD 	tmpx, tmpy;
 	REG WORD	tmpx1, tmpy1;
@@ -631,54 +598,52 @@ r_box( id, win )
 	GRECT		rect;
 
 	graf_mkstate( &gr_mkmx, &gr_mkmy, &gr_mkmstate, &gr_mkkstate );
-
 	if ( !( 0x0001 & gr_mkmstate ) )
 	  return;	
 
 	wind_update( 1 );	
 	desk_mice( POINT_HAND|0x8000 );
 
-	rect.x = full.x;
-	rect.y = full.y;
-	rect.w = full.x + full.w; 
-	rect.h = full.y + full.h;
+	rect.g_x = full.g_x;
+	rect.g_y = full.g_y;
+	rect.g_w = full.g_x + full.g_w; 
+	rect.g_h = full.g_y + full.g_h;
 
-	vs_clip( 1, &rect );
+	vs_clip( 1, (WORD *) &rect );
 
 	while( TRUE )	
 	{
-	  if ( 0x0001 & gr_mkmstate )	
-	  {
-	    tmpy = tmpy1 = gr_mkmy;
-	    tmpx = tmpx1 = gr_mkmx;
-	    frame( tmpx, tmpy, tmpx1, tmpy1 );
+		if ( 0x0001 & gr_mkmstate )	
+		{
+			tmpy = tmpy1 = gr_mkmy;
+			tmpx = tmpx1 = gr_mkmx;
+			frame( tmpx, tmpy, tmpx1, tmpy1 );
 
-	    while ( 0x0001 & gr_mkmstate )	
-	    {
-	      if (((tmpx1 != gr_mkmx) || (tmpy1 != gr_mkmy)) && (0x0001&gr_mkmstate))	
-	      {
-		frame( tmpx, tmpy, tmpx1, tmpy1 );
-		frame( tmpx, tmpy, gr_mkmx, gr_mkmy );
-		tmpy1 = gr_mkmy;
-		tmpx1 = gr_mkmx;
-	      }
-
-	      graf_mkstate(&gr_mkmx, &gr_mkmy, &gr_mkmstate, &gr_mkkstate);
-	    }
-
-	    frame( tmpx, tmpy, tmpx1, tmpy1 );
-	  }
-	  break;
+			while ( 0x0001 & gr_mkmstate )	
+			{
+				if (((tmpx1 != gr_mkmx) || (tmpy1 != gr_mkmy)) && 
+					(0x0001&gr_mkmstate))	
+				{
+					frame( tmpx, tmpy, tmpx1, tmpy1 );
+					frame( tmpx, tmpy, gr_mkmx, gr_mkmy );
+					tmpy1 = gr_mkmy;
+					tmpx1 = gr_mkmx;
+				}
+				graf_mkstate(&gr_mkmx, &gr_mkmy, &gr_mkmstate, &gr_mkkstate);
+			}
+			frame( tmpx, tmpy, tmpx1, tmpy1 );
+		}
+		break;
 	}
 
-	rect.x = min( tmpx, tmpx1 );
-	rect.y = min( tmpy, tmpy1 );
+	rect.g_x = min( tmpx, tmpx1 );
+	rect.g_y = min( tmpy, tmpy1 );
 
-	rect.w = abs( tmpx, tmpx1 );
-	rect.h = abs( tmpy, tmpy1 );	
+	rect.g_w = abs( tmpx, tmpx1 );
+	rect.g_h = abs( tmpy, tmpy1 );	
 
-	if ( ( rect.w ) && ( rect.h ) )
-	  chk_rect( win, &rect, id );
+	if ( ( rect.g_w ) && ( rect.g_h ) )
+		chk_rect( win, &rect, id );
 
 	desk_mice( ARROW );
 	wind_update( 0 );
@@ -687,26 +652,23 @@ r_box( id, win )
 
 /*	Return an absolute value	*/
 
-	WORD
-abs( x, y )
-	WORD x,y;
+WORD
+abs( WORD x, WORD y )
 {
 	if ( x > y )
-	  return( x - y );
+		return( x - y );
 	else
-	  return( y - x );
+		return( y - x );
 }
 
 
 /*	Move icons from window to desktop	*/
 
-	VOID
-win_desk( swin, sitems, ditem, mx, my )
-	REG WINDOW	*swin;
-	WORD		sitems,ditem,mx,my;
+VOID
+win_desk( REG WINDOW *swin, WORD sitems, WORD ditem, WORD mx, WORD my )
 {
-	DIR		*dir;
-	REG OBJECT	*obj;
+/*	DIR			*dir; */
+/*	REG OBJECT	*obj; */
 	REG WORD	i;
 	WORD		temp,first,type,status,ntype;
 	WORD		x,y;
@@ -716,156 +678,143 @@ win_desk( swin, sitems, ditem, mx, my )
 
 	if ( !ditem )
 	{
-	  first = TRUE;
-	  status = x_first( &str, &type );
+		first = TRUE;
+		status = x_first( &str, &type );
 
-	  while( status )
-	  {
-	    if ( type == SUBDIR )
-	    {
-	      ntype = XDIR;
-	      save_mid( str, buffer );
-	    }
-	    else
-	    {
-	      ntype = XFILE;
-	      save_ext( str, buffer );		    	
-	    }
+		while( status )
+		{
+			if ( type == SUBDIR )
+			{
+				ntype = XDIR;
+				save_mid( str, buffer );
+			} else {
+				ntype = XFILE;
+				save_ext( str, buffer );		    	
+			}
+			app_icon( buffer, ( type == SUBDIR ) ? FOLDER : -1, &temp );
+			
+			if ( ( i = make_icon( 0, temp, ntype, buffer ) ) == -1 )
+			{
+				do1_alert( NOICON );
+				break;
+			}
 
-	    app_icon( buffer, ( type == SUBDIR ) ? FOLDER : -1, &temp );
+			if ( first )
+			{
+				objc_offset( swin->w_obj, sitems, &x, &y );
+				app_mtoi( mx + x, my + y, &background[i].ob_x, &background[i].ob_y );
+				first = FALSE;
+			}
+
+			lp_fill( str, &backid[i].i_path );
+
+			if ( !backid[i].i_path )
+			{
+				do1_alert( NOICON );
+				background[i].ob_flags |= HIDETREE;
+				break;
+			}
 	
-	    if ( ( i = make_icon( 0, temp, ntype, buffer ) ) == -1 )
-	    {
-	      do1_alert( NOICON );
-	      break;
-	    }
+			do_redraw( 0, &full, i );
+			status = x_next( &str, &type );
 
-	    if ( first )
-	    {
-	      objc_offset( swin->w_obj, sitems, &x, &y );
-	      app_mtoi( mx + x, my + y, &background[i].ob_x, &background[i].ob_y );
-	      first = FALSE;
-	    }
+		}/* while */
 
-	    lp_fill( str, &backid[i].i_path );
-
-	    if ( !backid[i].i_path )
-	    {
-	      do1_alert( NOICON );
-	      background[i].ob_flags |= HIDETREE;
-	      break;
-	    }
-	
-	    do_redraw( 0, &full, i );
-	    status = x_next( &str, &type );
-
-	  }/* while */
-
-	  clr_xwin( swin, TRUE );
-	}
-	else		/* drop on desktop object	*/
-	{
-	  if ( backid[ditem].i_type == XFILE )
-	  {
-/*	     dir = get_dir( swin, sitems );
-	     strcpy( swin->w_path, &swin->w_buf[1] );
-	     rep_path( dir->d_name, &swin->w_buf[1] );
-	     swin->w_buf[0] = strlen( &swin->w_buf[1] );
-	     tail = swin->w_buf;
+		clr_xwin( swin, TRUE );
+	} else {		/* drop on desktop object	*/
+		if ( backid[ditem].i_type == XFILE )
+		{
+/*			dir = get_dir( swin, sitems );
+			strcpy( swin->w_path, &swin->w_buf[1] );
+			rep_path( dir->d_name, &swin->w_buf[1] );
+			swin->w_buf[0] = strlen( &swin->w_buf[1] );
+			tail = swin->w_buf;
 */
-	     tail = (BYTE*)0;	
-	  }
-	  else
-	    tail = Nostr;
-
-	  to_desk( ditem, tail );
+			tail = (BYTE*)0;	
+		} else tail = Nostr;
+		
+		to_desk( ditem, tail );
 	}
 }
 
 
 /*	Move icons from desktop to desktop	*/
 
-	VOID
-desk_desk( sitem, ditem, mx, my )
-	WORD	sitem;
-	WORD	ditem;
-	WORD	mx,my;
+VOID
+desk_desk( WORD sitem, WORD ditem, WORD mx, WORD my )
 {
 	REG OBJECT	*obj;
 	BYTE		buffer[14];
 	REG BYTE	temp1;
 	BYTE		temp2;
 	GRECT		rect;
-	WORD		x,y,sitems;
-	BYTE		*ptr;	
+	WORD		/*x,y,*/sitems;
+/*	BYTE		*ptr;	*/
 	BYTE		*tail;
 
 	obj = background;
 
 	if ( !ditem )			/* on the background	*/
 	{
-	  if ( ( mx ) || ( my ) ) 	/* moved		*/
-	  {
-	    sitems = 1;
-	    while ( i_next( sitems, obj, &sitems ) )
-	    {				/* copy x,y,w,h		*/
-	      rc_copy( &dicon, &rect );	/* set x,y		*/
-	      rect.x = obj[0].ob_x + obj[sitems].ob_x;
-	      rect.y = obj[0].ob_y + obj[sitems].ob_y;
-	      app_mtoi( rect.x + mx, rect.y + my, &obj[sitems].ob_x, &obj[sitems].ob_y );
-	      do_redraw( 0, &rect, 0 ); 	/* erase old one	*/
-	      do_redraw( 0, &full, sitems );	/* draw the new one	*/
-	      sitems++;
+		if ( ( mx ) || ( my ) ) 	/* moved		*/
+		{
+			sitems = 1;
+			while ( i_next( sitems, obj, &sitems ) )
+			{				/* copy x,y,w,h		*/
+				rc_copy((WORD *)&dicon,(WORD *)&rect );	/* set x,y		*/
+				rect.g_x = obj[0].ob_x + obj[sitems].ob_x;
+				rect.g_y = obj[0].ob_y + obj[sitems].ob_y;
+				app_mtoi( rect.g_x + mx, rect.g_y + my, &obj[sitems].ob_x, &obj[sitems].ob_y );
+				do_redraw( 0, &rect, 0 ); 	/* erase old one	*/
+				do_redraw( 0, &full, sitems );	/* draw the new one	*/
+				sitems++;
 
-	    }/* while */
-	  }/* if moved */
-	}/* if open area */
-	else	
-	{				/* check for floppy disk copy	*/
-	  temp1 = ((CICONBLK*)(obj[sitem].ob_spec))->monoblk.ib_char[1];
-	  temp2 = ((CICONBLK*)(obj[ditem].ob_spec))->monoblk.ib_char[1];
+			}/* while */
+		}/* if moved */
+	} else {/* if open area */
 	
-	  if ( ( backid[sitem].i_type == DISK ) && ( backid[ditem].i_type == DISK ) )
-	  {
-	    if ( temp1 == temp2 )
-	    {
-	       do1_alert( STBADCOP );
-	       return;
-	    }
-	    else
-	    if ( ( ( temp1 == 'A' ) || ( temp1 == 'B' ) ) &&  
-	           ( ( temp2 == 'A' ) || ( temp2 == 'B' ) ) )
- 	    {
-	       buffer[0] = temp1;
-/*	       wind_update(1);	*/
-	       fc_start( buffer, CMD_COPY );
-/*	       wind_update(0);	*/
-	       return;
-	    }
-	  }
+		/* check for floppy disk copy	*/
+		temp1 = (BYTE)(((CICONBLK*)(obj[sitem].ob_spec))->monoblk
+.ib_char & 0x00ff);
+		temp2 = (BYTE)(((CICONBLK*)(obj[ditem].ob_spec))->monoblk.ib_char & 0x00ff);
+	
+		if ( ( backid[sitem].i_type == DISK ) && ( backid[ditem].i_type == DISK ) )
+		{
+			if ( temp1 == temp2 )
+			{
+				do1_alert( STBADCOP );
+				return;
+			} 
+			else
+				if ( ( ( temp1 == 'A' ) || ( temp1 == 'B' ) ) &&  
+					( ( temp2 == 'A' ) || ( temp2 == 'B' ) ) )
+ 				{
+					buffer[0] = temp1;
+/*					wind_update(1);	*/
+					fc_start( buffer, CMD_COPY );
+/*					wind_update(0);	*/
+					return;
+				}
+		}
 
-	  if ( backid[ditem].i_type == XFILE )
-	  {
-/*	    if ( ch_tail( backid[sitem].i_path, path2 ) )	*/
-	      tail = (BYTE*)0;
-/*	    else
-	      return;
+		if ( backid[ditem].i_type == XFILE )
+		{
+/*			if ( ch_tail( backid[sitem].i_path, path2 ) )	*/
+				tail = (BYTE*)0;
+/*			else
+				return;
 */	      
-	  }
-	  else
-	    tail = Nostr;
+		} else tail = Nostr;
 
-	  to_desk( ditem, tail );
+		to_desk( ditem, tail );
 	}
 }
 
 
 /*	Ghost icon initalization	*/
 
-	WORD
-gh_init( obj, disk )
-	REG OBJECT	*obj;
-	WORD	disk;
+WORD
+gh_init( REG OBJECT *obj, WORD disk )
 {
 	REG WORD	*ptr1;
 	WORD		x,y,i,offx,offy;
@@ -874,12 +823,12 @@ gh_init( obj, disk )
 	WORD		*ptr;
 	OBJECT		*tree;
 
-	if ( ! ( gh_buffer = malloc( 0x7800L ) ) )
+	if ( ! ( gh_buffer = (long)malloc( 0x7800L ) ) )
 	  return( FALSE );
 	
 	j = 0x7800L / 40L;		/* 9 vertices x 2 x 2 	*/ 	
 					/* + 1 ascushion	*/
-	limit = (UWORD)obj->ob_tail;
+	limit = (LONG)obj->ob_tail;
 
 	if ( limit > j )
 	  limit = j;
@@ -887,7 +836,7 @@ gh_init( obj, disk )
 	offx = obj->ob_x;
 	offy = obj->ob_y;
 
-	ptr1 = gh_buffer;
+	ptr1 = (WORD *)gh_buffer;
 	ptr1++;			/* leave space to save the count	*/
 
 	tree = obj++;
@@ -914,7 +863,7 @@ gh_init( obj, disk )
 	  }
 	}
 
-	ptr1 = gh_buffer;
+	ptr1 = (WORD *)gh_buffer;
 	*ptr1 = count;
 	return( TRUE );
 }
@@ -922,10 +871,8 @@ gh_init( obj, disk )
 
 /*	Draw icons outline	*/ 
 
-	VOID
-ghost_icon( offx, offy, disk )
-	REG 	WORD	offx,offy;
-	WORD	disk;
+VOID
+ghost_icon( REG WORD offx, REG WORD offy, WORD disk )
 {
 	REG WORD	*ptr;
 	REG WORD	i,j,limit;
@@ -935,14 +882,14 @@ ghost_icon( offx, offy, disk )
 
 	desk_mice( M_OFF );
 
-	rc_copy( &full, buffer );	/* set clipping rectangle	*/
+	rc_copy( (WORD *)&full, (WORD *)buffer );	/* set clipping rectangle	*/
 	buffer[2] = buffer[0] + buffer[2];
 	buffer[3] = buffer[1] + buffer[3];
 	vs_clip( 1, buffer );	
 
 	d_setattr( MD_XOR, BLACK );
 
-	ptr = gh_buffer;
+	ptr = (WORD *)gh_buffer;
 	limit = *ptr++;
 	
 	lines = disk ? 9 : 5;	
@@ -967,10 +914,8 @@ ghost_icon( offx, offy, disk )
 /*	Handle the holding down button event	*/
 
 
-	VOID
-hd_down( sitem, stype, swin )
-	REG WORD	sitem,stype;
-	REG WINDOW	*swin;
+VOID
+hd_down( REG WORD sitem, REG WORD stype, REG WINDOW *swin )
 {
 	REG WORD	pitem,state;
 	WORD		itype,w,h,ret,exec;
@@ -1039,7 +984,7 @@ hd_down( sitem, stype, swin )
 	ghost_icon( 0, 0, itype );	/* draw icon			*/
 					/* draw the biggest rectangle	*/
 	build_rect( sobj, &pt, w, h ); 
-	rc_copy( &pt, &pt2 );
+	rc_copy( (WORD *)&pt, (WORD *)&pt2 );
 
 	state = SELECTED;
 	i_find( omx, omy, &pwin, &ret, &ptype );
@@ -1060,16 +1005,16 @@ hd_down( sitem, stype, swin )
 
 	  if ( ( abs( mx, omx ) > 2 ) || ( abs( my, omy ) > 2 ) ) 
 	  {
-	    o1 = pt.x;			/* save the old rectangle x,y	*/
-	    o2 = pt.y;
+	    o1 = pt.g_x;			/* save the old rectangle x,y	*/
+	    o2 = pt.g_y;
 
-	    pt.x = o1 + mx - omx;	/* update the new x.y	*/
-	    pt.y = o2 + my - omy;
+	    pt.g_x = o1 + mx - omx;	/* update the new x.y	*/
+	    pt.g_y = o2 + my - omy;
 
 	    rc_constrain( &full, &pt );	/* check how far it can move	*/
 
-	    offx = pt.x - o1;		/* movement distance	*/
-	    offy = pt.y - o2;	
+	    offx = pt.g_x - o1;		/* movement distance	*/
+	    offy = pt.g_y - o2;	
 
 	    if ( offx )			/* movement	*/
 	    {
@@ -1082,7 +1027,7 @@ hd_down( sitem, stype, swin )
 	      {
 		if ( mx < cx )
 		{
-h_3:		  pt.x -= offx;
+h_3:		  pt.g_x -= offx;
 		  offx = 0;
 		}
 	      }
@@ -1101,7 +1046,7 @@ h_3:		  pt.x -= offx;
 	      {
 		if ( my < cy )
 		{
-h_4:		  pt.y -= offy;   
+h_4:		  pt.g_y -= offy;   
 		  offy = 0;
 		}
 	      }
@@ -1166,7 +1111,7 @@ h_4:		  pt.y -= offy;
 
 	ghost_icon( 0, 0, itype );		/* erase ghost icon	*/
 
-	free( gh_buffer );
+	free( (VOIDP) gh_buffer );
 
 	desk_mice( ARROW );
 
@@ -1213,7 +1158,7 @@ h_4:		  pt.y -= offy;
 	  if ( dtype == DESKICON )	/* Hit the desktop	*/
 	  {
 	    if ( ( !ditem ) || ( exec ) )
-	      win_desk( swin, sitem, ditem, pt.x - pt2.x, pt.y - pt2.y );
+	      win_desk( swin, sitem, ditem, pt.g_x - pt2.g_x, pt.g_y - pt2.g_y );
 	  }
 	  else
 	  {
@@ -1230,7 +1175,7 @@ h_4:		  pt.y -= offy;
 	      ditem = 0;
 
 	    if ( ( !ditem ) || ( exec ) )  	
-	      desk_desk( sitem, ditem, pt.x - pt2.x, pt.y - pt2.y );
+	      desk_desk( sitem, ditem, pt.g_x - pt2.g_x, pt.g_y - pt2.g_y );
 	  }
 	  else				/* hit the window	*/
 	  {
@@ -1246,13 +1191,11 @@ h_2:
 
 /*	Take action when something is dragged to desktop area	*/
 
-	VOID
-to_desk( ditem, tail )
-	WORD	ditem;
-	BYTE	*tail;
+VOID
+to_desk( WORD ditem, BYTE *tail )
 {
 	BYTE		buffer[14];
-	WORD		ret;
+/*	WORD		ret; */
 	REG IDTYPE	*itype;
 
 	itype = &backid[ditem];
@@ -1265,7 +1208,7 @@ to_desk( ditem, tail )
 		
 	    case DISK:			/* copy to disk		*/
 	      strcpy( wildext, buffer );	
- 	      buffer[0] = itype->i_cicon.monoblk.ib_char[1];
+ 	      buffer[0] = (BYTE)(itype->i_cicon.monoblk.ib_char & 0x00ff);
 	      file_op( buffer, OP_COPY );
 	      break;
 	   
@@ -1290,10 +1233,8 @@ to_desk( ditem, tail )
 
 /*	Take action when something is dragged to window	*/
 
-	VOID
-to_win( sitem, swin, ditem, dwin )
-	WORD	sitem,ditem;
-	WINDOW	*swin,*dwin;
+VOID
+to_win( WORD sitem, WINDOW *swin, WORD ditem, WINDOW *dwin )
 {
 	REG DIR		*dir;
 	REG BYTE	*temp;
@@ -1320,12 +1261,12 @@ to_win( sitem, swin, ditem, dwin )
 	      temp[0] = strlen( &temp[1] );
 	      temp = (BYTE*)0;
 #endif
-	      open_wfile( dwin, ditem, (BYTE*)0, swin, sitem );
+	      open_wfile( dwin, ditem, (BYTE *)0, swin, sitem );
 	    }
 	    else			/* desktop to window	*/
 	    {
 /*	      if ( ch_tail( backid[sitem].i_path, path2 ) )	*/
-	        open_wfile( dwin, ditem, (BYTE*)0, swin, sitem );
+	        open_wfile( dwin, ditem, (BYTE *)0, swin, sitem );
 	    }
 	    return;
 	  }
@@ -1335,18 +1276,14 @@ to_win( sitem, swin, ditem, dwin )
  	file_op( temp, OP_COPY );
 }
 
-
-
 /*	make a desktop icon	*/
-
-	WORD
-make_icon( drive, icon, type, text )
-	WORD	drive,icon,type;
-	BYTE	*text;
+WORD
+make_icon( WORD drive, WORD icon, WORD type, BYTE *text )
 {
 	REG WORD	id;
 	REG IDTYPE	*itype;
 	OBJECT		*obj;
+	WORD		temp;
 
 	if ( ( id = av_icon() ) != -1 )
 	{
@@ -1354,9 +1291,10 @@ make_icon( drive, icon, type, text )
 	  obj = background; 
 	  cp_iblk( icon, (CICONBLK*)(obj[id].ob_spec) );	       
           itype->i_type = type;
-	  itype->i_cicon.monoblk.ib_char[1] = (BYTE)drive;
+	  temp = (itype->i_cicon.monoblk.ib_char & 0xFF00);
+	  itype->i_cicon.monoblk.ib_char = temp | drive;
 	  itype->i_icon = icon;
-	  strcpy( text, (CICONBLK*)(obj[id].ob_spec)->monoblk.ib_ptext );
+	  strcpy( text, (BYTE *)((CICONBLK*)(obj[id].ob_spec))->monoblk.ib_ptext );
 	}
 
 	return( id );
@@ -1414,24 +1352,22 @@ static BYTE pipename[] = "U:\\PIPE\\DRAGDROP.AA";
 
 /*	Drag and drop to another window	*/
 
-	WORD
-d_dragdrop( apid, winid, msx, msy )
-	WORD	apid;
-	WORD	winid, msx, msy;
+WORD
+d_dragdrop( WORD apid, WORD winid, WORD msx, WORD msy )
 {
 	WORD	handle,err;
 	LONG	len;
 	BYTE	*addr;
 	BYTE	recexts[32];
-	WORD	kstate;
+	WORD	kstate, dummy;
 
 /* get shift key state */
-	graf_mkstate( &len,&len,&len,&kstate );
+	graf_mkstate( &dummy,&dummy,&dummy,&kstate );
 	kstate &= 0xff;
  
 	addr = bld_par(1,0);
 	if (!addr)
-		return;
+		return 0;		/* JTT - Added zero */
 
 	len = strlen( addr );
 	handle = ddcreate(apid, winid, msx, msy, kstate, recexts);
@@ -1476,9 +1412,7 @@ d_dragdrop( apid, winid, msx, msy )
  */
 
 WORD
-ddcreate(apid, winid, msx, msy, kstate, exts)
-	WORD apid, winid, msx, msy, kstate;
-	char *exts;
+ddcreate( WORD apid, WORD winid, WORD msx, WORD msy, WORD kstate, char *exts )
 {
 	WORD fd, i;
 	WORD msg[8];
@@ -1495,7 +1429,7 @@ ddcreate(apid, winid, msx, msy, kstate, exts)
 				break;
 		}
 /* FA_HIDDEN means "get EOF if nobody has pipe open for reading" */
-		fd = Fcreate(pipename, 0x02);
+		fd = (WORD)Fcreate(pipename, 0x02);   /* JTT - added (WORD) */
 	} while (fd == EACCDN);
 
 	if (fd < 0) {
@@ -1511,7 +1445,7 @@ ddcreate(apid, winid, msx, msy, kstate, exts)
 	msg[5] = msy;
 	msg[6] = kstate;
 	msg[7] = (pipename[17] << 8) | pipename[18];
-	i = appl_write(apid, 16, msg);
+	i = appl_write(apid, 16, (BYTE *)msg);
 	if (i == 0) {
 		Fclose(fd);
 		return -2;
@@ -1519,7 +1453,7 @@ ddcreate(apid, winid, msx, msy, kstate, exts)
 
 /* now wait for a response */
 	fd_mask = 1L << fd;
-	i = Fselect(DD_TIMEOUT, &fd_mask, 0L, 0L);
+	i = (WORD)Fselect(DD_TIMEOUT, &fd_mask, 0L, 0L);
 	if (!i || !fd_mask) {	/* timeout happened */
 abort_dd:
 		Fclose(fd);
@@ -1527,13 +1461,13 @@ abort_dd:
 	}
 
 /* read the 1 byte response */
-	i = Fread(fd, 1L, &c);
+	i = (WORD)Fread(fd, 1L, &c);
 	if (i != 1 || c != DD_OK) {
 		goto abort_dd;
 	}
 
 /* now read the "preferred extensions" */
-	i = Fread(fd, (long)DD_EXTSIZE, exts);
+	i = (WORD)Fread(fd, (long)DD_EXTSIZE, exts);
 	if (i != DD_EXTSIZE) {
 		goto abort_dd;
 	}
@@ -1562,10 +1496,7 @@ abort_dd:
  */
 
 WORD
-ddstry(fd, ext, name, size)
-	WORD fd;
-	BYTE *ext, *name;
-	LONG size;
+ddstry( WORD fd, BYTE *ext, BYTE *name, LONG size)
 {
 	WORD hdrlen, i;
 	char c;
@@ -1574,17 +1505,17 @@ ddstry(fd, ext, name, size)
  * trailing 0
  */
 	hdrlen = 9 + strlen(name);
-	i = Fwrite(fd, 2L, &hdrlen);
+	i = (WORD)Fwrite(fd, 2L, &hdrlen);
 
 /* now send the header */
 	if (i != 2) return DD_NAK;
-	i = Fwrite(fd, 4L, ext);
-	i += Fwrite(fd, 4L, &size);
-	i += Fwrite(fd, (long)strlen(name)+1, name);
+	i = (WORD)Fwrite(fd, 4L, ext);
+	i += (WORD)Fwrite(fd, 4L, &size);
+	i += (WORD)Fwrite(fd, (long)strlen(name)+1, name);
 	if (i != hdrlen) return DD_NAK;
 
 /* wait for a reply */
-	i = Fread(fd, 1L, &c);
+	i = (WORD)Fread(fd, 1L, &c);
 	if (i != 1) return DD_NAK;
 	return c;
 }
@@ -1597,8 +1528,7 @@ ddstry(fd, ext, name, size)
  */
 
 VOID
-ddclose(fd)
-	WORD fd;
+ddclose( WORD fd )
 {
 	Psignal(SIGPIPE, oldpipesig);
 	Fclose(fd);
@@ -1628,9 +1558,7 @@ ddclose(fd)
  */
 
 WORD
-ddopen(ddnam,preferext)
-	WORD ddnam;
-	BYTE *preferext;
+ddopen( WORD ddnam, BYTE *preferext)
 {
 	WORD fd;
 	BYTE outbuf[DD_EXTSIZE+1];
@@ -1640,7 +1568,7 @@ ddopen(ddnam,preferext)
 	pipename[18] = ddnam & 0x00ff;
 	pipename[17] = (ddnam & 0xff00) >> 8;
 
-	fd = Fopen(pipename, 2);
+	fd = (WORD)Fopen(pipename, 2);
 	if (fd < 0) return fd;
 
 	outbuf[0] = DD_OK;
@@ -1685,29 +1613,25 @@ ddopen(ddnam,preferext)
  */
 
 WORD
-ddrtry(fd, name, whichext, size)
-	WORD fd;
-	BYTE *name;
-	LONG *size;
-	BYTE *whichext;
+ddrtry( WORD fd, BYTE *name, BYTE *whichext, LONG *size)
 {
 	WORD hdrlen;
 	WORD i;
 	BYTE buf[80];
 
-	i = Fread(fd, 2L, &hdrlen);
+	i = (WORD)Fread(fd, 2L, &hdrlen);
 	if (i != 2) {
 		return -1;
 	}
 	if (hdrlen < 9) {	/* this should never happen */
 		return -1;
 	}
-	i = Fread(fd, 4L, whichext);
+	i = (WORD)Fread(fd, 4L, whichext);
 	if (i != 4) {
 		return -1;
 	}
 	whichext[4] = 0;
-	i = Fread(fd, 4L, size);
+	i = (WORD)Fread(fd, 4L, size);
 	if (i != 4) {
 		return -1;
 	}
@@ -1747,8 +1671,7 @@ ddrtry(fd, name, whichext, size)
  */
 
 WORD
-ddreply(fd, ack)
-	WORD fd, ack;
+ddreply( WORD fd, WORD ack)
 {
 	BYTE c = ack;
 
@@ -1767,15 +1690,15 @@ ddreply(fd, ack)
 static char ourexts[DD_EXTSIZE] = "";
 
 VOID
-rec_ddmsg(msg)
-	WORD msg[];
+rec_ddmsg( WORD msg[] )
 {
 	WORD winid;
 	WORD msx, msy, kstate;
 	WORD fd, pnam;
-	WORD i;
-	BYTE txtname[DD_NAMEMAX], ext[5];
-	LONG size;
+/* JTT - These aren't needed now, so I commented them out. */
+/*	WORD i; */
+/*	BYTE txtname[DD_NAMEMAX], ext[5]; */
+/*	LONG size; */
 
 	winid = msg[3];
 	msx = msg[4];

@@ -10,6 +10,8 @@
 /*	Remove mouse reset		6/14/91		D.Mui		*/
 /*	Appl_exit will do rs_free too	8/14/91		D.Mui		*/
 /*	Add rs_fixit			10/1/91		D.Mui		*/
+/*	Modify for Lattice C 5.51	02/24/93	C.Gee		*/
+/*	Force the use of prototypes					*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -18,21 +20,19 @@
 *	All Rights Reserved
 *	-----------------------------------------------------------
 */	
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <windlib.h>
-#include <crysbind.h>
-#include <aesmint.h>
-#include <gemusa.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "windlib.h"
+#include "crysbind.h"
+#include "aesmint.h"
+#include "gemusa.h"
 
-EXTERN	PD	*idtopd();
-EXTERN	WINDOW	*srchwp();
+#define GB_STATE 	int_in[3]
+
 EXTERN	BYTE	PATHEQUAL[];
 EXTERN	GRECT	gl_rzero;
 EXTERN	GRECT	gl_rscreen;
@@ -80,13 +80,13 @@ do_chg(tree, iitem, chgvalue, dochg, dodraw, chkdisabled)
 
 	if ( dodraw )
 	{			/* make sure it is the current menu */
-	  if ( tree != idtopd( gl_mnpid )->p_mnaddr )
+	  if ( tree != (OBJECT *)(idtopd( gl_mnpid )->p_mnaddr) )
 	    dodraw = FALSE;
 	  else
 	    gsx_sclip( &gl_rscreen );
 	}
 
-	ob_change(tree, iitem, curr_state, dodraw );
+	ob_change( (LONG)tree, iitem, curr_state, dodraw );
 	return( TRUE );
 }
 
@@ -102,8 +102,9 @@ crysbind( pcrys_blk )
 	LONG		*addr_in,*addr_out;
 	LONG		tmparm,buparm,tree;
 	LONG		value,ad_rso;
-	WORD		ret,i,offset;
+	WORD		ret;
 	UWORD		*control;
+	LONG		temp;
 
 	if ( currpd->p_state == PS_ZOMBIE )
 	{
@@ -111,12 +112,12 @@ crysbind( pcrys_blk )
 	  goto c_1;
 	}
 
-	control = pcrys_blk->cb_pcontrol;
-	global_in = pcrys_blk->cb_pglobal;
-	int_in = pcrys_blk->cb_pintin;
-	addr_in = pcrys_blk->cb_padrin;
-	int_out = pcrys_blk->cb_pintout;
-	addr_out = pcrys_blk->cb_padrout;
+	control = (UWORD *)(pcrys_blk->cb_pcontrol);
+	global_in = (LONG *)(pcrys_blk->cb_pglobal);
+	int_in = (WORD *)(pcrys_blk->cb_pintin);
+	addr_in = (LONG *)(pcrys_blk->cb_padrin);
+	int_out = (WORD *)(pcrys_blk->cb_pintout);
+	addr_out = (LONG *)(pcrys_blk->cb_padrout);
 
 	ret = TRUE;
 
@@ -127,19 +128,19 @@ crysbind( pcrys_blk )
 	{	
 	  case APPL_INIT:		/* Application Manager	*/
 		Debug7( "appl_init\r\n" ); 
-	    	ret = ap_init( global_in );
+	    	ret = ap_init( ( LONG )global_in );
 		break;
 	  case APPL_READ:
 		Debug7( "appl_read\r\n" ); 
-		ret = ap_rdwr(AQRD, AP_RWID, AP_LENGTH, AP_PBUFF);
+		ret = ap_rdwr(AQRD, AP_RWID, AP_LENGTH, ( BYTE *)AP_PBUFF);
 		break;
 	  case APPL_WRITE:
 		Debug7( "appl_write\r\n" ); 
-		ret = ap_rdwr(AQWRT, AP_RWID, AP_LENGTH, AP_PBUFF);
+		ret = ap_rdwr(AQWRT, AP_RWID, AP_LENGTH, ( BYTE *)AP_PBUFF);
 		break;
 	  case APPL_FIND:
 		Debug7( "appl_find\r\n" ); 
-		ret = ap_find( AP_PNAME );
+		ret = ap_find( ( BYTE *)AP_PNAME );
 		break;
 	  case APPL_TPLAY:
 		Debug7( "appl_tplay\r\n" ); 
@@ -159,7 +160,7 @@ crysbind( pcrys_blk )
 		break;
 	  case APPL_SEARCH:
 		Debug7( "appl_search\r\n" ); 
-		ret = ap_search( AP_STYPE, AP_ONAME, &AP_PTYPE, &AP_PPID2 );	
+		ret = ap_search( AP_STYPE, ( BYTE *)AP_ONAME, &AP_PTYPE, &AP_PPID2 );	
 		break;
 	  case APPL_GETINFO:
 	        ret = ap_getinfo( AI_TYPE, &AI_OUT1, &AI_OUT2, &AI_OUT3, &AI_OUT4 );
@@ -174,22 +175,24 @@ crysbind( pcrys_blk )
 		break;
 	  case EVNT_MOUSE:
 		Debug7( "evnt_mouse\r\n" ); 
-		ret = ev_mouse(&MO_FLAGS, &EV_MX);
+		ret = ev_mouse( ( MOBLK *)&MO_FLAGS, &EV_MX);
 		break;
 	  case EVNT_MESAG:
 		Debug7( "evnt_mesag\r\n" ); 
-		ret = ev_mesag(ME_PBUFF);
+		ret = ev_mesag( ( BYTE *)ME_PBUFF);
 		break;
 	  case EVNT_TIMER:
 		Debug7( "evnt_timer\r\n" ); 
-		ret = ev_timer(T_HICOUNT, T_LOCOUNT);
+		temp = ((LONG)T_HICOUNT << 16L) & 0xFFFF0000L;
+		temp = temp | ((LONG) T_LOCOUNT & 0x0000FFFFL );
+		ret = ev_timer(temp);
 		break;
 	  case EVNT_MULTI:
 		Debug7( "evnt_multi\r\n" ); 
 		if (MU_FLAGS & MU_TIMER)
 		  tmparm = HW(MT_HICOUNT) + LW(MT_LOCOUNT);
-		buparm = HW(MB_CLICKS) | LW((MB_MASK << 8) | MB_STATE);
-		ret = ev_multi(MU_FLAGS, &MMO1_FLAGS, &MMO2_FLAGS, tmparm,
+		buparm = HW(MB_CLICKS) | LW((MB_MASK << 8) | GB_STATE );
+		ret = ev_multi(MU_FLAGS, ( MOBLK *)&MMO1_FLAGS, ( MOBLK *)&MMO2_FLAGS, tmparm,
 			buparm, MME_PBUFF, &EV_MX);
 		break;
 	  case EVNT_DCLICK:
@@ -204,42 +207,42 @@ crysbind( pcrys_blk )
 
 	  case MENU_ICHECK:
 		Debug7( "menu_icheck\r\n" ); 
-		do_chg(MM_ITREE, ITEM_NUM, CHECKED, CHECK_IT, FALSE, FALSE);
+		do_chg( ( OBJECT *)MM_ITREE, ITEM_NUM, CHECKED, CHECK_IT, FALSE, FALSE);
 		break;
 
 	  case MENU_IENABLE:
 		Debug7( "menu_ienable\r\n" ); 
-		do_chg(MM_ITREE, (ITEM_NUM & 0x7FFF), DISABLED,
+		do_chg( ( OBJECT *)MM_ITREE, (ITEM_NUM & 0x7FFF), DISABLED,
 			!ENABLE_IT, ((ITEM_NUM & 0x8000) != 0x0), FALSE);
 		break;
 	  case MENU_TNORMAL:
 		Debug7( "menu_tnormal\r\n" ); 
-		do_chg(MM_ITREE, TITLE_NUM, SELECTED, !NORMAL_IT, TRUE, TRUE);
+		do_chg( ( OBJECT *)MM_ITREE, TITLE_NUM, SELECTED, !NORMAL_IT, TRUE, TRUE);
 		break;
 	  case MENU_TEXT:
 		Debug7( "menu_text\r\n" ); 
 		tree = MM_ITREE;
-		LSTCPY(LLGET(OB_SPEC(ITEM_NUM)), MM_PTEXT);
+		LSTCPY( ( BYTE *)LLGET(OB_SPEC(ITEM_NUM)), ( BYTE *)MM_PTEXT);
 		break;
 	  case MENU_REGISTER:
 		Debug7( "menu_register\r\n" ); 
-		ret = mn_register(MM_PID, MM_PSTR);
+		ret = mn_register(MM_PID, ( BYTE *)MM_PSTR);
 		break;
 					/* 5/14/92	*/
 	  case MN_POPUP:
 		Debug7( currpd->p_name );
 		Debug7( " call mn_popup\r\n" );
 		ret = mn_popup( ( currpd == scr_pd ) ? gl_mnpid : currpd->p_pid,
-		  		M_MENU, M_XPOS, M_YPOS, M_MDATA );
+		  		( MENU *)M_MENU, M_XPOS, M_YPOS, ( MENU *)M_MDATA );
 		break;
 	  case MN_ATTACH:
-		ret = mn_attach( currpd->p_pid, M_FLAG, M_TREE, M_ITEM, M_MDATA );
+		ret = mn_attach( currpd->p_pid, M_FLAG, ( OBJECT *)M_TREE, M_ITEM, ( MENU *)M_MDATA );
 		break;
 	  case MN_ISTART:
-		ret = mn_istart( currpd->p_pid, M_FLAG, M_TREE, M_MENU2, M_ITEM2 );
+		ret = mn_istart( currpd->p_pid, M_FLAG, ( OBJECT *)M_TREE, M_MENU2, M_ITEM2 );
 		break;
 	  case MN_SETTING:
-		mn_settings( M_FLAG, M_MENU );
+		mn_settings( M_FLAG, ( MN_SET *)M_MENU );
 		break;
 
 	  case OBJC_ADD:		/* Object Manager	*/
@@ -254,7 +257,7 @@ crysbind( pcrys_blk )
 
 	  case OBJC_DRAW:
 		Debug7( "objc_draw\r\n" ); 
-		gsx_sclip(&OB_XCLIP);
+		gsx_sclip( ( GRECT *)&OB_XCLIP);
 		ob_draw(OB_TREE, OB_DRAWOB, OB_DEPTH);
 		break;
 
@@ -283,7 +286,7 @@ crysbind( pcrys_blk )
 
 	  case OBJC_CHANGE:
 		Debug7( "objc_change\r\n" ); 
-		gsx_sclip(&OB_XCLIP);
+		gsx_sclip( ( GRECT *)&OB_XCLIP);
 		ob_change(OB_TREE, OB_DRAWOB, OB_NEWSTATE, OB_REDRAW);
 		break;
 				
@@ -293,7 +296,7 @@ crysbind( pcrys_blk )
 		break;
 	  case FORM_DIAL:
 		Debug7( "form_dial\r\n" ); 
-		ret = fm_dial(FM_TYPE, &FM_IX, &FM_X);
+		ret = fm_dial(FM_TYPE, ( GRECT *)&FM_IX, ( GRECT *)&FM_X);
 		break;
 	  case FORM_ALERT:
 		Debug7( "form_alert\r\n" ); 
@@ -305,7 +308,7 @@ crysbind( pcrys_blk )
 		break;
 	  case FORM_CENTER:
 		Debug7( "form_center\r\n" ); 
-		ob_center(FM_FORM, &FM_XC);
+		ob_center(FM_FORM, ( GRECT *)&FM_XC);
 		break;
 	  case FORM_KEYBD:
 		Debug7( "form_keybd\r\n" ); 
@@ -326,7 +329,7 @@ crysbind( pcrys_blk )
 		break;
 	  case GRAF_DRAGBOX:
 		Debug7( "graf_dragbox\r\n" ); 
-		gr_dragbox(GR_I1, GR_I2, GR_I3, GR_I4, &GR_I5, &GR_O1, &GR_O2);
+		gr_dragbox(GR_I1, GR_I2, GR_I3, GR_I4, ( GRECT *)&GR_I5, &GR_O1, &GR_O2);
 		break;
 	  case GRAF_MBOX:
 		Debug7( "graf_mbox\r\n" ); 
@@ -334,11 +337,11 @@ crysbind( pcrys_blk )
 		break;
 	  case GRAF_GROWBOX:
 		Debug7( "graf_growbox\r\n" ); 
-		gr_growbox(&GR_I1, &GR_I5);
+		gr_growbox( ( GRECT *)&GR_I1, ( GRECT *)&GR_I5);
 		break;
 	  case GRAF_SHRINKBOX:
 		Debug7( "graf_shrinkbox\r\n" ); 
-		gr_shrinkbox(&GR_I1, &GR_I5);
+		gr_shrinkbox( ( GRECT *)&GR_I1, ( GRECT *)&GR_I5);
 		break;
 	  case GRAF_WATCHBOX:
 		Debug7( "graf_watchbox\r\n" ); 
@@ -358,12 +361,13 @@ crysbind( pcrys_blk )
 		break;
 	  case GRAF_MOUSE:
 		Debug7( "graf_mouse\r\n" ); 
-		ret = gr_mouse( GR_MNUMBER, GR_MADDR );
+		ret = gr_mouse( GR_MNUMBER, ( MFORM *)GR_MADDR );
 		break;
 		
 	  case GRAF_MKSTATE:
 		Debug7( "graf_mkstate\r\n" ); 
-		ret = gr_mkstate(&GR_MX, &GR_MY, &GR_MSTATE, &GR_KSTATE);
+		gr_mkstate(&GR_MX, &GR_MY, &GR_MSTATE, &GR_KSTATE);
+		ret = 1;
 		break;
 				/* Scrap Manager	*/
 
@@ -378,23 +382,23 @@ crysbind( pcrys_blk )
 				/* File Selector Manager	*/
 	  case FSEL_INPUT:
 		Debug7( "fsel_input\r\n" ); 
-		ret = fs_input(FS_IPATH, FS_ISEL, &FS_BUTTON, ad_fsel);
+		ret = fs_input( ( BYTE *)FS_IPATH, FS_ISEL, &FS_BUTTON, ( BYTE *)ad_fsel );
 		break;
 
 	  case FSEL_EXINPUT:
 		Debug7( "fsel_exinput\r\n" ); 
-		ret = fs_input(FS_IPATH, FS_ISEL, &FS_BUTTON, FS_LABEL);
+		ret = fs_input( ( BYTE *)FS_IPATH, FS_ISEL, &FS_BUTTON, ( BYTE *)FS_LABEL);
 		break;
 
 				/* Window Manager		*/
 	  case WIND_CREATE:
 		Debug7( "wind_create\r\n" ); 
-		ret = wm_create(WM_KIND, &WM_WX);
+		ret = wm_create(WM_KIND, ( GRECT *)&WM_WX);
 		break;
 
 	  case WIND_OPEN:
 		Debug7( "wind_open\r\n" ); 
-		ret = wm_open(WM_HANDLE, &WM_WX);
+		ret = wm_open(WM_HANDLE, ( GRECT *)&WM_WX);
 		break;
 
 	  case WIND_CLOSE:
@@ -440,22 +444,22 @@ crysbind( pcrys_blk )
 				
 	  case RSRC_LOAD:	/* Resource Manager	*/
 		Debug7( "rsrc_load\r\n" ); 
-		ret = rs_load(global_in, RS_PFNAME);
+		ret = rs_load( ( LONG )global_in, RS_PFNAME);
 		break;
 
 	  case RSRC_FREE:
 		Debug7( "rsrc_free\r\n" ); 
-		ret = rs_free( global_in );
+		ret = rs_free( ( LONG )global_in );
 		break;
 
 	  case RSRC_GADDR:
 		Debug7( "rsrc_gaddr\r\n" ); 
-		ret = rs_gaddr(global_in, RS_TYPE, RS_INDEX, &ad_rso);
+		ret = rs_gaddr( ( LONG )global_in, RS_TYPE, RS_INDEX, &ad_rso);
 		addr_out[0] = ad_rso;
 		break;
 	  case RSRC_SADDR:
 		Debug7( "rsrc_saddr\r\n" ); 
-		ret = rs_saddr(global_in, RS_TYPE, RS_INDEX, RS_INADDR);
+		ret = rs_saddr( ( LONG )global_in, RS_TYPE, RS_INDEX, RS_INADDR);
 		break;
 	  case RSRC_OBFIX:
 		Debug7( "rsrc_obfix\r\n" ); 
@@ -463,7 +467,7 @@ crysbind( pcrys_blk )
 		break;
 	  case RSRC_RCFIX:
 		Debug7( "rsrc_rcfix\r\n" ); 
-		rs_rcfix( global_in, RC_HEADER );
+		rs_rcfix( ( LONG )global_in, ( BYTE *)RC_HEADER );
 		break;	
 				/* Shell Manager	*/
 	  case SHEL_READ:
@@ -472,27 +476,28 @@ crysbind( pcrys_blk )
 		break;
 	  case SHEL_WRITE:
 		Debug7( "shel_write\r\n" ); 
-		ret = sh_write(SH_DOEX, SH_ISGR, SH_ISCR, SH_PCMD, SH_PTAIL);
+		ret = sh_write(SH_DOEX, SH_ISGR, SH_ISCR, ( BYTE *)SH_PCMD, ( BYTE *)SH_PTAIL);
 		break;
 	  case SHEL_GET:
 		Debug7( "shel_get\r\n" ); 
-		ret = sh_get(SH_PBUFFER, SH_LEN);
+		ret = sh_get( ( BYTE *)SH_PBUFFER, SH_LEN);
 		break;
 	  case SHEL_PUT:
 		Debug7( "shel_put\r\n" ); 
-		ret = sh_put(SH_PDATA, SH_LEN);
+		ret = sh_put( ( BYTE *)SH_PDATA, SH_LEN);
 		break;
 	  case SHEL_FIND:
 		Debug7( "shel_find\r\n" ); 
-		ret = sh_find(SH_PATH, NULLPTR, PATHEQUAL, TRUE );
+		ret = sh_find(SH_PATH, ( WORD(*)())NULLPTR, PATHEQUAL, TRUE );
 		break;
 	  case SHEL_ENVRN:
 		Debug7( "shel_envrn\r\n" ); 
-		ret = sh_envrn(SH_PATH, SH_SRCH);
+		sh_envrn( ( LONG *)SH_PATH, ( BYTE *)SH_SRCH );
+		ret = 1;
 		break;
 	  default:
 	 	value = (LONG)OP_CODE;
-		fm_show( ALRTNOFUNC, &value, 1 );
+		fm_show( ALRTNOFU, ( UWORD *)&value, 1 );
 		ret = -1;
 		break;
 	}
@@ -519,7 +524,7 @@ chkbind( pcrys_blk, what )
 	REG WORD	*int_in,*int_out;
 	LONG		*addr_in,*addr_out;
 	LONG		tree,tmparm,buparm,ad_rso;     
-	WORD		ret,i,wait;
+	WORD		ret,wait;
 	UWORD		*control;
 
 	if ( currpd->p_state & PS_NEW )
@@ -535,12 +540,12 @@ chkbind( pcrys_blk, what )
 	  goto c_out; 
 
 		  
- 	control = pcrys_blk->cb_pcontrol;
-	global_in = pcrys_blk->cb_pglobal;
-	int_in = pcrys_blk->cb_pintin;
-	addr_in = pcrys_blk->cb_padrin;
-	int_out = pcrys_blk->cb_pintout;
-	addr_out = pcrys_blk->cb_padrout;
+ 	control = (UWORD *)(pcrys_blk->cb_pcontrol);
+	global_in = (LONG *)(pcrys_blk->cb_pglobal);
+	int_in = (WORD *)(pcrys_blk->cb_pintin);
+	addr_in = (LONG *)(pcrys_blk->cb_padrin);
+	int_out = (WORD *)(pcrys_blk->cb_pintout);
+	addr_out = (LONG *)(pcrys_blk->cb_padrout);
 
 	Debug7( currpd->p_name );
 	Debug7( " calls chkbind " );
@@ -559,7 +564,7 @@ chkbind( pcrys_blk, what )
 #endif
 	  case APPL_SEARCH:
 	  	Debug7( "appl_search\r\n" ); 
-		ret = ap_search( AP_STYPE, AP_ONAME, &AP_PTYPE, &AP_PPID2 );	
+		ret = ap_search( AP_STYPE, ( BYTE *)AP_ONAME, &AP_PTYPE, &AP_PPID2 );	
 		break;
 
 	  case APPL_GETINFO:
@@ -570,8 +575,8 @@ chkbind( pcrys_blk, what )
 	  	Debug7( "evnt_multi\r\n" ); 
 		if ( MU_FLAGS & MU_TIMER )
 		  tmparm = HW(MT_HICOUNT) + LW(MT_LOCOUNT);
-		buparm = HW(MB_CLICKS) | LW((MB_MASK << 8) | MB_STATE);
-		if ( ! ( ret = check_event( MU_FLAGS, &MMO1_FLAGS, &MMO2_FLAGS, tmparm,
+		buparm = HW(MB_CLICKS) | LW((MB_MASK << 8) | GB_STATE);
+		if ( ! ( ret = check_event( MU_FLAGS, ( MOBLK *)&MMO1_FLAGS, ( MOBLK *)&MMO2_FLAGS, tmparm,
 				   buparm, MME_PBUFF, &EV_MX ) ) )
 		  wait = TRUE;
 
@@ -579,30 +584,30 @@ chkbind( pcrys_blk, what )
 
 	  case GRAF_MOUSE:
 	  	Debug7( "graf_mouse\r\n" ); 
-		ret = gr_mouse( GR_MNUMBER, GR_MADDR );
+		ret = gr_mouse( GR_MNUMBER, ( MFORM *)GR_MADDR );
 		break;
 
 	  case MENU_ICHECK:
 	  	Debug7( "menu_icheck\r\n" ); 
-		do_chg(MM_ITREE, ITEM_NUM, CHECKED, CHECK_IT, FALSE, FALSE);
+		do_chg( ( OBJECT *)MM_ITREE, ITEM_NUM, CHECKED, CHECK_IT, FALSE, FALSE);
 		break;
 /*
 	  case MENU_IENABLE:
 	  	Debug7( "menu_ienable\r\n" ); 
-		do_chg(MM_ITREE, (ITEM_NUM & 0x7FFF), DISABLED,
+		do_chg( ( OBJECT *)MM_ITREE, (ITEM_NUM & 0x7FFF), DISABLED,
 			!ENABLE_IT, ((ITEM_NUM & 0x8000) != 0x0), FALSE);
 		break;
 */
 	  case MENU_TNORMAL:
 		Debug7( currpd->p_name );
 		Debug7( " call menu_tnormal\r\n" );  
-		do_chg(MM_ITREE, TITLE_NUM, SELECTED, !NORMAL_IT, TRUE, TRUE);
+		do_chg( ( OBJECT *)MM_ITREE, TITLE_NUM, SELECTED, !NORMAL_IT, TRUE, TRUE);
 		break;
 
 	  case MENU_TEXT:
 	  	Debug7( "menu_text\r\n" ); 
 		tree = MM_ITREE;
-		LSTCPY(LLGET(OB_SPEC(ITEM_NUM)), MM_PTEXT);
+		LSTCPY( ( BYTE *)LLGET(OB_SPEC(ITEM_NUM)), ( BYTE *)MM_PTEXT);
 		break;
 /*
 	  case MENU_REGISTER:		
@@ -624,7 +629,7 @@ chkbind( pcrys_blk, what )
 					 * caller because of the user defined obj
 					 */
 	  	Debug7( "objc_draw\r\n" ); 
-		gsx_sclip(&OB_XCLIP);
+		gsx_sclip( ( GRECT *)&OB_XCLIP);
 		ob_draw( OB_TREE, OB_DRAWOB, OB_DEPTH );
 		break;
 
@@ -667,7 +672,7 @@ chkbind( pcrys_blk, what )
 
 	  case FORM_CENTER:
 	  	Debug7( "form_center\r\n" ); 
-		ob_center(FM_FORM, &FM_XC);
+		ob_center(FM_FORM, ( GRECT *)&FM_XC);
 		break;
 
 	  case FORM_KEYBD:
@@ -680,12 +685,12 @@ chkbind( pcrys_blk, what )
 
 	  case GRAF_GROWBOX:
 	  	Debug7( "graf_growbox\r\n" ); 
-		gr_growbox(&GR_I1, &GR_I5);
+		gr_growbox( ( GRECT *)&GR_I1, ( GRECT *)&GR_I5);
 		break;
 
 	  case GRAF_SHRINKBOX:
 	  	Debug7( "graf_shrinkbox\r\n" ); 
-		gr_shrinkbox(&GR_I1, &GR_I5);
+		gr_shrinkbox( ( GRECT *)&GR_I1, ( GRECT *)&GR_I5);
 		break;
 
 	  case GRAF_HANDLE:
@@ -699,7 +704,8 @@ chkbind( pcrys_blk, what )
 		
 	  case GRAF_MKSTATE:
 	  	Debug7( "graf_mkstate\r\n" ); 
-		ret = gr_mkstate(&GR_MX, &GR_MY, &GR_MSTATE, &GR_KSTATE);
+		gr_mkstate(&GR_MX, &GR_MY, &GR_MSTATE, &GR_KSTATE);
+		ret = 1;
 		break;
 				/* Scrap Manager	*/
 
@@ -753,23 +759,23 @@ chkbind( pcrys_blk, what )
 
 	  case RSRC_LOAD:	/* Resource Manager	*/
 	  	Debug7( "rsrc_load\r\n" ); 
-		ret = rs_load(global_in, RS_PFNAME);
+		ret = rs_load( ( LONG )global_in, RS_PFNAME);
 		break;
 		
 	  case RSRC_FREE:
 	  	Debug7( "rsrc_free\r\n" ); 
-		ret = rs_free( global_in );
+		ret = rs_free( ( LONG )global_in );
 		break;
 
 	  case RSRC_GADDR:
 	  	Debug7( "rsrc_gaddr\r\n" ); 
-		ret = rs_gaddr(global_in, RS_TYPE, RS_INDEX, &ad_rso);
+		ret = rs_gaddr( ( LONG )global_in, RS_TYPE, RS_INDEX, &ad_rso);
 	        addr_out[0] = ad_rso;
 		break;
 
 	  case RSRC_SADDR:
 	  	Debug7( "rsrc_saddr\r\n" ); 
-		ret = rs_saddr(global_in, RS_TYPE, RS_INDEX, RS_INADDR);
+		ret = rs_saddr( ( LONG )global_in, RS_TYPE, RS_INDEX, RS_INADDR);
 		break;
 
 	  case RSRC_OBFIX:
@@ -779,17 +785,17 @@ chkbind( pcrys_blk, what )
 
 	  case RSRC_RCFIX:
 	  	Debug7( "rsrc_rcfix\r\n" ); 
-		rs_rcfix( global_in, RC_HEADER );
+		rs_rcfix( ( LONG )global_in, ( BYTE *)RC_HEADER );
 		break;	
 				/* Shell Manager	*/
 	  case SHEL_READ:
 	  	Debug7( "shel_read\r\n" ); 
-		ret = sh_read(SH_PCMD, SH_PTAIL);
+		ret = sh_read( ( LONG )SH_PCMD, SH_PTAIL);
 		break;
 
 	  case SHEL_GET:
 	  	Debug7( "shel_get\r\n" ); 
-		ret = sh_get(SH_PBUFFER, SH_LEN);
+		ret = sh_get( ( BYTE *)SH_PBUFFER, SH_LEN);
 		break;
 /*		
 	  case SHEL_PUT:
@@ -799,12 +805,13 @@ chkbind( pcrys_blk, what )
 */
 	  case SHEL_FIND:
 	  	Debug7( "shel_find\r\n" ); 
-		ret = sh_find(SH_PATH, NULLPTR, PATHEQUAL, TRUE );
+		ret = sh_find(SH_PATH, ( WORD(*)())NULLPTR, PATHEQUAL, TRUE );
 		break;
 		
 	  case SHEL_ENVRN:
 	  	Debug7( "shel_envrn\r\n" ); 
-		ret = sh_envrn(SH_PATH, SH_SRCH);
+		sh_envrn( ( LONG *)SH_PATH, ( BYTE *)SH_SRCH);
+		ret = 1;
 		break;
 
 	  default:

@@ -6,13 +6,16 @@
  *		- added scroll_flag field to the MENU_NODE structure
  * 01/13/93 cjg - added MTOP_FLAG() and MB_FLAG()
  */
+#include "mnstuf.h"
 
+#ifndef _MN_TOOLS_H_
+#define _MN_TOOLS_H_
 
 /* STRUCTURES
  * ================================================================
  */
 
-
+#ifdef NEVER
 /* Structure for passing menu data */
 typedef struct _menu
 {
@@ -33,7 +36,7 @@ typedef struct _mn_set
    LONG   Speed;		/* The scroll speed delay */
    WORD   Height;		/* The menu scroll height */
 }MN_SET;
-
+#endif
 
 
 typedef struct _mrets
@@ -422,3 +425,6 @@ typedef struct _menu_node
 /* these are defined or should have been defined in gemlib etc */
 #define BEG_MCTRL	3
 #define END_MCTRL	2
+
+#endif
+

@@ -36,27 +36,19 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <osbind.h>
-#include <gemdefs.h>
-#include <deskwin.h>
-#include <error.h>
-#include <message.h>
-#include <deskusa.h>
-#include <error.h>
-#include <extern.h>
-
-EXTERN	char	*get_fstring();
-EXTERN	char	*malloc();
-EXTERN	VOID	free();
-EXTERN	char	*r_slash();
-EXTERN	char 	*strcat();
-EXTERN	char 	*strcpy();
-EXTERN	OBJECT	*get_tree();
-EXTERN	BYTE	*g_name();
-EXTERN	WORD	fill_string();
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "osbind.h"
+/*#include "gemdefs.h"*/
+#include "deskwin.h"
+#include "error.h"
+#include "message.h"
+#include "deskusa.h"
+#include "error.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 
 /* "DMA" buffer structure for Fsfirst() and Fsnext().	*/
@@ -107,13 +99,11 @@ MLOCAL int	f_cancel;	/* some one want to cancel	*/
 *	there is only one destination
 */
 
-	WORD
-dofiles(s, d, code, ndirs, nfiles, tsize, type, multiple, handle)
-	BYTE	*s, *d;
-	WORD	code,type,multiple,handle;
-	LONG	*ndirs,*nfiles,*tsize;
+WORD
+dofiles( BYTE *s, BYTE *d, WORD code, LONG *ndirs, LONG *nfiles, LONG *tsize, 
+		 WORD type, WORD multiple, WORD handle)
 {
-	WORD	ret,trash;
+	WORD	ret;  /*trash; */
 	BYTE	buffer[2];
 
 	if ( *d == 'c' )
@@ -154,7 +144,7 @@ dofiles(s, d, code, ndirs, nfiles, tsize, type, multiple, handle)
 
 	  if ( ( d_display ) && ( code != OP_COUNT ) )
 	  {
-	    inf_sset( cpbox, CSDRIVE, buffer );
+	    inf_sset( (LONG)cpbox, CSDRIVE, buffer );
 	    wind_update( 1 );
 	    w_draw_fld( handle, cpbox, CSDRIVE );
 	    wind_update( 0 );
@@ -248,9 +238,8 @@ clnup:
 
 /* do the rm, cp and mv file job */
 
-	WORD
-doright( flag )
-	int flag;
+WORD
+doright( int flag )
 {
 	REG int 	ret,retmsg;
 	char	*temp, buf[14];
@@ -286,7 +275,7 @@ doright( flag )
 	  if (opcode != OP_COPY)
 	  {
 redel:
-	     if ( (ret = Fdelete(fixsrc)) )	
+	     if ( (ret = (WORD)Fdelete(fixsrc)) )	
 	     {				/* seek error or drive not ready */
 /*		if ( (ret == E_SEEK) || (ret == EDRVNR) )	
 	      	{
@@ -339,11 +328,11 @@ endright:
 
 /* recursively cp or mv or rm files or directoies from a given path */
 
-	int
-doact()
+int
+doact( VOID )
 {
-	char 		*saved;
-	DMABUFFER 	*dumb;
+/*	char 		*saved; */
+	DMABUFFER 	*dumb, * saved;
 	REG int 	ret, retmsg;
 	int		error;
 
@@ -352,8 +341,8 @@ doact()
 act_1:	  do1_alert( STFO8DEE );
 	  return( FALSE );
 	}
-
-	if ( !( dumb = (char *)malloc( (LONG)sizeof( DMABUFFER ) ) ) )
+	/* changed CHAR * to DMABUFFER * in expression below - JTT */
+	if ( !( dumb = (DMABUFFER *)malloc( (LONG)sizeof( DMABUFFER ) ) ) )
 	  goto act_1; 
 	
 	f_level++;
@@ -511,7 +500,7 @@ clndir:
 		if (opcode == OP_COPY)
 		  goto clnfile;
 remvf:
-		if (ret = (Fdelete(fixsrc))) 	/* rm the file from source */
+		if (ret = (WORD)(Fdelete(fixsrc))) 	/* rm the file from source */
 		{			/* seek error or drive not ready */
 /*		  if ((ret == E_SEEK) || (ret == EDRVNR))
 		  {
@@ -563,9 +552,8 @@ mvend:
  *	routine to do the counting
 */
 
-	WORD
-count( s )
-	char	*s;
+WORD
+count( char *s )
 {
 	char	*tmp;
 	int	ret;
@@ -591,14 +579,14 @@ count( s )
 
 /* count the file and directory recursivly */
 
-	WORD
-countrec()
+WORD
+countrec( VOID )
 {
-	char 		*saved;
-	DMABUFFER 	*dumb;
+/*	char 		*saved; */
+	DMABUFFER 	*dumb, *saved;
 	REG int 	retmsg;
 	
-	dumb = malloc( (LONG)sizeof(DMABUFFER) );
+	dumb = (DMABUFFER *)malloc( (LONG)sizeof(DMABUFFER) );
 	if ( !dumb )
 	{
 	  do1_alert( STFO8DEE );
@@ -662,15 +650,14 @@ endrec:
 
 /* Copy the file from the s to d */
 
-	WORD
-wrfile( fstr )
-	char *fstr;
+WORD
+wrfile( char *fstr )
 {
 	REG int 	ret, retmsg;
 	int 		inhand,outhand;
 	int		time[2];
-	DMABUFFER 	*mydta;
-	char 		*buffer, *saved;
+	DMABUFFER 	*mydta, *saved;
+	char 		*buffer;
 	long 		copysiz, bufsiz, wrsiz, tmpsiz; 
 	int 		crted,sttime;
 	char		buf[2];
@@ -680,7 +667,7 @@ wrfile( fstr )
 	retmsg = TRUE;
 	rename = 0;
 open:					/* open the source file	*/
-	if ( ( inhand = Fopen(fixsrc, 0) ) < 0 )		
+	if ( ( inhand = (WORD)Fopen(fixsrc, 0) ) < 0 )		
 	{				/* seek error or drive not ready */	
 /*	  if ( (inhand == E_SEEK) || (inhand == EDRVNR) )
 	    return( FALSE );
@@ -768,7 +755,7 @@ rechkd:
 
 	  if ( Frename(0, fixsrc, fixdst) >= 0 )
    	  {	
-	    inhand = Fopen( fixdst, 0 );
+	    inhand = (WORD)Fopen( fixdst, 0 );
 	    if ( !p_timedate )		/* get the new time and date */
 	    {
 	      time[0] = Tgettime();
@@ -780,7 +767,7 @@ y22:
 	    goto y1;
 	  }
 	  else
-	    inhand = Fopen( fixsrc, 0 );		
+	    inhand = (WORD)Fopen( fixsrc, 0 );		
 	}
 
 
@@ -809,7 +796,7 @@ create:
 	  {
 	    sttime = 0;
 
-	    if ((outhand = Fcreate(fixdst, mydta->d_fattr&7)) < 0)	
+	    if ((outhand = (WORD)Fcreate(fixdst, mydta->d_fattr&7)) < 0)	
 	    {
 	      if ( ( ret = fill_string( fixdst, CNTCRTFL ) ) == 2 )
 		goto create;
@@ -884,9 +871,8 @@ y3:
 /* Copy s and d into fixsrc and fixdst. Also check it is one file
    copy or files and directories copy */
 
-	int
-getinfo(s, d)
-	char *s, *d;
+int
+getinfo(char *s, char *d)
 {
 	int 	sdir, ddir;
 	int	ret;
@@ -939,9 +925,8 @@ getinfo(s, d)
 }
 
 
-	WORD
-created(dir)
-char *dir;
+WORD
+created( char *dir )
 {
 	int 	ret;
 	char	*ptr;
@@ -992,8 +977,8 @@ ll_1:			/* update the number of dir */
 
 
 
-	WORD
-deleted()
+WORD
+deleted( VOID )
 {
 	int	ret;
 	char	buffer[14];
@@ -1032,9 +1017,8 @@ domore:
  * 	if s0 -> c:\d1\d2\*.* or c:\d1\d2\f, after the call,
  *	s1 -> c:\d1\d2\  or c:\d1\d2\f ; 			*/
 
-	WORD
-mystrcp(s0, s1 )
-	char *s0, *s1;
+WORD
+mystrcp( char *s0, char *s1 )
 {
 	register char *ptr;
 
@@ -1050,10 +1034,8 @@ mystrcp(s0, s1 )
 
 /* check the size of source buffer */
 
-	VOID
-chkbuf(len, bufsiz, src)
-	int len, bufsiz;
-	char **src;
+VOID
+chkbuf(int len, int bufsiz, char **src)
 {
 	char *ptr;
 
@@ -1072,9 +1054,8 @@ chkbuf(len, bufsiz, src)
 /* s -> c:\d1\d2\*.* or c:\d1\d2\, obj -> f; after the call
  * s -> c:\d1\d2\f							*/
 
-	VOID
-addfile(s, obj)
-	char *s, *obj;
+VOID
+addfile(char *s, char *obj)
 {
 	register char *ptr;
 
@@ -1092,9 +1073,8 @@ addfile(s, obj)
 /* src -> c:\d1\d2\*.* or -> c:\d3\d5\, after the call,
  * src -> c:\d1\d2 or -> c:\d3\d5				*/
 
-	VOID
-rmstarb(src)
-	register char *src;
+VOID
+rmstarb( register char *src)
 {
 	while (*src++);		
 
@@ -1108,9 +1088,8 @@ rmstarb(src)
 /* str -> c:\d1\d2\ or c:\d1\d2\*.* or c:\d2\d4 or c:\; after the call,
  * str -> c:\d1\  or c:\d2\ or c:\		*/
 
-	VOID
-backdir(str)
-	register char *str;
+VOID
+backdir( register char *str)
 {
 	while (*str++);
 
@@ -1129,10 +1108,8 @@ backdir(str)
 
 /* check the directory or file is exist or not */
 
-	int
-chkdf( str, flag )
-	char *str;
-	int flag;
+int
+chkdf( char *str, int flag )
 {
 	REG int 	ret;
 	int	first,change;
@@ -1149,7 +1126,7 @@ chkdf( str, flag )
 	  if ( write_save )	/* overwrite existing file	*/
 	    return( OK );
 
-cc_1:	  if ( (ret = Fopen(fixdst, 0)) >= 0 )	
+cc_1:	  if ( (ret = (WORD)Fopen(fixdst, 0)) >= 0 )	
 	  {			 		/* file exist */
 	    Fclose( ret );
 cc_3:	    ret = edname( str, CPFILE, change );
@@ -1173,7 +1150,7 @@ cc_3:	    ret = edname( str, CPFILE, change );
 		    
 cc_6:	  Dsetdrv(*fixdst - 'A');
 
-	  if ( !( ret = Dsetpath( fixdst + 2 ) ) )	/* direcory exist */
+	  if ( !( ret = (WORD)Dsetpath( fixdst + 2 ) ) )	/* direcory exist */
 	  {
 cc_5:	    ret1 = edname( str, CPDIR, change ); 	/* update name conflict box */
 	
@@ -1196,11 +1173,8 @@ cc_5:	    ret1 = edname( str, CPDIR, change ); 	/* update name conflict box */
 }
 
 
-	int
-edname(src, kind, change)
-	char 	*src;
-	int	kind;
-	int	change;
+int
+edname(char *src, int kind, int change)
 {
 	int 	but;
 	REG OBJECT	*obj;
@@ -1208,14 +1182,13 @@ edname(src, kind, change)
 	obj = get_tree( SAMENAME );
 
 	pack(src, 0);
-	strcpy(src, ((TEDINFO *)(obj[FNAME].ob_spec))->te_ptext);
-	strcpy(src, ((TEDINFO *)(obj[EDFNAME].ob_spec))->te_ptext);
+	strcpy(src, (BYTE *)((TEDINFO *)(obj[FNAME].ob_spec))->te_ptext);
+	strcpy(src, (BYTE *)((TEDINFO *)(obj[EDFNAME].ob_spec))->te_ptext);
 /*	obj[COPY].ob_state = NORMAL;
 	obj[SKIP].ob_state = NORMAL;
 	obj[QUIT].ob_state = NORMAL;
 */
-	((TEDINFO*)(obj[SNAME].ob_spec))->te_ptext = 
-			get_fstring( ( change ) ? RNAME : NCONFLICT );
+	((TEDINFO*)(obj[SNAME].ob_spec))->te_ptext = (LONG)get_fstring( ( change ) ? RNAME : NCONFLIC );
 
 /*	desk_mice( ARROW );	*/
 /*	fm_draw( SAMENAME, FALSE );	*/
@@ -1223,10 +1196,10 @@ edname(src, kind, change)
 	switch( but = fmdodraw( SAMENAME, 0 ) )
 	{
 	    case COPY:	
-     	      if (!strcmp(((TEDINFO *)(obj[EDFNAME].ob_spec))->te_ptext, src)) 
+     	      if (!strcmp((BYTE *)((TEDINFO *)(obj[EDFNAME].ob_spec))->te_ptext, src)) 
 	      {			/* user edit the new name */
-		strcpy( ((TEDINFO *)(obj[EDFNAME].ob_spec))->te_ptext,src);
-		strcpy( src, ((TEDINFO *)(cpbox[kind].ob_spec))->te_ptext);
+		strcpy( (BYTE *)((TEDINFO *)(obj[EDFNAME].ob_spec))->te_ptext,src);
+		strcpy( src, (BYTE *)((TEDINFO *)(cpbox[kind].ob_spec))->te_ptext);
 		pack(src,1);
 		backdir(fixdst);
 		strcat(src, fixdst);
@@ -1250,7 +1223,7 @@ edname(src, kind, change)
 	  
 	  if ( d_display )
 	  {
-	    draw_loop( whandle, cpbox, 0, MAX_DEPTH, 0, 0, full.w, full.h );
+	    draw_loop( whandle, cpbox, 0, MAX_DEPTH, 0, 0, full.g_w, full.g_h );
 /*	    fm_draw( CPBOX, FALSE );	*/
 	  }
 /*	  else
@@ -1265,10 +1238,8 @@ edname(src, kind, change)
 /* pack	 : src -> file    rsc, after the call; src -> file.rsc	*/
 /* unpack: buf -> unpack.rsc, after the call, buf -> unpack  rsc.  */
 
-	VOID
-pack( src, flag )
-	char *src;
-	int flag;
+VOID
+pack( char *src, int flag )
 {
 	char temp[14];
 
@@ -1283,9 +1254,8 @@ pack( src, flag )
 /* src -> c:\f or c:\d1\f or c:\f\, or c:\f\*.*, after the call,
    buf -> f. But if src ->c:\, then buf -> Null 	*/
 
-	VOID
-getlastpath(buf, src)
-	register char *buf, *src;
+VOID
+getlastpath(register char *buf, register char *src)
 {
 	register	char *tmp;
 
@@ -1298,29 +1268,26 @@ getlastpath(buf, src)
 	if (*tmp == '*')			/* src -> c:\f\*.* */
 		tmp -= 3;				
 	if (*(tmp-1) == ':')			/* src -> c:\ */
-	  return OK;
+	  return; /*( OK );*/
 
   	while (*--tmp != '\\');			/* back one more path */	
 
 	while ((*buf = *++tmp) != '\\')
-		if (!*buf++)	return OK;
+		if (!*buf++)	return; /*( OK ); */
 	*buf = '\0';
 }
 
 
 /* up date the number of file or directory in the dialog box */
-
-	VOID
-updatnum( index, num )
-	int 	index;
-	long 	num;
+VOID
+updatnum( int index, int num )
 {
 	if ( d_display )
 	{
 	  f_str( cpbox, index, num );
 	  if ( wind_update( 0x0101 ) )
 	  {
-	    if ( w_draw_fld( whandle, cpbox, index ) == WM_CLOSED )
+	    if ( w_draw_fld( whandle, cpbox, index ) == WM_CLOSE )
 	      f_cancel = TRUE;
 
 	    wind_update(0);
@@ -1330,19 +1297,17 @@ updatnum( index, num )
 
 /* up date the file or directory in the dialog box */
 
-	VOID
-updatname( index, str )
-	int 	index; 
-	char 	*str;
+VOID
+updatname( int index, char *str )
 {
 	if ( d_display )
 	{
 	  pack(str,0);
-	  strcpy(str, ((TEDINFO *)(cpbox[index].ob_spec))->te_ptext);
+	  strcpy(str, (BYTE *)((TEDINFO *)(cpbox[index].ob_spec))->te_ptext);
 	  pack(str,1);
 	  if ( wind_update( 0x0101 ) )
 	  {
-	    if ( w_draw_fld( whandle, cpbox, index ) == WM_CLOSED )
+	    if ( w_draw_fld( whandle, cpbox, index ) == WM_CLOSE )
 	      f_cancel = TRUE;
 
 	    wind_update(0);	
@@ -1351,21 +1316,20 @@ updatname( index, str )
 }
 
 
-	VOID
-updatbox(str)
-	char *str;
+VOID
+updatbox( char *str)
 {
 	if ( d_display )
 	{
 	  pack(str,0);
-	  strcpy(str, ((TEDINFO *)(cpbox[CPDIR].ob_spec))->te_ptext);
+	  strcpy(str, (BYTE *)((TEDINFO *)(cpbox[CPDIR].ob_spec))->te_ptext);
 	  pack(str,1);
-	  strcpy("_", ((TEDINFO *)(cpbox[CPFILE].ob_spec))->te_ptext);
+	  strcpy("_", (BYTE *)((TEDINFO *)(cpbox[CPFILE].ob_spec))->te_ptext);
 	  wind_update( 1 );
-	  draw_loop( whandle, cpbox, HIDECBOX, MAX_DEPTH, 0, 0, full.w, full.h );
+	  draw_loop( whandle,cpbox,HIDECBOX,MAX_DEPTH,0,0,full.g_w,full.g_h );
 	  wind_update( 0 );
 
-	  if ( wait_msg( whandle, cpbox ) == WM_CLOSED )
+	  if ( wait_msg( whandle, cpbox ) == WM_CLOSE )
 	    f_cancel = TRUE;
 	}
 }

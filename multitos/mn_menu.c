@@ -43,56 +43,40 @@
  *			- Added MTOP_FLAG() and MB_FLAG()
  *			  This signifies that a submenu is attached.
  *			  The MenuID is in the extended object type.
+ *
+ * 02/11/93   cjg	- Convert to Lattice C 5.51
+ * 02/19/93   cjg	- Force the use of Prototypes
  */
 
 
 /* INCLUDE FILES
  * ================================================================
  */
-#include <portab.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <osbind.h>
+#include "pgem.h"
+#include "pmisc.h"
 
-#include "mn_tools.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "osbind.h"
+
+
 
 
 /* EXTERNS
  * ================================================================
  */
-/* in MN_EVENT.C */
-
-EXTERN WORD	MenuBar_Mode;
-EXTERN	BYTE	*dos_xalloc();
-EXTERN BYTE   	UpText[];
-EXTERN BYTE   	DownText[];
-
-
-/* in MN_INDEX.C */
+EXTERN WORD	  MenuBar_Mode;
+EXTERN BYTE   	  UpText[];
+EXTERN BYTE   	  DownText[];
 EXTERN PNODE_PTR  IndexList;
+EXTERN GRECT 	  gl_rfull;	/* GRECT of the full window area */
+EXTERN WORD	  gl_hchar;
+EXTERN WORD	  gl_wchar;
 
 
-/* in GEMBIND.C */
-EXTERN VOID	ob_delete();
-EXTERN VOID	ob_add();
 
-
-/* in APGSXIF.S */
-EXTERN GRECT 	gl_rfull;	/* GRECT of the full window area */
-EXTERN WORD	gl_hchar;
-EXTERN WORD	gl_wchar;
-
-
-/* in OPTIMIZE.C */
-EXTERN BYTE	*strcpy();
-EXTERN WORD	min();
-
-/* must be declared here, or redeclarations occur */
-MENU_PTR	GetMenuPtr();
 
 /* GLOBALS
  * ================================================================
@@ -172,14 +156,14 @@ WORD	MenuID;				/* MenuID of node to delete*/
    if( ( MenuPtr = GetMenuPtr( MenuID )) > NULL ) /* Get the Ptr to the node*/
    {					/* YUP!                   */
      if(  MBUFFER( MenuPtr ) )		/* If the menu buffer is  */
-	dos_free( MBUFFER( MenuPtr ));	/* still around, delete it*/
+	dos_free( ( LONG )MBUFFER( MenuPtr ));	/* still around, delete it*/
      MBUFFER( MenuPtr ) = NULL;		/* and clear the variable */
 
      ptr = MenuList;			/* Get the ptr to the head*/
      if( ptr == MenuPtr )		/* Is the Node the 1st one*/
      {					/* Yes! so update the ptr */
 	MenuList = MNEXT( ptr );	/* and give us a new head */
-        dos_free( ptr );			/* So Long to the Node    */
+        dos_free( ( LONG )ptr );			/* So Long to the Node    */
      }
      else					   /* Its not the first */
      {
@@ -188,7 +172,7 @@ WORD	MenuID;				/* MenuID of node to delete*/
 	if( MNEXT( ptr ) == MenuPtr )		   /* Until we find it  */
         {					   /* and delete it!    */
 	   MNEXT( ptr ) = MNEXT( MenuPtr );
-           dos_free( MenuPtr );
+           dos_free( ( LONG )MenuPtr );
         }
      }
    }
@@ -217,8 +201,8 @@ mn_init( VOID )
     /* These are required to make the menu system work and strut its stuff*/
     Init_Delays();
     SetMaxHeight( INIT_MAX_HEIGHT );
-    MenuList  = NULLPTR;  /* Clear out the Master Menu Node Pointer */
-    IndexList = NULLPTR;  /* Clear the SubMenu Index Master Pointer */
+    MenuList  = ( MENU_PTR )NULLPTR;  /* Clear out the Master Menu Node Pointer */
+    IndexList = ( PNODE_PTR )NULLPTR;  /* Clear the SubMenu Index Master Pointer */
     MenuBar_Mode = 0;	  /* 8/3/92 */	
 }
 
@@ -271,9 +255,9 @@ REG MENU_PTR	MenuPtr;		/* ptr to the Menu Node */
      MB_FLAG( MenuPtr )   = NONE;
      MB_TXT( MenuPtr )[0] = '\0';
 
-     MBUFFER( MenuPtr )      = NULLPTR;
-     MPREV( MenuPtr )        = NULLPTR;
-     MNEXT( MenuPtr )	     = NULLPTR;
+     MBUFFER( MenuPtr )      = ( LONG *)NULLPTR;
+     MPREV( MenuPtr )        = ( MENU_PTR )NULLPTR;
+     MNEXT( MenuPtr )	     = ( MENU_PTR )NULLPTR;
 
      MSCROLL( MenuPtr )	     = FALSE;
 }
@@ -302,7 +286,7 @@ GetNewMenu( VOID )
 
    if( ( MenuID = FindNewMenuID()) == NULL ) /* Get us a new and unused ID!   */
    {
-       dos_free( newptr );		/* free the node		 */
+       dos_free( ( LONG )newptr );	/* free the node		 */
        return( NULL );			/* a zero to the powers above.   */
    }
 
@@ -548,8 +532,8 @@ BOOLEAN		adjust_flag;		/* see above...            */
      */
      for( obj = MSCROLL( MenuPtr ); obj < offset_obj; obj++ )
      {
-	ObH( parent ) -= ObH( obj );  /* fixup height of root menu */
-        ob_delete( tree, obj );       /* delete object in question */
+	ObH( parent ) -= ObH( obj );    /* fixup height of root menu */
+        ob_delete( ( LONG )tree, obj ); /* delete object in question */
      }
 
     /* update the yoffset starting from the offset object + MSCROLL()
@@ -585,7 +569,7 @@ BOOLEAN		adjust_flag;		/* see above...            */
     for( obj = MLAST_CHILD( MenuPtr ); obj > MB_OBJ( MenuPtr ); obj-- )
     {
        ObH( parent ) -= ObH( obj );
-       ob_delete( tree, obj );
+       ob_delete( ( LONG )tree, obj );
     }
 
     if( MLASTFLAG( MenuPtr ) )		/* CJG 01/13/92 */
@@ -649,7 +633,7 @@ REG MENU_PTR	MenuPtr;	/* ptr to the menu node... */
     while( obj != parent )
     {
 	temp = ObNext( obj );
-        ob_delete( tree, obj );
+        ob_delete( ( LONG )tree, obj );
         ObH( parent ) -= ObH( obj );
 	obj = temp;
     }
@@ -657,7 +641,7 @@ REG MENU_PTR	MenuPtr;	/* ptr to the menu node... */
     /* Add in all the menu items again...*/
     for( obj = MFIRST_CHILD( MenuPtr ); obj <= MLAST_CHILD( MenuPtr ); obj++ )
     {
-       ob_add( tree, parent, obj );
+       ob_add( ( LONG )tree, parent, obj );
        if( IsSelected( obj ) )
            Deselect( obj );
        ObH( parent ) += gl_hchar;
@@ -798,7 +782,7 @@ WORD		start_obj;	/* the menu item that we want on top*/
 
 	/* Add in the objects preceding up to offset_obj */
 	for( obj = offset_obj; obj < MTOP_OBJ( MenuPtr ); obj++ )
-	   ob_add( MTREE( MenuPtr ), MPARENT( MenuPtr ), obj );
+	   ob_add( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ), obj );
 	MTOP_OBJ( MenuPtr ) = offset_obj;
 
         /* Delete the bottom object or objects.*/
@@ -806,7 +790,7 @@ WORD		start_obj;	/* the menu item that we want on top*/
 			   MLAST_CHILD( MenuPtr ) );
 
 	for( obj = ( new_bottom + 1 ); obj <= MB_OBJ( MenuPtr ); obj++ )
-             ob_delete( MTREE( MenuPtr ), obj );
+             ob_delete( ( LONG )MTREE( MenuPtr ), obj );
 	MB_OBJ( MenuPtr ) = new_bottom;
     }
     else
@@ -815,14 +799,14 @@ WORD		start_obj;	/* the menu item that we want on top*/
 
         /* Delete the starting objects. */
 	for( obj = MTOP_OBJ( MenuPtr ); obj < offset_obj; obj++ )
-           ob_delete( MTREE( MenuPtr ), obj );
+           ob_delete( ( LONG )MTREE( MenuPtr ), obj );
         MTOP_OBJ( MenuPtr ) = offset_obj;
       
         /* Add in the bottom objects */
         new_bottom = min( (MAX_MENU_HEIGHT - MSCROLL(MenuPtr))+start_obj,
 			   MLAST_CHILD( MenuPtr ) );
         for( obj = MB_OBJ( MenuPtr ) + 1; obj <= new_bottom; obj++ )
-           ob_add( MTREE( MenuPtr ), MPARENT( MenuPtr ), obj );
+           ob_add( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ), obj );
         MB_OBJ( MenuPtr ) = new_bottom;
     }
 

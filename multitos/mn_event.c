@@ -49,86 +49,48 @@
  * 07/01/92  cjg   - The scroll flag now lets one start scrolling from
  *		     an object other than the first child of the parent.
  * 09/22/92  cjg   - pop_blit() - use ob_gclip()
+ *
+ * 02/11/93  cjg   - Converted to Lattice C 5.51
+ * 02/19/93  cjg   - Force the use of Prototype Files
  */
+
 
 /* INCLUDE FILES
  * ================================================================
  */
-#include <portab.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <osbind.h>
+#include "pgem.h"
+#include "pmisc.h"
 
-#include "mn_tools.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "osbind.h"
+
 
 
 /* EXTERNS
  * ================================================================
  */
-
 EXTERN	OBJECT	*mn_addr;
-EXTERN	BYTE	*dos_xalloc();
-
-/* MN_MENU.C */
-EXTERN VOID	MenuScrollAdjust();
 EXTERN WORD	MAX_MENU_HEIGHT;
-
-/* MN_SUBMN.C*/
-EXTERN BOOLEAN   CheckForSubMenu();
-EXTERN MENU_PTR  DoSubMenu();
-EXTERN VOID	 HideSubMenu();
-
-EXTERN LONG SUBMENU_DELAY;	/* Menu Display Delay       */
-EXTERN LONG SUBDRAG_DELAY;	/* Drag mouse to Menu Delay */
-EXTERN LONG SCROLL_DELAY;	/* scrolling delay */
-EXTERN LONG ARROW_DELAY;	/* start scrolling delay */
-
-
-/* MN_MBAR.C*/
-/*EXTERN BOOLEAN	Menu_Set();*/
-
+EXTERN LONG 	SUBMENU_DELAY;	/* Menu Display Delay       */
+EXTERN LONG 	SUBDRAG_DELAY;	/* Drag mouse to Menu Delay */
+EXTERN LONG 	SCROLL_DELAY;	/* scrolling delay */
+EXTERN LONG 	ARROW_DELAY;	/* start scrolling delay */
 EXTERN BOOLEAN  MenuBar_Mode;
 EXTERN GRECT    ActiveRect;
 EXTERN GRECT    TitleRect;
 EXTERN OBJECT   *gl_mtree;
 EXTERN WORD	buparm;
-
-/* OPTIMIZE.S */
-EXTERN WORD 	strcmp();
-EXTERN BOOLEAN  rc_intersect();
-EXTERN BOOLEAN	inside();
-
-
-/* GEMOBLIB.C */
-EXTERN VOID	ob_actxywh();
-EXTERN VOID	ob_find();
-
-
-/* MN_TOOLS.C */
-EXTERN VOID	ObjcDraw();
-EXTERN VOID	rc_2xy();
-
-
-EXTERN VOID	ev_timer();
-
 EXTERN WORD	gl_hchar;
 EXTERN GRECT	gl_rfull;
 EXTERN GRECT	gl_rscreen;
 EXTERN GRECT	gl_rzero;
-EXTERN VOID	gsx_sclip();
 EXTERN WORD	gl_nplanes;
-EXTERN VOID	gsx_mon();
-EXTERN VOID	gsx_moff();
 
-EXTERN VOID	ob_gclip();		/* cjg 09/22/92 */
 
-/* PROTOTYPES
- * ================================================================
- */
+
 
 /* GLOBALS
  * ================================================================
@@ -185,13 +147,13 @@ xdo_chg( tree, iitem, chgvalue, dochg, dodraw, usetrap )
 	  curr_state &= ~chgvalue;
 
 	if ( usetrap )
-	    objc_change( tree, iitem, 0, gl_rscreen.g_x,
+	    objc_change( ( LONG )tree, iitem, 0, gl_rscreen.g_x,
 			 gl_rscreen.g_y, gl_rscreen.g_w,
 			 gl_rscreen.g_h, curr_state, dodraw );
 	else
 	{
 	  gsx_sclip( &gl_rscreen );
-	  ob_change( tree, iitem, curr_state, dodraw );
+	  ob_change( ( LONG )tree, iitem, curr_state, dodraw );
 	}
 
 	return( TRUE );
@@ -586,7 +548,7 @@ do_more:
 		    	     */
 		    	    if( inside( mk.x, mk.y, &ActiveRect ) )
                    	    {
-				title = ob_find( gl_mtree, THEACTIVE, 1, mk.x, mk.y );
+				title = ob_find( ( LONG )gl_mtree, THEACTIVE, 1, mk.x, mk.y );
 				if( title != NIL )
 				{
 				   /* Check if we are in the same menu title OR
@@ -600,11 +562,11 @@ do_more:
 
 				       /* Set the M1 RECT to LOOK IN at our current rectangle */
           			       m1.m_out = FALSE;	
-				       ob_actxywh( MTREE( MenuPtr ), MPARENT( MenuPtr ), ( GRECT *)&m1.m_x );
+				       ob_actxywh( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ), ( GRECT *)&m1.m_x );
 
 				       /* Set M2 to Look OUT of the title */
           			       m2.m_out = TRUE;	
-				       ob_actxywh( gl_mtree, title, ( GRECT *)&m2.m_x );
+				       ob_actxywh( ( LONG )gl_mtree, title, ( GRECT *)&m2.m_x );
 								       
 				       continue;
 			     	       /*goto skip;*/   
@@ -974,14 +936,14 @@ MRETS		*mk;
 
 	  }
           m1->m_out = TRUE;	/* Look for leaving this menu item */
-          ob_actxywh( MTREE( MenuPtr ), cur_obj, ( GRECT *)&m1->m_x );
+          ob_actxywh( ( LONG )MTREE( MenuPtr ), cur_obj, ( GRECT *)&m1->m_x );
 
        }
        else	/* We are OUTSIDE the Menu! */
        {
 	  /* Set the M1 RECT to LOOK IN at our current rectangle */
           m1->m_out = FALSE;	
-          ob_actxywh( MTREE( MenuPtr ), MPARENT( MenuPtr ), ( GRECT *)&m1->m_x );
+          ob_actxywh( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ), ( GRECT *)&m1->m_x );
 	  
 	  /* If the current menu ISN'T the ROOT MENU, then set M2
 	   * into pixel search mode. Of course, set it to this mode
@@ -1009,8 +971,7 @@ MRETS		*mk;
  		 * Set M2 to look into the Active!
 		 */
 	       m2->m_out = FALSE;
-/*    	       ob_actxywh( MTREE( MenuPtr ), THEACTIVE, ( GRECT *)&m2->m_x );	*/
-    	       ob_actxywh( gl_mtree, THEACTIVE, ( GRECT *)&m2->m_x );	
+    	       ob_actxywh( ( LONG )gl_mtree, THEACTIVE, ( GRECT *)&m2->m_x );	
              }
 	     *mn_mask  = MU_BUTTON | MU_M1 | MU_M2;
 	  }
@@ -1066,15 +1027,7 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
 	
    ActiveTree( MTREE( MenuPtr ) );
 
-#if 0
-   clip = MOBRECT( MenuPtr );	/* Get the clipping rectangle  */
-   clip.g_x -= 1;		/* Adjust for boundaries       */
-   clip.g_y -= 1;
-   clip.g_w += 4;
-   clip.g_h += 4;
-#endif
-
-   ob_gclip( MTREE( MenuPtr ), MPARENT( MenuPtr ), &dummy,&dummy,
+   ob_gclip( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ), &dummy,&dummy,
 	     &clip.g_x,&clip.g_y,&clip.g_w,&clip.g_h );
 
    rc_intersect( &gl_rfull, &clip );	/* clip to the work area*/
@@ -1085,7 +1038,7 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
        size = (LONG)(( LONG ) ((LONG)( ((LONG)clip.g_w + 15L )/16L )*2L)*
               (LONG)clip.g_h * (LONG)gl_nplanes );
                
-       MBUFFER( MenuPtr ) = dos_xalloc( size, 3 );
+       MBUFFER( MenuPtr ) = ( LONG *)dos_xalloc( size, 3 );
    }
    if( !MBUFFER( MenuPtr ) )	 /* No memory - FAILURE        */
    {
@@ -1094,7 +1047,7 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
    }
 
    /* Setup the Destination MFDB */
-   ObjMFDB.fd_addr    = (long*)MBUFFER( MenuPtr ) + 1L;
+   ObjMFDB.fd_addr    = (LONG)MBUFFER( MenuPtr ) + 1L;
    ObjMFDB.fd_w       = clip.g_w;
    ObjMFDB.fd_h       = clip.g_h;
    ObjMFDB.fd_wdwidth = ( clip.g_w + 15 ) / 16;       
@@ -1110,7 +1063,7 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
        pxy[4] = pxy[5] = 0;		/* set destination   */
        pxy[6] = clip.g_w - 1;
        pxy[7] = clip.g_h - 1;
-       vro_cpyf( 3, pxy, ( FDB *)&location, &ObjMFDB );
+       vro_cpyfm( 3, pxy, ( WORD *)&location, ( WORD *)&ObjMFDB );
    }
    else
    {					/* BUFFER to SCREEN! */
@@ -1118,10 +1071,10 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
        pxy[2] = clip.g_w - 1;
        pxy[3] = clip.g_h - 1;
        rc_2xy( &clip, ( WORD *)&pxy[4] ); /* set the dest    */
-       vro_cpyf( 3, pxy, &ObjMFDB, ( FDB *)&location );
+       vro_cpyfm( 3, pxy, ( WORD *)&ObjMFDB, ( WORD *)&location );
 
        if( MBUFFER( MenuPtr ) )		/* Clear the buffer  */
-           dos_free( MBUFFER( MenuPtr ) );
+           dos_free( ( LONG )MBUFFER( MenuPtr ) );
        MBUFFER( MenuPtr ) = NULL;
    }
    gsx_sclip( &gl_rscreen );		/* set clip to screen */
@@ -1191,7 +1144,7 @@ ArrowScroll( MenuPtr, cur_obj )
 REG MENU_PTR	MenuPtr;	/* ptr to the menu node     */
 REG WORD        cur_obj;	/* the obj being clicked on */
 {
-   REG GRECT   clip;		/* the blit clip rectangle  */
+   GRECT       clip;		/* the blit clip rectangle  */
    MRETS       mk;		/* the mouse structure      */
    GRECT       rect;		/* temp GRECT		    */
 
@@ -1203,7 +1156,6 @@ REG WORD        cur_obj;	/* the obj being clicked on */
    BOOLEAN     UpArrowFlag;	/* Up arrow clicked on      */
    BOOLEAN     DownArrowFlag;	/* Down arrow clicked on    */
    BOOLEAN     DelayFlag;	/* Do the scroll delay      */
-   WORD        dummy;
 
    WORD	       done;
    WORD        event;	   	/* evnt_multi event    		     */
@@ -1224,7 +1176,7 @@ REG WORD        cur_obj;	/* the obj being clicked on */
 
 
    m1.m_out = TRUE;	/* Look for leaving this menu item */
-   ob_actxywh( MTREE( MenuPtr ), cur_obj, ( GRECT *)&m1.m_x );
+   ob_actxywh( ( LONG )MTREE( MenuPtr ), cur_obj, ( GRECT *)&m1.m_x );
    mn_mask = MU_BUTTON | MU_M1 | MU_TIMER;
 
    /* In order to get here, cur_obj cannot be NIL. */
@@ -1268,10 +1220,7 @@ REG WORD        cur_obj;	/* the obj being clicked on */
           /* get the clipping Rectangle */
 	  clip = *( GRECT *)&MTREE( MenuPtr )[ MTOP_OBJ( MenuPtr )].ob_x;
 
-/*
-          ob_offset( MTREE( MenuPtr ), MPARENT( MenuPtr ), &clip.g_x, &clip.g_y );
- */
-          ob_offset( MTREE( MenuPtr ), MTOP_OBJ( MenuPtr ), &clip.g_x, &clip.g_y );
+          ob_offset( ( LONG )MTREE( MenuPtr ), MTOP_OBJ( MenuPtr ), &clip.g_x, &clip.g_y );
 
 	  /* This is MAX_MENU_HEIGHT because to get here we needed to
            * scroll the menu, therefore, its automatically, MAX_MENU_HEIGHT
@@ -1280,7 +1229,6 @@ REG WORD        cur_obj;	/* the obj being clicked on */
 	  /* The height is the number of visible objects in the scrolling
 	   * area - set by ( BOTTOM - TOP ) + 1 == # of objects
 	   */
-/*          clip.g_h *= (( MB_OBJ( MenuPtr ) - MTOP_OBJ( MenuPtr ) ) + 1 );*/
 	   clip.g_h *= ( ( MAX_MENU_HEIGHT - MSCROLL( MenuPtr )) + 1);
 
 
@@ -1311,7 +1259,7 @@ REG WORD        cur_obj;	/* the obj being clicked on */
 
           /* BLIT the screen portion in the proper direction */ 
 	  gsx_moff();
-          vro_cpyf( 3, pxy, (FDB*)&location,(FDB*)&location);
+          vro_cpyfm( 3, pxy, ( WORD*)&location,(WORD*)&location);
 	  gsx_mon();
 
 	  gsx_sclip( &gl_rscreen );
@@ -1324,11 +1272,11 @@ REG WORD        cur_obj;	/* the obj being clicked on */
 	    /* Redraw the Down arrow if its needed and not already drawn */
 	    if( !DownArrowFlag && ( MB_OBJ( MenuPtr ) != MLAST_CHILD( MenuPtr ) ) )
             {
-		ob_actxywh( MTREE( MenuPtr), MB_OBJ( MenuPtr ), &rect );
+		ob_actxywh( ( LONG )MTREE( MenuPtr), MB_OBJ( MenuPtr ), &rect );
 		MTREE( MenuPtr )[ MB_OBJ( MenuPtr ) ].ob_state = NORMAL;
 		ObjcDraw( MTREE( MenuPtr ), MPARENT( MenuPtr ), &rect );
             }
-	    ob_actxywh( MTREE( MenuPtr ), MTOP_OBJ( MenuPtr ), &rect );
+	    ob_actxywh( ( LONG )MTREE( MenuPtr ), MTOP_OBJ( MenuPtr ), &rect );
 
 	    if( MTOP_OBJ( MenuPtr ) != MSCROLL( MenuPtr ) )
 	    {  /* Draw 1 item...*/
@@ -1347,10 +1295,10 @@ REG WORD        cur_obj;	/* the obj being clicked on */
              if( !UpArrowFlag && ( MTOP_OBJ( MenuPtr ) != MSCROLL( MenuPtr) ) )
              {
 	       MTREE( MenuPtr )[ MTOP_OBJ( MenuPtr )].ob_state = NORMAL;
-	       ob_actxywh( MTREE( MenuPtr ), MTOP_OBJ( MenuPtr ), &rect );
+	       ob_actxywh( ( LONG )MTREE( MenuPtr ), MTOP_OBJ( MenuPtr ), &rect );
                ObjcDraw( MTREE( MenuPtr ), MPARENT( MenuPtr ), &rect );
              }
-	     ob_actxywh( MTREE( MenuPtr ), MB_OBJ( MenuPtr ), &rect );
+	     ob_actxywh( ( LONG )MTREE( MenuPtr ), MB_OBJ( MenuPtr ), &rect );
 
              /* Draw at least one item. */
              rect.g_y -= gl_hchar;
@@ -1421,7 +1369,7 @@ REG WORD        cur_obj;	/* the obj being clicked on */
 	   * The blit routines need to know whether or not to draw
 	   * based upon the current object and the last menu item in the menu.
 	   */
-          cur_obj = ob_find( MTREE( MenuPtr ), MPARENT( MenuPtr ),
+          cur_obj = ob_find( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ),
 	                       1, mk.x, mk.y );
    	  if( !cur_obj || ( cur_obj == MPARENT( MenuPtr ) ) ) 
                cur_obj = NIL;
@@ -1491,7 +1439,7 @@ REG MENU_PTR	MenuPtr;		/* ptr to the node we want checked*/
 {
   REG WORD cur_obj;
 
-  cur_obj = ob_find( MTREE( MenuPtr ), MPARENT( MenuPtr ),
+  cur_obj = ob_find( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ),
 		       1, mk->x, mk->y );
 
   if( !cur_obj || ( cur_obj == MPARENT( MenuPtr ) ) ) 

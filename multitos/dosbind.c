@@ -5,20 +5,23 @@
 /*	Add do_cdir		1/28/88		D.Mui			*/
 /*	Use MAC to assemble	6/29/90		D.Mui			*/
 /*	Restore into C language	from 3.01	8/31/90	D.Mui		*/
-
-#include	<gemdos.h>
-#include 	<machine.h>
+/*	Convert to Lattice C 5.51		2/17/93	C.Gee		*/
+/*	Force the use of prototypes		2/25/93 C.Gee		*/
+#include "pgem.h"
+#include "pmisc.h"
+#include "gemdos.h"
+#include "machine.h"
 
 EXTERN	LONG	trap();
-EXTERN	BYTE	*r_slash();
 
 GLOBAL	WORD	DOS_AX;
+
 
 /*  I know what this does, but I don't
 *  know why it's supposed to do it.
 */
 	WORD
-isdrive()
+isdrive( VOID )
 {
 	return( dos_sdrv( dos_gdrv() ) );
 }
@@ -41,7 +44,7 @@ pgmld( pname, ldaddr, tail, envrn )
   	LONG	length;
   	LONG	*temp;
   
-	if ( *ldaddr = trap( X_EXEC, 3, pname, tail, envrn ) )
+	if ( *ldaddr = ( LONG *)trap( X_EXEC, 3, pname, tail, envrn ) )
 	{
   	  temp = *ldaddr;		/* code+data+bss lengths */
   	  length = temp[3] + temp[5] + temp[7] + 0x150;
@@ -71,7 +74,7 @@ dos_sfirst(pspec, attr)
 
 
 	WORD			/* 8/31/90	*/
-dos_snext()
+dos_snext( VOID )
 {
   	REG LONG		ret;
 
@@ -91,8 +94,6 @@ dos_open(pname, access)
   	BYTE		*pname;
   	WORD		access;
 {
-  	LONG		ret;
-  
   	return( (WORD)trap( X_OPEN, pname, access ) );
 }
 
@@ -145,7 +146,7 @@ dos_gdir(drive, pdrvpath)
   	WORD		drive;
   	LONG		pdrvpath;
 {
- 	return( trap(X_GETDIR,pdrvpath,drive) );
+ 	return( ( WORD )trap(X_GETDIR,pdrvpath,drive) );
 }
 
 
@@ -165,19 +166,19 @@ dos_xalloc(nbytes, type)
 
 
 	WORD
-dos_gdrv()
+dos_gdrv( VOID )
 {
-	return( trap(X_GETDRV) );
+	return( ( WORD )trap(X_GETDRV) );
 }
 
 
 /*	Set dta buffer	*/
 
-	VOID
+	WORD
 dos_dta(ldta)
 	LONG		ldta;
 {
-	return(trap(X_SETDTA,ldta));
+	return( ( WORD )trap(X_SETDTA,ldta));
 }
 
 
@@ -185,7 +186,7 @@ dos_dta(ldta)
 dos_close(handle)
 	WORD		handle;
 {
-	return( trap(X_CLOSE,handle) );
+	return( ( WORD )trap(X_CLOSE,handle) );
 }
 
 
@@ -193,8 +194,6 @@ dos_close(handle)
 dos_chdir(pdrvpath)
 	LONG		pdrvpath;
 {
-	LONG		ret;
-
 	return( trap( X_CHDIR, pdrvpath ) );
 }
 
@@ -205,7 +204,7 @@ dos_free(maddr)
 {
 	Debug7( "AES frees " );
 	Ndebug7( maddr );
-	return( trap(X_MFREE,maddr) );
+	return( ( WORD )trap(X_MFREE,maddr) );
 }
 
 
@@ -213,7 +212,7 @@ dos_free(maddr)
 dos_sdrv(newdrv)
 	WORD		newdrv;
 {
-	return( trap(X_SETDRV,newdrv) );
+	return( ( WORD )trap(X_SETDRV,newdrv) );
 }
 
 
@@ -223,7 +222,7 @@ do_cdir( drive, path )
 	BYTE	*path;
 {
 	trap( X_SETDRV, drive );
-	return( trap( X_CHDIR, path ) );
+	return( ( WORD )trap( X_CHDIR, path ) );
 }
 
 
@@ -250,7 +249,7 @@ dos_setdir( path, mode )
 
 	if ( path[0] == '\\' )		/* at the current root	*/
 	{
-	   dos_chdir( "\\" );
+	   dos_chdir( ( LONG )"\\" );
 	   return;
 	}
 
@@ -260,19 +259,19 @@ dos_setdir( path, mode )
 	  return; 
 	
 	if ( mode )
-	  dos_chdir( &path[2] );
+	  dos_chdir( ( LONG )&path[2] );
 	else
 	{
 	  ptr = r_slash( path );
 	  if ( &path[2] == ptr )
 	  {
 	    Debug1( "Set to root\r\n" );		
-	    dos_chdir( "\\" );
+	    dos_chdir( ( LONG )"\\" );
 	  }
 	  else
 	  {
 	    *ptr = 0;
-	    dos_chdir( &path[2] );
+	    dos_chdir( ( LONG )&path[2] );
 	    *ptr = '\\';	
 	  }
 	}

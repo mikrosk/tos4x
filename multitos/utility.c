@@ -5,7 +5,8 @@
 /*	remove mid,cmps 06/10/85		Mike Schmal		*/
 /*		bit_num	06/10/85		Mike Schmal		*/
 /*	Fix the bfill	4/3/86			Derek Mui		*/
-
+/*	02/16/93	cjg	Convert to Lattice C 5.51		*/
+/*	02/22/93	cjg	Force the use of prototypes		*/
 
 /*	-------------------------------------------------------------
 *	GEM Application Environment Services		  Version 1.1
@@ -13,11 +14,11 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pmisc.h"
 
-#include <portab.h>
-#include <machine.h>
-#include <objaddr.h>
-#include <obdefs.h>
+#include "machine.h"
+#include "objaddr.h"
+
 
 EXTERN WORD	gl_wchar;
 EXTERN WORD	gl_hchar;
@@ -104,7 +105,7 @@ lbintoasc( longval, buffer )
 	{
 	  while( longval )
 	  {
-	    divten = longval / 10;
+	    divten = longval / 10L;
 	    digit = (int)(longval - ( divten * 0x0AL ));
 	    buf1[i++] = '0' + digit;
 	    longval = divten;
@@ -132,7 +133,7 @@ asctobin( ptr, value )
 	{
 	  if ( ( *ptr >= '0' ) && ( *ptr <= '9' ) )
 	  {
-	    n1 = ( 10 * n1 ) + ( *ptr - '0' );
+	    n1 = ( 10L * n1 ) + (LONG)( *ptr - '0' );
 	    if ( n1 >= n )
 	      n = n1;
 	    else
@@ -150,7 +151,7 @@ asctobin( ptr, value )
 /* 	Routine to set the variables x,y,w,h to the values found
 *	in an x,y,w,h block (grect)
 */
-
+	VOID
 r_get(pxywh, px, py, pw, ph)
 	REG WORD	*pxywh;
 	WORD		*px, *py, *pw, *ph;
@@ -165,7 +166,7 @@ r_get(pxywh, px, py, pw, ph)
 /* 	Routine to set a x,y,w,h block to the x,y,w,h  
 *	values passed in.
 */
-
+	VOID
 r_set(pxywh, x, y, w, h)
 	REG WORD	*pxywh;
 	WORD		x, y, w, h;
@@ -181,7 +182,7 @@ r_set(pxywh, x, y, w, h)
 *	seting the x,y of the inner box to remain within the
 *	constraining box.
 */
-
+	VOID
 rc_constrain(pc, pt)
 	REG GRECT	*pc;
 	REG GRECT	*pt;
@@ -198,7 +199,7 @@ rc_constrain(pc, pt)
 
 
 /* 	Copy src xywh block to dest xywh block.		*/
-
+	VOID
 rc_copy(psxywh, pdxywh)
 	REG WORD	*psxywh;
 	REG WORD	*pdxywh;
@@ -588,7 +589,7 @@ fs_sset(tree, obj, pstr, ptext, ptxtlen)
 	REG LONG	spec;
 
 	*ptext = LLGET( spec = LLGET(OB_SPEC(obj)) );
-	LSTCPY(*ptext, pstr);
+	LSTCPY( ( BYTE *)*ptext, ( BYTE *)pstr);
 	*ptxtlen = LWGET( spec + 24 );
 }
 
@@ -602,7 +603,8 @@ inf_sset(tree, obj, pstr)
 	LONG		text;
 	WORD		txtlen;
 
-	fs_sset(tree, obj, ADDR(pstr), &text, &txtlen);
+/*	fs_sset(tree, obj, ADDR(pstr), &text, &txtlen);*/
+	fs_sset( tree, obj, ( LONG )pstr, &text, &txtlen );
 }
 
 
@@ -615,7 +617,7 @@ fs_sget(tree, obj, pstr)
 	LONG		ptext;
 
 	ptext = LLGET( LLGET(OB_SPEC(obj)) );
-	LSTCPY(pstr, ptext);
+	LSTCPY( ( BYTE *)pstr, ( BYTE *)ptext);
 }
 
 
@@ -630,7 +632,8 @@ inf_sget(tree, obj, pstr)
 	WORD		obj;
 	BYTE		*pstr;
 {
-	fs_sget(tree, obj, ADDR(pstr));
+/*	fs_sget(tree, obj, ADDR(pstr));*/
+	fs_sget(tree, obj, ( LONG )pstr );
 }
 
 
@@ -695,20 +698,23 @@ inf_what(tree, ok, cncl)
 }
 
 
-	WORD
+	VOID
 merge_str(pdst, ptmp, parms)
 	REG BYTE	*pdst;
 	REG BYTE	*ptmp;
 	UWORD		parms[];	
 {
-	REG WORD		num;
+	REG WORD	num;
 	WORD		do_value;
 	BYTE		lholder[12];
-	REG BYTE		*pnum;
+	REG BYTE	*pnum;
 	BYTE		*psrc;
-	REG LONG		lvalue, divten;
+	REG LONG	lvalue, divten;
 	WORD		digit;
+	LONG		*parms2;
+	WORD		*wtmp;
 
+	parms2 = (LONG *)parms;
 	num = 0;
 	while(*ptmp)
 	{
@@ -724,18 +730,20 @@ merge_str(pdst, ptmp, parms)
 		*pdst++ = '%';
 		break;
 	      case 'L':
-		lvalue = *((LONG *) &parms[num]);
-		num += 2;
+		lvalue = *((LONG *) &parms2[num]);
+		num += 1;
 		do_value = TRUE;
 		break;
 	      case 'W':
-		lvalue = parms[num];
-		num += 2;
+		wtmp = (WORD *)&parms2[num];
+		lvalue = *wtmp;
+		num += 1;
 		do_value = TRUE;
 		break;
 	      case 'S':
-		psrc = (BYTE *) parms[num]; 
-		num += 2;
+		lvalue = *((LONG *) &parms2[num]);
+		psrc = (BYTE *) lvalue; 
+		num += 1;
 		while(*psrc)
 		  *pdst++ = *psrc++;
 		break;
@@ -745,8 +753,8 @@ merge_str(pdst, ptmp, parms)
 	      pnum = &lholder[0];
 	      while(lvalue)
 	      {
-		divten = lvalue / 10;
-		digit = (WORD) lvalue - (divten * 10);
+		divten = lvalue / 10L;
+		digit = (WORD)( lvalue - (divten * 10L));
 		*pnum++ = '0' + digit;
 		lvalue = divten;
 	      }

@@ -12,6 +12,8 @@
 /*	Take out gl_fakemsg at hctl_button	2/17/88		D.Mui	*/ 
 /*	Take out gl_fakemsg at hctl_button	6/25/90		D.Mui	*/
 /*	Fixed at hctl_window to check if button is pressed 6/6/92	*/
+/*	Convert to Lattice C 5.51		2/17/93		C.Gee	*/
+/*	Force the use of prototypes		2/24/93		C.Gee	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -28,30 +30,27 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <windlib.h>
-#include <message.h>
-#include <gemlib.h>
-#include <aesmint.h>
-#include <signal.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "windlib.h"
+#include "message.h"
+#include "aesmint.h"
+#include "signal.h"
+
+/* FROM DESKMISC.C */
+VOID	rep2_path( BYTE *name, BYTE *path );
+
+
+
 
 #define THEDESK 	3
 #define MBDOWN 		0x0001
 #define BELL 		0x07	
 
-EXTERN	WINDOW	*wm_top();
-EXTERN	WINDOW	*srchwp();
-EXTERN	WORD	runaes();
-EXTERN	PD	*fpdnm();
-EXTERN	PD	*idtopd();
-EXTERN	PD	*pstart();
-EXTERN	PD	*get_pd();
 
 EXTERN	PD	*shellpd;
 EXTERN	WORD	cpdid;
@@ -167,7 +166,7 @@ c_clipdraw( pwin, cpt, pointer )
 	BYTE	*pointer;
 {
 	waitforaes();
-	w_clipdraw( pwin, cpt, NULLPTR );
+	w_clipdraw( pwin, cpt, ( GRECT *)NULLPTR );
 	releaes();
 }
 			
@@ -190,7 +189,7 @@ ct_msgup(message, owner, wh, m1, m2, m3, m4)
 	msg[5] = m2;
 	msg[6] = m3;
 	msg[7] = m4;	
-	appl_write( owner, EV_BUFSIZE, msg );
+	appl_write( owner, EV_BUFSIZE, ( BYTE *)msg );
 }
 
 
@@ -202,8 +201,6 @@ ct_wmsgup(message, owner, wh, m1, m2, m3, m4)
 	WORD		owner, wh;
 	WORD		m1, m2, m3, m4;
 {
-	WORD		msg[8];
-
 	if ( message )
 	{
 	  while( gl_button & 0x01 ); 
@@ -218,21 +215,20 @@ ct_wmsgup(message, owner, wh, m1, m2, m3, m4)
 hctl_window( mx, my )
 	WORD		mx, my;
 {
-	GRECT		t, f, real;
+	GRECT		f, real;
 	WORD		set, w_handle, x, y, w, h, buttonset;
 	WORD		wm, hm;
 	WORD		mstate, kind, xelev, yelev;
 	REG WORD	message, cpt;
 	REG WINDOW	*pwin;
 	WORD		rets[8];
-	LONG		bwait;
 	PD		*p;
 	REG OBJECT	*obj;
 
 	if ( ( w_handle = wind_find( mx, my ) ) == NIL )
 	  return;
 
-	graf_mouse( M_ARROW|0xC000, (BYTE*)0 );
+	graf_mouse( M_ARROW|0xC000, 0L );
 
 	waitforaes();
 	pwin = srchwp( w_handle );
@@ -245,7 +241,7 @@ hctl_window( mx, my )
 	cpt = objc_find( obj, W_BOX, MAX_DEPTH, mx, my );
 /*	t = pwin->curr;	*/
 /*	rc_intersect( &gl_rfull, &t );	*/
-	r_get( &pwin->curr, &x, &y, &w, &h );
+	r_get( ( WORD *)&pwin->curr, &x, &y, &w, &h );
 	kind = pwin->kind;
 	p = pwin->owner;
 	buttonset = TRUE;
@@ -301,7 +297,7 @@ hctl_window( mx, my )
 		{
 		  obj[cpt].ob_state |= SELECTED;		  
 		  c_clipdraw( pwin, cpt, NULLPTR );
-		  r_set(&f, 0, gl_hbox,(gl_rscreen.g_w + w - gl_wbox - 6), 10000);
+		  r_set( ( WORD *)&f, 0, gl_hbox,(gl_rscreen.g_w + w - gl_wbox - 6), 10000);
 		  graf_dragbox( w, h, x, y, f.g_x, f.g_y, f.g_w, f.g_h, &x, &y );
 		  if ( ( mx == gl_xrat ) && ( my == gl_yrat ) )
 		    message = 0;
@@ -451,7 +447,7 @@ h_2:	      if ( w_handle != gl_topw )
 	    c_clipdraw( pwin, cpt, NULLPTR );
 	  }
 
-	  graf_mouse( M_RESTORE, (BYTE*)0 );
+	  graf_mouse( M_RESTORE, 0L );
 	  return;
 }
 
@@ -493,6 +489,7 @@ hctl_rect( mx, my )
 	OBJECT		*obj;
 	WORD		keyret,pmenu;
 	LONG		*ptree;
+	WORD		temp1, temp2;
 
 	if ( ( gl_mntree != 0x0L ) && ( inside( mx, my, &gl_rmnactv ) ) )
 	{
@@ -505,15 +502,15 @@ hctl_rect( mx, my )
 #endif
 
 	  if ( idtopd( gl_kbid )->p_mobj != -1 )
-	  {
-	    /* clean up all the check mark in the menu */
-	    for( i = 0; i <= obj[0].ob_tail; i++ )
-	      xdo_chg( obj, i, CHECKED, FALSE, FALSE, TRUE  );
+ 	  {
+ 	    /* clean up all the check mark in the menu */
+ 	    for( i = 0; i <= obj[0].ob_tail; i++ )
+ 	      xdo_chg( obj, i, CHECKED, FALSE, FALSE, TRUE  );
 	    xdo_chg( mn_addr, idtopd( gl_kbid)->p_mobj, CHECKED, TRUE, FALSE, TRUE );
 	  }
 	  kill = FALSE;		/* assume we will not kill the process */
 
-	  if ( mn_hdo( &title, &ptree, &pmenu, &item, &keyret ) )
+	  if ( mn_hdo( &title, ( OBJECT **)&ptree, &pmenu, &item, &keyret ) )
 	  {
 	    if ( keyret & 0x04 )
 	      kill = TRUE;	
@@ -556,7 +553,7 @@ hctl_rect( mx, my )
 		      if ( ( kill ) && ( p != scr_pd ) )
 		      {
 		  	if ( p->p_events & 0x01 )
-			  ct_wmsgup( AP_TERM, owner, 0, 0, 0, 0 );
+			  ct_wmsgup( AP_TERM, owner, 0, 0, 0, 0, 0  );
 			else
 			  Pkill( p->p_sysid, SIGTERM );
 		      }
@@ -576,11 +573,15 @@ hctl_rect( mx, my )
 
 	    }/* if desk menu	*/
 
-	    ct_wmsgup( mesag, owner, title, item, ptree, pmenu );
+	    temp1 = (WORD) (( (LONG)ptree >> 16L ) & 0x0000FFFFL );
+	    temp2 = (WORD) ( (LONG)ptree & 0x0000FFFFL );
+
+	    ct_wmsgup( mesag, owner, title, item, temp1, temp2, pmenu );
 
 	  }/* menu item selected */
 	}/* if hit the menu	*/
 h_exit:
+	return;
 }
 
 
@@ -658,7 +659,7 @@ c1:	  if ( !( p = p->p_thread ) )
 */	
 
 	WORD
-hctl_timer()
+hctl_timer( VOID )
 {
 	BYTE		name[10];
 	UWORD		id,type,mode;
@@ -702,7 +703,7 @@ hctl_timer()
 
 	    if ( !( type & 1 ) )/* if not system process */
 	    {
-	       if ( Pkill( appl_find( 0xFFFE0000L|(LONG)id ), 0 ) )
+	       if ( Pkill( appl_find( ( BYTE *)(0xFFFE0000L|(LONG)id) ), 0 ) )
 		 appl_term( id );	
 	    }
 	  }
@@ -759,13 +760,13 @@ hctl_timer()
 /*	Process 1 - Screen manager 	*/
 
 	VOID
-screenmgr()
+screenmgr( VOID )
 {
 	REG WORD	ev_which;
 	WORD		rets[6];
 	WORD		msgbuff[8];
-	WORD		cont,i;
-	PD		*p;
+	WORD		cont;
+	LONG		temp;
 
 	Bigstack();
 
@@ -799,8 +800,8 @@ screenmgr()
 				 gl_ctwait.m_y,
 				 gl_ctwait.m_w,
 				 gl_ctwait.m_h,
-				 msgbuff,
-				 (ctrl_shut ? 0x10 : 0x500),0x0,
+				 ( LONG )msgbuff,
+ 				 (ctrl_shut ? 0x10 : 0x500),0x0,
 				 &rets[0], &rets[1],
 				 &rets[2],
 				 &rets[3],
@@ -821,9 +822,11 @@ screenmgr()
 	  if (ev_which & MU_M1)
 	    hctl_rect( rets[0], rets[1] );
 
-	  if (ev_which & MU_KEYBD )
-	    hctl_keybd( rets[3], rets[4] );
-
+	  if (ev_which & MU_KEYBD ) {
+	    temp = ((LONG) rets[3] << 16L) & 0xFFFF0000L;
+	    temp = temp | (LONG) rets[4];
+	    hctl_keybd( temp );
+	  }
 	  wind_update(0);
 			
 	}while( cont );
@@ -846,19 +849,19 @@ drawit( handle, px, obj, start )
 
 	wind_update(1);
 
-	graf_mouse( M_OFF, (BYTE*)0 );
+	graf_mouse( M_OFF, 0L );
 
 	wind_get( handle, WF_FIRSTXYWH, &pt.g_x, &pt.g_y, &pt.g_w, &pt.g_h );
 
 	while( pt.g_w && pt.g_h )
 	{
 	  if ( rc_intersect( px, &pt ) )
-	    objc_draw( obj, start, MAX_DEPTH, pt.g_x, pt.g_y, pt.g_w, pt.g_h );
+	    objc_draw( ( LONG )obj, start, MAX_DEPTH, pt.g_x, pt.g_y, pt.g_w, pt.g_h );
 
 	  wind_get( handle, WF_NEXTXYWH, &pt.g_x, &pt.g_y, &pt.g_w, &pt.g_h );
 	}
 
-	graf_mouse( M_ON, (BYTE*)0 );
+	graf_mouse( M_ON, 0L );
 
 	wind_update(0);
 }
@@ -870,8 +873,8 @@ drawit( handle, px, obj, start )
 hctl_mesag( msgbuff )
 	WORD	msgbuff[];
 {
-	PD		*p,*p1;
-	WORD		item,x,y;
+	PD		*p;
+	WORD		item;
 	BYTE		name[16];	/* file name 	*/
 	BYTE		buffer[128];	/* path buffer 	*/
 	WORD		button;
@@ -887,7 +890,7 @@ hctl_mesag( msgbuff )
 	  switch( item )
 	  {
 	    case 1:		/* Restart desktop */	
-	      if ( !shel_write( 12, 0, 0, (BYTE*)0, (BYTE*)0 ) )
+	      if ( !shel_write( 12, 0, 0, 0L, 0L ) )
 	        form_alert( 1, a_faildesk );
 	      else
 	      {			/* Screen is not the shell anymore */ 
@@ -899,18 +902,18 @@ hctl_mesag( msgbuff )
    	    case 2:		/* Load another application	*/		
 	      strcpy( "C:\\BIN\\*.PRG", buffer );
 	      name[0] = 0;
-	      fsel_exinput( buffer, name, &button, loadapp );
+	      fsel_exinput( ( LONG )buffer, ( LONG )name, &button, loadapp );
 	      if ( button )	/* if OK */
 	      {
-	        rep_path( name, buffer );
-	        if ( !shel_write( 0, 0, 0, buffer, "" ) )
+	        rep2_path( name, buffer );
+	        if ( !shel_write( 0, 0, 0, ( LONG )buffer, 0L ) )
 	          form_error( 8 );
 	      }
 	      break;	
 	    default:
 	      break;		 
 	  }	
-	  menu_tnormal( scr_pd->p_mnaddr, msgbuff[3], 1 );
+	  menu_tnormal( ( LONG )scr_pd->p_mnaddr, msgbuff[3], 1 );
 	  return( TRUE );
 	}
 
@@ -935,7 +938,7 @@ hctl_mesag( msgbuff )
 	      gl_kbid = p->p_pid;	/* force the mouse ownership	*/
 
 	      if ( ( p->p_mnaddr ) && ( p->p_pid != gl_mnpid ) )
-		menu_bar( p, TRUE|0x0100 );
+		menu_bar( ( OBJECT *)p, TRUE|0x0100 );
 
 	      break;
 
@@ -948,13 +951,13 @@ hctl_mesag( msgbuff )
 	      if ( p == scr_pd )
 		break;
 
-	      shel_envrn( &bptr, AE_SREDRAW );
+	      shel_envrn( ( LONG )&bptr, ( LONG )AE_SREDRAW );
 	      if ( bptr ) 
 	      {
 		if ( *bptr == '1' )
 		{
 	      	   if ( ( p->p_mnaddr ) && ( p->p_pid != gl_mnpid ) )
-	             menu_bar( p, TRUE|0x0100 );
+	             menu_bar( ( OBJECT *)p, TRUE|0x0100 );
 	      	   else
 	             menu_bar( (OBJECT*)0, TRUE|0x0200 );
 
@@ -971,7 +974,7 @@ hctl_mesag( msgbuff )
 	
 	      if ( p != scr_pd )	
 	      {	
-	        shel_envrn( &bptr, AE_TREDRAW );
+	        shel_envrn( ( LONG )&bptr, ( LONG )AE_TREDRAW );
 	        if ( bptr ) 
 	        {
 		  if ( *bptr == '1' )
@@ -984,7 +987,7 @@ hctl_mesag( msgbuff )
 	      if ( shutdown )	/* it is determined in swap_next	*/
 		break;
 l_1:
-	      graf_mouse( M_ARROW, (BYTE*)0 );		
+	      graf_mouse( M_ARROW, 0L );		
 	      form_dial( 3, 0, 0, 0, 0, gl_rfull.g_x, gl_rfull.g_y, gl_rfull.g_w, 
 		 	 gl_rfull.g_h );
 	      break;
@@ -1011,11 +1014,11 @@ l_1:
 	      break;
 
 	    case 8:			/* update the menu bar */
-	      menu_bar( p, TRUE|0x0100 );
+	      menu_bar( ( OBJECT *)p, TRUE|0x0100 );
 	      break;
 
 	    case 9:			/* swap out the menu bar */
-	      menu_bar( p, 0x0200 );
+	      menu_bar( ( OBJECT *)p, 0x0200 );
 	      break;
 	      	
 	    default:
@@ -1030,16 +1033,31 @@ l_1:
 /*	Create a screen manager	*/
 
 	PD
-*iscrmgr()
+*iscrmgr( VOID )
 {
 					/* create a screen process */
 	if ( gl_mowner = scr_pd = get_pd( "SCREEN", AESSYSTEM ) )
 	{
 	  gl_kbid = gl_mowner->p_pid;
-	  pstart( scr_pd, &runaes, &screenmgr );
+	  pstart( scr_pd, &runaes, ( BYTE *)&screenmgr );
 	  srchwp( 0 )->owner = scr_pd;
 	  ps_rename( scr_pd->p_sysid, "SCREEN.", TRUE );	
 	}
 
 	return( scr_pd );
+}
+
+
+
+/*	Replace path			*/
+/*	A:\aaa\*.* -> A:\aaa\bbb	*/
+/* COPIED FROM DESKMISC.C		*/
+	VOID
+rep2_path( name, path )
+	BYTE	*name;
+	BYTE	*path;
+{
+	path = r_slash( path );	
+	path++;
+	strcpy( name, path ); 
 }

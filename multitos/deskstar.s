@@ -70,10 +70,10 @@ _ctrl_cnts:			 	* Application Manager
 	.dc.b	2, 1, 1			* func 033	menu_tnormal	
 	.dc.b	1, 1, 2			* func 034	menu_text	
 	.dc.b	1, 1, 1			* func 035	menu_register	
-	.dc.b	0, 0, 0			* func 036		
-	.dc.b	0, 0, 0			* func 037		
-	.dc.b	0, 0, 0			* func 038		
-	.dc.b	0, 0, 0			* func 039		
+	.dc.b	2, 1, 2			* func 036	menu_popup	
+	.dc.b	2, 1, 2			* func 037	menu_attach	
+	.dc.b	3, 1, 1			* func 038	menu_istart	
+	.dc.b	1, 1, 1			* func 039	menu_setting	
 *							 Object Manager
 	.dc.b	2, 1, 1			* func 040	objc_add		
 	.dc.b	1, 1, 1			* func 041	objc_delete	

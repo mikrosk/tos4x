@@ -2,17 +2,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/gemfslib.c,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemfslib.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: gemfslib.c,v $
-*  Revision 1.2  93/03/08 20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.2  89/04/26  18:23:06  mui
 * TT
 * 
@@ -87,6 +90,8 @@
 /*	Mininum height of slide bar is 1		1/6/92	D.Mui	*/
 /*	Use Mxalloc instead of Malloc			3/30/92		*/
 /*	Add ini_fsel to adjust drive boxes	7/15/92		D.Mui	*/
+/* 	02/17/93	cjg	Converted to Lattice C 5.51		*/
+/*	02/24/93	cjg	Force the use of prototypes		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -103,33 +108,35 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemdos.h>
-#include <rslib.h>
-#include <gemlib.h>
-#include <gemusa.h>
+#include "machine.h"
+#include "objaddr.h"
+#include "gemdos.h"
+#include "rslib.h"
+#include "gemusa.h"
 
 #define LEN_FSNAME 16
 #define NM_NAMES 9
 #define DEVICES	16	/* sixteen devices	*/
 #define LPATH	128
 
+
+
 typedef	struct	fstruct
 {
 	BYTE	snames[LEN_FSNAME];
 } FSTRUCT;
 
-EXTERN	BYTE	toupper();			
-EXTERN	BYTE	*dos_xalloc();
-EXTERN  WORD	DOS_AX;
+
+static VOID		r_sort( REG FSTRUCT *buffer, WORD count );
+
 EXTERN  LONG	trap();
 EXTERN	LONG	trap13();
 
+
+EXTERN  WORD	DOS_AX;
 EXTERN	WS	gl_ws;
 EXTERN	WORD	q_change;
 EXTERN  GRECT	gl_rcenter;
@@ -228,7 +235,6 @@ REG	LONG	tree;
 	WORD	curdrv,savedrv,firstry;
 	BYTE	dirbuffer[122];
 	BYTE	scopy[16];	
-	BYTE	*chrptr;	
 	BYTE	chr;
 	LONG	**lgptr;
 	GRECT	clip;
@@ -249,6 +255,8 @@ REG	LONG	tree;
 	rs_gaddr(ad_sysglo, R_TREE, SELECTOR, &ad_fstree);
 	ob_center(ad_fstree, &gl_rfs);
 
+	gsx_mxmy( &mx, &my );		/* cjg 02/17/93 */
+
 	firstry = TRUE;
 	fs_first = TRUE;		/* first enter		*/	
 	last = F1NAME;			/* last selected file	*/
@@ -258,19 +266,18 @@ REG	LONG	tree;
 
 	curdrv = defdrv + DRIVEA;
 					/* save for default dr	*/ 
-	pxpath = dos_xalloc( (LONG)( ( WORD )LPATH * ( WORD )( DEVICES + 1 ) ), 
-			     3 );
+	pxpath = ( PATHSTRUCT *)dos_xalloc( (LONG)( ( WORD )LPATH * ( WORD )( DEVICES + 1 ) ),3 );
 
 	if ( !pxpath )
 	  goto bye2;
 					/* allocate dta buffer	*/
-	ad_fsdta = dos_xalloc( 0x00000100L, 3 );	
+	ad_fsdta = ( BYTE *)dos_xalloc( 0x00000100L, 3 );	
 
 	if ( !ad_fsdta )		/* no buffer, bail out	*/
 	  goto bye;
 
 					/* get all the memory	*/
-	mul = dos_xalloc( -1L, 3 );
+	mul = ( LONG )dos_xalloc( -1L, 3 );
 					/* we shouldn't need more than 256K! */
 	if (mul > 262144L)
 	  mul = 262144L;		/* ++ERS 1/19/93 */
@@ -280,33 +287,34 @@ REG	LONG	tree;
 
 	if ( ( !mul ) || ( fs_fnum < (LONG)NM_NAMES ) )
 	{
-	  dos_free( ad_fsdta );
-bye:	  dos_free( pxpath );
+	  dos_free( ( LONG )ad_fsdta );
+bye:	  dos_free( ( LONG )pxpath );
 bye2:	  fm_show( NOMEMORY, 0x0L, 1 );
 	  wm_update( 2 );
 /*	  currpd->p_state = state;	*/
 	  return( FALSE );
 	}
 	else
-	  ad_fsnames = dos_xalloc( mul, 3 );  
+	  ad_fsnames = ( FSTRUCT *)dos_xalloc( mul, 3 );  
 
 
-	savepath = pxpath;		/* save the address	*/
-	pathcopy = savepath;
-	pxpath = savepath + (WORD)LPATH;	
+	savepath = ( LONG )pxpath;		/* save the address	*/
+	pathcopy = ( BYTE *)savepath;
+	pxpath = ( PATHSTRUCT *)( savepath + (WORD)LPATH );	
 
 	fm_dial( FMD_START, &gl_rcenter, &gl_rfs );
 
-	xtree = obj = tree = ad_fstree;
+	xtree = obj = ( OBJECT *)ad_fstree;
+	tree = ( LONG )ad_fstree;
 	
-	lgptr = OB_SPEC( FDIRECTORY );	/* change the buffer pointer */
-	**lgptr = dirbuffer;
+	lgptr = ( LONG **)OB_SPEC( FDIRECTO );	/* change the buffer pointer */
+	**lgptr = ( LONG )dirbuffer;
 
 
-	fs_sset( tree, FLABEL, lstring, &addr, &addr );
-	fs_sset( tree, FDIRECTORY, "", &ad_fpath, &addr ); 
-	fs_sset( tree, FTITLE, "", &ad_title, &addr );
-	fs_sset( tree, FSELECTION, "", &ad_select, &addr );
+	fs_sset( tree, FLABEL, ( LONG )lstring, &addr, ( WORD *)&addr );
+	fs_sset( tree, FDIRECTO, ( LONG)"", ( LONG *)&ad_fpath, ( WORD *)&addr ); 
+	fs_sset( tree, FTITLE, ( LONG )"", &ad_title, ( WORD*)&addr );
+	fs_sset( tree, FSELECTI, ( LONG )"", &ad_select, ( WORD *)&addr );
 
 						/* get the current drive */
 	count = isdrive();
@@ -331,7 +339,7 @@ bye2:	  fm_show( NOMEMORY, 0x0L, 1 );
 
 	for ( i = 0; i < NM_NAMES; i++ )	/* clean up fields	*/
 	{
-	  fs_sset( tree, label, " ", &addr, &addr );
+	  fs_sset( tree, label, ( LONG )" ", &addr, ( WORD *)&addr );
 	  LWSET( OB_STATE( label++ ), NORMAL );
 	}
 
@@ -351,7 +359,7 @@ bye2:	  fm_show( NOMEMORY, 0x0L, 1 );
 
 	ob_draw( tree, 0, MAX_DEPTH );		/* draw the box		*/
 
-	fmt_str( pisel, scopy );		
+	fmt_str( ( BYTE *)pisel, scopy );		
 
 	strcpy( pipath, ad_fpath );		/* make a copy		*/
 
@@ -363,7 +371,8 @@ bye2:	  fm_show( NOMEMORY, 0x0L, 1 );
 	fs_topptr = 0;
 	botptr = 0;
 
-	ret = FDIRECTORY;			/* initial action	*/
+	ret = FDIRECTO;			/* initial action	*/
+	bret = 0;			/* cjg 02/17/93		*/
 
 	do
 	{
@@ -395,7 +404,7 @@ cg_1:
 	        mul = ((LONG)( count - NM_NAMES )) * (LONG)(value);
 	        if ( fs_topptr != ( mul / 1000 ) )
 	        {
-		  fs_topptr = mul / 1000;
+		  fs_topptr = ( UWORD )( mul / 1000 );
 	          r_sfiles( fs_topptr, value );
 	        }
 	      }
@@ -451,10 +460,10 @@ sfiles:
 	      gsx_sclip( &gl_rfs );
 
 	      *( fs_back( ad_fpath ) ) = 0;	/* back to last path	*/	
-	      strcpy( ad_title, fs_back( ad_fpath ) + 1 );
+	      strcpy( ( BYTE *)ad_title, fs_back( ad_fpath ) + 1 );
 
 						/* fall through		*/
-	    case FDIRECTORY:
+	    case FDIRECTO:
 rdir:
 	      if ( !*ad_fpath )
 		strcpy( pathcopy, ad_fpath );
@@ -487,7 +496,7 @@ rdir:
 	      else
 	      {
 rdir5:		strcpy( pathcopy, ad_fpath );
-	        ob_draw( tree, FDIRECTORY, MAX_DEPTH );
+	        ob_draw( tree, FDIRECTO, MAX_DEPTH );
 		if ( firstry )
 		{
 		  firstry = FALSE;
@@ -561,7 +570,7 @@ rdir5:		strcpy( pathcopy, ad_fpath );
 	      i = ( ret - DRIVEA );		/* get the drive */
 	      *ad_fpath = (BYTE)( i + 'A' );	/* stuff into the path */
 	      *( ad_fpath + 1 ) = ':';
-	      if ( !dos_gdir( i + 1, ad_fpath + 2 ) )
+	      if ( !dos_gdir( i + 1, ( LONG )(ad_fpath + 2) ) )
 	        goto fs1;
 	      else
 		goto rdir5;
@@ -576,13 +585,13 @@ rdir5:		strcpy( pathcopy, ad_fpath );
 	    case F8NAME:
 	    case F9NAME:
 	      i = ret - F1NAME;
-	      addr = &ad_fsnames[i + fs_topptr].snames[1];
+	      addr = ( LONG )&ad_fsnames[i + fs_topptr].snames[1];
 	      chr = ad_fsnames[i + fs_topptr].snames[0];
 
 						
 	      if ( chr == 7 )  		/* is it a directory ?  */
 	      {
-		unfmt_str( addr, fs_back( ad_fpath ) + 1 );
+		unfmt_str( ( BYTE *)addr, fs_back( ad_fpath ) + 1 );
 fs1:
 		strcat( &fsname[0], ad_fpath );
 		goto rdir;
@@ -591,9 +600,9 @@ fs1:
 	        if ( chr )
 	        {				/* clean up the last selected */
 		  ob_change( tree, last, NORMAL, TRUE );
-		  strcpy( addr, LLGET( LLGET(OB_SPEC(FSELECTION)) ));
+		  strcpy( ( BYTE *)addr, ( BYTE *)LLGET( LLGET(OB_SPEC(FSELECTI)) ));
 		  ob_change( tree, ret, SELECTED, TRUE );		  
-		  ob_draw( tree, FSELECTION, MAX_DEPTH );
+		  ob_draw( tree, FSELECTI, MAX_DEPTH );
 		  last = ret;
 		  if ( bret & 0x8000 )		/* double click		*/ 
 		  {
@@ -608,7 +617,7 @@ fs1:
 	        break;  
 	  }					/* end of switch	*/
 
-	  bret = fm_do( tree, FSELECTION );
+	  bret = fm_do( tree, FSELECTI );
 
 	  gsx_mxmy( &mx, &my );
 
@@ -620,7 +629,7 @@ fs1:
 	  if ( !strcmp( ad_fpath, pathcopy ) )/*  is dir changed ?	*/
 	  {
 	    ob_change( tree, ret, NORMAL, TRUE );
-	    ret = FDIRECTORY;			/* force a read again	*/
+	    ret = FDIRECTO;			/* force a read again	*/
 	  }
 	  else {  
 		 if ( ret == OK )
@@ -632,11 +641,11 @@ fs1:
 fdone:
 
 	dos_sdrv( savedrv );
-	dos_free( ad_fsdta );
-	dos_free( ad_fsnames );
+	dos_free( ( LONG )ad_fsdta );
+	dos_free( ( LONG )ad_fsnames );
 	dos_free( savepath );
 	strcpy( ad_fpath, pipath );
-	unfmt_str( ad_select, pisel );
+	unfmt_str( ( BYTE *)ad_select, ( BYTE *)pisel );
 
 	if ( ( *pbutton = inf_what( tree, OK, CANCEL ) ) == -1 )
 	  *pbutton = NULL;
@@ -663,7 +672,7 @@ r_dir( path, select, count )
 REG	UWORD	*count;
 {
 	LONG	tree,addr;
-REG	WORD	status,i;
+REG	WORD	status;
 	LONG	h,h1;
 	BYTE	filename[16];
 
@@ -678,9 +687,9 @@ REG	WORD	status,i;
 	}
 
 	fs_count = *count;
-	fs_draw( FDIRECTORY, path, &addr, &addr ); 
-	fs_draw( FTITLE, filename, &addr, &addr );
-	fs_draw( FSELECTION, select, &ad_select, &addr ); 
+	fs_draw( FDIRECTO, ( LONG )path, ( LONG )&addr, ( LONG )&addr ); 
+	fs_draw( FTITLE, ( LONG )filename, ( LONG )&addr, ( LONG )&addr );
+	fs_draw( FSELECTI, ( LONG )select, ( LONG )&ad_select, ( LONG )&addr ); 
 
 	tree = ad_fstree;
 	fs_topptr = 0;				/* reset top pointer	*/
@@ -690,7 +699,7 @@ REG	WORD	status,i;
 	if ( *count > NM_NAMES )
 	{
 	  h1 = *count;
-	  h = ( h * NM_NAMES ) / h1;
+	  h = ( h * (LONG)NM_NAMES ) / h1;
 	}
 
 	if ( !h )				/* min size */
@@ -698,7 +707,7 @@ REG	WORD	status,i;
 	else
 	{
 	  if ( h > ( ADJ3DPIX << 1 ) )
-	    h -= (ADJ3DPIX << 1);	
+	    h -= (LONG) (ADJ3DPIX << 1);	
 	}
 	LWSET( OB_Y(FSVELEV), 0 );		/* move it to the top	  */
 	LWSET( OB_HEIGHT(FSVELEV), (UWORD)h );	/* height of the elevator */
@@ -726,11 +735,9 @@ REG	BYTE	*filename;/*4*/
 		LONG	j;/*2*/
 	REG	LONG	k;/*4*/
 		WORD	ret/*3*//*,len*/;
-/*		LONG	temp,addr;*/
-		BYTE	*chrptr;/*7*/
 	REG	FSTRUCT	*fsnames;
 	REG	WORD	drvid;/*4*/
-/*		BYTE	save;*/
+		BYTE	*chrptr;
 
 	fsnames = ad_fsnames;
 
@@ -746,7 +753,7 @@ REG	BYTE	*filename;/*4*/
 	  drvid = defdrv;
 
  				/* the drive present ? 	*/
-	k = 1;
+	k = 1L;
 	k = k << drvid; 
 	j = trap13( 0xa );	/* get the drive map	*/
 
@@ -766,9 +773,9 @@ REG	BYTE	*filename;/*4*/
 
 	strcpy( chrptr, filename );	/* save the file name	*/
 	strcpy( wildstr, chrptr );	/* this is the dir	*/
-	dos_dta( ad_fsdta );					
+	dos_dta( ( LONG )ad_fsdta );					
 					/* look for all sub dir	*/
-	if ( ! ( ret = dos_sfirst( path, 0x37 ) ) )	
+	if ( ! ( ret = dos_sfirst( ( LONG )path, 0x37 ) ) )	
 	{				/* error		*/
 	  if ( DOS_AX != E_NOFILES )	/* it is not no files	*/
 	  {				
@@ -818,18 +825,18 @@ rfile2:
 
 	strcpy( filename, chrptr );	/* restore file name	*/
 
-	*count = i;
+	*count = (UWORD) i;
 
 	return( TRUE );
 }
 		   
 
-	WORD
+static VOID
 r_sort( buffer, count )
-REG	FSTRUCT	(*buffer)[];
+REG	FSTRUCT	*buffer;
 	WORD	count;
 { 
-REG	WORD	gap,i,j,k;
+REG	WORD	gap,i,j;
 	BYTE	tmp[LEN_FSNAME];
 
 	for( gap = count/2; gap > 0; gap /= 2 )
@@ -838,12 +845,12 @@ REG	WORD	gap,i,j,k;
 	  {
 	    for ( j = i - gap; j >= 0; j -= gap )
 	    {
-	      if ( strchk( buffer[j], buffer[j+gap] ) <= 0 )
+	      if ( strchk( buffer[j].snames, buffer[j+gap].snames ) <= 0 )
 	        break; 
 
-	      LSTCPY( tmp, buffer[j] );
-	      LSTCPY( buffer[j], buffer[j+gap] );
-	      LSTCPY( buffer[j+gap], tmp );
+	      LSTCPY( tmp, buffer[j].snames );
+	      LSTCPY( buffer[j].snames, buffer[j+gap].snames );
+	      LSTCPY( buffer[j+gap].snames, tmp );
 	    }
 	  }
 	}
@@ -867,8 +874,8 @@ REG	LONG	tree;
 	for ( i = index; i < ( index + NM_NAMES ); i++ )
 	{
 	  LWSET( OB_STATE(label),NORMAL );
-	  fs_sset( ad_fstree, label, " ", &addr, &addr ); 
-	  fs_draw( label++, &ad_fsnames[i], &addr, &addr ); 
+	  fs_sset( ad_fstree, label, ( LONG )" ", &addr, ( WORD *)&addr ); 
+	  fs_draw( label++, ( LONG )&ad_fsnames[i], ( LONG )&addr, ( LONG )&addr ); 
 	}
 
 	h = LWGET( OB_HEIGHT( FSVSLID ) );
@@ -877,19 +884,19 @@ REG	LONG	tree;
 	h1 = LWGET( OB_HEIGHT( FSVELEV ) );
 	h1 += ADJ3DPIX << 1;
 
-	h3 = index;
+	h3 = (LONG) index;
 
 	if ( ratio == 1 || ratio == NM_NAMES )
 	{
 	  if ( fs_count > NM_NAMES )
 	    h = ( (h - h1) * h3 ) / (LONG)(( fs_count - NM_NAMES ));
 	  else
-	    h = 0;
+	    h = 0L;
 	}
 	else
-	  h = ( (h - h1) * ratio ) / 1000;	  
+	  h = ( (h - h1) * (LONG)ratio ) / 1000L;	  
 
-	LWSET( OB_Y(FSVELEV), h );
+	LWSET( OB_Y(FSVELEV), ( WORD )h );
 
 	ob_draw( tree, FSVSLID, MAX_DEPTH );	/* erase the old slide bar */
 }
@@ -902,7 +909,7 @@ fs_draw( index, path, addr1, addr2 )
 	WORD	index;
 	LONG	path,addr1,addr2;
 {
-	fs_sset( ad_fstree, index, path, addr1, addr2 ); 
+	fs_sset( ad_fstree, index, path, ( LONG *)addr1, ( WORD *)addr2 ); 
 	ob_draw( ad_fstree, index, MAX_DEPTH );
 }
 
@@ -910,14 +917,14 @@ fs_draw( index, path, addr1, addr2 )
 /*	Adjust all the drive boxes	*/
 
 	VOID
-ini_fsel()
+ini_fsel( VOID )
 {
-	WORD		x,y,i,j,w,h;
+	WORD		x,y,i,j,w;
 	REG OBJECT	*obj;
 	OBJECT		*tree;
 	TEDINFO		*edspec;
 
-	rs_gaddr(ad_sysglo, R_TREE, SELECTOR, &tree );
+	rs_gaddr(ad_sysglo, R_TREE, SELECTOR, ( LONG *)&tree );
 	obj = tree;
 
 	y = x = 0;
@@ -935,11 +942,11 @@ ini_fsel()
 
 	obj[FUPAROW].ob_height -= 1;
 	obj[FDNAROW].ob_height -= 1;
-	ob_offset( tree, DRIVEA, &x, &y );
+	ob_offset( ( LONG )tree, DRIVEA, &x, &y );
 	y -= obj[FSDRIVE].ob_height + 2 + ADJ3DPIX;
 	obj[FSDRIVE].ob_y = y;
 
-	ob_offset( tree, FCLSBOX, &x, &y );
+	ob_offset( ( LONG )tree, FCLSBOX, &x, &y );
 
  	obj[FILEBOX].ob_x = x - ADJ3DPIX - 1; 
 	obj[FTITLE].ob_x = x + obj[FCLSBOX].ob_width + (ADJ3DPIX << 1);
@@ -964,7 +971,7 @@ ini_fsel()
 	obj[FILEBOX].ob_width = w;
 	obj[SCRLBAR].ob_x = obj[FILEBOX].ob_x + w;
 
-	ob_offset( tree, FILEBOX, &x, &y );
+	ob_offset( ( LONG )tree, FILEBOX, &x, &y );
 	y = obj[FILEBOX].ob_height + y + 6 + ADJ3DPIX;
 	obj[OK].ob_y = obj[CANCEL].ob_y = y;
 	y += obj[OK].ob_height + ADJ3DPIX + 6;
@@ -974,7 +981,8 @@ ini_fsel()
 	if (gl_ws.ws_ncolors <= LWHITE)
 	{
 	  edspec = (TEDINFO *)obj[FTITLE].ob_spec;
-	  edspec->te_color &= 0xffffff00L;
+/*	  edspec->te_color &= ( WORD )0xffffff00L;*/
+	  edspec->te_color &= ( WORD )0xff00;
 	  edspec->te_color |=0x41;
 	}
 #if 0
@@ -996,8 +1004,8 @@ ini_fsel()
 }
 
 
-	WORD
-FXWait()
+	VOID
+FXWait( VOID )
 {
     do
     {
@@ -1005,7 +1013,7 @@ FXWait()
 }
 
 
-	WORD
+	VOID
 FXSelect( tree, obj )
 OBJECT *tree;
 WORD   obj;
@@ -1015,14 +1023,14 @@ WORD   obj;
 	
     tree[ obj ].ob_state |= SELECTED;
     rect = *(GRECT *)&tree[(obj)].ob_x;
-    ob_gclip( tree, obj, &dummy, &dummy, &rect.g_x, &rect.g_y,
+    ob_gclip( ( LONG )tree, obj, &dummy, &dummy, &rect.g_x, &rect.g_y,
 	      &rect.g_w, &rect.g_h );
     gsx_sclip( &rect );
-    ob_draw( tree, obj, MAX_DEPTH );		/* draw the box		*/
+    ob_draw( ( LONG )tree, obj, MAX_DEPTH );		/* draw the box		*/
 }
 
 
-	WORD
+	VOID
 FXDeselect( tree, obj )
 OBJECT *tree;
 WORD   obj;
@@ -1032,10 +1040,10 @@ WORD   obj;
  	
     tree[ obj ].ob_state &= ~SELECTED;
     rect = *(GRECT *)&tree[(obj)].ob_x;
-    ob_gclip( tree, obj, &dummy, &dummy, &rect.g_x, &rect.g_y,
+    ob_gclip( ( LONG )tree, obj, &dummy, &dummy, &rect.g_x, &rect.g_y,
 	      &rect.g_w, &rect.g_h );
     gsx_sclip( &rect );
-    ob_draw( tree, obj, MAX_DEPTH );		/* draw the box		*/
+    ob_draw( ( LONG )tree, obj, MAX_DEPTH );		/* draw the box		*/
 }
 
 /* X_Deselect()
@@ -1043,7 +1051,7 @@ WORD   obj;
  * Deselect an object and redraw - use the flag to redraw in case
  * the area to redraw needs to be bigger.( ie: SHADOWED )
  */
-	WORD
+	VOID
 X_Deselect( tree, obj )
 OBJECT *tree;
 WORD   obj;
@@ -1055,10 +1063,10 @@ WORD   obj;
        {
          tree[ obj ].ob_state &= ~SELECTED;
          trect = *(GRECT *)&tree[(obj)].ob_x;
-	 ob_gclip( tree, obj, &dummy, &dummy, &trect.g_x, &trect.g_y, 
+	 ob_gclip( ( LONG )tree, obj, &dummy, &dummy, &trect.g_x, &trect.g_y, 
 		   &trect.g_w, &trect.g_h );
     	 gsx_sclip( &trect );
-         ob_draw( tree, obj, MAX_DEPTH );
+         ob_draw( ( LONG )tree, obj, MAX_DEPTH );
        }
 }
 

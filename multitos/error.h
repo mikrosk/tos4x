@@ -1,5 +1,8 @@
 /*	ERROR.H		3/17/89	- 6/14/89		Derek Mui	*/
 
+#ifndef _ERROR_H_
+#define _ERROR_H_
+
 /*	GEMDOS ERROR CODES	*/
 
 #define	EINVFN	-32
@@ -38,3 +41,6 @@
 #define	EUNDEV	-15
 #define	EBADSF	-16
 #define EOTHER	-17
+
+#endif
+

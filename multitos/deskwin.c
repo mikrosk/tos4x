@@ -18,22 +18,23 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <osbind.h>
-#include <message.h>
-#include <deskusa.h>
-#include <extern.h>
-#include <error.h>
-
-EXTERN	BYTE	*get_fstring();
-EXTERN	BYTE	*malloc();
-EXTERN	OBJECT	*get_tree();
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "osbind.h"
+#include "message.h"
+#include "deskusa.h"
+#include "extern.h"
+#include "error.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 EXTERN	WORD	desk_id;
+
+MLOCAL	VOID	srl_row();
+MLOCAL	VOID	srl_col();
+MLOCAL	VOID	do_redraw();
 
 GRECT	sizes[] = { 150, 150, 150, 150 };
 OBJECT	blank[] = { -1, -1, -1, G_BOX, NONE, NORMAL, 0x000000F0L, 0, 0, 0, 0 };
@@ -51,30 +52,30 @@ draw_loop( handle, obj, start, depth, x, y, w, h )
 
 	if ( !handle )		/* if background window */
 	{
-	  wind_get( handle, WF_OWNER, &pt.x, &pt.y, &pt.w, &pt.h );
-	  if ( pt.x != desk_id )
+	  wind_get( handle, WF_OWNER, &pt.g_x, &pt.g_y, &pt.g_w, &pt.g_h );
+	  if ( pt.g_x != desk_id )
 	    goto d_l1;
 	}
 	
 	if ( handle == -1 )
 	{
-	  objc_draw( obj, start, depth, x, y, w, h );
+	  objc_draw( (LONG)obj, start, depth, x, y, w, h );
 	  goto d_l1;
 	}
 
-	px.x = x;
-	px.y = y;
-	px.w = w;
-	px.h = h;
+	px.g_x = x;
+	px.g_y = y;
+	px.g_w = w;
+	px.g_h = h;
 
-	wind_get( handle, WF_FIRSTXYWH, &pt.x, &pt.y, &pt.w, &pt.h );
+	wind_get( handle, WF_FIRSTXYWH, &pt.g_x, &pt.g_y, &pt.g_w, &pt.g_h );
 	
-	while( pt.w && pt.h )
+	while( pt.g_w && pt.g_h )
 	{
 	  if ( rc_intersect( &px, &pt ) )
-	    objc_draw( obj, start, depth, pt.x, pt.y, pt.w, pt.h );
+	    objc_draw( (LONG)obj, start, depth, pt.g_x, pt.g_y, pt.g_w, pt.g_h );
 
-	  wind_get( handle, WF_NEXTXYWH, &pt.x, &pt.y, &pt.w, &pt.h );
+	  wind_get( handle, WF_NEXTXYWH, &pt.g_x, &pt.g_y, &pt.g_w, &pt.g_h );
 	}
 d_l1:
 	desk_mice( M_ON );
@@ -96,8 +97,9 @@ winfo( win )
 	LONG		sizes1;
 	BYTE		buffer[14];
 	BYTE		*type;
+	WORD		temp1, temp2;
 
-	dir = win->w_memory;
+	dir = (DIR *) win->w_memory;
 	j = 0;
 	sizes = 0;
 	sizes1 = 0;
@@ -125,8 +127,10 @@ winfo( win )
 	  type = get_fstring( ( win->w_items == 1 ) ? ISTR : ISTRS );
 	}
 
-	merge_str( win->w_info, type, buffer );
-	wind_set( win->w_id, WF_INFO, win->w_info, 0, 0 );	
+	merge_str( win->w_info, type, (UWORD *)buffer );
+	temp1 = (WORD) ( (LONG) win->w_info >> 16L );
+	temp2 = (WORD) ((LONG) win->w_info & 0x0000FFFFL);
+	wind_set( win->w_id, WF_INFO, temp1, temp2, 0, 0 );	
 }
 
 
@@ -138,7 +142,7 @@ winfo( win )
 	while( ww_win )
 	{
 	  win = ww_win;
-	  ww_win = ww_win->w_next;	  
+	  ww_win = (WINDOW *) ww_win->w_next;	  
 	  if ( win->w_id != -1 )
 	    return( win );
 	}
@@ -238,7 +242,8 @@ up_win( win, mediac )
 	WINDOW	*win;
 	WORD	mediac;
 {
-	BYTE	*ptr,*old;
+	BYTE	*ptr;
+	/* BYTE	*old;	not used */
 	WORD	ret;
 
 	ptr = win->w_path;
@@ -270,9 +275,9 @@ up_win( win, mediac )
 	  {
 	    strcpy( wilds, &win->w_path[2] );
 	    return( open_subdir( win, 0, FALSE, FALSE, TRUE ) );
-	  } else {
-	    return( FALSE );
-	  }	    
+ 	  } else {
+ 	    return( FALSE );
+ 	  }	    
 	}
 
 	return( TRUE );
@@ -286,7 +291,7 @@ bottop()
 {
 	REG WINDOW	*win;
 	WINDOW	*win1;
-	WORD	item;
+	/* WORD	item;  		not used */
 	WORD	buffer[8];
 
 	if ( win = w_gfirst() )
@@ -404,7 +409,7 @@ clr_xwin( win, infoupdate )
 	REG DIR		*dir;
 	GRECT		pt;
 
-	dir = win->w_memory;
+	dir = (DIR *) win->w_memory;
 	obj = win->w_obj;
 	ret = build_rect( obj, &pt, obj[1].ob_width, obj[1].ob_height );
 	change = FALSE;
@@ -442,8 +447,8 @@ srl_verbar( win, pos )
 	UWORD	i;
 	WORD	diff,dir;
 
-	l = pos * win->w_vvicons;
-	i = l / 1000;
+	l = (LONG)pos * (LONG)win->w_vvicons;
+	i = (UWORD) (l / 1000L);	/* L added by hmk when changed to LC */
 
 	if ( i == win->w_rowi )		/* No change	*/
 	  return;
@@ -465,15 +470,15 @@ srl_verbar( win, pos )
 	  win->w_rowi = i;
 	  if ( win->w_vvicons )
 	  {
-	    l = 1000 * win->w_rowi;
-	    l = l / win->w_vvicons;
+	    l = 1000L * (LONG) win->w_rowi;
+	    l = l / (LONG)win->w_vvicons;
 	  }
 	  else
-	    l = 0;
+	    l = 0L;
   
 	  wind_set( win->w_id, WF_VSLIDE, (UWORD)l, 0, 0, 0 );	
 
-	  win->w_obj->ob_y = win->w_work.y;	/* reset at the topmost	*/
+	  win->w_obj->ob_y = win->w_work.g_y;	/* reset at the topmost	*/
 	  win->w_srtitem = i * win->w_icol;
 	  up_1( win );
 	}
@@ -493,8 +498,8 @@ srl_hzbar( win, pos )
 	REG WORD	diff,i;
 	WORD		dir;
 
-	l = pos * win->w_hvicons;
-	i = l / 1000;
+	l = (LONG)pos * (LONG)win->w_hvicons;
+	i = (UWORD) (l / 1000L);  /* L added by hmk when changed to LC */
 	
 	if ( i == win->w_coli )
 	  return;
@@ -516,24 +521,25 @@ srl_hzbar( win, pos )
 	  win->w_coli = i;
 	  if ( win->w_hvicons )
 	  { 
-	    l = 1000 * win->w_coli;
-	    l /= win->w_hvicons;  
+	    l = 1000L * (LONG)win->w_coli;
+	    l /= (LONG)win->w_hvicons;  
 	  }
 	  else
-	    l = 0;
+	    l = 0L;
 
 	  wind_set( win->w_id, WF_HSLIDE, (UWORD)l, 0, 0, 0 );	
 
-	  x = win->w_work.x;
-	  w = win->w_work.w;
+	  x = win->w_work.g_x;
+	  w = win->w_work.g_w;
 
 	  obj = win->w_obj;	
 	  obj[0].ob_x = x;	/* reset at the leftmost	*/
 	  obj[0].ob_width = w;
-	  i = i * fobj.w;
+	  i = i * fobj.g_w;
 	  obj[0].ob_x -= i;
 	  obj[0].ob_width += i;
-	  draw_loop( win->w_id, obj, 0, MAX_DEPTH, x, win->w_work.y, w, win->w_work.h );	  
+	  draw_loop( win->w_id, obj, 0, MAX_DEPTH, x, win->w_work.g_y,
+		 w, win->w_work.g_h );	  
 	}
 }
 
@@ -544,7 +550,7 @@ srl_hzbar( win, pos )
 	VOID
 srl_row( win, row, dir )
 	REG WINDOW	*win;
-	WORD		row,dir;
+	WORD		row, dir;
 {
 	WORD		i;
 
@@ -600,19 +606,23 @@ srl_col( win, col, dir )
 
 /*	Bitblt a window content either up, dowm, left or right	*/
 
-	WORD
+	VOID
 blt_window( win, mode, size )
 	REG	WINDOW	*win;
 	WORD	mode,size;
 {
 	REG 	OBJECT	*obj;
-	REG 	WORD	x,y;
-		WORD	e_x[12];	/* bitblt rectangle	*/
-		LONG	trash,l;
-		WORD	y1,block,w,h,i;
-		WORD	*ptr;
+	REG 	WORD	x;
+		LONG	l;
+		WORD	block;
+		UWORD	i;
+		WORD	w = 0;	/* before changing to LC, 'w' was NOT */
+				/* initalized. (02/16/92 hmk */
+	/* NOT USED ANYMORE:
+		WORD	y, e_x[12], y1, h, *ptr, top;
+		LONG	trash;
 		GRECT	pt;
-		WORD	top;
+	*/
 
 	obj = win->w_obj;
 
@@ -630,11 +640,11 @@ blt_window( win, mode, size )
 	  
 	  if ( win->w_vvicons )
 	  {
-	    l = 1000 * win->w_rowi;
-	    l = l / win->w_vvicons;  
+	    l = 1000L * (LONG)win->w_rowi;
+	    l = l / (LONG)win->w_vvicons;  
 	  }
 	  else
-	    l = 0;
+	    l = 0L;
 
 	  wind_set( win->w_id, WF_VSLIDE, (UWORD)(l), 0, 0, 0 );
 
@@ -657,7 +667,7 @@ blt_window( win, mode, size )
 	  }
 
 	  if ( block > w )
-	    x = win->w_work.x;
+	    x = win->w_work.g_x;
 	  else
 	    w = block + 1;
 
@@ -665,11 +675,11 @@ blt_window( win, mode, size )
 
 	  if ( win->w_hvicons )
 	  {
-	    l = 1000 * win->w_coli;
-	    l /= win->w_hvicons;
+	    l = 1000L * (LONG)win->w_coli;
+	    l /= (LONG)win->w_hvicons;
 	  }
 	  else
-	    l = 0;
+	    l = 0L;
   
 	  wind_set( win->w_id, WF_HSLIDE, (UWORD)l, 0, 0, 0 );
 
@@ -707,7 +717,7 @@ view_adjust( win )
 	if ( !x )			 /* at least one row	*/
 	  x = 1;
 	
-	row = win->w_work.h / fobj.h; /* current visible number of row */
+	row = win->w_work.g_h / fobj.g_h; /* current visible number of row */
 
 	win->w_xrow = row;
 
@@ -715,8 +725,8 @@ view_adjust( win )
 
 	if ( x > row )		/* if there is more need to be shown */	
 	{
-	  l = 1000 * row;
-	  i = l / x;
+	  l = 1000L * (LONG)row;
+	  i = (UWORD) (l / (LONG)x);
 	}
 	else
 	  i = 1000;
@@ -730,8 +740,8 @@ view_adjust( win )
           i = 0;
 	else
 	{
-	  l = 1000 * win->w_rowi;
-	  i = l / win->w_vvicons;
+	  l = 1000L * (LONG)win->w_rowi;
+	  i = (UWORD) (l / (LONG)win->w_vvicons);
 	}
 
 	wind_set( win->w_id, WF_VSLIDE, i, 0, 0, 0 );
@@ -741,7 +751,7 @@ view_adjust( win )
 	if ( win->w_icol <= 1 )
 	  col = 1;
 	else
-	  col = win->w_work.w / fobj.w; /* current visible column	*/
+	  col = win->w_work.g_w / fobj.g_w; /* current visible column	*/
 
 	if ( !col )
 	  col = 1;
@@ -756,8 +766,8 @@ view_adjust( win )
 	  i = 1000;
 	else
 	{
-	  l = 1000 * col;
-	  i = l / x;
+	  l = 1000L * (LONG)col;
+	  i = (UWORD)(l / (LONG)x);
 	}
 
 	wind_set( win->w_id, WF_HSLSIZE, i, 0, 0, 0 );
@@ -765,17 +775,17 @@ view_adjust( win )
 	if ( win->w_coli > win->w_hvicons )
 	  win->w_coli = win->w_hvicons;
 
-	obj[0].ob_x = win->w_work.x;
-	obj[0].ob_x -= ( win->w_coli * fobj.w );
-	obj[0].ob_width = win->w_work.w;
-	obj[0].ob_width += ( win->w_coli * fobj.w );
+	obj[0].ob_x = win->w_work.g_x;
+	obj[0].ob_x -= ( win->w_coli * fobj.g_w );
+	obj[0].ob_width = win->w_work.g_w;
+	obj[0].ob_width += ( win->w_coli * fobj.g_w );
 
 	if ( !win->w_hvicons )	/* fits all the file	*/
 	  i = 0;
 	else
 	{
-	  l = 1000 * win->w_coli;
-	  i = l / win->w_hvicons;
+	  l = 1000L * (LONG)win->w_coli;
+	  i = (UWORD)(l / (LONG)win->w_hvicons);
 	}
 
 	wind_set( win->w_id, WF_HSLIDE, i, 0, 0, 0 );
@@ -839,8 +849,8 @@ view_fixmode( win )
 
 	if ( s_view == S_ICON )		/* icon mode	*/
 	{
-	  w = dicon.w;
-	  h = dicon.h;			/* Change also at deskinf.c	*/ 
+	  w = dicon.g_w;
+	  h = dicon.g_h;			/* Change also at deskinf.c	*/ 
 	  offx = ( gl_hchar == 8 ) ? gl_wchar / 2 : gl_wchar; 
 	  offy = gl_hchar / 2;		
 	  type = G_CICON;
@@ -848,8 +858,8 @@ view_fixmode( win )
 	}
 	else				/* text mode	*/
 	{
-	  obj1 = get_tree( TEXTLINES );
-	  len = strlen( ( (TEDINFO*)(obj1[TSTYLE].ob_spec) )->te_ptext );	
+	  obj1 = get_tree( TEXTLINE ); /* was TEXTLINES, changed by hmk for LC */
+	  len = strlen( (BYTE *)( (TEDINFO*)(obj1[TSTYLE].ob_spec) )->te_ptext );	
 	  w = ( len - 1 ) * gl_wchar;
 	  h = gl_hchar;	  
 	  offx = 3 * gl_wchar;
@@ -859,15 +869,15 @@ view_fixmode( win )
 	  ted = win->w_ted;
 	}
 
-	fobj.w = w + offx; 
-	fobj.h = h + offy;
+	fobj.g_w = w + offx; 
+	fobj.g_h = h + offy;
 
 	if ( s_stofit )		/* size to fit	*/
-	  limitw = win->w_work.w;
+	  limitw = win->w_work.g_w;
 	else
-	  limitw = full.w - gl_wbox;
+	  limitw = full.g_w - gl_wbox;
 
-	limith = full.h - ( 3 * gl_hbox );
+	limith = full.g_h - ( 3 * gl_hbox );
 
 	x = offx;
 	y = offy;
@@ -887,11 +897,11 @@ view_fixmode( win )
 	  obj[i].ob_next = i+1;
 
 	  if ( s_view == S_ICON )	/* icon mode	*/	  
-            obj[i].ob_spec = iblk++;
+            obj[i].ob_spec = (LONG) iblk++;
 	  else
 	  {
-	    obj[i].ob_spec = ted;
-	    ted->te_ptext = text;
+	    obj[i].ob_spec = (LONG) ted;
+	    ted->te_ptext = (LONG) text;
 	    text += len;
 	    ted++;
 	  }
@@ -946,15 +956,15 @@ make_top( win )
 
 	  while( winptr )	
 	  {
-	    if ( winptr->w_next == win )
+	    if ( winptr->w_next == (BYTE *) win )
 	    {
 	      winptr->w_next = win->w_next;
-	      win->w_next = winhead;
+	      win->w_next = (BYTE *) winhead;
 	      winhead = win;
 	      break;	
 	    }
 
-	    winptr = winptr->w_next;
+	    winptr = (WINDOW *) winptr->w_next;
 	  }
 	}
 }
@@ -970,30 +980,32 @@ alloc_obj( mode, win )
 	REG WORD	i,j;
 	REG UWORD	item;
 	REG OBJECT	*obj1,*obj2;
-	WORD		w,h,len;
+	WORD		len;
 	CICONBLK	*iblk;
 	TEDINFO		*ted;
 	UWORD		k;
 	LONG		size;
-
- 	i = full.w / dicon.w;		
-	if ( full.w % dicon.w )
+/* UNUSED:
+	WORD		w, h;
+*/
+ 	i = full.g_w / dicon.g_w;		
+	if ( full.g_w % dicon.g_w )
 	  i++;	 
 
-	j = full.h / dicon.h;
-	if ( full.h % dicon.h )
+	j = full.g_h / dicon.g_h;
+	if ( full.g_h % dicon.g_h )
 	  j++;	 
 	  
 	item = i * j;
 
-	obj2 = get_tree( TEXTLINES );
+	obj2 = get_tree( TEXTLINE ); /* was TEXTLINES, changed by hmk for LC */
 
- 	i = full.w / obj2[TSTYLE].ob_width;		
-	if ( full.w % obj2[TSTYLE].ob_width )
+ 	i = full.g_w / obj2[TSTYLE].ob_width;		
+	if ( full.g_w % obj2[TSTYLE].ob_width )
 	  i++;	 
 
-	j = full.h / obj2[TSTYLE].ob_height;
-	if ( full.h % obj2[TSTYLE].ob_height )
+	j = full.g_h / obj2[TSTYLE].ob_height;
+	if ( full.g_h % obj2[TSTYLE].ob_height )
 	  j++;	 
 	  
 	k = i * j;
@@ -1001,7 +1013,7 @@ alloc_obj( mode, win )
 	if ( k > item )
 	  item = k;	
 
-	len = strlen ( ( (TEDINFO*)(obj2[TSTYLE].ob_spec) )->te_ptext );
+	len = strlen ((BYTE *)( (TEDINFO*)(obj2[TSTYLE].ob_spec) )->te_ptext );
 
 	size = 0;
 	size += (UWORD)(( item + 1 ) * sizeof( OBJECT ) );
@@ -1009,29 +1021,29 @@ alloc_obj( mode, win )
 	size += (UWORD)( item * sizeof( TEDINFO ) );
 	size += (UWORD)( item * sizeof( CICONBLK ) );
 
-	if ( win->w_obj = malloc( size ) )
+	if ( win->w_obj = (OBJECT *) malloc( size ) )
 	{
 	  obj1 = win->w_obj;
 
-	  LBCOPY( obj1++, blank, sizeof( OBJECT ) );		
+	  LBCOPY( (BYTE *)obj1++,(BYTE *)blank, sizeof( OBJECT ) );		
 
 	  for( i = 0; i < item; i++ )	/* copy object structure */
-	    LBCOPY( obj1++, &iconaddr[ICON1], sizeof( OBJECT ) );
+	    LBCOPY( (BYTE *)obj1++,(BYTE *)&iconaddr[ICON1], sizeof( OBJECT ) );
 
-	  win->w_ciblk = iblk = obj1;
+	  win->w_ciblk = iblk = (CICONBLK *) obj1;
 
 					/* start of the iconblk area	*/
 	  for( i = 0; i < item; i++ )	/* copy icon structure		*/
-	    LBCOPY( iblk++, iconaddr[ICON1].ob_spec, sizeof( CICONBLK ) );
+	    LBCOPY( (BYTE *)iblk++,(BYTE *)iconaddr[ICON1].ob_spec, sizeof( CICONBLK ) );
 
-	  win->w_ted = ted = iblk;
+	  win->w_ted = ted = (TEDINFO *) iblk;
 
 	  for ( i = 0; i < item; i++ )
-	    LBCOPY( ted++, obj2[TSTYLE].ob_spec, sizeof( TEDINFO ) );
+	    LBCOPY( (BYTE *)ted++,(BYTE *)obj2[TSTYLE].ob_spec, sizeof( TEDINFO ) );
 
-	  win->w_text = ted;		/* set the text pointer		*/
+	  win->w_text = (BYTE *) ted;		/* set the text pointer		*/
 
-	  win->w_maxicons = item;
+	  win->w_maxicons = (WORD) item;
 	  return( TRUE );
 	}
 	else
@@ -1057,7 +1069,7 @@ ini_windows( )
 
 	for( i = 0; i < MAXWIN; i++, win++ )
 	{
-	  win->w_obj = (BYTE*)0;
+	  win->w_obj = (OBJECT*)0;
 	  win->w_path = (BYTE*)0;	/* window path	*/
 	  win->w_buf = (BYTE*)0;	  
 	  win->w_free = FALSE;		/* window is not free yet	*/
@@ -1069,8 +1081,8 @@ ini_windows( )
 
 	  /* Put in default sizes, in case users have old inf file */
 	  
-	  rc_copy( sizes, &win->w_work );
-	  rc_copy( sizes, &win->w_sizes );
+	  rc_copy( (WORD *)sizes, (WORD *)&win->w_work );
+	  rc_copy( (WORD *)sizes, (WORD *)&win->w_sizes );
 	}		
 
 	path_alloc( 4 );		/* allocate path memory	*/
@@ -1086,7 +1098,7 @@ ini_windows( )
 	    break;
 	  }
 #endif
-	  win->w_next = &winpd[i+1];
+	  win->w_next = (BYTE *) &winpd[i+1];
 	  win->w_free = TRUE;		/* this window is available	*/
 	}
 
@@ -1131,7 +1143,7 @@ ret_win( win )
 	    return( win );
 	  }
 
-	  win = win->w_next;
+	  win = (WINDOW *) win->w_next;
 	}
 
 	return( (WINDOW*)0 );
@@ -1153,7 +1165,7 @@ ret_win( win )
 	   if ( win->w_id == handle )
 	     break;
 
-	   win = win->w_next;
+	   win = (WINDOW *) win->w_next;
 	}
 
 	return( win );	
@@ -1162,7 +1174,7 @@ ret_win( win )
 
 /*	Open window	*/
 
-	WORD
+	VOID
 open_window( handle )
 	WORD	handle;
 {
@@ -1174,18 +1186,18 @@ open_window( handle )
 	win->w_obj->ob_spec = windspec;		/* set window's color	*/
 
 	do_xyfix( &win->w_sizes );
-	wind_open( handle, win->w_sizes.x, win->w_sizes.y, win->w_sizes.w, 
-		   win->w_sizes.h );
+	wind_open( handle, win->w_sizes.g_x, win->w_sizes.g_y, win->w_sizes.g_w, 
+		   win->w_sizes.g_h );
 
-	wind_get( handle, WF_CURRXYWH, &win->w_sizes.x, &win->w_sizes.y, 
-		  &win->w_sizes.w, &win->w_sizes.h );
+	wind_get( handle, WF_CURRXYWH, &win->w_sizes.g_x, &win->w_sizes.g_y, 
+		  &win->w_sizes.g_w, &win->w_sizes.g_h );
 
 						/* get the working area	*/
 						/* and set it to object	*/
-	wind_get( handle, WF_WORKXYWH, &win->w_work.x, &win->w_work.y,
-		  &win->w_work.w, &win->w_work.h );
+	wind_get( handle, WF_WORKXYWH, &win->w_work.g_x, &win->w_work.g_y,
+		  &win->w_work.g_w, &win->w_work.g_h );
 						
-	rc_copy( &win->w_work, &win->w_obj->ob_x );
+	rc_copy( (WORD *)&win->w_work, &win->w_obj->ob_x );
 	make_top( win );
 }
 
@@ -1200,8 +1212,8 @@ create_window( )
 					/* Do we have any window pd ?	*/
 	if ( win = alloc_win( ) )
 	{
-	  handle = wind_create( ALLITEMS, win->w_sizes.x, win->w_sizes.y, 
-			win->w_sizes.w, win->w_sizes.h );
+	  handle = wind_create( ALLITEMS, win->w_sizes.g_x, win->w_sizes.g_y, 
+			win->w_sizes.g_w, win->w_sizes.g_h );
 		
 	  if ( handle < 0 )		/* release windows	*/
 	    ret_win( win );
@@ -1280,7 +1292,7 @@ close_window( handle, closeit )
 		  break;
 		}
 	        else
-		  win = win->w_next;
+		  win = (WINDOW *) win->w_next;
 	      }
 	    }
 	  }
@@ -1325,12 +1337,12 @@ do_redraw( handle, pc, which )
 	GRECT	*pc;
 	WORD	which;
 {
-	GRECT	pt;
+	/* NOT USED: GRECT	pt; */
 	REG OBJECT	*obj;
 	WINDOW	*win;
 	GRECT	px;
 
-	rc_copy( pc, &px );
+	rc_copy( (WORD *)pc, (WORD *)&px );
 	
 	if ( handle > 0 )
 	{
@@ -1342,12 +1354,12 @@ do_redraw( handle, pc, which )
 
 	if ( which )
 	{
-	  objc_offset( obj, which, &px.x, &px.y ); 
-	  px.w = obj[which].ob_width;
-	  px.h = obj[which].ob_height;	
+	  objc_offset( (OBJECT *)obj, which, &px.g_x, &px.g_y ); 
+	  px.g_w = obj[which].ob_width;
+	  px.g_h = obj[which].ob_height;	
 	}
 
-	draw_loop( handle, obj, 0, MAX_DEPTH, px.x, px.y, px.w, px.h );
+	draw_loop( handle, obj, 0, MAX_DEPTH, px.g_x, px.g_y, px.g_w, px.g_h );
 }
 
 
@@ -1359,45 +1371,45 @@ do_xyfix( pc )
 {
 	GRECT	rect;
 	
-	rc_copy( &full, &rect );
+	rc_copy( (WORD *)&full, (WORD *)&rect );
 
-	pc->w =	min( pc->w, rect.w );
-	pc->h =	min( pc->h, rect.h );
+	pc->g_w =	min( pc->g_w, rect.g_w );
+	pc->g_h =	min( pc->g_h, rect.g_h );
 	
-	if ( pc->x >= ( rect.x + rect.w ) )
-	  pc->x = rect.x + rect.w;
+	if ( pc->g_x >= ( rect.g_x + rect.g_w ) )
+	  pc->g_x = rect.g_x + rect.g_w;
 	  
-	if ( pc->x < rect.x )
-	  pc->x = rect.x;
+	if ( pc->g_x < rect.g_x )
+	  pc->g_x = rect.g_x;
 
-	if ( pc->y >= ( rect.y + rect.h ) )
-	  pc->y = rect.y + rect.h;
+	if ( pc->g_y >= ( rect.g_y + rect.g_h ) )
+	  pc->g_y = rect.g_y + rect.g_h;
 
-	if ( pc->y < rect.y )
-	  pc->y = rect.y;
+	if ( pc->g_y < rect.g_y )
+	  pc->g_y = rect.g_y;
 
-	rect.x = pc->x;
+	rect.g_x = pc->g_x;
 
-	pc->x = (rect.x & 0x000f);
+	pc->g_x = (rect.g_x & 0x000f);
 	
-	if ( pc->x < 8 )
-	  pc->x = rect.x & 0xfff0;
+	if ( pc->g_x < 8 )
+	  pc->g_x = rect.g_x & 0xfff0;
 	else
-	  pc->x = (rect.x & 0xfff0) + 16;
+	  pc->g_x = (rect.g_x & 0xfff0) + 16;
 
-	pc->y = max(pc->y, rect.y);
+	pc->g_y = max(pc->g_y, rect.g_y);
 }
 
 
 
 /* 	Blitwd.c written by Ye Jian Wen	*/
 
-	WORD
+	VOID
 do_blit(wh, wdact, dir, pixel)	
-	int wh;			/* blit window handle */
+	WORD wh;		/* blit window handle */
 	GRECT *wdact;		/* the window to blit */
-	int dir;		/* the direction to blit */
-	int pixel;		/* number of pixel to blit */
+	WORD dir;		/* the direction to blit */
+	WORD pixel;		/* number of pixel to blit */
 {  
 	WINDOW	*win;
 
@@ -1407,10 +1419,10 @@ do_blit(wh, wdact, dir, pixel)
 
 	rc_intersect( &full, wdact );	/* clip to the screen	*/	
 
-	wind_get(wh, WF_FIRSTXYWH, &wdrct.x, &wdrct.y, &wdrct.w, &wdrct.h);
+	wind_get(wh, WF_FIRSTXYWH, &wdrct.g_x, &wdrct.g_y, &wdrct.g_w, &wdrct.g_h);
 	win = get_win(wh);
 
-	while (wdrct.w && wdrct.h)	
+	while (wdrct.g_w && wdrct.g_h)	
 	{				/* clip to the screen	*/
 	   if ( rc_intersect( &full, &wdrct ) )
 	   {				/* while it is not the last one */
@@ -1419,7 +1431,8 @@ do_blit(wh, wdact, dir, pixel)
 		setclip(&wdrct);
 		blit( dir, win, &wdrct, pixel);	/* blit arrow up */
 	     }
-	     wind_get(wh, WF_NEXTXYWH, &wdrct.x, &wdrct.y, &wdrct.w, &wdrct.h);
+	     wind_get(wh, WF_NEXTXYWH, &wdrct.g_x, &wdrct.g_y, &wdrct.g_w,
+		 &wdrct.g_h);
 	   }
 	}
 	wind_update(END_UPDATE);	/* unlock screen */
@@ -1430,13 +1443,13 @@ do_blit(wh, wdact, dir, pixel)
 
 	VOID
 blit( dir, win, box, pixel)
-	int	dir;
+	WORD	dir;
 	WINDOW	*win;
 	GRECT 	*box;
-	int 	pixel;
+	WORD 	pixel;
 {
-	int pxyarray[8];
-	int x[2]; 
+	WORD pxyarray[8];
+	WORD x[2]; 
 
 	x[0] = 0;
 	x[1] = 0;
@@ -1448,81 +1461,83 @@ blit( dir, win, box, pixel)
 	switch( dir )
 	{
 	  case 0:		/* move contents up */
-	    if ( pixel > box->h )
-	      pixel = box->h;
+	    if ( pixel > box->g_h )
+	      pixel = box->g_h;
 	    else
 	    {
-		pxyarray[0] = box->x;
-		pxyarray[1] = box->y;
-		pxyarray[2] = box->x+box->w;
-		pxyarray[3] = box->y+box->h-pixel;
-		pxyarray[4] = box->x;
-		pxyarray[5] = box->y+pixel;
-		pxyarray[6] = box->x+box->w;
+		pxyarray[0] = box->g_x;
+		pxyarray[1] = box->g_y;
+		pxyarray[2] = box->g_x+box->g_w;
+		pxyarray[3] = box->g_y+box->g_h-pixel;
+		pxyarray[4] = box->g_x;
+		pxyarray[5] = box->g_y+pixel;
+		pxyarray[6] = box->g_x+box->g_w;
 		pxyarray[7] = pxyarray[3]+pixel;
-		d_vro_cpyfm(3, pxyarray, &x[0], &x[0]);
+		d_vro_cpyfm(3, pxyarray, (LONG *)&x[0],(LONG *)&x[0]);
 	    }
 	
-	     objc_draw( win->w_obj, 0, MAX_DEPTH, box->x, box->y, box->w, pixel);
+	     objc_draw( (LONG)win->w_obj, 0, MAX_DEPTH, box->g_x, box->g_y,
+		 box->g_w, pixel);
 	     break;
 
 	  case 1:
-	    if ( pixel > box->h )
-	      pixel = box->h;
+	    if ( pixel > box->g_h )
+	      pixel = box->g_h;
 	    else
 	    {
-		pxyarray[0] = box->x;
-		pxyarray[1] = box->y+pixel;
-		pxyarray[2] = box->x+box->w;
-		pxyarray[3] = box->y+box->h-1;
-		pxyarray[4] = box->x;
-		pxyarray[5] = box->y;
-		pxyarray[6] = box->x+box->w;
+		pxyarray[0] = box->g_x;
+		pxyarray[1] = box->g_y+pixel;
+		pxyarray[2] = box->g_x+box->g_w;
+		pxyarray[3] = box->g_y+box->g_h-1;
+		pxyarray[4] = box->g_x;
+		pxyarray[5] = box->g_y;
+		pxyarray[6] = box->g_x+box->g_w;
 		pxyarray[7] = pxyarray[3]-pixel;
-		d_vro_cpyfm( 3, pxyarray, &x[0], &x[0]);
+		d_vro_cpyfm( 3, pxyarray,(LONG *)&x[0],(LONG *)&x[0]);
 	     }
 
-	     objc_draw( win->w_obj, 0, MAX_DEPTH, box->x, box->y+box->h-pixel, 
-		   	box->w, pixel );
+	     objc_draw( (LONG)win->w_obj, 0, MAX_DEPTH, box->g_x, box->g_y
+		+box->g_h-pixel,box->g_w, pixel );
 	     break;
 
 	  case 2:		/* Move contents to right */
-	    if ( pixel > box->w )
-	      pixel = box->w;
+	    if ( pixel > box->g_w )
+	      pixel = box->g_w;
 	    else
 	    {
-		pxyarray[0] = box->x;	/* source */
-		pxyarray[1] = box->y;
-		pxyarray[2] = box->x+box->w-pixel;
-		pxyarray[3] = box->y+box->h;
-		pxyarray[4] = box->x+pixel;
-		pxyarray[5] = box->y;
-		pxyarray[6] = box->x+box->w;
-		pxyarray[7] = box->y+box->h;
-		d_vro_cpyfm( 3, pxyarray, &x[0], &x[0]);
+		pxyarray[0] = box->g_x;	/* source */
+		pxyarray[1] = box->g_y;
+		pxyarray[2] = box->g_x+box->g_w-pixel;
+		pxyarray[3] = box->g_y+box->g_h;
+		pxyarray[4] = box->g_x+pixel;
+		pxyarray[5] = box->g_y;
+		pxyarray[6] = box->g_x+box->g_w;
+		pxyarray[7] = box->g_y+box->g_h;
+		d_vro_cpyfm( 3, pxyarray,(LONG *)&x[0],(LONG *)&x[0]);
 	    }
 
-	     objc_draw( win->w_obj, 0, MAX_DEPTH, box->x, box->y, pixel, box->h);
+	     objc_draw( (LONG)win->w_obj, 0, MAX_DEPTH, box->g_x, box->g_y,
+		 pixel, box->g_h);
 	     break;
 
 	   case 3:		/* Move contents to left	*/
-	     if ( pixel > box->w )
-	       pixel = box->w;
+	     if ( pixel > box->g_w )
+	       pixel = box->g_w;
 	     else
 	     {   	
-	     	pxyarray[0] = box->x+pixel;
-	      	pxyarray[1] = box->y;
-		pxyarray[2] = box->x+box->w - 1;
-	      	pxyarray[3] = box->y+box->h;
-	 	pxyarray[4] = box->x;
-		pxyarray[5] = box->y;
+	     	pxyarray[0] = box->g_x+pixel;
+	      	pxyarray[1] = box->g_y;
+		pxyarray[2] = box->g_x+box->g_w - 1;
+	      	pxyarray[3] = box->g_y+box->g_h;
+	 	pxyarray[4] = box->g_x;
+		pxyarray[5] = box->g_y;
 		pxyarray[6] = pxyarray[2]-pixel;
-		pxyarray[7] = box->y+box->h;
-		d_vro_cpyfm( 3, pxyarray, &x[0], &x[0]);
+		pxyarray[7] = box->g_y+box->g_h;
+		d_vro_cpyfm( 3, pxyarray,(LONG *)&x[0],(LONG *)x[0]);
 	     }
 
-	     objc_draw( win->w_obj, 0, MAX_DEPTH, box->x+box->w-pixel, box->y, pixel, 
-			box->h);
+	     objc_draw( (LONG)win->w_obj, 0, MAX_DEPTH, box->g_x+box->g_w
+		-pixel, box->g_y, pixel, box->g_h);
 	     break;
 	
 	   default:
@@ -1540,11 +1555,11 @@ blit( dir, win, box, pixel)
 setclip(p)	
 	GRECT *p;
 {
-	int ptr[4];
+	WORD ptr[4];
 
-	ptr[0] = p->x;
-	ptr[1] = p->y;
-	ptr[2] = p->x + p->w - 1;
-	ptr[3] = p->y + p->h - 1;
+	ptr[0] = p->g_x;
+	ptr[1] = p->g_y;
+	ptr[2] = p->g_x + p->g_w - 1;
+	ptr[3] = p->g_y + p->g_h - 1;
 	vs_clip( 1, ptr );
 }

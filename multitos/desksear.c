@@ -6,26 +6,22 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>	
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <osbind.h>
-#include <gemdefs.h>
-#include <deskwin.h>
-#include <deskusa.h>
-#include <error.h>
-#include <extern.h>
+#include "portab.h"	
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "osbind.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "error.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
-EXTERN	WINDOW	*alloc_win();
-EXTERN	WINDOW	*w_gfirst();
 EXTERN 	WORD	f_level;	/* local level counter same as deskdir	*/
 EXTERN	WORD	f_rename;	/* window opened?			*/
 EXTERN	WINDOW	*x_win;
 EXTERN	WORD	x_type;
 EXTERN	WORD	x_status;
-
 
 /*	Position an item within a window	*/
 
@@ -52,23 +48,23 @@ pos_item( win, newi )
 
 	win->w_rowi = j;
 
-	win->w_srtitems = j * win->w_icol;
+	win->w_srtitem = j * win->w_icol; /* was w_srtitems, changed for LC */
 	      	
 	if ( i > win->w_xrow )
 	{
-	  l = 1000 * j;
-	  l = l / ( i - win->w_xrow );
+	  l = 1000L * (LONG)j;
+	  l = l / (LONG)( i - win->w_xrow );
 	}
 	else
-	  l = 1000;
+	  l = 1000L;
 
-	win->w_obj->ob_y = win->w_work.y;
+	win->w_obj->ob_y = win->w_work.g_y;
 	wind_set( win->w_id, WF_VSLIDE, (UWORD)l, 0, 0, 0 );
 
 	/*******  adjust the horizontal bar  ********/
 
-	win->w_obj->ob_x = win->w_work.x;
-	win->w_obj->ob_width = win->w_work.w;
+	win->w_obj->ob_x = win->w_work.g_x;
+	win->w_obj->ob_width = win->w_work.g_w;
 
 	i = ( newi % win->w_icol ) + 1;		/* column index		*/
 	if ( i > win->w_xcol )			/* bigger than one frame*/ 
@@ -78,17 +74,17 @@ pos_item( win, newi )
 	    
 	win->w_coli = j;		/* column index		*/	
 		
-	k = j * fobj.w;			/* move the object if necessary */
+	k = j * fobj.g_w;			/* move the object if necessary */
 	win->w_obj->ob_x -= k;
 	win->w_obj->ob_width += k;
 
 	if ( win->w_hvicons )
 	{
-	  l = 1000 * j;
-	  l = l / win->w_hvicons;
+	  l = 1000L * (LONG)j;
+	  l = l / (LONG)win->w_hvicons;
 	}
 	else
-	  l = 1000;
+	  l = 1000L;
 
 	wind_set( win->w_id, WF_HSLIDE, (UWORD)l, 0, 0, 0 );	  	
 	up_2( win );
@@ -153,7 +149,7 @@ sea_file( filename )
 	      goto s_ex2;
 	    }
 	
-	    dir = win->w_memory;
+	    dir = (DIR *) win->w_memory;
 	    for ( i = 0; i < win->w_items; i++ )
 	    {
 	      if ( wildcmp( filename, dir[i].d_name ) )
@@ -198,13 +194,13 @@ rec_sea( filename )
 	DTA		*savedta;
 	REG WORD	status,ret;
 	
-	if ( !( dtabuf = malloc( (LONG)sizeof(DTA) ) ) )
+	if ( !( dtabuf = (DTA *) malloc( (LONG)sizeof(DTA) ) ) )
 	{
 	  do1_alert( FCNOMEM );
 	  return( TRUE );
 	}
 
-	savedta = Fgetdta();		/* save the dta buffer	*/
+	savedta = (DTA *) Fgetdta();	/* save the dta buffer	*/
 	Fsetdta( dtabuf );		/* set the new dta	*/
 
 	status = FALSE;			/* not found		*/
@@ -280,7 +276,9 @@ s_exit:
 display( filename )
 	BYTE	*filename;
 {
+#if 0	/* NOT USED: */
 	LONG		size;
+#endif
 	REG BYTE	*addr;
 	REG WINDOW	*win;
 	REG DIR		*dir;
@@ -311,7 +309,7 @@ display( filename )
 	
 	       if ( open_subdir( win, 0, FALSE, FALSE, FALSE ) )
 	       {
-	    	 dir = win->w_memory;
+	    	 dir = (DIR *) win->w_memory;
 	    	 for ( i = 0; i < win->w_items; i++ )
 	    	 {	
 		   if ( wildcmp( filename, dir[i].d_name ) )
@@ -357,7 +355,7 @@ display( filename )
 	      return( FALSE );
 
 	    win = w_gfirst();
-	    dir = win->w_memory;
+	    dir = (DIR *) win->w_memory;
 	    first = TRUE;
 
 	    for ( i = 0; i < win->w_items; i++ )
@@ -372,7 +370,7 @@ display( filename )
 		dir[i].d_state = SELECTED;
 	      }
 	    }
-	    wait_msg( -1 );
+	    wait_msg( -1, (OBJECT *) 0L );
 	  }
 	  pos_item( win, newi );
 	  return( TRUE );

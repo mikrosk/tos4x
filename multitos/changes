@@ -1,3 +1,32 @@
+Changes made 3/10/93:
+
+EVERYWHERE:
+	Merged in Lattice port. Here are the notes from that:
+
+
+Moved all of stuff from gemdefs.h to gemlib.h. This means that gemdefs.h
+is no longer required. Please get rid of it and use gemlib.h
+
+Discovered that deskobde.h is nothing more than a subset of obdefs.h. 
+You should kill the deskobde.h file and use obdefs.h instead.
+
+Compiler.h and portab.h were almost identical. I merged the two files
+and compiler.h should be deleted. Use portab.h instead.
+
+
+Overview:
+
+ - gemdefs.h doesn't exist. Use gemlib.h instead.
+ - deskobde.h doesn't exist. Use obdefs.h instead.
+ - compiler.h doesn't exist. Use portab.h instead.
+
+
+
+
+do1_alert from VOID to WORD, change return value in the deskmisc.c
+removed extern func decl in pgem.h
+rm duplicate func protos from pmisc.h
+moved all of ctrlbind.c protos from pgem.h to pmisc.h
 ====================== MultiTOS 1.01 released ==================
 Changes made 3/05/93:
 
@@ -16,7 +45,7 @@ deskdisk.c:
 Changes made 3/03/93:
 
 deskgrm.rsc:
-	Changed the OK button from an indicator to an activtor (as it
+	Changed the OK button from an indicator to an activator (as it
 	is in other languages).
 
 Changes made 2/24/93:

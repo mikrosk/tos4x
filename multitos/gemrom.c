@@ -2,17 +2,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/gemrom.c,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemrom.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: gemrom.c,v $
-*  Revision 1.2  93/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.2  89/04/26  18:26:27  mui
 * TT
 * 
@@ -42,6 +45,8 @@
 /*	Change at rsc_read do_cdir	1/28/88		D.Mui		*/	
 /*	Change at rsc_read for TOS and ROM system 3/11/88		*/
 /*	Put in all the resources		6/10/92	D.Mui		*/ 
+/* 	02/16/93	cjg	Converted to Lattice C 5.51		*/
+/*	02/23/93	cjg	Force the use of prototypes		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -52,15 +57,13 @@
 */	
 
 #define ONE_LANG	/* only 1 country resource */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "objaddr.h"
+#include "aesmint.h"
 
-EXTERN	LONG	dos_xalloc();
-EXTERN	VOID	do_rsfix();
 
 EXTERN	LONG	rs_global;
 EXTERN	LONG	rs_hdr;
@@ -79,24 +82,24 @@ MLOCAL	UWORD		*tosrsc;
 #ifdef ONE_LANG
 MLOCAL	BYTE	*RSCTABLE[] =
 {
-	USARSC,		/* USA, UK	*/
-	USARSC,		/* GERMAN	*/
-	USARSC,		/* FRENCH	*/
-	USARSC,		/* reserved	*/
-	USARSC,		/* SPANISH	*/
-	USARSC,		/* ITALIAN	*/
-	USARSC		/* suppose to be SWEDISH	*/
+	( BYTE *)USARSC,		/* USA, UK	*/
+	( BYTE *)USARSC,		/* GERMAN	*/
+	( BYTE *)USARSC,		/* FRENCH	*/
+	( BYTE *)USARSC,		/* reserved	*/
+	( BYTE *)USARSC,		/* SPANISH	*/
+	( BYTE *)USARSC,		/* ITALIAN	*/
+	( BYTE *)USARSC		/* suppose to be SWEDISH	*/
 };	
 #else
 MLOCAL	BYTE	*RSCTABLE[] =
 {
-	USARSC,		/* USA, UK	*/
-	GRMRSC,		/* GERMAN	*/
-	FRERSC,		/* FRENCH	*/
-	USARSC,		/* reserved	*/
-	SPARSC,		/* SPANISH	*/
-	ITARSC,		/* ITALIAN	*/
-	USARSC		/* suppose to be SWEDISH	*/
+	( BYTE *)USARSC,		/* USA, UK	*/
+	( BYTE *)GRMRSC,		/* GERMAN	*/
+	( BYTE *)FRERSC,		/* FRENCH	*/
+	( BYTE *)USARSC,		/* reserved	*/
+	( BYTE *)SPARSC,		/* SPANISH	*/
+	( BYTE *)ITARSC,		/* ITALIAN	*/
+	( BYTE *)USARSC		/* suppose to be SWEDISH	*/
 };	
 #endif
 
@@ -112,16 +115,15 @@ rom_ram( which, pointer )
 	REG LONG	pointer;
 {
 	WORD		size;
-	REG WORD	doit;
 	BYTE		*ptr;
 
 	switch( which )
 	{
 	  case 0:		/* get the gem resource	*/
-	    ptr = tosrsc;
+	    ptr = ( BYTE *)tosrsc;
 	    ptr += 10;
 	    size = tosrsc[0];
-	    LBCOPY( gemptr, ptr, size );
+	    LBCOPY( ( BYTE *)gemptr, ptr, size );
 	    rs_global = pointer;
 	    rs_hdr = gemptr;
 	    LLSET( pointer + 14, rs_hdr );
@@ -131,13 +133,13 @@ rom_ram( which, pointer )
 	    break;
 
 	  case 1:		/* copy the desktop resource	*/
-	    ptr = tosrsc;
+	    ptr = ( BYTE *)tosrsc;
 	    ptr += tosrsc[0];
-	    LBCOPY( pointer, ptr, tosrsc[1] - tosrsc[0] );
+	    LBCOPY( ( BYTE *)pointer, ptr, tosrsc[1] - tosrsc[0] );
 	    break;
 
 	  case 3:		/* read in desktop.inf		*/
-	    LBCOPY( pointer, infptr, tosrsc[2] - tosrsc[1] );
+	    LBCOPY( ( BYTE *)pointer, ( BYTE *)infptr, tosrsc[2] - tosrsc[1] );
 	    return( tosrsc[2] - tosrsc[1] );
 	}
 }
@@ -146,7 +148,7 @@ rom_ram( which, pointer )
 /*	Free the system resource	*/
 
 	VOID
-rsc_free( )
+rsc_free( VOID )
 {
 	dos_free( gl_pglue );
 }
@@ -156,7 +158,7 @@ rsc_free( )
 /*	Read in the resource file	*/	
 
 	WORD
-rsc_read()
+rsc_read( VOID )
 {
 	REG UWORD	*intptr;
 	UWORD		size;
@@ -178,7 +180,7 @@ rsc_read()
 	  st_lang = 0;
 #endif
 
-	tosrsc = RSCTABLE[st_lang];	
+	tosrsc = ( UWORD *)RSCTABLE[st_lang];	
  
 	if ( !( gl_pglue = dos_xalloc( (LONG)tosrsc[2], 3 ) ) )
 	{
@@ -189,8 +191,8 @@ rsc_read()
 	intptr = tosrsc;
 				/* copy the resource to RAM	*/
 	size = intptr[2];
-	a = tosrsc;
-	b = gl_pglue;
+	a = ( BYTE *)tosrsc;
+	b = ( BYTE *)gl_pglue;
 
 	while( size )
 	{
@@ -198,7 +200,7 @@ rsc_read()
 	  size--;	   
 	}
 
-	intptr = gl_pglue;
+	intptr = ( UWORD *)gl_pglue;
 	gemptr = (LONG)(gl_pglue + 10);	/* Gem Resource */
 	deskptr = (LONG)(gl_pglue + intptr[0]);/* Desktop Resource */
 	infptr = (LONG)( gl_pglue + intptr[1] );/* Inf file resource */

@@ -10,6 +10,8 @@
 /*	iasync return 0 for error			4/23/91 	*/
 /*	Change at mwait for Mint OS	7/23/91		D.Mui		*/
 /*	Change at acancel( p )		7/24/91		D.Mui		*/
+/*	Convert to Lattice C 5.51	02/25/93	C.Gee		*/
+/*	Force the use of prototypes					*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -26,17 +28,14 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "aesmint.h"
 						/* in OPTIMIZE.C	*/
 						/* in DSPTCH88.C	*/
-EXTERN	PD	*ch_mowner();
 EXTERN	WORD	cu_button;
 EXTERN	WORD	gl_bpend;
 EXTERN	LONG	CMP_TICK;
@@ -66,7 +65,7 @@ EXTERN	PD	*scr_pd;
 	  e = &p->p_evb[i];
 	  if ( !e->e_mask )
 	  {
-	    bfill( sizeof(EVB), 0, e );
+	    bfill( sizeof(EVB), 0, ( BYTE *)e );
 	    break;
 	  }
 	}
@@ -229,7 +228,7 @@ iasync( afunc, aparm )
 	  
 	e->e_nextp = currpd->p_evlist;		/* link the EVB to the	*/
 	currpd->p_evlist = e;			/* PD evlist		*/
-	e->e_pd = currpd;
+	e->e_pd = (BYTE *)currpd;
 						/* find a free bit in	*/
 						/*   in the mask	*/
 
@@ -244,11 +243,11 @@ iasync( afunc, aparm )
 	switch( afunc )
 	{
 	  case AQRD: 
-		ret = aqueue( FALSE, e, aparm );
+		ret = aqueue( FALSE, e, ( QPB *)aparm );
 		goto i_3;
 
 	  case AQWRT:	
-		ret = aqueue( TRUE, e, aparm );
+		ret = aqueue( TRUE, e, ( QPB *)aparm );
 i_3:		
 		if ( !e->e_mask )	/* O.K */
 		{
@@ -334,11 +333,11 @@ i_3:
 			
 	  case AMOUSE:			/* link to the CDA also	*/
 					/* amouse(e,aparm);	*/
-		LBCOPY( &mob, aparm, sizeof(MOBLK));
+		LBCOPY( ( BYTE *)&mob, ( BYTE *)aparm, sizeof(MOBLK));
 					/* if already in (or	*/
 					/*   out) signal	*/
 					/*   immediately	*/
-		if ( mob.m_out != inside( cu_xrat, cu_yrat, &mob.m_x ) )
+		if ( mob.m_out != inside( cu_xrat, cu_yrat, ( GRECT *)&mob.m_x ) )
 	  	  zombie(e);
 		else
 		{

@@ -11,6 +11,10 @@
  *       they will CHANGE. DO NOT RELY ON THEM.
  */
 
+#ifndef _VDOMODE_H_
+#define _VDOMODE_H_
+
+
 #define setmode(a)	(int)xbios(88,a)
 #define mon_type(a)	(int)xbios(89)
 #define ext_sync(a)	(void)xbios(90,a)
@@ -32,8 +36,5 @@
 #define BPS2		1
 #define BPS1		0
 
-
-
-
-
+#endif
 

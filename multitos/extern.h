@@ -1,6 +1,9 @@
 /*	EXTERN.H		6/12/89 - 6/13/89	Derek Mui	*/
 /*	Take out some variable	6/28/89					*/
 
+#ifndef _EXTERN_H_
+#define _EXTERN_H_
+
 /* EXTERN	WORD	namecon; */	/* name conflict flag		*/
 EXTERN	BYTE	dr[];
 EXTERN	WORD	p_timedate;		/* preserve time and date	*/
@@ -107,3 +110,5 @@ EXTERN	BYTE 	baklvl[];
 
 EXTERN	BYTE	Nextline[];
 EXTERN	BYTE	Nostr[];
+
+#endif

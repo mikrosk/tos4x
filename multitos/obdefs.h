@@ -2,17 +2,14 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: /u2/MRS/osrevisions/aes/obdefs.h,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/obdefs.h,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: obdefs.h,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
 * Revision 2.2  89/04/26  18:29:21  mui
 * TT
 * 
@@ -27,13 +24,16 @@
 /*	OBDEFS.H	03/15/84 - 02/08/85	Gregg Morris		*/
 /*	Add 3D definitons		7/7/92	D.Mui			*/
 
+#ifndef _OBDEFS_H_
+#define _OBDEFS_H_
+
 #define ROOT 0
 #define NIL -1
 						/* keybd states		*/
-#define K_RSHIFT 0x0001
-#define K_LSHIFT 0x0002
-#define K_CTRL 0x0004
-#define K_ALT 0x00008
+#define K_RSHIFT	0x0001
+#define K_LSHIFT	0x0002
+#define K_CTRL		0x0004
+#define K_ALT		0x0008
 						/* max string length	*/
 #define MAX_LEN 81
 						/* max depth of search	*/
@@ -337,3 +337,5 @@ typedef struct cicon_blk {
 #define TE_LEFT 0
 #define TE_RIGHT 1
 #define TE_CNTR 2
+
+#endif

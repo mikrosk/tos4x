@@ -2,17 +2,21 @@
 *************************************************************************
 *			REVISION144 Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/gemobed.c,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemobed.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: gemobed.c,v $
-*  Revision 1.2  93/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
+*
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.2  89/04/26  18:25:25  mui
 * TT
 * 
@@ -43,6 +47,8 @@
 /*	Fix at find_pos		   03/25/88		D.Mui		*/
 /*	Inclined code of ob_getsp  03/25/88		D.Mui		*/
 /*	Change at ob_center for 3D buttons	7/7/92	D.Mui		*/
+/*  	02/16/93	cjg	Convert to Lattice C 5.51		*/
+/*	02/23/93	cjg	Force the use of prototypes		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -60,13 +66,12 @@
 *	-------------------------------------------------------------
 */
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <gemusa.h>
+#include "pgem.h"
+#include "pmisc.h"
+
+#include "machine.h"
+#include "objaddr.h"
+#include "gemusa.h"
 
 #define BACKSPACE 0x0E08			/* backspace		*/
 #define SPACE 0x3920				/* ASCII <space>	*/
@@ -81,10 +86,6 @@
 #define ENTER 0x720D				/* enter key on keypad	*/
 #define ESCAPE 0x011B				/* escape		*/
 #define BYTESPACE 0x20				/* ascii space in bytes	*/
-
-EXTERN VOID	gsx_gclip();
-EXTERN VOID	gsx_sclip();
-EXTERN BYTE	*rs_str();
 
 EXTERN WORD	gl_wchar;
 EXTERN WORD	gl_hchar;
@@ -133,7 +134,7 @@ ob_center(tree, pt)
 	  hd += th;
 	}
 
-	r_set(pt, xd, yd, wd, hd);
+	r_set( ( WORD *)pt, xd, yd, wd, hd);
 }
 
 
@@ -436,13 +437,13 @@ ob_edit(tree, obj, in_char, idx, kind)
 	if ( flags & INDIRECT )
 	  spec = LLGET( spec );
 	
-	LBCOPY( &edblk, spec, sizeof(TEDINFO));
+	LBCOPY( ( BYTE *)&edblk, ( BYTE *)spec, sizeof(TEDINFO));
 
 						/* copy passed in strs	*/
 						/*   to local strs	*/
- 	LSTCPY(&DGLO->g_tmpstr[0], edblk.te_ptmplt);
- 	LSTCPY(&DGLO->g_rawstr[0], edblk.te_ptext);
- 	len = ii = LSTCPY(&DGLO->g_valstr[0], edblk.te_pvalid);
+ 	LSTCPY(&DGLO->g_tmpstr[0], ( BYTE *)edblk.te_ptmplt);
+ 	LSTCPY(&DGLO->g_rawstr[0], ( BYTE *)edblk.te_ptext);
+ 	len = ii = LSTCPY(&DGLO->g_valstr[0], ( BYTE *)edblk.te_pvalid);
 						/* expand out valid str	*/
 	while ( (ii > 0) &&
 		(len < edblk.te_tmplen) )
@@ -529,7 +530,11 @@ ob_edit(tree, obj, in_char, idx, kind)
 
 		 	  if (pos < (edblk.te_txtlen - 2) )
 			  {
-			    bfill(pos - *idx, SPACE, &DGLO->g_rawstr[*idx]);
+			    bfill(pos - *idx, BYTESPACE, &DGLO->g_rawstr[*idx]);
+
+
+
+
 			    DGLO->g_rawstr[pos] = NULL;
 			    *idx = pos;
 		 	    no_redraw = FALSE;
@@ -539,7 +544,7 @@ ob_edit(tree, obj, in_char, idx, kind)
 		     break;
 		}
 
-		LSTCPY(edblk.te_ptext, &DGLO->g_rawstr[0]);
+		LSTCPY( ( BYTE *)edblk.te_ptext, &DGLO->g_rawstr[0]);
 
 		if (!no_redraw)
 		{

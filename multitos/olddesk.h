@@ -3,6 +3,9 @@
 
 /* Increased MAXMENU to 31	07/07/92  cjg				*/
 
+#ifndef _OLDDESK_H_
+#define _OLDDESK_H_
+
 #define DOWARNING	0	/* Do we need initial warning box ? 	     */
 				/* There is also a flag in Gemjstrt.s:       */
 				/* 'dodowarn', which must be set along       */
@@ -219,3 +222,6 @@ typedef struct idtype
 	BYTE	*i_path;
 	BYTE	i_name[14];
 } IDTYPE;
+
+#endif
+

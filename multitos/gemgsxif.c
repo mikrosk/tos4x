@@ -11,6 +11,8 @@
 /*	Restore into C language from 3.01	8/29/90	D.Mui		*/
 /*	Fix gsx_wsopen for TT resolutions	8/29/90	D.Mui		*/
 /*	Change at gsx_mfset			5/8/91	D.Mui		*/
+/*	Convert to Lattice C 5.51		2/17/93 C.Gee		*/
+/*	Force the use of prototypes		2/23/93	C.Gee		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -27,12 +29,17 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <obdefs.h>
-#include <vdidefs.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "vdidefs.h"
+#include "aesmint.h"
+
+EXTERN LONG	trap();
+EXTERN LONG	trap13();
+EXTERN LONG	trap14();
+
 
 EXTERN	MFORM	gl_cmform;
 EXTERN	MFORM	gl_omform;
@@ -45,26 +52,6 @@ EXTERN	WORD	gl_mfid;
 EXTERN	WORD	gl_omfid;
 
 						/* in GEMDOS.C		*/
-EXTERN 	LONG	dos_xalloc();
-EXTERN 	WORD	dos_free();
-						/* in DOSIF.A86		*/
-EXTERN 	WORD	justretf();
-						/* in GSX2.A86		*/
-EXTERN		gsx2();
-EXTERN		i_ptsin();
-EXTERN		i_intin();
-EXTERN		i_ptsout();
-EXTERN		i_intout();
-EXTERN		i_ptr();
-EXTERN		i_ptr2();
-EXTERN		i_lptr1();	
-EXTERN		m_lptr2();
-						/* in OPTIMIZE.C	*/
-EXTERN	WORD	max();
-EXTERN	WORD	min();
-						/* in DOSIF.A86		*/
-EXTERN	WORD	far_bcha();
-EXTERN	WORD	far_mcha();
 EXTERN	LONG	drwaddr;
 						/* in APGSXIF.C		*/
 EXTERN	WORD	gl_xrat;
@@ -176,14 +163,14 @@ res_type( in )
 /*     save 25 columns and full height of the screen memory	*/
 
 	VOID
-gsx_malloc()
+gsx_malloc( VOID )
 {
 	LONG	len;
 	
-	gsx_fix( &gl_tmp, 0x0L, 0x0L );
-	len = (LONG)((UWORD)gl_wchar) * (LONG)25 * (LONG)((UWORD)gl_height)
+	gsx_fix( &gl_tmp, 0x0L, 0x0, 0x0 );
+	len = (LONG)((UWORD)gl_wchar) * 25L * (LONG)((UWORD)gl_height)
 		    * (LONG)((UWORD)gl_nplanes);
-	len = len / 8;
+	len = len / 8L;
 	gl_mlen = len;
 
 	if ( !( gl_tmp.fd_addr = dos_xalloc( gl_mlen, 0x23 ) ) )
@@ -203,11 +190,11 @@ gsx_malloc()
 /*     save 1/2 of the screen memory	*/
 
 	VOID
-gsx_malloc()
+gsx_malloc( VOID )
 {
 	gsx_fix( &gl_tmp, 0x0L, 0x0L );
 	gl_mlen = (LONG)(( gl_ws.ws_yres + 1 ) * ( gl_ws.ws_xres + 1 ) );
-	gl_mlen = ( gl_mlen * gl_nplanes * 3 ) / 40; 
+	gl_mlen = ( gl_mlen * (LONG)gl_nplanes * 3L ) / 40L; 
 	if ( !( gl_tmp.fd_addr = dos_xalloc( gl_mlen, 0x23 ) ) )
 	  bailout( "AES failed to allocate blt buffer\r\n" );
 	else
@@ -222,19 +209,21 @@ gsx_malloc()
 #endif
 
 	VOID
-gsx_mfree()
+gsx_mfree( VOID )
 {
 	if ( gl_tmp.fd_addr )
 	{
 	  gl_tmp.fd_addr -= 4;
 	  dos_free( gl_tmp.fd_addr );
-	  gl_tmp.fd_addr = (BYTE*)0;
+/*	  gl_tmp.fd_addr = (BYTE*)0;*/
+	  gl_tmp.fd_addr = ( LONG )0L;
 	}
 
 	if ( gl_crit.fd_addr )
 	{
 	  dos_free( gl_crit.fd_addr );
-	  gl_crit.fd_addr = (BYTE*)0;
+/*	  gl_crit.fd_addr = (BYTE*)0;*/
+	  gl_crit.fd_addr = ( LONG )0L;
 	}
 }
 
@@ -274,11 +263,11 @@ gsx_1code(code, value)
 
 
 	VOID
-gsx_init()
+gsx_init( VOID )
 {
 	gsx_wsopen();
 	gsx_start();
-	gsx_setmb(&far_bcha, &far_mcha, &drwaddr);
+	gsx_setmb( ( UWORD *)&far_bchange, ( UWORD *)&far_mchange, &drwaddr);
 	gsx_ncode(MOUSE_ST, 0, 0);
 	cu_xrat = gl_xrat = ptsout[0];
 	cu_yrat = gl_yrat = ptsout[1];
@@ -295,7 +284,7 @@ gsx_graphic(tographic)
 	  if (gl_graphic)
 	  {
 	    gsx_escapes(2);
-	    gsx_setmb(&far_bcha, &far_mcha, &drwaddr);
+	    gsx_setmb( ( UWORD*)&far_bchange, ( UWORD *)&far_mchange, &drwaddr);
 	  }
 	  else
 	  {
@@ -315,20 +304,17 @@ gsx_escapes(esc_code)
 }
 
 	VOID
-v_hardcopy()
+v_hardcopy( VOID )
 {
 	gsx_escapes(17);
 }
 
 
 	VOID
-gsx_wsopen()
+gsx_wsopen( VOID )
 {
 	REG WORD	i;
 	WORD		res;
-	LONG		save1;
-	LONG		save13;
-	LONG		save14;
 
 	for(i=0; i<10; i++)
 	  intin[i] = 1;
@@ -340,20 +326,20 @@ gsx_wsopen()
 	if ( ( gl_vdo & HIGHWORD ) == FALCON )
 	{
 	  intin[0] = 5;		/* FALCON special res handle */
-	  a_rezword = trap14( 95, a_rezword );	/* massage the res mode word */
+	  a_rezword = (WORD)trap14( 95, a_rezword );	/* massage the res mode word */
 	  gl_ws.ws_pts0 = b_rezword = a_rezword;	
 	}
 
 	/* Use gl_ws as intout and gl_ws.ws_pt0 as ptsout	*/
 
-	v_opnwk( &intin[0], &gl_handle, &gl_ws, &gl_ws.ws_pts0 );
+	v_opnwk( &intin[0], &gl_handle, ( WORD *)&gl_ws, &gl_ws.ws_pts0 );
 
 	if ( ( gl_vdo & HIGHWORD ) == FALCON )
 	  a_rezword = (WORD)trap14( 88, -1 );	
 	
 	trap13( 3, 2, ' ' );		/* put system in raw mode */
 
-	res = trap14( 4 );
+	res = (WORD)trap14( 4 );
 
 	gl_restype = res + 2;
 /*	gl_restype = res_type( res );	*/
@@ -392,14 +378,14 @@ gsx_wsopen()
 
 
 	VOID
-gsx_wsclose()
+gsx_wsclose( VOID )
 {
 	gsx_ncode(CLOSE_WORKSTATION, 0, 0);
 }
 
 
 	VOID
-ratinit()
+ratinit( VOID )
 {
 	gsx_1code(SHOW_CUR, 0);
 	gl_moff = 0;
@@ -407,7 +393,7 @@ ratinit()
 
 
 	VOID
-ratexit()
+ratexit( VOID )
 {
 	gsx_moff();
 }
@@ -441,8 +427,8 @@ bb_set(sx, sy, sw, sh, pts1, pts2, pfd, psrc, pdst)
 	pts2[2] = sw - 1;
 	pts2[3] = sh - 1 ;
 
-	gsx_fix(pfd, 0, 0, 0, 0);
-	vro_cpyfm( S_ONLY, &ptsin[0], psrc, pdst );
+	gsx_fix(pfd, 0L, 0, 0);
+	vro_cpyfm( S_ONLY, &ptsin[0], ( WORD *)psrc, ( WORD *)pdst );
 	gsx_mon();
 }
 
@@ -470,13 +456,13 @@ gsx_setmb(boff, moff, pdrwaddr)
 	UWORD		*boff, *moff;
 	LONG		*pdrwaddr;
 {
-	i_lptr1( boff, 0x0 );	
+	i_lptr1( (LONG)boff );	
 	gsx_ncode(BUT_VECX, 0, 0);
-	m_lptr2( &old_bcode );
+	m_lptr2( (LONG)&old_bcode );
 
-	i_lptr1( moff, 0x0 );	
+	i_lptr1( (LONG) moff );	
 	gsx_ncode(MOT_VECX, 0, 0);
-	m_lptr2( &old_mcode );
+	m_lptr2( (LONG)&old_mcode );
 
 /*	i_lptr1( justretf, 0x0 );	
 	gsx_ncode(CUR_VECX, 0, 0);
@@ -485,7 +471,7 @@ gsx_setmb(boff, moff, pdrwaddr)
 
 
 	VOID
-gsx_resetmb()
+gsx_resetmb( VOID )
 {
 	i_lptr1( old_bcode );	
 	gsx_ncode(BUT_VECX, 0, 0);
@@ -505,17 +491,17 @@ gsx_tick(tcode, ptsave)
 {
 	i_lptr1( tcode );	
 	gsx_ncode(TIM_VECX, 0, 0);
-	m_lptr2( ptsave );
+	m_lptr2( (LONG)ptsave );
 	return(intout[0]);
 }
 
 
-	WORD
+	VOID
 gsx_xmfset( pmfnew )
 	LONG		pmfnew;
 {
 	gsx_moff();
-	LWCOPY(ad_intin, pmfnew, 37);
+	LWCOPY( ( WORD *)ad_intin, ( WORD *)pmfnew, 37);
  	gsx_ncode(ST_CUR_FORM, 0, 37);
 	gsx_mon();
 }
@@ -529,7 +515,7 @@ gsx_mfset(pmfnew)
 	gl_omform = gl_cmform;		/* save the current mouse form */
 	gl_omkind = gl_mkind;		/* save the current mouse kind */
 	gl_omfid = gl_mfid;
-	LWCOPY(ad_intin, pmfnew, 37);
+	LWCOPY( ( WORD *)ad_intin, ( WORD *)pmfnew, 37);
  	gsx_ncode(ST_CUR_FORM, 0, 37);
 	gl_cmform = *( (MFORM*)pmfnew );
 	gsx_mon();
@@ -548,14 +534,14 @@ gsx_mxmy( pmx, pmy )
 
 
 	WORD
-gsx_button()
+gsx_button( VOID )
 {
 	return( gl_button );
 }
 
 
 	VOID
-gsx_moff()
+gsx_moff( VOID )
 {
 	if (!gl_moff)
 	{
@@ -568,7 +554,7 @@ gsx_moff()
 
 
 	VOID
-gsx_mon()
+gsx_mon( VOID )
 {
 	gl_moff--;
 	if (!gl_moff)
@@ -588,17 +574,17 @@ v_opnwk( pwork_in, phandle, pwork_out, ppt_out )
 REG	WORD	*pwork_out;
 	WORD	*ppt_out;
 {
-	i_ptsout( ppt_out );	/* set ptsout to work_out array */
-	i_intin( pwork_in );	/* set intin to point to callers data  */
-	i_intout( pwork_out );	/* set intout to point to callers data */
+	i_ptsout( ( LONG )ppt_out );	/* set ptsout to work_out array */
+	i_intin( ( LONG )pwork_in );	/* set intin to point to callers data  */
+	i_intout( ( LONG )pwork_out );	/* set intout to point to callers data */
 
 	gsx_ncode(OPEN_WORKSTATION, 0, 11);
 
 	*phandle = contrl[6];		
-	i_intin( &intin );	/* reset all the arrays	*/
-	i_intout( &intout );
- 	i_ptsin( &ptsin );
-	i_ptsout( &ptsout );
+	i_intin( ( LONG )&intin );	/* reset all the arrays	*/
+	i_intout( ( LONG )&intout );
+ 	i_ptsin( ( LONG )&ptsin );
+	i_ptsout( ( LONG )&ptsout );
 }
 
 
@@ -607,9 +593,9 @@ v_pline( count, pxyarray )
 	WORD	count;
 	WORD	*pxyarray;
 {
-	i_ptsin( pxyarray );
+	i_ptsin( (LONG)pxyarray );
 	gsx_ncode(POLYLINE, count, 0);
-	i_ptsin( &ptsin );
+	i_ptsin( (LONG)&ptsin );
 }
 
 
@@ -622,14 +608,14 @@ vst_clip( clip_flag, pxyarray )
 	WORD		value;
 
 	value = ( clip_flag != 0 ) ? 2 : 0;
-	i_ptsin( pxyarray );
+	i_ptsin( ( LONG )pxyarray );
 	intin[0] = clip_flag;
 	gsx_ncode(TEXT_CLIP, value, 1);
-	i_ptsin(&ptsin);
+	i_ptsin( ( LONG )&ptsin);
 }
 
 
-	WORD
+	VOID			/* WORD */
 vst_height( height, pchr_width, pchr_height, pcell_width, pcell_height )
 	WORD	height;
 	WORD	*pchr_width;
@@ -655,26 +641,26 @@ vr_recfl( pxyarray, pdesMFDB )
 	WORD	*pxyarray;
 	WORD	*pdesMFDB;
 {
-	i_ptr( pdesMFDB );
-	i_ptsin( pxyarray );
+	i_ptr( ( LONG )pdesMFDB );
+	i_ptsin( ( LONG )pxyarray );
 	gsx_ncode(FILL_RECTANGLE, 2, 1);
-	i_ptsin( &ptsin );
+	i_ptsin( ( LONG )&ptsin );
 }
 
 
 	VOID
-vro_cpyfm( wr_mode, pxyarray, psrcMFDB, pdesMFDB, )
+vro_cpyfm( wr_mode, pxyarray, psrcMFDB, pdesMFDB )
 	WORD	wr_mode;
 	WORD	*pxyarray;
 	WORD	*psrcMFDB;
 	WORD	*pdesMFDB;
 {
 	intin[0] = wr_mode;
-	i_ptr( psrcMFDB );
-	i_ptr2( pdesMFDB );
-	i_ptsin( pxyarray );
+	i_ptr( ( LONG )psrcMFDB );
+	i_ptr2( ( LONG )pdesMFDB );
+	i_ptsin( ( LONG )pxyarray );
 	gsx_ncode(COPY_RASTER_FORM, 4, 1);
-	i_ptsin( &ptsin );
+	i_ptsin( ( LONG )&ptsin );
 }
 
 
@@ -692,11 +678,11 @@ vrt_cpyfm( wr_mode, pxyarray, psrcMFDB, pdesMFDB, fgcolor, bgcolor )
 	pintin[0] = wr_mode;
 	pintin[1] = fgcolor;
 	pintin[2] = bgcolor;
-	i_ptr( psrcMFDB );
-	i_ptr2( pdesMFDB );
-	i_ptsin( pxyarray );
+	i_ptr( ( LONG )psrcMFDB );
+	i_ptr2( ( LONG )pdesMFDB );
+	i_ptsin( ( LONG )pxyarray );
 	gsx_ncode(121, 4, 3);
-	i_ptsin( &ptsin );
+	i_ptsin( ( LONG )&ptsin );
 }
 
 
@@ -705,8 +691,8 @@ vrn_trnfm( psrcMFDB, pdesMFDB )
 	WORD	*psrcMFDB;
 	WORD	*pdesMFDB;
 {
-	i_ptr( psrcMFDB );
-	i_ptr2( pdesMFDB );
+	i_ptr( ( LONG )psrcMFDB );
+	i_ptr2( ( LONG )pdesMFDB );
 	gsx_ncode(TRANSFORM_FORM, 0, 0);
 }
 
@@ -722,10 +708,10 @@ vsl_width( width )
 
 
 	WORD
-v_load_fonts( )
+v_load_fonts( VOID )
 {
 	intin[0] = 0;
-	gsx_ncodes(LOAD_ALPHA_TEXT,0,1 );
+	gsx_ncode(LOAD_ALPHA_TEXT,0,1 );
 	return( intout[0] );
 }
 
@@ -779,17 +765,17 @@ v_setpoint( point, wchar, hchar, wbox, hbox )
 
 
 	VOID
-v_unload_font()
+v_unload_font( VOID )
 {
 	if ( gl_fsm )
-	  gsx_ncodes(UNLOAD_ALPHA_TEXT,0,1 );
+	  gsx_ncode(UNLOAD_ALPHA_TEXT,0,1 );
 }
 
 
 	VOID
 v_monotext( x,y,i,width )
-	int  x,y,i;
-	int width;
+	WORD  x,y,i;
+	WORD  width;
 {
 	ptsin[0] = x;
 	ptsin[1] = y;
@@ -800,8 +786,8 @@ v_monotext( x,y,i,width )
 
 	WORD
 vst_arbpt( point,chwd,chht,cellwd,cellht )
-	int point;
-	int *chwd,*chht,*cellwd,*cellht;
+	WORD point;
+	WORD *chwd,*chht,*cellwd,*cellht;
 {
 	intin[0] = point;
 	gsx_ncode( 246, 0, 1 );

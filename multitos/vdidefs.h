@@ -4,17 +4,14 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: /u2/MRS/osrevisions/aes/funcdef.h,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/vdidefs.h,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: vdidefs.h,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
 * Revision 2.2  89/04/26  18:20:13  mui
 * TT
 * 
@@ -26,6 +23,11 @@
 * 
 *************************************************************************
 */
+
+#ifndef _VDIDEFS_H_
+#define _VDIDEFS_H_
+
+#include "portab.h"
 
 typedef struct wsstr		/* work stationn structure	*/
 {
@@ -181,3 +183,6 @@ typedef struct mfstr
 #define vsf_style( x )		gsx_1code(S_FILL_INDEX, x)
 #define vsf_color( x )		gsx_1code(S_FILL_COLOR, x)
 #define vsl_udsty( x )		gsx_1code(ST_UD_LINE_STYLE, x)
+
+#endif
+

@@ -14,7 +14,10 @@
 *
 *
 
-_docall::
+.globl _docall
+.globl _osif
+
+_docall:
 	move.w	4(sp),d0	; trap number in d0
 	move.w	6(sp),fncode	; function number in fncode
 	move.l	8(sp),a0	; a0 -> args (all longs)
@@ -30,68 +33,68 @@ _docall::
 	asl.w	#1,d2		; d2 *= 2 again (offs past last arg long)
 	lea.l	-4(a0,d2.w),a0	; a0 -> last arg longword
 
-.loop:
+loop:
 	tst.b	1(a1)
-	beq.s	.next
-	bmi.s	.long
+	beq.b	next
+	bmi.b	islong
 ; int
 	move.w	2(a0),-(sp)	; move lo word of Nth arg to stack
-	bra.s	.next
+	bra.b	next
 
-.long:	move.l	(a0),-(sp)	; move whole long of Nth arg to stack
-.next:	subq	#$4,a0
+islong:	move.l	(a0),-(sp)	; move whole long of Nth arg to stack
+next:	subq	#$4,a0
 	subq	#$2,a1
-	dbra	d1,.loop
+	dbra	d1,loop
 
 	move.w	fncode,-(sp)
 	asl.w	#2,d0		; trapno *= 4
-	jmp	.jmptab(PC,d0.w)
+	jmp	jmptab(PC,d0.w)
 	nop
 
-.jmptab:
+jmptab:
 	trap	#0
-	bra.s	.done
-	bra.s	.dotrap1
+	bra.b	done
+	bra.b	dotrap1
 	nop
-	bra.s	.done
+	bra.b	done
 	trap	#2
-	bra.s	.done
+	bra.b	done
 	trap	#3
-	bra.s	.done
+	bra.b	done
 	trap	#4
-	bra.s	.done
+	bra.b	done
 	trap	#5
-	bra.s	.done
+	bra.b	done
 	trap	#6
-	bra.s	.done
+	bra.b	done
 	trap	#7
-	bra.s	.done
+	bra.b	done
 	trap	#8
-	bra.s	.done
+	bra.b	done
 	trap	#9
-	bra.s	.done
+	bra.b	done
 	trap	#$a
-	bra.s	.done
+	bra.b	done
 	trap	#$b
-	bra.s	.done
+	bra.b	done
 	trap	#$c
-	bra.s	.done
+	bra.b	done
 	trap	#$d
-	bra.s	.done
+	bra.b	done
 	trap	#$e
-	bra.s	.done
+	bra.b	done
 	trap	#$f
-	bra.s	.done
+	bra.b	done
 	nop
-.done:
+done:
 	move.l	osp,sp
 	rts
 
-.dotrap1:
+dotrap1:
 	move.l	sp,a0
 	move.l	a0,-(sp)
 	jsr	_osif
-	bra	.done
+	bra	done
 
 .bss
 osp:	ds.l	1

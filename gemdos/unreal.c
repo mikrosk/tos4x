@@ -82,8 +82,10 @@ uint bootdev = 0;
 voidfn
 upd_tod()
 {
+/*
 	long x = (realdate << 16) | (realtime);
 	trap14(0x16,x);
+*/
 }
 
 MD initmd;

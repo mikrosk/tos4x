@@ -22,7 +22,7 @@ long xgetfree _P((long *buf, uint drv));
 /* fsdir.c */
 long xchdir _P((char *p));
 long xgetdir _P((char *buf, int drv));
-long xgetndir _P((char *buf, ulong len, uint drv));
+long xgetndir _P((char *buf, uint drv, ulong len));
 long _getndir _P((char **pbuf, ulong len, DIR *dir, DMD *dmd));
 long xmkdir _P((char *s));
 long xrmdir _P((char *p));
@@ -159,19 +159,3 @@ void x0term _P((void));
 void ixterm _P((PD *r));
 long xexec _P((int mode, char *s, char *t, char *v));
 long xpgmld _P((PRG *prg, int h, PD *lp));
-
-/* ftest.c */
-void get_time _P((void));
-void main _P((int argc, char *argv[]));
-void ui _P((char *cmdbuf));
-long internal _P((int c));
-void mputs _P((char *s));
-void mputlong _P((long l));
-void mputint _P((int i));
-void mput _P((int c));
-void mgets _P((char *buf));
-void mgetarg _P((char *name, int type, int n));
-void err _P((char *s));
-long atolx _P((char *s));
-void doload _P((char *buf));
-void dotrans _P((char *buf));

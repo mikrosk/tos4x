@@ -1,0 +1,369 @@
+
+/***************************************************************************/
+/*									   */
+/*			COLOR ICON ROUTINES				   */
+/*									   */
+/***************************************************************************/
+
+/*	Takes a list of icons and returns the first icon that 
+ *	has the same number of planes.  Returns a null pointer if no match.
+ */
+CICON *
+match_planes( iconlist, planes )
+CICON *iconlist;
+int planes;
+{
+    CICON *tempicon;
+
+    tempicon = iconlist;
+    while (tempicon) {
+	if (tempicon->num_planes == planes) break;
+	else tempicon = tempicon->next_res;
+    }
+    return( tempicon );
+}
+
+/*
+ *	Routine to draw a color icon, which is a graphic image with a text
+ *	string underneath it.  Note that this routine is very similar to
+ *	gr_icon().   It has an extra parameter which is the list of color
+ *	icons for different resolutions.
+ */
+	VOID
+gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
+	REG WORD		state;
+	LONG		pmask;
+	LONG		pdata;
+	LONG		ptext;
+	REG WORD		ch;
+	WORD		chx, chy;
+	REG GRECT		*pi;
+	REG GRECT		*pt;
+	CICONBLK	*cicon;
+{
+    REG WORD		fgcol, bgcol, tmp;
+						/* crack the color/char	*/
+						/*   definition word	*/
+    CICON *color;
+    int col_select;		/* is there a color select icon */
+    int i,j;
+
+    color = match_planes( cicon->mainlist, gl_nplanes );
+
+    fgcol = (ch >> 12) & 0x000f;
+    bgcol = (ch >> 8) & 0x000f;
+    ch &= 0x0ff;
+						/* invert if selected	*/
+    if (state & SELECTED)
+    {
+	tmp = fgcol;	
+	fgcol = bgcol;
+	bgcol = tmp;
+    }
+
+    col_select = 0;
+					/* substitue mask if color avail */
+    if ( color ) {
+	if ( (state & SELECTED) && color->sel_data ) {
+	    col_select = 1;
+	    pdata = color->sel_data;
+	    pmask = color->sel_mask;
+	} else {
+	    pdata = color->col_data;
+	    pmask = color->mask;
+	}
+	if (state & SELECTED)
+	{
+	    tmp = fgcol;	
+	    fgcol = bgcol;
+	    bgcol = tmp;
+	}
+    }
+	
+						/* do mask unless its on*/
+						/* a white background	*/
+    if ( !( (state & WHITEBAK) && (bgcol == WHITE) ) )
+    {
+	gsx_blt(pmask, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
+		gl_width/8, pi->g_w, pi->g_h, MD_TRANS,
+		bgcol, fgcol); 
+	if ( color && (state & SELECTED) )
+	    gr_rect(fgcol, IP_SOLID, pt);
+	else
+	    gr_rect(bgcol, IP_SOLID, pt);
+    }
+
+						/* draw the data	*/
+    if ( color ) {
+/* NOTE: The call below is commented out because it does a transform form
+ * on the color data every time it is drawn.  The code in the color icon 
+ * resource load should do all of the transforms.  Uncomment this line for
+ * testing purposes only.
+ */
+/*      my_trans( pdata, pi->g_w/8, pdata,pi->g_w/8,pi->g_h );*/
+	gsx_cblt(pdata, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
+		gl_width/8, pi->g_w, pi->g_h, S_OR_D,		/* 6/30/92 */
+		color->num_planes); 
+	if ( state & SELECTED ) {
+	    tmp = fgcol;	
+	    fgcol = bgcol;
+	    bgcol = tmp;
+	    if ( !col_select ) {	/* check if we need to darken */
+		convert_mask( pmask, gl_colmask, pi->g_w, pi->g_h );
+		gsx_blt(gl_colmask, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
+			gl_width/8, pi->g_w, pi->g_h, MD_TRANS,
+			1, 0); 
+	    }
+	}
+    } else 
+	gsx_blt(pdata, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
+		gl_width/8, pi->g_w, pi->g_h, MD_TRANS,
+		fgcol, bgcol); 
+
+						/* draw the character	*/
+    gsx_attr(TRUE, MD_TRANS, fgcol);
+    if ( ch )
+    {
+	intin[0] = ch;
+	gsx_tblt(SMALL, pi->g_x+chx, pi->g_y+chy, 1);
+    }
+						/* draw the label	*/
+    gr_gtext(TE_CNTR, SMALL, ptext, pt, MD_TRANS);
+
+}
+
+/*	Takes the blit code and makes sure that the number of planes is
+ *	set.  This code was taken from gsx_blt() and modified so that the
+ *	number of planes is passed in and the source and destination MFDB's
+ *	had that value set correctly.  Otherwise, it is the same code.
+ */
+	WORD
+gsx_cblt(saddr, sx, sy, swb, daddr, dx, dy, dwb, w, h, rule, numplanes)
+	LONG		saddr;
+	REG UWORD		sx, sy, swb;
+	LONG		daddr;
+	REG UWORD		dx, dy;
+	UWORD		dwb, w, h, rule;
+	WORD		numplanes;
+{
+	WORD		*ppts;
+
+	ppts = &ptsin[0];
+
+	gsx_fix(&gl_src, saddr, swb, h);
+	gsx_fix(&gl_dst, daddr, dwb, h);
+
+	gl_src.fd_nplanes = numplanes;
+	gl_dst.fd_nplanes = numplanes;
+
+	gsx_moff();
+
+	ppts[0] = sx;
+	ppts[1] = sy;
+	ppts[2] = sx + w - 1;
+	ppts[3] = sy + h - 1;
+	ppts[4] = dx;
+	ppts[5] = dy;
+	ppts[6] = dx + w - 1;
+	ppts[7] = dy + h - 1 ;
+	  vro_cpyfm( rule, &ppts[0], &gl_src, &gl_dst);
+	gsx_mon();
+
+}
+
+/*	Takes a ptr to a mask and copies it to another while dithering
+ *	the data.  Note that this does not check the limits of the gl_mask.
+ */
+convert_mask( mask, gl_mask, width, height )
+WORD *mask, *gl_mask;
+WORD width, height;
+{
+    int i, j, wdwide, no_bytes;
+
+    wdwide = width/16;
+    no_bytes = width/8 * height;
+    for (i = 0; i < height; i+=2 ) {
+	for ( j=0; j < wdwide; j++ ) {
+	    gl_mask[ j + i*wdwide ] = mask[ j + i*wdwide ] & 0x5555;
+	}
+	for ( j=wdwide; j < 2*wdwide; j++ ) {
+	    gl_mask[ j + i*wdwide ] = mask[ j + i*wdwide ] & 0xAAAA;
+	}
+    }
+}
+
+
+/* FIX_MONO()
+ * Do fixups on the monochrome icon then pass back a ptr to the next part.
+ */
+WORD *
+fix_mono( ptr, plane_size, tot_res )
+WORD *ptr;
+long *plane_size;
+WORD *tot_res;
+{
+    long *temp;
+    WORD width, height;
+    long size;
+
+    width = ptr[11];
+    height = ptr[12];
+    temp = &ptr[17];
+    *tot_res = (WORD)*temp;
+    *plane_size = size = (long) ((width/16) * height * 2);
+    temp = &ptr[2];
+    *temp = &ptr[19];	/* data */
+    temp = &ptr[0];
+    *temp = (long)&ptr[19] + size;
+    temp = &ptr[4];
+    *temp = (long)&ptr[19] + 2*size;
+    temp = *temp + 12L;
+    return( temp );    
+}
+
+/* FIX_RES()
+ * Does fixups on the resolution dependent color icons.  Returns
+ * a pointer past the last icon fixed up.
+ */
+WORD *
+fix_res( ptr, mono_size, next_res )
+WORD *ptr;
+long mono_size;
+long *next_res;
+{
+    long *temp, *end;
+    WORD select;
+
+    *next_res = &ptr[9];
+
+    temp = &ptr[5];
+    select = (int) *temp;
+    temp = &ptr[1];
+    *temp = (long) ptr + (long) sizeof( CICON );
+    temp = &ptr[3];
+    *temp = (long)ptr + (long) sizeof( CICON ) + ((long) ptr[0] * mono_size );
+    end = *temp + mono_size;	/* push pointer past the mask */
+    if ( select ) {	/* there are some selected icons */
+	temp = &ptr[5];
+	*temp = end;
+	temp = &ptr[7];	/* selected mask */	
+	end = (long *) ((long) end + ((long) ptr[0] * mono_size ));
+	*temp = end;
+	end = (long *) ((long) end + mono_size);
+    }
+    return( end );
+}
+
+
+/* FIXUP_CICON()
+ * Does fixups on the pointers in the color icon structures.
+ */
+fixup_cicon( ptr, tot_icons, carray )
+WORD *ptr;
+int tot_icons;
+CICONBLK **carray;
+{
+    int tot_resicons, tot_selicons;
+    int i, j, k;
+    long mono_size;	/* size of a single mono icon in bytes */
+    long *next_res;
+    CICONBLK *cicon;
+
+    
+    for ( i = 0; i < tot_icons; i++ ) {
+	cicon = (CICONBLK *)ptr;
+	carray[i] = cicon;
+	ptr = fix_mono( ptr, &mono_size, &tot_resicons );
+	if ( tot_resicons )	/* 7/9/92 */
+	{
+	  
+	  cicon->mainlist = ptr;
+	  for ( j = 0; j < tot_resicons; j++ ) {
+	    ptr = fix_res( ptr, mono_size, &next_res );
+	    *next_res = ptr;
+	  }
+	  *next_res = 0L;
+	}
+    }
+}
+
+
+
+/* MY_TRANS()
+ * C code stolen from the apgsxif.s file.  This is call is identical to
+ * gsx_trans except that gsx_trans is hardwired to one-plane transforms.
+ */
+	WORD
+my_trans(saddr, swb, daddr, dwb, h)
+	LONG		saddr;
+	UWORD		swb;
+	LONG		daddr;
+	UWORD		dwb;
+	REG UWORD		h;
+{
+	gsx_fix(&gl_src, saddr, swb, h);
+	gl_src.fd_stand = TRUE;
+	gl_src.fd_nplanes = gl_nplanes;
+
+	gsx_fix(&gl_dst, daddr, dwb, h);
+	gl_dst.fd_stand = TRUE;
+	gl_dst.fd_nplanes = gl_nplanes;
+	vrn_trnfm( &gl_src, &gl_dst );
+}
+
+
+/* TRANS_CICON()
+ * Takes an array of color icons (and the number of icons), and changes
+ * all of the color data from device-independent form to device-dependent.
+ */
+	VOID
+trans_cicon( tot_icons, carray )
+	WORD tot_icons;
+	CICONBLK **carray;
+{
+	WORD 	i;
+	CICONBLK *ciconblk;
+	CICON *cic;
+	WORD	w, h;
+	
+    for (i = 0; i < tot_icons; i++ ) {
+	ciconblk = carray[i];
+	w = ciconblk->monoblk.ib_wicon;
+	h = ciconblk->monoblk.ib_hicon;
+	cic = ciconblk->mainlist;
+	while (cic) {
+	    my_trans( cic->col_data, w/8, cic->col_data, w/8, h );
+	    if (cic->sel_data)
+		my_trans( cic->sel_data, w/8, cic->sel_data, w/8, h );
+	    cic = cic->next_res;
+	}
+    }
+
+}
+
+
+/* GET_COLOR_RSC()
+ * This is the main routine that fixes up the color icons.
+ * Pass in a pointer to the array of CICONBLK's.  Count the number of 
+ * entries (up until an entry has a -1L) to get the number of CICONBLK's.
+ */
+	
+	VOID
+get_color_rsc( cicondata )
+	BYTE 	*cicondata;
+{
+	CICONBLK *ptr,**array_ptr;
+	WORD 	totalicons;
+
+	array_ptr = (CICONBLK **) cicondata;
+	totalicons = 1;
+	while (*array_ptr++ != -1L) 
+	  totalicons++;
+
+	ptr = (CICONBLK *) array_ptr;
+
+	fixup_cicon( ptr, totalicons, (CICONBLK **)cicondata ); /* fixup pointers */
+	trans_cicon( totalicons, (CICONBLK **)cicondata ); /* transform form */
+}
+
+

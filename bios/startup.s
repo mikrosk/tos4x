@@ -4,19 +4,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/07/27 15:08:15 $
+* $Date: 90/08/01 13:12:28 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.56  90/08/01  13:12:28  apratt
+* Changed boot color to white, and commented out color-cycling code.
+* Changed date to 8/1/90.  This is the final TT release revision.
+*
 * Revision 2.55  90/07/27  15:08:15  apratt
 * Removed obsolete (and long-commented-out) dmaboot code.
-*
+* 
 * Added "boot preference" code: first ttscu1 bits 7-3, then the first
 * word of NVM are used as boot preference.  If NVM is invalid it's zero.
-*
+* 
 * Revision 2.54  90/07/25  14:24:45  apratt
 * Re-added clear of bootdev at reset time when you're a RAM TOS so the
 * floppy's AUTO folder gets executed, not the hard disk's.
@@ -515,7 +519,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.55 $
+* $Revision: 2.56 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -603,14 +607,14 @@ date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .else
-version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$07261990	; TT date, $MMDDYYYY @check@
+version		equ	$0300		; version number (need not be even)
+date		equ	$08011990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010011111010 ; Jul 26, 1990
+dosdate		equ	%0001010100000001 ; August 8, 1990
 .endc
 
 .ifne TT
-bootcolor	equ	$0fc		; change this each release
+bootcolor	equ	$fff		; WHITE for TT production ROMs (!)
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
 bootcolor	equ	$fff		; white for production ROMs
 .endc
@@ -2887,25 +2891,25 @@ dmab_to:
 * A simple backspace after the Nth one doesn't work because you may or may
 * not be on an N-column display, where the cursor is ALREADY on the
 * Nth one.  Sigh.
-* color cycling code: pulse with increasing blue (yellow to white)
-
-.ifne TT
-	move.w	_frclock+2,d0		; get lo word of frame clock
-	lsr.w	#2,d0			; divide by 4 ('prox 1 sec cycle)
-	and.w	#$f,d0			; get just blue bits
-	move.w	ttcolor0,d1		; get current color
-	and.w	#$ff0,d1		; zero old blue bits
-	or.w	d0,d1			; OR in new blue value
-	move.w	d1,ttcolor0		; and write new color
-.else
-	move.w	_frclock+2,d0
-	lsr.w	#3,d0			; divide by 8 ('prox 1 sec cycle)
-	and.w	#$7,d0			; mask off just blue bits
-	move.w	color0,d1
-	and.w	#$ff0,d1
-	or.w	d0,d1
-	move.w	d1,color0
-.endc
+** color cycling code: pulse with increasing blue (yellow to white)
+*
+*.ifne TT
+*	move.w	_frclock+2,d0		; get lo word of frame clock
+*	lsr.w	#2,d0			; divide by 4 ('prox 1 sec cycle)
+*	and.w	#$f,d0			; get just blue bits
+*	move.w	ttcolor0,d1		; get current color
+*	and.w	#$ff0,d1		; zero old blue bits
+*	or.w	d0,d1			; OR in new blue value
+*	move.w	d1,ttcolor0		; and write new color
+*.else
+*	move.w	_frclock+2,d0
+*	lsr.w	#3,d0			; divide by 8 ('prox 1 sec cycle)
+*	and.w	#$7,d0			; mask off just blue bits
+*	move.w	color0,d1
+*	and.w	#$ff0,d1
+*	or.w	d0,d1
+*	move.w	d1,color0
+*.endc
 
 	move.l	#$00010002,-(sp)
 	trap	#$d			; poll for char: Bconstat(2)
@@ -2918,7 +2922,7 @@ nomt:
 	move.l	d7,_hz_200		; you broke out: write 90 sec
 * if (mt_done && _hz_200 >= d6)
 	trap	#$d
-	move.w	#bootcolor,color0
+*	move.w	#bootcolor,color0	; end color cycling
 * this is the end of the memory-test/shrinking bar sequence.  We check
 .ifne TT
 * Check the keyboard for a user aborting the timeout
@@ -4986,6 +4990,9 @@ _levelB2:
 	dc.l	$fa000000+%01000001	; $fa - inhibit
 	dc.l	$fb000000+%01000001	; $fb - inhibit
 	dc.l	$fc000000+%01000001	; $fc - inhibit
+	dc.l	$fd000000+%01000001	; $fd - inhibit
+	dc.l	$fe000000+%01000001	; $fe - inhibit
+	dc.l	levelC+%0010	; translates $FF byte into $00
 
 _levelC:
 	dc.l	$00000000+%00000001	; $000/ff0 - enable

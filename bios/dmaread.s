@@ -4,16 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/02 17:46:34 $
+* $Date: 90/03/06 16:09:16 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.7  90/03/06  16:09:16  apratt
+* Moved .globl _resetscsi into the TT conditional; otherwise
+* MAS thinks it's external, even though it's never used!
+*
 * Revision 1.6  90/03/02  17:46:34  apratt
 * This rev is the source for the 3/1/90 ROM.
-*
+* 
 * Revision 1.5  90/03/01  17:27:00  apratt
 * Checkin of Minna's changes, including adding better spin-up delays
 * and the dmawrite call.
@@ -36,7 +40,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.6 $
+* $Revision: 1.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -79,7 +83,6 @@
 
 .globl	_dmaread
 .globl	_dmawrite
-.globl	_resetscsi
 
 
 flock	equ	$43e		; FIFO lock variable
@@ -494,6 +497,8 @@ rstdelay:
 ;	SCSI specific		;
 ;				;
 ;+++++++++++++++++++++++++++++++;
+
+.globl	_resetscsi
 
 ; Definitions
 REGBASE	equ	1	; most are on odd part of data bus

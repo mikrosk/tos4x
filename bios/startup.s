@@ -4,13 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/26 17:27:28 $
+* $Date: 90/03/01 17:10:51 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.42  90/03/01  17:10:51  apratt
+* Added equates for TTMFP: ttgpip, ttiera, etc.
+* Fixed ttwait, stwait for new equates.
+* Added use of noblank, rather than vwait: see comments at noblank.
+* Noblank1 is similar, but returns via rts.
+* Fixed a some things causing STe not to work.
+* Removed restriction (in findpackages) that phystop be on a 1K boundary.
+*
 * Revision 2.41  90/02/26  17:27:28  apratt
 * Fixed up conditionals, using else rather than endc/if. Added stwait,
 * using STMFP timer A for delays, suitable for delays during boot
@@ -20,7 +28,7 @@
 * vblq is always 1st. Hope this doesn't hurt if we ever build ST ROMS
 * again! Changed _term to use dc.w's to get what I'm after: a jsr (not
 * bsr) to the next instruction.
-*
+* 
 * Revision 2.40  90/02/22  17:51:41  apratt
 * Changed bootup BG color from yellow to magenta.  Added moveq #0,d0
 * to clear screen so it doesn't turn green.  Removed twin color
@@ -404,7 +412,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.41 $
+* $Revision: 2.42 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -978,6 +986,34 @@ tbcr	equ	mfp+$1b			; timer B control
 tcdcr	equ	mfp+$1d			; timer C & D control
 tadr	equ	mfp+$1f			; timer A data
 tbdr	equ	mfp+$21			; timer B data
+tcdr	equ	mfp+$23			; timer C data
+ttmfp	equ	$fffffa81
+scr	equ	mfp+$27			; sync char
+ttgpip	equ	mfp+1			; general purpose I/O
+ttaer	equ	mfp+3			; active edge reg
+ttddr	equ	mfp+5			; data direction reg
+ttiera	equ	mfp+7			; interrupt enable A & B
+ttierb	equ	mfp+9
+ttipra	equ	mfp+$b			; interrupt pending A & B
+ttiprb	equ	mfp+$d
+ttisra	equ	mfp+$f			; interrupt inService A & B
+ttisrb	equ	mfp+$11
+ttimra	equ	mfp+$13			; interrupt mask A & B
+ttimrb	equ	mfp+$15
+ttvr	equ	mfp+$17			; interrupt vector base
+tttacr	equ	mfp+$19			; timer A control
+tttbcr	equ	mfp+$1b			; timer B control
+tttcdcr	equ	mfp+$1d			; timer C & D control
+tttadr	equ	mfp+$1f			; timer A data
+tttbdr	equ	mfp+$21			; timer B data
+tttcdr	equ	mfp+$23			; timer C data
+tttddr	equ	mfp+$25			; timer D data
+ttscr	equ	mfp+$27			; sync char
+ttucr	equ	mfp+$29			; USART control reg
+ttrsr	equ	mfp+$2b			; receiver status
+tttsr	equ	mfp+$2d			; transmit status
+ttudr	equ	mfp+$2f			; USART data
+tttbdr	equ	ttmfp+$21		; timer B data
 tttcdr	equ	ttmfp+$23		; timer C data
 tttddr	equ	ttmfp+$25		; timer D data
 ttscr	equ	ttmfp+$27		; sync char
@@ -1389,15 +1425,16 @@ vtend:	move.w	(a0)+,d0
 *+
 *  Initialize PSG output ports.
 *  Make ports A and B output-only;
-*  the hardware into 50hz mode.  Wait for the next vblank
-*  and then do it.
+*  initialize floppy select lines (so
+*  that none are selected).
+*
 * Note: The floppy side and selects are inverted, so writing 1 disables them.
 * Other outputs are initialized to zero here: *DTR, *RTS, STROBE,
 .ifeq TT
 	btst.b	#0,os_conf+1(pc)	; check bit: configured for 50hz?
 	lea	giselect,a0		; a0 -> giselect, giwrite-2
 	move.b	#7,(a0)			; set porta & portb to output
-	bra	vwait			; wait for vblank start
+	move.b	#$c0,2(a0)
 	move.b	#$e,(a0)		; select port A
 .else
 	move.b	#$01,syncmode		; set external sync mode always
@@ -2164,30 +2201,29 @@ scuberr:
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
 	move.l	#ikbreset,-(sp)	; ikbd reset string
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
-TBDR	equ	$fffffa21		; timer B data reg
-TBCR	equ	$fffffa1b		; timer B control reg
 	dbra	d1,ikbdlp1
-	moveq.l	#0,d0			; pre-select low rez
+	bsr	cartscan		; execute cartridge aps
 *+
-	bne	nomono			; no mono - d0 is fine
+*  Initialize screen resolution -- algorithm from Jim Tittsler (thank you!)
 .ifeq TT
-	moveq	#2,d0			; st/mono: choose mode 2 (ST HIGH)
+*  If in medium resolution, make color 3 black (color 15 ==> color 3).
 *
-	moveq	#6,d0			; tt/mono: choose mode 6 (TT HIGH)
+* This used to read the current rez out of the hardware & set the software
 .endif
 
 * a mono monitor, in which case we set high rez (read "ST LOW" at "TT HIGH"
 * when on a TT).
 .ifeq TT
-* on ST, wait for a vblank, then set the shift mode; for some reason
-* this is necessary when changing from low to high, but we do it here
-* regardless.
+* As of 5/14/91, TT's with color monitors boot in TT MED, which makes it
+* is call noblank, which returns when it's sure we are NOT in a vblank.
+* THEN we can change modes.  (Note: noblank clobbers d0.)
+* The STPAD part of this moved to the place where the sync mode and
 	lea	vwt_r(pc),a6		; a6 -> ret addr
-	bra	vwait			; wait for vblank
+	bra	noblank			; wait until we're NOT in a vblank
 vwt_r:
 .endc
-	move.b	d0,shiftmd		; set hardware
-	move.b	d0,sshiftmd.w		; set software
+
+.if STPAD
 	move.b	#$80,$ffff827f		; write LCD and power control
 	move.b	#$80,$889		; $889 is "shadow shadow"
 	moveq.l	#2,d1			; STPAD is always mono
@@ -2644,8 +2680,12 @@ dskb1:	rts				; return status
 
 *		checksum is $1234), then it is executed.  The search stops
 * 		fall through to continuation of bar shrinking;
+.ifne TT
 * Check the keyboard for a user aborting the timeout
 	moveq.l	#8,d4			; start with SCSI device 0
+.else
+	moveq.l	#0,d4			; start with ACSI device 0
+.endc
 dmab_todone:
 	move.w	#1,d1			; retry count (try twice total)
 	move.w	#13,-(sp)
@@ -2926,15 +2966,13 @@ v_read2:
 *** doesn't quite ensure lack of trouble, but it does give some hope.
 ***
 *** STPAD doesn't have any of this cruft - you can't change monitors!
-* (But wait 2-3ms first "to wait for mono monitor's window of 
-* vulnerability to end.")
 ***
-	move.w	#$0203,d0
-	bsr	dowait			; this is ttwait or stwait
-* (it's OK to use stwait, which uses Timer A, because we're resetting anyway)
-
 .ifeq TT
-	move.b	#2,d0			; set mode 2 (high rez)
+* For ST, this code calls noblank to wait until vblank is over before 
+* changing mode.  Otherwise the monochrome shifter can be 16 bits off.
+	lea.l	v_ret,a6		; this is noblank's return PC reg
+	bra	noblank			; returns when NOT in vblank
+v_ret:	move.b	#2,d0			; set mode 2 (high rez)
 
 	move.w	sr,-(sp)
 .endc
@@ -3224,7 +3262,11 @@ trp13tab:
 
 
 *------ jump table for Atari BIOS extensions:
+.ifne TT
 	dc.l	_bconmap		; 43: Bconmap call
+.else
+	dc.l	unimpl
+.endc
 	dc.l	unimpl			; 44: unused (0x2c)
 	dc.l	unimpl			; 45: unused
 	dc.l	unimpl			; 46: unused
@@ -3570,7 +3612,7 @@ phydone:
 	rts				; return pointer in d0
 
 
-	bsr	wvbl			; wait for start of vertical-blank
+*+
 * _logbase - get logical display base
 .ifeq TT
 *-
@@ -3742,7 +3784,7 @@ savp_1:	move.w	(a1)+,(a0)+		; save a word
 	subq	#1,d1			; 2 for bus error, 3 for address, etc.
 	bsr	do_shroom
 
-	moveq	#29,d7			; wait half a (60 Hz) second
+	move.l	#savend,savptr.w	; clobber BIOS top level
 	move.w	#$ffff,-(sp)		; -1 ("error") return condition
 	move.w	#$4c,-(sp)		; GEMDOS function #$4c: Pterm(code)
 	trap	#1			; "terminate process"
@@ -4055,38 +4097,36 @@ _scrdmp:
 *--- screen resolution table (pixels) for printScreen
 reztab:	dc.w	320,640,640		; widths
 	dc.w	200,200,400		; heights
-.ifeq TT
 
-*  Wait for vblank, return.
-*  (Hacky, timer method from JWT).
+
+*--- printer flavors (based on low 3 bits of pconfig)
+ptype:
+	dc.b	0			; atari mono dot
+	dc.b	2			; atari mono daisy
 	dc.b	1			; atari color dot
 	dc.b	-1			; [atari color daisy???]
-*  Returns:	At beginning of next vblank
-*  Uses:	a0,a1,d0,d3,d4
+	dc.b	3			; epson mono dot
+*  Uses:	d0
 	dc.b	-1			; [epson color dot]
+* Noblank1 is the same thing, but returns via RTS.
 *-
-TBDR	equ	$fffffa21		; timer B data reg
-TBCR	equ	$fffffa1b		; timer B control reg
 
-vwait:	lea	TBDR,a0			; a0 -> timer B data reg
-	lea	TBCR,a1			; a1 -> timer B control reg
-	move.b	#$10,(a1)		; reset timer B
-	moveq	#1,d4			; d4 = number we want
-	move.b	#$00,(a1)		; pause timer B
-	move.b	#240,(a0)		; number of lines to wait for
-	move.b	#$08,TBCR		; startup timer B, in event-count mode
-tb_1:	move.b	(a0),d0			; get contents of data reg
-	cmp.b	d4,d0			; down to desired value?
-	bne	tb_1			; (not yet)
-tb_2:	move.b	(a0),d4			; get current value
-	move.w	#615,d3			; 2ms timeout
-tb_3:	cmp.b	(a0),d4			; has timer changed?
-	bne	tb_2			; (yes, not a vbl)
-	dbra	d3,tb_3			; wait for 2ms w/o change
-	move.b	#$10,(a1)		; reset timer B
+*
+	move.b	#$10,tbcr		; halt the timer
+	move.b	#$08,tbcr		; start timer B in event-count mode
+	move.b	tbdr,d0			; get contents of data reg
+tb_1:	cmp.b	tbdr,d0			; changed yet?
+	beq	tb_1			; (not yet)
 	jmp	(a6)			; return
-.endc
 * around VBLANK.  THEORY 3 most clearly states "it's safe just after
+* get DE's, because if you get (a rising edge of) DE then you know you're
+	move.b	#$10,tbcr		; halt the timer
+	move.b	#$08,tbcr		; start timer B in event-count mode
+	move.b	tbdr,d0			; get contents of data reg
+tb_2:	cmp.b	tbdr,d0			; changed yet?
+	beq	tb_2			; (not yet)
+	rts				; return
+
 noblank1:
 * THEORY 1: if you get any ticks on Timer B, it's safe.
 *	move.b	iera,d0			; save old iera
@@ -4111,7 +4151,7 @@ noblank1:
 *	movem.l	d1/d3/d4,-(sp)
 *	move.b	iera,d1			; save old Timer B interrupt enable
 *	and.b	#1,d1
-	beq	fpk_r			; (yes -- punt)
+*	bclr	#0,iera			; disable Timer B interrupt
 *	swap	d1
 *	move.b	tbcr,d1			; save old Timer B control reg
 *	moveq	#1,d4			; d4 = number we want
@@ -4267,7 +4307,6 @@ cphbra:	bra	cphjmp
 *
 * BUG reported: if you don't have a blitter, Blitmode(-1) returns 0. If you
 * then you call Blitmode(1) to set "hard blit mode" and then ask for
-.ifne TT
 * Blitmode(-1) it returns 2, meaning the call has installed a blitter!
 *-
 	.globl	_GETBLT
@@ -4286,7 +4325,8 @@ cphbra:	bra	cphjmp
 	bmi	Bmd_1			; (don't set if mode is negative)
 	and.w	d5,d0			; force to soft mode if no chip
 	or.w	d4,d0			; replace installed status
-*		When the time has elapsed, bit 5 of ipra gets set.
+	jsr	_SETBLT			; set blit mode
+*		(That's bit 5 of ipra or ttipra, depending.)
 Bmd_1:	move.w	d3,d0			; return "old" blit mode
 	rts
 
@@ -4331,11 +4371,12 @@ TB_e:	move.l	a1,8(a0)		; restore original bus error vector
 * bit 5 of ipra: it becomes 1 when the time has expired.
 *
 * (Procedures used by other parts of the BIOS for timing delays.)
-TT_mfp	equ	$fffffa81
-
 WAITBIT		equ	5		; Timer A (TB is easy; others hard)
 * Uses Timer C of the TT MFP. (could use any timer in any MFP).
 * For documentation purposes, say, "Timer C of the TT MFP is used by
+.ifne TT
+WAITREG		equ	ttipra
+* USAGE:
 *
 *	ttwait	delays for a time specified in D0.W: the high
 *		byte is the value for the divider, and the low
@@ -4343,28 +4384,25 @@ WAITBIT		equ	5		; Timer A (TB is easy; others hard)
 *		the time expires, ttwait returns.  No interrupts
 *		are used.
 *
-twait1:	btst.b	#WAITBIT,TT_mfp+ipra	; while not pending
+*	ttdelay	sets up the delay as for ttwait, but returns immediately.
 *		When the time has elapsed, WAITBIT of WAITREG gets set.
-	clr.b	TT_mfp+tacr		; stop the timer
+	clr.b	tttacr			; stop the timer
 	rts				; and return
 *		(The timer will run ad infinitum, but who cares?)
 *		(This is not actually used at this time.)
-	move.l	a0,-(sp)		; save a0
-	lea.l	TT_mfp,a0
 *	dowait	is either ttwait or stwait, for use during boot.
 *		Only TT can use ttwait after the boot; stwait uses
-	clr.b	tacr(a0)		; stop timer
-	bclr.b	#WAITBIT,iera(a0)	; disable int
-	move.b	#NOTWAITBIT,ipra(a0)	; clear pending
-	bclr.b	#WAITBIT,imra(a0)	; mask int
-	bset.b	#WAITBIT,iera(a0)	; enable int
+	clr.b	tttacr			; stop timer
+	bclr.b	#WAITBIT,ttiera		; disable int
+	move.b	#NOTWAITBIT,ttipra	; clear pending
+	bclr.b	#WAITBIT,ttimra		; mask int
+	bset.b	#WAITBIT,ttiera		; enable int
 *	3 (/16)		 6   us		  1.6 ms
 
-	move.b	d0,tadr(a0)		; set data value
+	move.b	d0,tttadr		; set data value
 	ror.w	#8,d0			; get mode byte into d0.b
-	move.b	d0,tacr(a0)		; start the clock (mode from d0)
+	move.b	d0,tttacr		; start the clock (mode from d0)
 	rol.w	#8,d0			; restore d0
-	move.l	(sp)+,a0		; restore a0
 *	5 (/64)		26   us		  6.6 ms
 *	6 (/100)	40   us		 10   ms
 *	7 (/200)	80   us		 20   ms
@@ -4376,6 +4414,8 @@ twait1:	btst.b	#WAITBIT,TT_mfp+ipra	; while not pending
 * is crummy.  I can't think of a good solution.
 *	Clear the pending bit
 *	Set the timer's mode (starts the timer)
+*
+* The interrupt is enabled but masked so the first time the timer
 * counts down to 0 it'll set the bit in the interrupt-pending register.
 * We never actually use this interrupt, just the pending bit.
 *
@@ -4383,28 +4423,25 @@ twait1:	btst.b	#WAITBIT,TT_mfp+ipra	; while not pending
 WAITBIT		equ	5		; Timer A
 NOTWAITBIT	equ	$df		; ~(1<<WAITBIT)
 
-swait1:	btst.b	#WAITBIT,mfp+ipra
+.if TT
 WAITREG		equ	ttiprb
-	clr	mfp+tacr
+
 	.globl	ttwait
 	.globl	ttdelay
 	.globl	dowait
-	move.l	a0,-(sp)
-	lea.l	mfp,a0
 
 dowait:
-	clr.b	tacr(a0)		; stop timer
-	bclr.b	#WAITBIT,iera(a0)	; disable int
-	move.b	#NOTWAITBIT,ipra(a0)	; clear pending
-	bclr.b	#WAITBIT,imra(a0)	; mask int
-	bset.b	#WAITBIT,iera(a0)	; enable int
+ttwait:
+	bsr	ttdelay
+twait1:	btst.b	#WAITBIT,WAITREG	; while not pending
+	beq	twait1			; just wait
+	rts				; and return (timer still running)
 
 ttdelay:
-	move.b	d0,tadr(a0)		; set data value
+	movem.w	d0/d1,-(sp)		; save regs we use, incl input (d0)
 	move.w	sr,-(sp)
-	move.b	d0,tacr(a0)		; start the clock (mode from d0)
+	or.w	#$0700,sr		; at IPL 7...
 	move.b	tttcdcr,d1		; don't disturb timer D's state
-	move.l	(sp)+,a0		; restore a0
 	and.b	#$0f,d1
 .endc
 *  Copyright 1986 Atari Corp. (stolen from clear.s, which is now obsolete)
@@ -4665,6 +4702,10 @@ _levelB2:
 .endc
 	clr.w	d1
 .ifne TT
+	lea	crctab,a2
+crclp:	move.w	d0,d1		;d1=current crc value
+	lsl.w	#8,d0		;shift left (low byte in high)
+	lsr.w	#8,d1		;shift right (high byte in low)
 	move.b	(a0),d3		;get next byte in stream
 	add.l	a1,a0		;increment by stride
 	eor.b	d3,d1		;eor with right shifted crc (high byte)
@@ -4689,7 +4730,7 @@ crctab:
 	dc.w	$b75b,$a77a,$9719,$8738,$f7df,$e7fe,$d79d,$c7bc
 	dc.w	$48c4,$58e5,$6886,$78a7,$0840,$1861,$2802,$3823
 	dc.w	$5af5,$4ad4,$7ab7,$6a96,$1a71,$0a50,$3a33,$2a12
-	bsr	wvbl			; wait for start of vertical-blank
+	bsr	noblank1		; wait until not blanking
 	dc.w	$dbfd,$cbdc,$fbbf,$eb9e,$9b79,$8b58,$bb3b,$ab1a
 	dc.w	$6ca6,$7c87,$4ce4,$5cc5,$2c22,$3c03,$0c60,$1c41
 	move.b	shiftmd,d0		; d0 <- curr rez

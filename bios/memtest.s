@@ -290,12 +290,15 @@ dobar:
 	sub.l	mt_start,d0
 	cmp.l	#(1024*1024),d0		; need to space over?
 	bhi	nospace			; no
-	move.l	d0,-(sp)		; yes
-	move.l	#spacemsg,a0
+	move.l	#spacemsg,a0		; yes: output spaces
 	bsr	prmsg
-	move.l	(sp)+,d0
 
 nospace:
+	move.l	#invmsg,a0		; begin inverse video
+	bsr	prmsg
+	move.l	mt_top,d0
+	sub.l	mt_start,d0		; get RAM size to d0 again
+
 	cmp.l	#(1024*4096),d0
 	ble	i128			; 4MB and lower: 128KB blocks
 
@@ -332,13 +335,14 @@ bsloop:	putchar	#8			; until d2 expires
 	rts
 
 mtestmsg:	dc.b	"Memory Test:",13,10
-		dc.b	"ST RAM ",27,"p",0
+		dc.b	"ST RAM ",0
 
-mttmsg:		dc.b	13,10,"TT RAM ",27,"p",0
+mttmsg:		dc.b	13,10,"TT RAM ",0
 mdonemsg:	dc.b	13,10,"Memory Test Complete.",13,10,0
 
 mkbmsg:		dc.b	" KB",27,"q",27,"K",0
 mabrtmsg:	dc.b	13,10,"Memory Test Aborted.",27,"q",13,10,0
+invmsg:		dc.b	27,'p',0
 spacemsg:	dc.b	"       ",0
 
 .even

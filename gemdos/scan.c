@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.7 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.8 $	$Source: e:/tos/gd2\rcs\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.8  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 1.7  1991/03/13  17:51:44  apratt
 * Added a debugging message on a new level at _dirnext.
 *
@@ -175,6 +178,9 @@ int flags;
     long err;
     FCB fcb, *pfcb;
 
+    DBCMD(0x20,"print fn2dir -s (lpeek (lpeek (+ `a6 8))) "
+		"flags -x (wpeek (+ `a6 10)) dir: (lpeek (+ `a6 c));_c");
+
     if (!*name) return EBADRQ;
     if (*(name+1) == COLON) {
 	dev = (uc(*name) - 'A');
@@ -221,6 +227,10 @@ int flags;
 	if (!*end) {
 	    if (earlyflag) {
 		*pname = name;
+		DBCMD(0x20,"print early return: *pname= "
+			    "-s (lpeek (lpeek (+ `a6 8))) "
+			    "dir -x (lpeek (+ `a6 c)) is:;"
+				"dirx (lpeek (+ `a6 c));_c");
 		return E_OK;
 	    }
 	    if ((!dotflag && isdots(name)) || haswild) return EBADRQ;
@@ -233,6 +243,10 @@ int flags;
 	/* do the scan (believe me, this loop is better than the old one!) */
 
 	if (err = dirfirst(dir,dmd)) return err;
+
+	DBCMD(0x20,"print scan new dir level. dir (lpeek (+ `a6 c)) is:;"
+			"dirx (lpeek (+ `a6 c));_c");
+
 	while (1) {
 	    pfcb = dir->dir_fcb;
 	    c = pfcb->f_name[0];
@@ -242,6 +256,8 @@ int flags;
 	}
 
 nomatch:
+	DBCMD(0x20,"print fn2dir returns no match;_c");
+
 	/* no match; if not last component then EPTHNF */
 	if (*end) return EPTHNF;
 	else {
@@ -269,6 +285,7 @@ didmatch:
     /* end still points to end of last component; check for trailing SLASH */
     if (*end == SLASH) return EBADRQ;
 
+    DBCMD(0x20,"print fn2dir returns, dir:;dirx (lpeek (+ `a6 c));_c");
     *pname = oname;
     return E_OK;
 }
@@ -282,6 +299,10 @@ DIR *dir;
 
     fcb = getrec(dir->dir_recno,dmd,0,&dir->dir_bcb);
     dir->dir_fcb = (FCB *)(fcb + dir->dir_recoffs);
+
+    DBCMD(0x20,"print dir2dir returns, dir (lpeek (+ `a6 8)) is:;"
+		"dirx (lpeek (+ `a6 8));_c");
+
     return E_OK;
 }
 
@@ -329,7 +350,8 @@ DMD *dmd;
     /* you only call this if you fell off the end of this record */
 
     DBCMD(0x20,
-	"print _dirnext dir: (lpeek (+ `a6 8)) dmd: (lpeek (+ `a6 c));_c");
+	"print _dirnext, dir: (lpeek (+ `a6 8)) dmd: (lpeek (+ `a6 c));"
+	"dirx (lpeek (+ `a6 8));dmd (lpeek (+ `a6 c));_c");
 	"print -n (DMD) ; dmd lpeek(a6 + c);_c");
 
     curcl = dir->dir_curcl;
@@ -362,6 +384,9 @@ DMD *dmd;
 		/* FAT error */
 		return ERROR;
 	    }
+	    dir->dir_curcl = xcl;
+    DBCMD(0x20,"print _dirnext returns, dir:;dirx (lpeek (+ `a6 8));_c");
+	}
 	/* (else recno is fine; it's the next rec of this clust) */
     }
 
@@ -376,6 +401,9 @@ DMD *dmd;
     uint cl, rec, i;
 dirslot(dir)
 DIR *dir;
+{
+    DBCMD(0x20,"print dirslot: dir after dirfirst:;dirx (lpeek (+ `a6 8));_c");
+    BCB *bcb;
     long err;
     DMD *dmd = &drvtbl[dir->dir_dev];
     uint cl, rec;
@@ -386,13 +414,19 @@ DIR *dir;
     DBCMD(0x20,"print dirslot: dir after dirfirst:;dirf (lpeek (`a6 + 8));_c");
 
     while (1) {
+    DBCMD(0x20,"print dirslot fell off dir:;dirx (lpeek (+ `a6 8));_c");
+	if (fcb->f_name[0] == 0 || fcb->f_name[0] == ERASED) return E_OK;
 	if (err = dirnext(dir,dmd)) {
 	    if (err == EFILNF) break;
 	    else return err;
 	}
     }
 
-    if (!(cl = nextcl(dir->dir_curcl,dmd,TRUE,NULL))) return ERROR;
+    if (!(cl = nextcl(dir->dir_curcl,dmd,TRUE,NULL))) {
+    DBCMD(0x20,"print dirslot fell off dir:;dirx (lpeek (`a6 + 8));_c");
+
+    /* total error if RD because you can't extend it */
+    if (dir->dir_clust == 0) return ERROR;
 
     /* Have to extend the directory. Allocate a new cluster. */
     /* Return ERROR on disk full. */

@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
+* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.11  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.10  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *
@@ -179,7 +182,8 @@ PD *pd;
 	    return EIHNDL;
 	}
 
-	if (src == dest) return EBADRQ;		/* can't Fforce(0,0)! */
+	/* Fforce of something to itself is a no-op, but succeeds. */
+	if (src == dest && pd == _run) return 0;
 
 	if (src < 0) {
 	    ofd = ofdtty(src+3);
@@ -219,17 +223,28 @@ PD *pd;
  * This function is documented as flushing all buffers on all devices.
  * It doesn't do that yet, partly because it is called from several places.
  * Maybe it will set a flag so that'll be done on the way out of GEMDOS.
+ *
+ * Close and ixclose are split out so ixterm can call ixclose to operate in
+ * a basepage other than run, e.g. in a partially-constructed basepage 
+ * which couldn't be finished because of an error.
  */
 
 long
 xclose(h)
 int h;
 {
+    return ixclose(h,run);
+}
+
+long
+ixclose(h,pd)
+int h;
+PD *pd;
+{
     OFD *ofd;
-    PD *_run = run;
     DFD *dfd;
 
-    DBCMD(1,"print xclose (wpeek (+ `a6 8));_c");
+    DBCMD(1,"print ixclose (wpeek (+ `a6 8)) (lpeek (+ `a6 a));_c");
 
     /*
      * A while ago, I "guaranteed" that any close would flush all dirty
@@ -245,13 +260,13 @@ int h;
 
     xsync();
 
-    if (h < -NUMBIOS || h >= _run->p_uftsize) return EIHNDL;
+    if (h < -NUMBIOS || h >= pd->p_uftsize) return EIHNDL;
     if (h < 0) return E_OK;	    /* "close" an old-style TTY */
 
-    if ((ofd = _run->p_uft[h]) == NULL) return EIHNDL;	/* not open */
+    if ((ofd = pd->p_uft[h]) == NULL) return EIHNDL;	/* not open */
 
     /* mark as closed NOW, but see below: h<NUMSTD gets reopened */
-    _run->p_uft[h] = NULL;
+    pd->p_uft[h] = NULL;
 
     if (ofdisatty(ofd)) {
 	/* close a new-style char device; really do nothing for now,  */
@@ -288,11 +303,12 @@ int h;
 	}
     }
 
-    /* now re-open the handle on its default BIOS device if < NUMSTD */
-    if (h < NUMSTD) {
+    /* Now re-open the handle on its default BIOS device if < NUMSTD and */
+    /* only if pd == run; otherwise we're terminating so don't bother.	 */
+    if (h < NUMSTD && pd == run) {
 	/* h was a std handle; we need to reopen it on a char dev. */
 	DBCMD(8,"print re-open handle on BIOS dev;_c");
-	_run->p_uft[h] = ofdtty(biosdev[h]);
+	pd->p_uft[h] = ofdtty(biosdev[h]);
     }
 
     DBCMD(8,"print end of xclose:;uft (lpeek .run);_c");
@@ -396,7 +412,7 @@ xsync()
 long
 xread(h,len,ubufr)
 int h;
-long len;
+ulong len;
 void *ubufr;
 {
 	OFD *ofd;
@@ -417,7 +433,7 @@ void *ubufr;
 long
 ixread(ofd,len,ubufr)
 OFD *ofd;
-long len;
+ulong len;
 void *ubufr;
 {
 	long maxlen;
@@ -720,9 +736,9 @@ OFD *ofd;
 int flg;
 {
     DFD *dfd;
-    uint new;
-    uint old;
-    uint clcount;
+    ulong new;	/* file-relative cluster number that byte n is in */
+    ulong old;	/* file-relative cluster number that curbyt is in */
+    ulong clcount;	/* number of clusters to advance from curcl */
     uint rec;
     DMD *dmd;
     uint curcl;
@@ -742,21 +758,35 @@ int flg;
     dmd = &drvtbl[dfd->dfd_dev];
 
     /* set OFD r/w pointer fields to the right values */
-    if (!n) ofd->o_curcl = 0;
+    if (!n) ofd->o_curcl = 0;	/* flag meaning beginning of file */
     else {
 	new = n >> dmd->m_clblog;
 	old = ofd->o_bytnum >> dmd->m_clblog;
 	if (new < old) {
 	    curcl = dfd->dfd_strtcl;
+	    swp68(curcl);
 	    clcount = new;
 	}
 	else {
 	    /* (new >= old) */
 	    curcl = ofd->o_curcl;
-	    clcount = (old-new);
+	    if (!curcl) {
+		curcl = ofd->o_dfd->dfd_strtcl;
+		swp68(curcl);
+	    }
+	    clcount = (new-old);
 	}
+
+	/*
+	 * Inside the loop, the if will return on two kinds of error. First
+	 * error: FAT entry too large, including bad sector or premature
+	 * EOF (0xfffx). Second error: a bad FAT which has a free cluster
+	 * in a file (0x0000).
+	 */
+
 	while (clcount--) {
-	    if (!(curcl = getcl(curcl,dmd))) return ERROR;
+	    if ((curcl > dmd->m_numcl) ||
+		(!(curcl = getcl(curcl,dmd)))) return ERROR;
 	}
 
 	/* set rec to the record offset in this clust */

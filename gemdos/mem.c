@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\mem.c,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\rcs\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.15  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.14  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *
@@ -27,32 +30,31 @@
 
 #include "fs.h"
 
-
 MPB pmd;
 
 /************************************************************************
- *									*
- *	TPA MEMORY MANAGEMENT						*
- *									*
- * Once, this Code was grand: it used the TPA itself to keep track of	*
- * the free and allocated blocks.  But then the Word came, and the Word	*
- * was Backward-Compatibility.  And so, the Code was backed out.  Now	*
- * you see before you the tattered shreds of code, with OSpool used to	*
- * keep track of memory blocks: back to the Bad Old Days.		*
- *									*
+ *
+ *	TPA MEMORY MANAGEMENT
+ *
+ *
+ * Once, this Code was grand: it used the TPA itself to keep track of the
+ * free and allocated blocks.  But then the Word came, and the Word was
+ * Backward-Compatibility.  And so, the Code was backed out.  Now you see
+ * before you the tattered shreds of code, with OSpool used to keep track
+ * of memory blocks: back to the Bad Old Days.
+ *
 
 Originally, for TT (the first machine with more than just ST RAM), this
-code managed two separate MPB's: "pmd" and "pmdfast".  Now there's just
-one again, and the MD's on the list contain information about the
-block.
+code managed two separate MPB's: "pmd" and "pmdfast".  Now there's just one
+again, and the MD's on the list contain information about the block.
 
-There are two types of memory in the system as far as GEMDOS is
-concerned: "ST RAM" and "ALTERNATIVE RAM."  The chief characteristic of
-alternative RAM is that you can't put a screen there.  You also can't
-do ACSI DMA to there, but drivers take care of that.  There are other
-things you can't do from there: DMA sound, and possibly blits.  The
-point is that some programs can run in any memory, and some _must_ have
-ST RAM (primarily because they do double-buffering).
+There are two types of memory in the system as far as GEMDOS is concerned:
+"ST RAM" and "ALTERNATIVE RAM."  The chief characteristic of alternative
+RAM is that you can't put a screen there.  You also can't do ACSI DMA to
+there, but drivers take care of that.  There are other things you can't do
+from there: DMA sound, and possibly blits.  The point is that some programs
+can run in any memory, and some _must_ have ST RAM (primarily because they
+do double-buffering).
 
 The code structure here is as follows: ffit has an extra argument, the
 kind(s) of RAM which are eligible for satisfying this request:
@@ -62,24 +64,23 @@ kind(s) of RAM which are eligible for satisfying this request:
 	2	Either, ST RAM preferred
 	3	Either, Alternative RAM preferred
 
-Cases 1 and 2 will only come from user requests; xmalloc and xexec use
-0 and 3, based on the hflags field of the process (either the one
-running or the one being loaded).  This means that alternative RAM is
-always preferred if it's available and eligible.
+Cases 1 and 2 will only come from user requests; xmalloc and xexec use 0
+and 3, based on the hflags field of the process (either the one running or
+the one being loaded).  This means that alternative RAM is always preferred
+if it's available and eligible.
 
-The low bit in the MD m_start field is used to distinguish one kind of
-RAM from the other: when this bit is zero, the block is in ST RAM. Even
-when contiguous, blocks do not coalesce when they're of different
-types.
+The low bit in the MD m_start field is used to distinguish one kind of RAM
+from the other: when this bit is zero, the block is in ST RAM. Even when
+contiguous, blocks do not coalesce when they're of different types.
 
-The Getmpb call to the BIOS returns an MPB which might have more than
-one free block on it: there is one free block per chunk of memory which
-the BIOS found.  User programs can inform GEMDOS of more memory with
-the Maddalt(start,size) call.  It gets put on the alternative RAM list;
-presumably the ROMs found all the ST RAM.  A user on a TT or Mega STe
-with a RAM card would put a program which calls Maddalt() in his AUTO
-folder: this is sort of a "memory driver" and approaches the
-long-awaited software-DRAM technology Atari's been working on.
+The Getmpb call to the BIOS returns an MPB which might have more than one
+free block on it: there is one free block per chunk of memory which the
+BIOS found.  User programs can inform GEMDOS of more memory with the
+Maddalt(start,size) call.  It gets put on the alternative RAM list;
+presumably the ROMs found all the ST RAM.  A user on a TT or Mega STe with
+a RAM card would put a program which calls Maddalt() in his AUTO folder:
+this is sort of a "memory driver" and approaches the long-awaited
+software-DRAM technology Atari's been working on.
 
 This code gets rid of the dumb "rover" idea.  What a dog!
 
@@ -90,10 +91,10 @@ This code gets rid of the dumb "rover" idea.  What a dog!
 #define PUTFLAG(val,flag) ((char *)(((long)val) | flag))
 
 /*
- * If you define QUANTUM to anything other than 2, you will change 
- * the maxim "two successive Malloc() calls probably return contiguous 
- * memory."  If you've changed that for other reasons, fine, but this 
- * is another contributing factor in that maxim.
+ * If you define QUANTUM to anything other than 2, you will change the
+ * maxim "two successive Malloc() calls probably return contiguous 
+ * memory."  If you've changed that for other reasons, fine, but this is
+ * another contributing factor in that maxim.
  *
  * On the other hand, QUANTUM had better be at LEAST 2, since otherwise 
  * you would get odd-sized blocks, and the next block would start on an 
@@ -109,19 +110,18 @@ This code gets rid of the dumb "rover" idea.  What a dog!
 void
 xminit()
 {
-REG MD *p;
-REG long s;
-REG long adjust;
+    MD *p;
+    long s;
+    long adjust;
 
     (void)getmpb(&pmd);
 
     /* 
-     * Make sure that each free block we got back 
-     * starts on a quantum boundary, and
-     * is an even number of quanta long.
+     * Make sure that each free block we got back starts on a quantum
+     * boundary, and is an even number of quanta long.
      *
-     * If that results in any zero-length blocks, 
-     * tough luck: life gets slower but no harm's done.
+     * If that results in any zero-length blocks, tough luck: life gets
+     * slower but no harm's done.
      */
 
     for (p = pmd.mp_mfl; p; p = p->m_link) {
@@ -142,6 +142,8 @@ int type;
 {
     REG MD *p;
     REG long maxval;
+
+    DBCMD(0x80,"print mbiggest mpb: (lpeek (+ `a6 8)) type: (wpeek (+ `a6 c));_c");
 
     maxval = 0;
 
@@ -166,15 +168,17 @@ MPB *mp;
 long amount;
 int type;
 {
-REG MD *p;
-REG MD **q, **q1;
-REG MD *p1;
-REG int fval;
+    MD *p;
+    MD **q, **q1;
+    MD *p1;
+    int fval;
+
+    DBCMD(0x80,"print ffit amt: (lpeek (+ `a6 8)) mpb: (lpeek (+ `a6 c)) "
+	       "type: (wpeek (+ `a6 c));_c");
 
     p = *(q = &mp->mp_mfl);		/* start at the beginning */
 
-    if (!p)
-	    return(0); /* no way */
+    if (!p) return(0); /* no way */
 
     if (amount == 0) return NULPTR;
 
@@ -262,55 +266,59 @@ int n;
 void *blk;
 long len;
 {
-REG	MD *m;
-REG	MD *p;
+    MD *m;
+    MD *p;
 
-/*
- * Traverse the list of memory descriptors looking for this block.
- */
-	for (p = pmd.mp_mal; p; p = p->m_link)
-		if (blk == UNFLAG(p->m_start))
-			goto found;
+    DBCMD(1,"print xmshrink {dummy} blk: (lpeek (+ `a6 a)) "
+	    "size: (lpeek (+ `a6 e));_c");
+    /*
+     * Traverse the list of memory descriptors looking for this block.
+     */
+    for (p = pmd.mp_mal; p; p = p->m_link)
+	if (blk == UNFLAG(p->m_start))
+	    goto found;
 
-/*
- * If block address doesn't match any memory descriptor, then abort.
- */
-	return(EIMBA);
+    /*
+     * If block address doesn't match any memory descriptor, then abort.
+     */
+    DBCMD(0x80,"print xmshrink fails: can not find block;_c");
+    return(EIMBA);
 
 found:
 
-/*
- * Always shrink to a block-granularity length
- */
-	len = (len + (QUANTUM-1)) & ~(QUANTUM-1);
+    /*
+     * Always shrink to a block-granularity length
+     */
+    len = (len + (QUANTUM-1)) & ~(QUANTUM-1);
 
-/*
- * If the caller is not shrinking the block size, then abort.
- */
-	if (p->m_length < len)
-		return(EGSBF);
+    /*
+     * If the caller is not shrinking the block size, then abort.
+     */
+    if (p->m_length < len)
+	return(EGSBF);
 
-/*
- * AKP: if not shrinking at all, just return.
- *	if shrinking to zero size, just free.
- */
+    /*
+     * if not shrinking at all, just return. if shrinking to zero size,
+     * just free.
+     */
 
-	if (len == p->m_length) return E_OK;
+    if (len == p->m_length) return E_OK;
 
-	if (!len) {
-	    freeit(p,&pmd);
-	    return E_OK;
-	}
-/*
- * Create a memory descriptor for the freed portion of memory.
- */
-	if (!(m = getsmall())) return ERROR;
-	m->m_start = p->m_start + len;		/* preserves flag */
-	m->m_length = p->m_length - len;
-	p->m_length = len;
-	freeit(m,&pmd);
+    if (!len) {
+	freeit(p,&pmd);
+	return E_OK;
+    }
 
-	return(E_OK);
+    /*
+     * Create a memory descriptor for the freed portion of memory.
+     */
+    if (!(m = getsmall())) return ERROR;
+    m->m_start = p->m_start + len;		/* preserves flag */
+    m->m_length = p->m_length - len;
+    p->m_length = len;
+    freeit(m,&pmd);
+
+    return(E_OK);
 }
 
 
@@ -322,64 +330,66 @@ freeit(m,mp)
 MD *m;
 MPB *mp;
 {
-REG	MD *p;
-REG	MD **q;
-	MD *p1;
-REG	void *mtemp;
+    MD *p;
+    MD **q;
+    MD *p1;
+    void *mtemp;
 
-	p1 = 0;		/* this is p's prev */
+    DBCMD(0x80,"print freeit (lpeek (+ `a6 8)) mpb: (lpeek (+ `a6 c));_c");
 
-	/*
-	 * Find where this block belongs in the free list.
-	 * Blocks are sorted in ascending address order.
-	 * Block p goes after m (or NULL), p1 goes before (or NULL)
-	 *
-	 * The "start" field may be odd for alt RAM.  That
-	 * won't hurt anything, and is preserved even through
-	 * the coalescing phase.
-	 */
+    p1 = 0;		/* this is p's prev */
 
-	mtemp = m->m_start;
-	for (p = *(q = &mp->mp_mfl); p ; p1=p, p = *(q = &p->m_link)) {
-	    if (mtemp < p->m_start) break;	/* relies on unsigned compare */
+    /*
+     * Find where this block belongs in the free list. Blocks are sorted in
+     * ascending address order. Block p goes after m (or NULL), p1 goes
+     * before (or NULL).
+     *
+     * The "start" field may be odd for alt RAM.  That won't hurt anything,
+     * and is preserved even through the coalescing phase.
+     */
+
+    mtemp = m->m_start;
+    for (p = *(q = &mp->mp_mfl); p ; p1=p, p = *(q = &p->m_link)) {
+	if (mtemp < p->m_start) break;	/* relies on unsigned compare */
+    }
+
+    m->m_link = p;
+    *q = m;
+
+    /*
+     * m is linked in; now coalesce if possible. Un-like memory blocks will
+     * not coalesce, even if contiguous, because start1+length1 != start2
+     * when either start is odd and the other isn't.
+     */
+
+    if (p) {
+	if (m->m_start + m->m_length == p->m_start) {
+	    /* join to higher neighbor */
+	    DBCMD(0x80,"print freeit: coalesce up;_c")
+	    m->m_length += p->m_length;
+	    m->m_link = p->m_link;
+
+	    freesmall(p);
 	}
+    }
 
-	m->m_link = p;
-	*q = m;
+    /* if there's a prev, join to lower neighbor */
+    if (p1) {
+	if (p1->m_start + p1->m_length == m->m_start) {
+	    /* join to lower neighbor */
+	    DBCMD(0x80,"print freeit: coalesce down;_c")
+	    p1->m_length += m->m_length;
+	    p1->m_link = m->m_link;
 
-	/*
-	 * m is linked in; now coalesce if possible.
-	 * Un-like memory blocks will not coalesce, even if contiguous,
-	 * because start1+length1 != start2 when either start is odd 
-	 * and the other isn't.
-	 */
-
-	if (p) {
-		if (m->m_start + m->m_length == p->m_start) {
-			/* join to higher neighbor */
-			m->m_length += p->m_length;
-			m->m_link = p->m_link;
-
-			freesmall(p);
-		}
+	    freesmall(m);
 	}
-
-	/* if there's a prev, join to lower neighbor */
-	if (p1) {
-		if (p1->m_start + p1->m_length == m->m_start) {
-			/* join to lower neighbor */
-			p1->m_length += m->m_length;
-			p1->m_link = m->m_link;
-
-			freesmall(m);
-		}
-	}
+    }
 }
 
 
 /*
- * Allocate memory; friendly version, with arg telling where
- * to get it from.  Values for the flag are:
+ * Allocate memory; friendly version, with arg telling where to get it
+ * from.  Values for the flag are:
  *
  *	0: slow only
  *	1: fast only
@@ -387,11 +397,11 @@ REG	void *mtemp;
  *	3: fast or slow, fast preferred
  *
  * FMalloc(-1L,0) tells how big the largest single block is in slow RAM.
- * Ditto (-1L,1) for fast RAM.  Modes 2 and 3 with arg -1L both give
- * the largest block available, without regard to where.
+ * Ditto (-1L,1) for fast RAM.  Modes 2 and 3 with arg -1L both give the
+ * largest block available, without regard to where.
  *
- * The hflags field of your PRG header dictates which mode (0 or 3) you
- * get when you use the old Malloc() call.
+ * The hflags field of your PRG header dictates which mode (0 or 3) you get
+ * when you use the old Malloc() call.
  */
 
 long
@@ -401,6 +411,8 @@ int mode;
 {
     REG MD *ret;
 
+    DBCMD(1,"print xfmalloc amt: (lpeek (+ `a6 8)) mode: (wpeek (+ `a6 c));_c");
+
     if (amount == -1L) return mbiggest(&pmd,mode);
     else {
 	ret = ffit(amount,&pmd,mode);
@@ -409,22 +421,21 @@ int mode;
     }
 }
 
-
 /*
  * Allocate Memory;
  * friendly version.
  *
- * Needs to know what *kind* of memory to allocate...  If P_RAMALLOC
- * is set, try fast RAM first, then slow RAM.  Else just slow.
+ * Needs to know what *kind* of memory to allocate...  If P_RAMALLOC is
+ * set, try fast RAM first, then slow RAM.  Else just slow.
  */
 long
 xmalloc(amount)
 long amount;
 {
-	if (run->p_hflags & P_RAMALLOC) 
-	    return xfmalloc(amount,3);
-	else 
-	    return xfmalloc(amount,0);
+    DBCMD(1,"print xmalloc amt: (lpeek (+ `a6 8));_c");
+
+    if (run->p_hflags & P_RAMALLOC) return xfmalloc(amount,3);
+    else return xfmalloc(amount,0);
 }
 
 /*
@@ -435,27 +446,30 @@ long
 xmfree(addr)
 void *addr;
 {
-REG	MD *p;
-REG	MD **q;
+    MD *p;
+    MD **q;
 
-	for (p = *(q = &pmd.mp_mal); p; p = *(q = &p->m_link)) {
-		if (addr == UNFLAG(p->m_start)) goto found;
-	}
+    DBCMD(0x01,"print xmfree (lpeek (+ `a6 8));_c");
 
-	return(EIMBA);
+    for (p = *(q = &pmd.mp_mal); p; p = *(q = &p->m_link)) {
+	if (addr == UNFLAG(p->m_start)) goto found;
+    }
 
-	/* unlink & pass to freeit */
+    DBCMD(0x80,"print mfree of block which is not allocated.;_c");
+    return(EIMBA);
+
+    /* unlink & pass to freeit */
 found:
-	*q = p->m_link;
+    *q = p->m_link;
 
-	freeit(p,&pmd);
+    freeit(p,&pmd);
 
-	return(E_OK);
+    return(E_OK);
 }
 
 /*
- * unhook allocated memory from both allocated and free lists:
- * this is called by xtermres.
+ * unhook allocated memory from both allocated and free lists: this is
+ * called by xtermres.
  */
 
 void
@@ -465,6 +479,8 @@ PD *pid;
     REG MD *m;
     REG MD **q;
     
+    DBCMD(0x80,"print xmunhook pid: (lpeek (+ `a6 8));_c");
+
     for (m = *(q = &pmd.mp_mal); m; ) {
 	if (m->m_own == pid) {
 	    /* here's one: link prev's next to m's next (and change m) */
@@ -478,8 +494,7 @@ PD *pid;
 }
 
 /*
- * free all memory owned by a given PID.
- * This is called by ixterm.
+ * free all memory owned by a given PID. This is called by ixterm.
  */
 
 void
@@ -489,6 +504,8 @@ PD *pid;
     REG MD *m;
     REG MD **q;
     
+    DBCMD(0x80,"print xmfreeall pid: (lpeek (+ `a6 8));_c");
+
     for (m = *(q = &pmd.mp_mal); m; ) {
 	if (m->m_own == pid) {
 	    /* here's one: unlink from allocated list, then freeit() */
@@ -504,9 +521,9 @@ PD *pid;
 }
 
 /*
- * new function by AKP 8/30/88: change ownership of a block
- * when all you know is its starting address.  Used by new
- * Pexec mode 6 (which is "just go" as God intended it to be).
+ * new function by AKP 8/30/88: change ownership of a block when all you
+ * know is its starting address.  Used by new Pexec mode 6 (which is "just
+ * go" as God intended it to be).
  */
 
 void
@@ -515,6 +532,8 @@ void *blk;
 PD *pid;
 {
     REG MD *m;
+
+    DBCMD(0x80,"print xmchown blk: (lpeek (+ `a6 8)) pid: (lpeek (+ `a6 c));_c");
 
     for (m = pmd.mp_mal; m; m = m->m_link) {
 	if (UNFLAG(m->m_start) == blk) {
@@ -525,8 +544,8 @@ PD *pid;
 }
 
 /*
- * New function 4/90: inform GEMDOS that a block of (alternate) RAM
- * exists and should be used for programs, etc.
+ * New function 4/90: inform GEMDOS that a block of (alternate) RAM exists
+ * and should be used for programs, etc.
  *
  * Usage: Maddalt(char *block,long size)
  */
@@ -539,13 +558,14 @@ long siz;
     REG MD *m;
     REG long s;
 
+    DBCMD(1,"print xmaddalt blk: (lpeek (+ `a6 8)) siz: (lpeek (+ `a6 c));_c");
+
     /* 
-     * Make sure that the new block we get
-     * starts on a quantum boundary, and
-     * is an even number of quanta long.
+     * Make sure that the new block we get starts on a quantum boundary,
+     * and is an even number of quanta long.
      *
-     * If that results in a zero-length block, 
-     * we return success but don't do anything.
+     * If that results in a zero-length block, we return success but don't
+     * do anything.
      */
 
     if (s = (((long)blk) & (QUANTUM-1))) {

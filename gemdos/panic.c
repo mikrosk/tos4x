@@ -1,12 +1,15 @@
 /*
 ***************************    PANIC.C     ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\panic.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\rcs\panic.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: panic.c,v $
+* Revision 2.9  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.8  1991/02/22  15:29:28  apratt
 * generic checkin
 *
@@ -41,3 +44,14 @@ panic()
   for (p=s; *p; bconout(2,*p++)) /* do nothing */ ;
   for (;;) /* halt the system */ ;
 }
+
+volatile void
+panic1(s)
+char *s;
+{
+    char *p;
+    DBMSG(-1,s);
+    for (p="\033HPANIC: "; *p; bconout(2,*p++)) ;
+    for (p=s; *p; bconout(2,*p++)) ;
+    for (;;) ;
+}    

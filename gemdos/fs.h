@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.18 $	$Source: e:/tos/gd2\rcs\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.18  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.17  1991/03/13  17:51:44  apratt
 * Don't know.
 *
@@ -63,6 +66,8 @@
  *	  08	    handles
  *	  10	    pool
  *	  20	    _dirnext calls
+ *	  40	    process stuff
+ *	  80	    memory stuff
  *	FFFFFFFF    really important, "non-maskable" stuff, like panic.
  */
 
@@ -148,14 +153,14 @@ extern void sprintf();
 #define GETMD()		((MD *)getsmall())
 #define MFREE(p)	freebig(p)
 #define xmfreblk(p)	freebig(p)
-#define bconstat(a)	trap13(1,a)
-#define bconin(a)	trap13(2,a)
-#define bconout(a,b)	trap13(3,a,b)
-#define bconostat(a)	trap13(8,a)
-#define getbpb(a)	(BPB *)trap13(7,a)
-#define getmpb(a)	(void)trap13(0,a)
-#define mediach(a)	(int)trap13(9,a)
-#define setexc(e,h)	(void (*)())trap13(5,e,h)
+#define bconstat(a)	trap13(1,(short)a)
+#define bconin(a)	trap13(2,(short)a)
+#define bconout(a,b)	trap13(3,(short)a,(short)b)
+#define bconostat(a)	trap13(8,(short)a)
+#define getbpb(a)	(BPB *)trap13(7,(short)a)
+#define getmpb(a)	(void)trap13(0,(long)a)
+#define mediach(a)	(int)trap13(9,(short)a)
+#define setexc(e,h)	(void (*)())trap13(5,e,((long)(h)))
 #define gettime()	(ulong)trap14(0x17)
 
 #define min(a,b)	(((a)<(b))?(a):(b))
@@ -215,37 +220,37 @@ PD
 /* 0x00 */
 	PD	*p_lowtpa;	/* -> base of TPA */
 	void	*p_hitpa;	/* -> end (+1) of TPA */
-	long	p_tbase;	/* -> text base */
-	long	p_tlen;		/* size of text segment */
+	ulong	p_tbase;	/* -> text base */
+	ulong	p_tlen;		/* size of text segment */
 /* 0x10 */
-	long	p_dbase;	/* -> data base */
-	long	p_dlen;		/* size of data segment */
-	long	p_bbase;	/* -> BSS base */
-	long	p_blen;		/* size of BSS segment */
+	ulong	p_dbase;	/* -> data base */
+	ulong	p_dlen;		/* size of data segment */
+	ulong	p_bbase;	/* -> BSS base */
+	ulong	p_blen;		/* size of BSS segment */
 /* 0x20 */
 	DTA	*p_xdta;	/* current DTA (Disk Transfer Address) */
 	PD	*p_parent;	/* parent PD */
-	long	p_hflags;	/* process flags (see P_ below) */
+	ulong	p_hflags;	/* process flags (see P_ below) */
 	char	*p_env;		/* at offset 2ch (eat your heart out, Lee) */
 /* 0x30 */
-	long	p_1fill[2];	/* (junk) */
+	ulong	p_1fill[2];	/* (junk) */
 	uint	p_curdrv;	/* current drive */
 	uint	p_uftsize;	/* number of OFD pointers at p_uft */
 	OFD	**p_uft;	/* ptr to my uft (allocated after env.) */
 /* 0x40 */
 	uint	p_curdir[MAXDEVS];	/* startcl of cur dir on each drive */
 /* 0x60 */
-	long	p_3fill[2];	/* (junk) */
-	long	p_dreg[1];	/* dreg[0] */
-	long	p_areg[5];	/* areg[3..7] */
+	ulong	p_3fill[2];	/* (junk) */
+	ulong	p_dreg[1];	/* dreg[0] */
+	ulong	p_areg[5];	/* areg[3..7] */
 /* 0x80 */
 	char	p_cmdlin[0x80];	/* commandline image */
 };
 
 /* macros for handling the OFD field a uft entry */
 
-#define ofdisatty(ofd) (((long)(ofd)) & 1)
-#define ofddevno(ofd) (((short)ofd) >> 1)
+#define ofdisatty(ofd) (((ulong)(ofd)) & 1)
+#define ofddevno(ofd) (((uint)ofd) >> 1)
 #define ofdtty(devno) ((OFD *)((devno << 1) | 1))
 
 /*
@@ -253,11 +258,11 @@ PD
  */
 PRG
 {
-	int g_magic;
-	long g_tsize, g_dsize, g_bsize, g_ssize;
-	long g_junk1;
-	long g_hflags;
-	int g_absflg;
+	uint g_magic;
+	ulong g_tsize, g_dsize, g_bsize, g_ssize;
+	ulong g_junk1;
+	ulong g_hflags;
+	uint g_absflg;
 };
 
 #define P_MAGIC		0x601a
@@ -277,7 +282,7 @@ MD
 {
 	MD	*m_link;	/* -> next MD on list */
 	void	*m_start;	/* starting address */
-	long	m_length;	/* number of bytes there */
+	ulong	m_length;	/* number of bytes there */
 	PD	*m_own;		/* -> owner's basepage */
 };
 
@@ -304,8 +309,8 @@ OFD
 	OFD	*o_next;	/* next in unordered list of OFDs */
 	OFD	*o_prev;	/* prev in unordered list of OFDs */
 	DFD	*o_dfd;		/* DFD this OFD refers to */
-	int	o_use;		/* use count */
-        int     o_mode;		/* mode file opened in (r, w, r/w) */
+	uint	o_use;		/* use count */
+        uint    o_mode;		/* mode file opened in (r, w, r/w) */
 	ulong	o_bytnum;	/* byte pointer within file */
 	uint	o_curcl;	/* current cluster pointer */
 	uint	o_currec;	/* rec number of current cluster */
@@ -320,7 +325,7 @@ DFD
 {
 	DFD	*dfd_next;	/* next in unordered list of DFDs */
 	DFD	*dfd_prev;	/* prev in unordered list of DFDs */
-	int	dfd_use;
+	uint	dfd_use;
 
 	/* these items are in the same order as the FCB.  In memory, */
 	/* time, date, and strtcl are in 8088 format, but length isn't */
@@ -380,10 +385,10 @@ FCB
 	char	f_name[11];
 	char	f_attrib;
 	char	f_fill[10];
-	int	f_time;
-	int	f_date;
-	int	f_clust;
-	long	f_fileln;
+	uint	f_time;
+	uint	f_date;
+	uint	f_clust;
+	ulong	f_fileln;
 };
 
 
@@ -393,15 +398,15 @@ FCB
  */
 BPB
 {
-	int	recsiz;		/* record size in bytes */
-	int	clsiz;		/* #records/cluster */
-	int 	clsizb;		/* #bytes/cluster (recsiz * clsiz) */
-	int	rdlen;		/* root directory length in records */
-	int	fsiz;		/* fat size in records */
-	int	fatrec;		/* first fat record (of last fat) */
-	int	datrec;		/* first data record */
-	int	numcl;		/* number of data clusters available */
-	int	b_flags;	/* bit 0 = 0 for 12-bit fat, 1 for 16-bit */
+	uint	recsiz;		/* record size in bytes */
+	uint	clsiz;		/* #records/cluster */
+	uint 	clsizb;		/* #bytes/cluster (recsiz * clsiz) */
+	uint	rdlen;		/* root directory length in records */
+	uint	fsiz;		/* fat size in records */
+	uint	fatrec;		/* first fat record (of last fat) */
+	uint	datrec;		/* first data record */
+	uint	numcl;		/* number of data clusters available */
+	uint	b_flags;	/* bit 0 = 0 for 12-bit fat, 1 for 16-bit */
 };
 
 
@@ -412,7 +417,7 @@ BPB
  */
 DMD
 {
-	int	m_recoff[3];	/* record offsets for fat,dir,data */
+	uint	m_recoff[3];	/* record offsets for fat,dir,data */
 
 /* "field names" for elements in m_recoff */
 #define m_recfat m_recoff[0]
@@ -478,10 +483,7 @@ struct block {
 #define Bmakeused(bp) ((bp)->b_type = -1)
 #define Bmakecut(bp)  ((bp)->b_type = 1)
 
-#if REAL
-#else
-#include <setjmp.h>
-#endif
+typedef long jmp_buf[3];
 
 #include "proto.h"
 #include "gemerror.h"
@@ -495,8 +497,6 @@ long trap1 _P(( int,... ));
 long trap13 _P(( int,... ));
 long trap14 _P(( int,... ));
 
-#if REAL
-/* these are in testbed.c until they are (more) real */
 voidfn s68 _P(( void *word_to_swap ));
 voidfn s68l _P(( void *long_to_swap ));
 int uc _P(( int ));
@@ -504,7 +504,9 @@ voidfn clear _P(( void *start, void *last_plus_1 ));
 voidfn usr2xfr _P(( int n, void *d, void *s ));
 voidfn xfr2usr _P(( int n, void *s, void *d ));
 voidfn upd_tod _P(( void ));
-#endif
+
+long setjmp _P(( jmp_buf buf ));
+long longjmp _P(( jmp_buf buf, long code ));
 
 volatile void gouser _P(( void ));
 voidfn dojmp _P(( long addr ));
@@ -514,18 +516,10 @@ voidfn clksync _P(( void ));
  * Macros and inlines
  */
 
-/* move 'count' bytes from 's' to 'd' - count must be >0 */
-static inline voidfn
-xmovs(count, s, d)
-int count;
-void *s, *d;
-{
-  /* this loop is constructed a la dbra */
-  --count;
-  do {
-    *(char *)d++ = *(char *)s++;
-  } while (--count >= 0);
-}
+/* move 'count' bytes from 's' to 'd' - count must be >0; coded for dbra */
+#define xmovs(xcount,xs,xd) ((void)({ \
+	int count = xcount; char *s = (char *)xs; char *d = (char *)xd; \
+	--count; do { *d++ = *s++; } while (--count != -1); }))
 
 /*
  * dirfirst macro: initialize dir to the first slot in the dir from the dev/cl 

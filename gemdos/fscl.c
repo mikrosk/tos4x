@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\rcs\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.15  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.14  1991/03/13  17:51:44  apratt
 * Fixed a bug: extended was used in xrw without being set.
 * Also, the comment about a bug concerning reads which end at
@@ -605,8 +608,9 @@ int *extended;
     }
 
     xcl = getcl(cl,dmd);
-    if (!xcl) {
+    if (!xcl || (xcl < 0xfff0 && xcl > dmd->m_numcl)) {
 	/* bad news: some clust or dir slot points to a free clust */
+	/* or other erroneous FAT entry. */
 	DBCMD(4,"print INCONSISTENT DIR/FAT: zero entry;_c");
 	return 0;
     }
@@ -796,7 +800,7 @@ long
 xrw(wrtflg,ofd,len,ubufr,bufxfr)
 int wrtflg;
 OFD *ofd;
-long len;
+ulong len;
 void *ubufr;
 void (*bufxfr) _P((uint, void *, void *));
 {
@@ -864,10 +868,9 @@ void (*bufxfr) _P((uint, void *, void *));
 	}
     }
 
-    ofd->o_curcl = curcl;
-    ofd->o_currec = currec;
-
-    DBCMD(4,"print OFD at top of xrw call:;do_ofd (lpeek (+ `a6 a));_c");
+    /* fill in the OFD fields so we can print them using the stack offset */
+    DBCMD(4,(ofd->o_curcl = curcl, ofd->o_currec = currec, 
+	    "print OFD at top of xrw call:;do_ofd (lpeek (+ `a6 a));_c"));
 
     recoffs = bytnum & dmd->m_rbm;
 

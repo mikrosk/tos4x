@@ -19,7 +19,7 @@ alias dblev "sl.__dblev"
 
 print say "dblev X" to set db level to X.
 print Levels: 1=top level, 2=rwabs/getrec, 4=xrw and clusters, 8=handles
-print 10=pool, 20=dirnext.
+print 10=pool, 20=dirnext, 40=pexec
 
 dblev 1
 

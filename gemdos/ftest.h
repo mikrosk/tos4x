@@ -1,6 +1,11 @@
 #include <osbind.h>
 #include <string.h>
+
+#if __STDC__
 #include <stdlib.h>
+#else
+char *malloc();
+#endif
 
 /* macros like Gx, Bx, XBx are hard-coded for NARGS */
 #define NARGS 9

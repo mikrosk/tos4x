@@ -1,12 +1,15 @@
 /*
 ***************************    SETUP.C     ******************************
 *
-* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\setup.c,v $
+* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\setup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: setup.c,v $
+* Revision 2.10  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.9  1991/03/13  17:51:44  apratt
 * Added a define for default buffer size, and made it big.
 * This is for testing; in production it should be 512.
@@ -80,16 +83,15 @@ osi()
 	bufl[0] = &bcbx[0];
 	bufl[1] = e1+1;
 
-#if REAL
 	/*
 	 * Initialize OS, login boot device:
 	 */
 
-	otime = setexc(0x100,tikhnd);
+	otime = setexc(0x100,-1);
+	(void)setexc(0x100,tikhnd);
+
 	obdos = setexc(0x22,ntrap2);
 	(void)setexc(0x21,enter);
-
-#endif
 
 	/* set rootpd and fill it with important stuff */
 	run = &rootpd;
@@ -100,6 +102,8 @@ osi()
 	clear(&run->p_uft[0],&run->p_uft[run->p_uftsize]);
 	for (i=0; i<NUMSTD; i++) run->p_uft[i] = ofdtty(biosdev[i]);
 
+	run->p_hflags = 7;
+
 	/* clear the PD table, then add rootpd to it */
 	clear(&pdtab[0],&pdtab[NUMPDS]);
 	pdtab[0] = run;
@@ -107,11 +111,7 @@ osi()
 	(void)xsetdrv(bootdev);		/* Dsetdrv(boot dev) */
 
 	poolinit();
-#if REAL
 	xminit();
-#endif
-
-	/* init keyboard queues */
 	coninit();
 }
 

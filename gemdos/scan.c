@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.12 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.13 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/09 17:37:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/30 16:06:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.13  1991/05/30  16:06:06  apratt
+* Added kludge code to handle multiple backslashes in a row.
+*
 * Revision 1.12  1991/05/09  17:37:28  apratt
 * Split out dotsok and added trailok, fixed logic and trailing SLASH,
 * changed dirnext's end-of-dir return from ENMFIL to EFILNF.
@@ -205,7 +208,7 @@ int flags;
     uint attr;
     long err;
     FCB fcb, *pfcb;
-    int dotsok, earlyflag, trailok;
+    int dotsok, earlyflag, trailok, tslash;
 
     /* just because these are bitmapped doesn't mean they combine well */
     dotsok = (flags & FN_DOTSOK);
@@ -231,7 +234,8 @@ int flags;
 
     if (*name == SLASH) {
 	cl = 0;
-	name++;
+	/* collapse out multiple leading slashes */
+	while (*name == SLASH) name++;
     }
     else cl = run->p_curdir[dev];
 
@@ -253,14 +257,6 @@ int flags;
 	/*
 	 * Empty component? Return file not found (!) for compatibility.
 	 * I'd rather return EBADRQ because it will never succeed.
-	 *
-	 * Compatibility time: the Desktop has a bug.  The cause media
-	 * change routine you get when you hit Escape sets up the pointers,
-	 * then calls Fopen("A:\\X",0).  This double-slash is rejected by
-	 * old GEMDOS, but still causes a hit on the disk.  If you reject
-	 * empty components too soon then you don't hit the disk and don't
-	 * see the media change.  So we have to hit the disk on purpose
-	 * here.  How?  I don't know.  Freshen dir, I guess.
 	 */
 
 	if (end == name) {
@@ -269,14 +265,34 @@ int flags;
 	}
 
 	/*
-	 * if (last component; trailing slash OK if trailok)
+	 * Sigh.  Old GEMDOS just stopped looking when it saw a double
+	 * slash, but didn't fail, so a cd to auto\\ works, and a cd to
+	 * gemdos\\dossys will cd you to gemdos.  I don't care about the
+	 * second case, but the first case has to work.  So set tslash as a
+	 * flag; if there's nothing but slashes from here to the end of the
+	 * name, p is true.  We only bother scanning if trailok.
+	 */
+
+	if (trailok && *end == SLASH) {
+	    char *p;
+
+	    for (p = (end+1); *p == SLASH; p++) ;
+	    tslash = !*p;
+	    DBCMD(0x20,tslash ? "print tslash!;_c" : "_c");
+	}
+	else tslash = 0;
+
+	/*
+	 * if (last component; trailing slash(es) OK if trailok)
 	 *     if earlyflag, bail out now.
 	 *     if isdots(),
 	 *	   if dotsok, do nothing (yet).
 	 *	   else return EBADRQ.
+	 *
+	 * Note: tslash can only be true if trailok: don't check trailok again.
 	 */
 
-	if (!*end || (trailok && *end == SLASH && !*(end+1))) {
+	if (!*end || tslash) {
 	    if (earlyflag) {
 		*pname = name;
 		DBCMD(0x20,"print early return: *pname= "
@@ -354,7 +370,10 @@ dotmatch:
 	if (*name == SLASH) {
 	    /* fail if found a file but not at end of path */
 	    if (!(attr & FA_SUBDIR)) return EPTHNF;
-	    name++;
+	    /* consume multiple slashes (Sigh...) */
+	    do {
+		name++;
+	    } while (*name == SLASH);
         }
     } while (*name);
 

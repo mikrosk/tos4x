@@ -1,11 +1,14 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\makefile.,v $
+# $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $     $Locker:  $
+# $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.14  1991/03/12  18:25:26  apratt
+# Making gtest.prg works and lets you test functions in this version
+#
 # Revision 2.13  1991/02/21  03:07:32  apratt
 # This version performs this testbed perfectly.
 #
@@ -26,6 +29,8 @@ TMPDIR	=	m:
 # un-comment this whole section to compile with GCC
 CC=c:\gnu\bin\gcc.ttp
 CFLAGS=-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem
+.s.o:
+	$(CC) -c $*.s
 #.c.o:
 #	$(CC) $(CFLAGS) -S $*.c
 #	emacs @gas2mac.rc $*.s 
@@ -40,15 +45,15 @@ CFLAGS=-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem
 ################
 
 FRAG =		fscl.o fscomm.o fsdir.o fsfs.o fshand.o scan.o \
-		setup.o time.o panic.o mem.o pool.o
+		setup.o time.o panic.o mem.o pool.o sup.o con.o
 
-frag.prg: testbed.o $(FRAG) traps.o
+gtest.prg: ftest.o fcmds.o docall.o traps.o unreal.o $(FRAG) 
+		$(CC) $(CFLAGS) -o $@ $< -lsyserr.o 
+
+frag.prg: testbed.o traps.o unreal.o $(FRAG) 
 		$(CC) $(CFLAGS) -o $@ $<
 
-traps.o: traps.s
-	gcc-as -o traps.o traps.s
-
-NOTYET =	fsproc.o sup.o con.o
+NOTYET =	fsproc.o
 
 DS=dossys
 LDOBJS	=	$(DS)\self.o $(DS)\ld_dos.o $(DS)\clear.o $(DS)\clock.o \

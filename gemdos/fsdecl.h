@@ -1,12 +1,15 @@
 /*
 ***************************    FSDECL.H    ******************************
 *
-* $Revision: 2.9 $	$Source: e:/tos/gd2\rcs\fsdecl.h,v $
+* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\fsdecl.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdecl.h,v $
+* Revision 2.10  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.9  1991/02/22  15:29:28  apratt
 * generic checkin
 *
@@ -36,8 +39,6 @@ extern uint logmsk[];
 
 extern PD *run;
 
-		/* AKP: callno++ once per OS call; sort of a timer */
-extern char callno;
 extern uint newcl;	/* AKP: set this TRUE at start of a cluster loop */
 extern uint drvsel;	/* mask of drives selected since power up */
 extern long rwerr;	/* hard error number currently in progress */
@@ -47,7 +48,6 @@ extern uint realtime;
 extern uint realdate;
 extern BCB *bufl[];
 extern uint bootdev;
-extern long errbuf[3];
 extern char diruse[];
 extern DMD drvtbl[16];
 
@@ -63,3 +63,4 @@ extern char biosdev[];
 DFD *dfd_head;
 OFD *ofd_head;
 
+extern jmp_buf errbuf;

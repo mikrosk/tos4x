@@ -1,12 +1,15 @@
 /*
 ***************************     CON.C      ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\con.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\con.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: con.c,v $
+* Revision 2.9  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.8  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -24,22 +27,38 @@
 
 #include "fs.h"
 
+/*
+ * Type-ahead buffers.  Should be one of these per possible ofdisatty value.
+ *
+ * put(c):
+ *  tempput = (kbput+1) % KBBUFSIZ;
+ *  if (tempput == kbget) return FULL;
+ *  kbput = tempput;
+ *  kbqueue[kbput] = c;
+ *
+ * get:
+ *  if (kbget == kbput) return EMPTY;
+ *  kbget = (kbget + 1) % KBBUFSIZ;
+ *  return kbqueue[kbget];
+ */
 
 /*
- * Type-ahead buffers.
- * They are stupid.  They've gotta come out.
+ * TTYs we know about: PRN, AUX, CON (BIOS devs 0, 1, 2).
  */
-long glbkbchar[3][KBBUFSZ];
-char kbchar[3];
-long *insptr[3];
-long *remptr[3];
 
-int glbcolumn[3];			/* column position */
+#define NTTYS 3
 
-#define UBWORD(x) (((int)x)&0x00ff)
+long kbqueue[NTTYS][KBBUFSIZ];
+int kbput[NTTYS], kbget[NTTYS];
+
+#ifdef TABOUT
+/* column counter (yuck!) only used to backspace over a tab in cgets. */
+int kbcol[NTTYS];
+#endif
+
+#define qempty(h) (kbput[h] == kbget[h])
 
 #define   ctrlc  0x03
-#define   ctrle  0x05
 #define   ctrlq  0x11
 #define   ctrlr  0x12
 #define   ctrls  0x13
@@ -53,96 +72,67 @@ int glbcolumn[3];			/* column position */
 #define   bs      0x08
 #define   space   0x20
 
-#define warmboot() xterm(-32)
+/* 
+ * You pass _conin arguments like (RAW|NOECHO). At most one of RAW/COOKED
+ * and one of ECHO/NOECHO may appear.
+ */
 
+#define	RAW	0
+#define COOKED	1
+#define ECHO	0
+#define NOECHO	2
+
+#define iscooked(mode) ((mode) & COOKED)
+#define israw(mode) (!iscooked(mode))
+#define isnoecho(mode) ((mode) & NOECHO)
+#define isecho(mode) (!isnoecho(mode))
+
+void
 coninit()
 {
-	kbchar[0] = kbchar[1] = kbchar[2] = 0;
-	remptr[0] = insptr[0] = &(glbkbchar[0][0]);
-	remptr[1] = insptr[1] = &(glbkbchar[1][0]);
-	remptr[2] = insptr[2] = &(glbkbchar[2][0]);
+	int i;
+
+	for (i=0; i<NTTYS; i++) {
+		buflush(i);
+#ifdef TABOUT
+		kbcol[i] = 0;
+#endif
+	}
 }
 
-/* TOP-LEVEL CALLS */
+/*
+ * xNNN calls _NNN with the (small) handle number and mode flags.
+ * _NNN checks to see if it isatty; if not, it calls ixread, ixwrite, etc.
+ * 	if so, it calls NNN with the BIOS device number.
+ *
+ * So xconout calls _conout(1,ch,COOKED), xauxout calls _conout(2,ch,cooked),
+ * and xprtout calls _conout(3,ch,COOKED)...
+ *
+ *    _conout (if isatty) calls conout(BIOS handle,char,mode)...
+ *    conout() does the actual output.  conout() is also called by other
+ * stuff, like cgets and the echoing mode of conin().
+ *
+ */
 
 long
 xconout(ch)
 int ch;
 {
-	return _conout(1,ch);
+	return _conout(1,ch,COOKED);
 }
 
 long
 xauxout(ch)
 int ch;
 {
-	return _conout(2,ch);
+	return _conout(2,ch,COOKED);
 }
 
 long
 xprtout(ch)
 int ch;
 {
-	return _conout(3,ch);
-}
-
-long
-_conout(h,ch)
-int h, ch;
-{
-	OFD *ofd;
-	int dev;
-	char c;
-	long err;
-
-	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
-	if (ofdisatty(ofd)) return bconout(ofddevno(ofd),ch);
-	c = ch;
-	if ((err = xwrite(h,1L,&c)) != 1) return err;
-	return E_OK;
-}
-
-long
-xconin()
-{
-	return _conin(COOKED|ECHO,0);
-}
-
-long
-xnecin()
-{
-	return _conin(COOKED|NOECHO,0);
-}
-
-long
-xauxin()
-{
-	return _conin(RAW|NOECHO,2);
-}
-
-long
-xrawio(ch)
-int ch;
-{
-	if (ch == 0x00ff) {
-		if (_istat(0)) return _conin(RAW|NOECHO,0);
-	}
-	else return _conout(1,ch);
-}
-
-_conin(mode,h)
-int mode;
-int h;
-{
-	OFD *ofd;
-	char c;
-	long err;
-
-	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
-	if (ofdisatty(ofd)) return conin(mode,ofddevno(ofd));
-
-	if ((err = xread(h,1L,&c)) != 1) return err;
-	return c;
+	return _conout(3,ch,COOKED);
 }
 
 /*
@@ -156,20 +146,164 @@ char *p;
 	long err;
 	long len;
 	char *p1;
+	int dev;
 
 	if ((ofd = syshnd(1)) == NULL) return EIHNDL;
 	if (ofdisatty(ofd)) {
-		while (*p) _conout(0,*p++);
-		return E_OK;
+	    dev = ofddevno(ofd);
+	    while (*p) conout(dev,*p++,COOKED);
+	    return E_OK;
 	}
 	else {
-		for (p1 = p; *p1++ ; ) ;
-		len = p1 - p;
-		if ((err = xwrite(1,len,p)) != len) return err;
-		return E_OK;
+	    for (p1 = p; *p1++ ; ) ;
+	    len = p1 - p;
+	    if ((err = xwrite(1,len,p)) != len) return err;
+	    return E_OK;
 	}
 }
 
+/*
+ * _conout: given a user handle number and flags, write a char out.
+ */
+
+long
+_conout(h,ch,flags)
+int h, ch, flags;
+{
+	OFD *ofd;
+	char c;
+	long err;
+
+	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+	if (ofdisatty(ofd)) {
+	    return conout(ofddevno(ofd),ch,flags);
+        }
+	c = ch;
+	if ((err = ixwrite(ofd,1L,&c)) != 1) return err;
+	return E_OK;
+}
+
+long
+char_write(tty,len,buf)
+int tty;
+long len;
+char *buf;
+{
+    long orig_len = len;
+    while (len--) conout(tty,*buf++,COOKED);
+    return orig_len;
+}
+
+/*
+ * conout: call Bconout, with conbrk if iscooked(flags)
+ * Called by _conout and cgets and char_write.
+ */
+
+long
+conout(dev,ch,mode)
+int dev;
+int ch;
+int mode;
+{
+    if (iscooked(mode)) conbrk(dev,0,mode);	    /* non-blocking mode */
+#ifdef TABOUT
+    if (ch == tab) kbcol[dev] = (kbcol[dev] + 8) & ~7;
+    else if (ch == cr) kbcol[dev] = 0;
+    else if (ch == bs) kbcol[dev]--;
+    else if (ch >= space) kbcol[dev]++;
+#endif
+    return bconout(dev,ch);
+}
+
+long
+xconin()
+{
+	return _conin(0,COOKED|ECHO);
+}
+
+long
+xnecin()
+{
+	return _conin(0,COOKED|NOECHO);
+}
+
+long
+xauxin()
+{
+	return _conin(2,RAW|NOECHO);
+}
+
+long
+xrawcin()
+{
+	return _conin(0,RAW|NOECHO);
+}
+
+
+long
+xrawio(ch)
+int ch;
+{
+	OFD *ofd;
+	unsigned char c;
+	long err;
+	int dev;
+
+	if (ch == 0x00ff) {
+	    ofd = syshnd(0);
+	    if (ofdisatty(ofd)) {
+		dev = ofddevno(ofd);
+		if (!qempty(dev) || (dev && bconstat(dev)))
+		    return conin(dev,RAW|NOECHO);
+		else return 0;
+	    }
+	    else {
+		/* "console input" from a file */
+		/* return 0 if at EOF or error, meaning "no input pending" */
+		if (err = ixread(ofd,1L,&c) != 1) return 0;
+		else return (unsigned long)c;
+	    }
+	}
+	else return _conout(1,ch,RAW);
+}
+
+long
+_conin(h,mode)
+int mode;
+int h;
+{
+	OFD *ofd;
+	char c;
+	long err;
+
+	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+	else if (ofdisatty(ofd)) return conin(ofddevno(ofd),mode);
+	else {
+		if ((err = ixread(ofd,1L,&c)) != 1) return err;
+		else return c;
+	}
+}
+
+/*
+ * Console Input, in the appropriate mode
+ *
+ * Calls conbrk in block mode if the queue is empty.
+ */
+long
+conin(dev,mode)
+int dev;
+int mode;
+{
+    REG long ch;
+
+    if (iscooked(mode) || qempty(dev)) conbrk(dev,1,mode);
+
+    /* we know !qempty now */
+    ch = qrem(dev);
+
+    if (isecho(mode)) bconout(dev,(int)ch);
+    return(ch);
+}
 
 long
 xconstat()
@@ -183,16 +317,27 @@ xauxis()
 	return _istat(2);
 }
 
+long
 _istat(h)
 int h;
 {
 	OFD *ofd;
-	char c;
 
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (ofdisatty(ofd)) return constat(ofddevno(ofd));
 
-	return (ofd->o_bytnum < ofd->o_dfd->dfd_fileln);
+	return (ofd->o_bytnum < ofd->o_dfd->dfd_fileln) ? -1 : 0;
+}
+
+/*
+ * Input status for Bios device h
+ */
+long
+constat(dev)
+int dev;
+{
+	/* AKP: Bconstat(0) is unimplemented in BIOS */
+	return( !qempty(dev) ? -1L : (dev ? bconstat(dev) : 0) );
 }
 
 long
@@ -202,15 +347,15 @@ xconos()
 }
 
 long
-xprnos()
-{
-	return _ostat(3);
-}
-
-long
 xauxos()
 {
 	return _ostat(2);
+}
+
+long
+xprnos()
+{
+	return _ostat(3);
 }
 
 long
@@ -219,249 +364,115 @@ int h;
 {
 	OFD *ofd;
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
-	if (ofdisatty(ofd)) return bconstat(ofddevno(ofd));
-	return 1;
+	if (ofdisatty(ofd)) return bconostat(ofddevno(ofd));
+	return -1;	/* files are always ready for output */
 }
 
-/* LOWER-LEVEL CALLS */
-
 /*
- * Input status for Bios device h
- */
-long
-constat(h)
-int h;
-{
-	/* AKP: Bconstat(0) is unimplemented in BIOS */
-	return( kbchar[h] ? -1L : (h ? bconstat(h) : 0) );
-}
-
-
-/*
- * Internal check for ^S, ^Q, ^C, and ^X.
+ * conbrk(dev,block,mode): on BIOS dev 'dev', check for input, do bconin, check
+ * for ^C (etc.) if iscooked(mode), enqueue if not cooked or nothing special.
  *
- * AKP: I changed this code to flush the BIOS input (until !bconstat(h))
- * each time it's checked, but I realize that's bad because you could be
- * getting input at 19,200 Baud, and never (rarely) get a chance to flush it.
- *
- * So instead, I gobble up to 16 bytes per call to conbrk, on the hope
- * that this is sufficient for most purposes without causing indefinite
- * postponement.
+ * If block, don't stop until there's something in the queue.  Else stop
+ * when !bconstat [should stop when you've read 16 chars, which is a 
+ * compromise because reading until !bconstat on a stream with lots of chars
+ * can cause indefinite postponement.  Doesn't, though].
  *
  * Also, I don't call bconstat on PRN: (device 0) because it's explicitly
- * not supported by the BIOS.
+ * not supported by the BIOS.  God help you if you actually try to read
+ * from PRN:.
+ *
+ * The oddity in ^X handling is a holdover from before: ^X causes typeahead
+ * to be flushed, but a ^X gets stuck in so cgets sees it.
  */
 
 void
-conbrk(h,block)
-int h;
+conbrk(dev,block,mode)
+int dev;
 int block;
+int mode;
 {
-    REG long ch;
-    REG int stop;
-    REG int c;
+    long ch;
+    int stop;
+    int c;
 
     stop = 0;
 
-    /*********************************************************************/
-    /* this will crank the loop as long as there are characters waiting, */
-    /* but calls bconin directly if we're in block mode & have nothing   */
-    /* queued.  That way we don't have a "while (!bconstat(h)) ;" busy-  */
-    /* waiting loop, and it's friendlier on multi-tasking.		 */
-    /*********************************************************************/
-
-    while ((block && kbchar[h] == 0) || (h && bconstat(h))) {
-	do {
-	    c = (ch = bconin(h)) & 0xFF;
+    while ((block && qempty(dev)) || stop || (dev && bconstat(dev))) {
+	c = (ch = bconin(dev)) & 0xFF;
+	if (iscooked(mode)) {
 	    if ( c == ctrlc ) {
-		buflush(h);	/* flush BDOS & BIOS buffers */
-		warmboot();	/* (this never returns) */
+		/* ^C: flush input buffers & call Pterm(-32) */
+		buflush(dev);
+		xterm(-32);
 	    }
-	    if ( c == ctrls )
-		    stop = 1;
-	    else if ( c == ctrlq )
-		stop = 0;
-	    else if ( c == ctrlx ) {
-		/* THIS IS STUPID BEHAVIOR */
-		buflush(h);
-		qins(h,ch);
+	    else if ( c == ctrls ) stop = 1;	/* ^S: set stop flag */
+	    else if ( c == ctrlq ) stop = 0;	/* ^Q: clear stop flag */
+	    else if ( c == ctrlx ) {		/* ^X: wipe typeahead */
+		buflush(dev);
+		qins(dev,ch);	/* leave ^X in buffer */
 	    }
-	    else {
-		qins(h,ch);
-	    }
-	} while (stop);
+	    else qins(dev,ch);
+	}
+	else qins(dev,ch);
     }
 }
-
 
 /*
  * Flush type-ahead buffer.
  */
 void
-buflush(h)
-int h;
+buflush(dev)
+int dev;
 {
-	kbchar[h] = 0;
-	remptr[h] = insptr[h] = &(glbkbchar[h][0]);
+	kbput[dev] = kbget[dev] = 0;
+	if (dev) while (bconstat(dev)) (void)bconin(dev);
 }
 
 /*
- * qins: add a character to a queue if it'll fit, and move insptr.
+ * qins: add a character to a queue if it'll fit
  */
+
 void
-qins(h,ch)
-int h;
+qins(dev,ch)
+int dev;
 long ch;
 {
-    if (kbchar[h] < KBBUFSZ) {
-	/* queue isn't full: add to it */
-	*insptr[h]++ = ch;
-	if (insptr[h] == &glbkbchar[h][KBBUFSZ]) {
-	    insptr[h] = &glbkbchar[h][0];
-	}
-	kbchar[h]++;
-    }
+    int tempput = (kbput[dev] + 1) % KBBUFSIZ;
+
+    /* if queue is full, send a bell to that device */
+    if (tempput == kbget[dev]) bconout(dev,7);
     else {
-	bconout(h, 7);		/* beep when buffer is full */
+	kbput[dev] = tempput;
+	kbqueue[dev][tempput] = ch;
     }
 }
 
-/*
- * Internal version of Conout.
- */
 long
-conout(h,ch)
-int h;
-int ch;
+qrem(dev)
+int dev;
 {
-    long s;
-
-    conbrk(h,0);		/* check for control-s break */
-    s = bconout(h,ch);		/* output character to console */
-    if (ch >= ' ') glbcolumn[h]++;	/* keep track of screen column */
-    else if (ch == cr) glbcolumn[h] = 0;
-    else if (ch == bs) glbcolumn[h]--;
-    return s;
+	if (qempty(dev)) return 0;
+	kbget[dev] = (kbget[dev] + 1) % KBBUFSIZ;
+	return kbqueue[dev][kbget[dev]];
 }
-
-
-/*
- * Expand tabs to output device.
- * (WE DON'T NEED THIS).
- */
-long
-tabout(h,ch)
-int h;
-int ch;
-{
-    long s;
-
-    ch &= 0xff;				/* should be unsigned */
-    if (ch == tab) do {
-	s = conout(h,' ');
-    } while (glbcolumn[h] & 7);
-    else s = conout(h,ch);
-    return s;
-}
-
 
 /*
  * Console Output;
- * with tab and control-character expansion.
+ * with control-character expansion.
  */
 long
-cookdout(h,ch)
-int h;
+cookdout(dev,ch)
+int dev;
 int ch;
 {
     long s;
     
     ch &= 0xff;				/* hack off like unsigned char */
-    if (ch == tab) s = tabout(h,ch);	/* if tab, expand it */
-    else
-    {
-	if ( ch < ' ' ) {
-            conout( h,'^' );
-	    ch |= 0x40;
-	}
-    	s = conout(h,ch);			/* output the character */
+    if (ch < space && ch != tab) {
+	conout(dev,'^',COOKED);
+	ch |= 0x40;
     }
-    return s;
-}
-
-
-/*
- * Get Character;
- * from a buffer, or the device itself.
- *
- * AKP: kbchar[h] will always be true when the I/O is in cooked mode,
- * because all cooked I/O calls conbrk in block mode first.  This
- * is so control characters are handled identically when they are
- * buffered and when they aren't.  (The fact is, because if block
- * mode in conbrk, they're all buffered.)
- */
-long
-getch(h)
-int h;
-{
-	REG long temp;
-
-	if (kbchar[h]) {
-		temp = *remptr[h]++;
-		kbchar[h]--;
-		if (remptr[h] == &glbkbchar[h][KBBUFSZ]) {
-		    remptr[h] = &glbkbchar[h][0];
-		}
-		return(temp);
-	}
-	else {
-	    return (bconin(h));
-	}
-}
-
-
-/*
- * Crawcin()
- */
-long
-xrawcin()
-{
-	return(getch(run->p_uft[0]+3));
-}
-
-
-/*
- * Console Input;
- * with echo.
- *
- * Calls conbrk in block mode.
- */
-long
-conin(mode,h)
-int mode;
-int h;
-{
-    REG long ch;
-
-	/* not really done yet */
-	1+;
-
-    conbrk(h,1);
-    conout( h,(int)(ch = getch(h)) );
-    return(ch);
-}
-
-/*
- * Print line.
- */
-long
-prt_line(h,p)
-int h;
-char *p;
-{
-    long s = 0;
-
-    while( *p ) s = tabout( h, *p++ );
+    s = conout(dev,ch,COOKED);		/* output the character */
     return s;
 }
 
@@ -473,70 +484,50 @@ char *p;
 \***********************************************/
 
 /*
- * Newline, advance to appropriate column on device.
- */
-void
-newline(h,startcol)
-REG int startcol;
-REG int h;
-{
-    conout(h,cr);			/* go to new line */
-    conout(h,lf);
-    while(startcol) {
-	conout(h,' ');
-	startcol -= 1;		/* start output at starting column */
-    }
-}
-
-
-/*
- * Backup one character;
- * yeah, they're assuming a video terminal.
- */
-int
-backsp(h,cbuf,retlen, col)
-int h;
-int retlen;
-char *cbuf;
-int col;			/* starting console column	*/
-{
-    REG char	ch;		/* current character	*/
-    REG int	i;
-    REG char	*p;		/* character pointer	*/
-
-    if (retlen) --retlen;
-				/* if buffer non-empty, decrease it by 1 */
-    i = retlen;
-    p = cbuf;
-    while (i--)			/* calculate column position 	*/
-    {				/*  across entire char buffer	*/
-	ch = *p++;		/* get next char		*/
-	if ( ch == tab ) {
-	    col += 8;
-	    col &= ~7;		/* for tab, go to multiple of 8 */
-	}
-	else if ( !(ch & ~0x1f) ) col += 2;
-				/* control chars put out 2 printable chars */
-	else col += 1;
-    }
-    while (glbcolumn[h] > col) {
-	conout(h,bs);		/* backspace until we get to proper column */
-	conout(h,' ');
-	conout(h,bs);
-    }
-    return(retlen);
-}
-
-
-/*
  * Cconrs()
+ * Input: p[0]: max length, &p[2]: buffer space.
+ * Output: returns actual read length and puts it in p[1].
  */
 long
-xconrs(p)	/* function 10 */
-char *p;	/* max length, return length, buffer space */
+xconrs(p)
+unsigned char *p;
 {
-	p[1] = cgets(run->p_uft[0]+3,(((int) p[0]) & 0x0ff),&p[2]);
-	return p[1];	/* this was an accident before; preserved. AKP 1/91 */
+	OFD *ofd;
+	unsigned char c;
+	int max, i;
+	unsigned char *result_ptr;
+
+	if ((ofd = syshnd(0)) == NULL) return EIHNDL;
+	if (ofdisatty(ofd)) {
+	    return (p[1] = cgets(ofddevno(ofd),p[0],(char *)&p[2]));
+	}
+
+	/* read string from a file... Don't echo it! */
+	max = p[0];
+	result_ptr = &p[1];
+	p += 2;
+	for (i=0; max--; i++,p++) {
+	    if (ixread(ofd,1L,p) == 1) {
+		if (*p == cr) {
+		    /* eat the lf, if any, and break */
+		    ixread(ofd,1L,&c);
+		    /* if not an LF then back up */
+		    if (c != lf) ixlseek(-1,ofd,1);
+		    break;
+		}
+		else if (*p == lf) break;
+	    }
+	    else {
+		/* read error or EOF or something */
+		break;
+	    }
+	}
+	*result_ptr = i;
+
+	/* returning the number of chars read was an accident before */
+	/* but is now official */
+
+	return *result_ptr;
 }
 
 
@@ -544,62 +535,77 @@ char *p;	/* max length, return length, buffer space */
  * Read string.
  */
 long
-cgets(h,maxlen,buf)
-int h;
-int maxlen;
+cgets(dev,maxlen,buf)
+int dev;
+long maxlen;
 char *buf;
 {
-	char ch;
-	int i;
-	REG int stcol;
-	REG int retlen;
+    char ch;
+    int i, col, col1;
+    int retlen;
+#ifdef TABOUT
+    int initcol = kbcol[dev];
+#else
+    int initcol = 0;
+#endif
 
-	stcol = glbcolumn[h];		/* set up starting column */
-	for (retlen = 0; retlen < maxlen; ) {
-		conbrk(h,1);	/* use block mode to handle ^C and ^S/^Q */
-		switch(ch = getch(h)) {
-			case cr:
-			case lf: conout(h,cr); goto getout;
-			case bs:
-			case rub:
-				retlen = backsp(h,buf,retlen,stcol);
-				break;
-			case ctrlx:
-				do retlen = backsp(h,buf,retlen,stcol);
-				while (retlen);
-				break;
-			case ctrlu:
-				conout(h,'#'); 
-				newline(h,stcol);
-				retlen = 0;
-				break;
-			case ctrlr:
-				conout(h,'#');
-				newline(h,stcol);
-				for (i=0; i < retlen; i++)
-					cookdout(h,buf[i]);
-				break;
-			default:
-				cookdout(h,buf[retlen++] = ch);
+    for (retlen = 0; retlen < maxlen; ) {
+	switch(ch = conin(dev,COOKED|NOECHO)) {
+	    case cr:
+	    case lf:
+		conout(dev,cr,COOKED); 
+		return retlen;
+
+	    case bs:
+	    case rub:
+		if (retlen) {
+		    /* compute (relative) goal column */
+		    for (col=initcol, i=0; i<(retlen-1); i++) {
+			if (buf[i] >= space) col++;
+			else if (buf[i] == tab) col = ((col+8) & ~7);
+			else col += 2;
+		    }
+		    col1 = col;
+		    if (buf[i] >= space) col1 += 1;
+		    else if (buf[i] == tab) col1 = ((col1+8) & ~7);
+		    else col1 += 2;
+
+		    for (i=col1; i > col; i--) {
+			conout(dev,bs,COOKED);
+			conout(dev,space,COOKED);
+			conout(dev,bs,COOKED);
+		    }
+		    --retlen;
 		}
+		break;
+	    case ctrlc: buflush(dev); xterm(-32);
+	    case ctrlx:
+		/* compute (relative) goal column */
+		for (col=initcol, i=0; i<retlen; i++) {
+		    if (buf[i] >= space) col++;
+		    else if (buf[i] == tab) col = ((col+8) & ~7);
+		    else col += 2;
+		}
+		while (col-- > initcol) {
+		    conout(dev,bs,COOKED);
+		    conout(dev,space,COOKED);
+		    conout(dev,bs,COOKED);
+		}
+		retlen = 0;
+		break;
+	    case ctrlr:
+	    case ctrlu:
+		conout(dev,'#',COOKED);
+		conout(dev,cr,COOKED);
+		conout(dev,lf,COOKED);
+		for (i=0; i<initcol; i++) conout(dev,' ',COOKED);
+		if (ch == ctrlu) retlen = 0;
+		else for (i=0; i < retlen; i++) cookdout(dev,buf[i]);
+		break;
+	    default:
+		cookdout(dev,buf[retlen++] = ch);
 	}
-getout:	return(retlen);
-}
-
-long
-char_write(tty,len,buf)
-int tty;
-long len;
-char *buf;
-{
-    long orig_len = len;
-    if (tty == 2) {
-	while (len--) tabout(tty,*buf++);
     }
-    else {
-	while (len--) bconout(tty,*buf++);
-    }
-    return orig_len;
+    return retlen;
 }
-
 

@@ -1,12 +1,21 @@
 
-/* panic.c */
-volatile void panic _P((void));
+/* pool.c */
+voidfn poolinit _P((void));
+int addheap _P((void *ptr, long size));
+void *getbig _P((void));
+struct block *newpool _P((void));
+MD *getsmall _P((void));
+struct block *compact _P((void));
+void mdmove _P((MD *target, MD *dest));
+MD *advance _P((struct block **pdptr, int *pdindex, struct block *sptr));
+long freebig _P((void *ptmp));
+void freesmall _P((MD *ptr));
 
 /* mem.c */
 void xminit _P((void));
 long mbiggest _P((MPB *mp, int type));
 MD *ffit _P((long amount, MPB *mp, int type));
-long xsetblk _P((int n, void *blk, long len));
+long xmshrink _P((int n, void *blk, long len));
 void freeit _P((MD *m, MPB *mp));
 long xfmalloc _P((long amount, int mode));
 long xmalloc _P((long amount));
@@ -34,26 +43,49 @@ long ckdrv _P((uint d));
 voidfn log _P((BPB *b, int drv));
 long xgetfree _P((long *buf, uint drv));
 
-/* pool.c */
-voidfn poolinit _P((void));
-int addheap _P((void *ptr, long size));
-void *getbig _P((void));
-struct block *newpool _P((void));
-MD *getsmall _P((void));
-struct block *compact _P((void));
-void mdmove _P((MD *target, MD *dest));
-MD *advance _P((struct block **pdptr, int *pdindex, struct block *sptr));
-long freebig _P((void *ptmp));
-void freesmall _P((MD *ptr));
+/* fsfs.c */
+DFD *getdfd _P((DIR *dir));
+long ixcreat _P((char *name, int attr, DIR *dir));
+long xchmod _P((char *p, int wrt, int attr));
+long xunlink _P((char *name));
+long ixdel _P((DIR *dir));
+long xrename _P((int n, char *p1, char *p2));
 
-/* scan.c */
-long fn2dir _P((char **pname, DIR *dir, int flags));
-long dir2dir _P((DIR *dir));
-long _dirnext _P((DIR *dir, DMD *dmd));
-long dirslot _P((DIR *dir));
-int match _P((FCB *pat, FCB *fcb));
-int wmatch _P((FCB *pat, FCB *fcb));
-long name2fcb _P((char *name, char *end, FCB *fcb));
+/* fscomm.c */
+
+/* fshand.c */
+int uftprobe _P((void));
+OFD *syshnd _P((int h));
+long xdup _P((int h));
+long xforce _P((int std, int h));
+long ixforce _P((int dest, int src, PD *pd));
+long xclose _P((int h));
+void offree _P((uint dev));
+long xsync _P((void));
+long xread _P((int h, long len, void *ubufr));
+long ixread _P((OFD *ofd, long len, void *ubufr));
+long xwrite _P((int h, long len, void *ubufr));
+long ixwrite _P((OFD *ofd, long len, void *ubufr));
+long xcreat _P((char *name, int attr));
+long xopen _P((char *name, int mod));
+long ttyopen _P((char *name));
+long ixopen _P((DIR *dir, uint mod));
+long xlseek _P((long n, int h, int flg));
+long ixlseek _P((long n, OFD *ofd, int flg));
+long xdatime _P((int *buf, int h, int wrt));
+long xgetdta _P((void));
+long xsetdta _P((DTA *addr));
+long xsetdrv _P((uint drv));
+long xgetdrv _P((void));
+long xgetver _P((void));
+long ni _P((void));
+
+/* time.c */
+void tikfrk _P((int n));
+long xgetdate _P((void));
+long xsetdate _P((int d));
+long xgettime _P((void));
+long xsettime _P((uint t));
 
 /* fsdir.c */
 long xchdir _P((char *p));
@@ -67,12 +99,84 @@ long ixsfirst _P((char *name, int att, DTA *dta));
 long xsnext _P((void));
 voidfn filldta _P((DTA *dta, DIR *dir));
 
+/* setup.c */
+voidfn osi _P((void));
+
+/* scan.c */
+long fn2dir _P((char **pname, DIR *dir, int flags));
+long dir2dir _P((DIR *dir));
+long _dirnext _P((DIR *dir, DMD *dmd));
+long dirslot _P((DIR *dir));
+int match _P((FCB *pat, FCB *fcb));
+int wmatch _P((FCB *pat, FCB *fcb));
+long name2fcb _P((char *name, char *end, FCB *fcb));
+
+/* panic.c */
+volatile void panic _P((void));
+
+/* con.c */
+void coninit _P((void));
+long xconout _P((int ch));
+long xauxout _P((int ch));
+long xprtout _P((int ch));
+long xconws _P((char *p));
+long _conout _P((int h, int ch, int flags));
+long char_write _P((int tty, long len, char *buf));
+long conout _P((int dev, int ch, int mode));
+long xconin _P((void));
+long xnecin _P((void));
+long xauxin _P((void));
+long xrawcin _P((void));
+long xrawio _P((int ch));
+long _conin _P((int h, int mode));
+long conin _P((int dev, int mode));
+long xconstat _P((void));
+long xauxis _P((void));
+long _istat _P((int h));
+long constat _P((int dev));
+long xconos _P((void));
+long xauxos _P((void));
+long xprnos _P((void));
+long _ostat _P((int h));
+void conbrk _P((int dev, int block, int mode));
+void buflush _P((int dev));
+void qins _P((int dev, long ch));
+long qrem _P((int dev));
+long cookdout _P((int dev, int ch));
+long xconrs _P((unsigned char *p));
+long cgets _P((int dev, long maxlen, char *buf));
+
+/* sup.c */
+long xmediach _P((int drv));
+long osif _P((int *pw));
+
+/* ftest.c */
+void get_time _P((void));
+void main _P((int argc, char *argv[]));
+void ui _P((char *cmdbuf));
+long internal _P((int c));
+void mputs _P((char *s));
+void mputlong _P((long l));
+void mputint _P((int i));
+void mput _P((int c));
+void mgets _P((char *buf));
+void mgetarg _P((char *name, int type, int n));
+void err _P((char *s));
+long atolx _P((char *s));
+void doload _P((char *buf));
+void dotrans _P((char *buf));
+
+/* fcmds.c */
+
 /* testbed.c */
 voidfn main _P((int argc, char *argv[]));
 int uc _P((int c));
 voidfn s68 _P((void *w));
 voidfn s68l _P((void *w));
 long xterm _P((int code));
+long x0term _P((void));
+long xtermres _P((long size, int rc));
+long xexec _P((int code, char *cmd, char *tail, char *env));
 voidfn clear _P((void *start, void *end));
 void xfr2usr _P((uint n, void *s, void *d));
 void usr2xfr _P((uint n, void *d, void *s));
@@ -80,42 +184,3 @@ voidfn upd_tod _P((void));
 long cgets _P((int h, long len, char *buf));
 long char_write _P((int h, long len, char *buf));
 void coninit _P((void));
-
-/* fscomm.c */
-
-/* fsfs.c */
-DFD *getdfd _P((DIR *dir));
-long ixcreat _P((char *name, int attr, DIR *dir));
-long xchmod _P((char *p, int wrt, int attr));
-long xdelete _P((char *name));
-long ixdel _P((DIR *dir));
-long xrename _P((int n, char *p1, char *p2));
-
-/* time.c */
-long xgetdate _P((void));
-long xsetdate _P((int d));
-long xgettime _P((void));
-long xsettime _P((uint t));
-
-/* setup.c */
-voidfn osi _P((void));
-
-/* fshand.c */
-int uftprobe _P((void));
-OFD *syshnd _P((int h));
-long xdup _P((int h));
-long xforce _P((int std, int h));
-long ixforce _P((int dest, int src, PD *pd));
-long xclose _P((int h));
-long xsync _P((void));
-long xread _P((int h, long len, void *ubufr));
-long xwrite _P((int h, long len, void *ubufr));
-long xcreat _P((char *name, int attr));
-long xopen _P((char *name, int mod));
-long ixopen _P((DIR *dir, uint mod));
-long xlseek _P((long n, int h, int flg));
-long xdatime _P((int *buf, int h, int wrt));
-long xgetdta _P((void));
-long xsetdta _P((DTA *addr));
-long xsetdrv _P((uint drv));
-long xgetdrv _P((void));

@@ -1,12 +1,15 @@
 /*
 ***************************    SETUP.C     ******************************
 *
-* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\setup.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\setup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: setup.c,v $
+* Revision 2.8  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.7  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -86,6 +89,7 @@ osi()
 	/* set rootpd and fill it with important stuff */
 	run = &rootpd;
 	clear(run,run+1);
+	run->p_xdta = (DTA *)run->p_cmdlin; /* default DTA is your cmd line */
 	run->p_uft = rootuft;
 	run->p_uftsize = OPNFILES;
 	clear(&run->p_uft[0],&run->p_uft[run->p_uftsize]);
@@ -101,8 +105,6 @@ osi()
 #if REAL
 	xminit();
 #endif
-
-	callno = 0;
 
 	/* init keyboard queues */
 	coninit();

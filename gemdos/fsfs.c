@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
+* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.13  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.12  1991/02/22  15:29:28  apratt
 * generic checkin
 *
@@ -197,7 +200,7 @@ int attr;			/* attribute byte */
  * dirty deed.  Simple returns from errors suffice.
  */
 long
-xdelete(name)
+xunlink(name)
 char *name;
 {
     DIR dir;
@@ -211,13 +214,13 @@ char *name;
 
     DBCMD(1,"print xdelete -s (lpeek (+ `a6 8));_c");
 
-    /* find normal files only, return any error */
+    /* return any error (file not found, bad request, etc.) */
     if (err = fn2dir(&name,&dir,FN_NORM)) return err;
 
     /*
-     *  Refuse if file is read-only
+     *  Refuse if file is read-only or a directory
      */
-    if (dir.dir_fcb->f_attrib & FA_RO)
+    if (dir.dir_fcb->f_attrib & (FA_RO | FA_SUBDIR))
 	return(EACCDN);
 
     /*

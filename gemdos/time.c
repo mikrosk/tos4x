@@ -1,12 +1,15 @@
 /*
 ***************************     TIME.C     ******************************
 *
-* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\time.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\time.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: time.c,v $
+* Revision 2.8  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.7  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -25,17 +28,95 @@
 #include "fs.h"
 
 /*
- * Get Date.
+ * Tick Handler;
+ * called every so often by the BIOS's
+ * timer interrupt handler.
+ */
+
+int msec;
+
+void
+tikfrk(n)
+int n;
+{
+	int curmo;
+
+	msec += n;
+	if (msec >= 2000)
+	{
+		/* update time */
+
+		msec -= 2000;
+		realtime++;
+
+		if ((realtime & 0x1F) != 30)
+			return;
+
+		realtime &= 0xFFE0;
+		realtime += 0x0020;
+
+		if ((realtime & 0x7E0) != (60 << 5))
+			return;
+
+		realtime &= 0xF81F;
+		realtime += 0x0800;
+
+		/* UNSIGNED below is for stupid old Alcyon compiler */
+		if ((unsigned)(realtime & 0xF800) != (unsigned)(24 << 11))
+			return;
+
+		realtime = 0;
+
+		/* update date */
+
+		if ((realdate & 0x001F) == 31)
+			goto datok;
+
+		realdate++;			/* bump day */
+
+		if ((realdate & 0x001F) <= 28)
+			return;
+
+		if ((curmo = (realdate >> 5) & 0x0F) == 2)
+		{
+		/* 2100 is the next non-leap year divisible by 4, so OK */
+			if (!(realdate & 0x0600))
+				if ((realdate & 0x001F) <= 29)
+					return;
+				else
+					goto datok;
+		}
+
+		if ((realdate & 0x001F) <= nday[curmo])
+			return;
+
+datok:		realdate &= 0xFFE0;		/* bump month */
+		realdate += 0x0021;
+
+		if ((realdate & 0x01E0) <= (12 << 5))
+			return;
+
+		realdate &= 0xFE00;		/* bump year */
+		realdate += 0x0221;
+	}
+}
+
+/*
+ * Get date.
  */
 long
 xgetdate()
 {
-	return(realdate);
+#if REAL
+	return realdate;
+#else
+	return realdate = trap1(0x2a);
+#endif
 }
 
 
 /*
- * Set Date.
+ * Set date.
  */
 long
 xsetdate(d)
@@ -73,7 +154,11 @@ REG	int day;
 long
 xgettime()
 {
-	return(realtime);
+#if REAL
+	return realtime;
+#else
+	return realtime = trap1(0x2c);
+#endif
 }
 
 
@@ -99,3 +184,5 @@ uint t;
 	upd_tod();			/* update BIOS clock */
 	return (E_OK);
 }
+
+

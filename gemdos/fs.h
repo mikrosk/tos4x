@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.15 $	$Source: e:/tos/gd2\rcs\fs.h,v $
+* $Revision: 2.16 $	$Source: e:/tos/gd2\rcs\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.16  1991/03/12  18:25:26  apratt
+* Making gtest.prg works and lets you test functions in this version
+*
 * Revision 2.15  1991/02/22  15:29:28  apratt
 * generic checkin
 *
@@ -97,14 +100,14 @@ extern void sprintf();
  * 0x2000 is something I'm hacking up (1/91).
  */
 
-/* GEMDOS version number (byte-reversed, nybble-packed, used only in sup.c) */
+/* GEMDOS version number (byte-reversed, nybble-packed, only in fshand.c) */
 #define	VERS_NUM	0x2000L
 
-#define	NULL	0L
-#define	OK	0
-#define NULPTR	((void *) 0)
-#define TRUE	1
-#define FALSE	0
+/*
+ * Feature-enabling switches
+ */
+
+#define TABOUT 1		/* worry about tabs in con.c */
 
 /*
  *  Fundamental(?) constants
@@ -116,9 +119,17 @@ extern void sprintf();
 #define OPNFILES	25	/* size of root process's uft */
 #define NUMSTD		6	/* number of standard files */
 #define NUMBIOS		3	/* number of BIOS dev handles -1, -2, -3 */
-#define	KBBUFSZ		80	/* size of typeahead buffer */
+#define	KBBUFSIZ	64	/* size of typeahead buffer; (2^n)-1 */
 #define SLASH		'\\'
 #define COLON		':'
+
+/* symbolic constants */
+
+#define	NULL	0L
+#define	OK	0
+#define NULPTR	((void *) 0)
+#define TRUE	1
+#define FALSE	0
 
 /*
  * Hacky Macros
@@ -167,7 +178,7 @@ extern void sprintf();
 #define MD	struct _md
 #define MPB	struct _mpb
 #define PD	struct _pd
-#define DTA	struct _dta
+#define DTA	struct _xdta
 #define PRG	struct _prg
 
 /*
@@ -230,8 +241,8 @@ PD
 /* macros for handling the OFD field a uft entry */
 
 #define ofdisatty(ofd) (((long)(ofd)) & 1)
-#define ofddevno(ofd) (~((short)((((unsigned long)(ofd)) >> 1))))
-#define ofdtty(devno) ((OFD *)((~(devno) << 1) | 1))
+#define ofddevno(ofd) (((short)ofd) >> 1)
+#define ofdtty(devno) ((OFD *)((devno << 1) | 1))
 
 /*
  * PRG, the header of an executable file
@@ -287,9 +298,10 @@ OFD
 	/* file position and per-open information */
 
 	OFD	*o_next;	/* next in unordered list of OFDs */
+	OFD	*o_prev;	/* prev in unordered list of OFDs */
+	DFD	*o_dfd;		/* DFD this OFD refers to */
 	int	o_use;		/* use count */
         int     o_mode;		/* mode file opened in (r, w, r/w) */
-	DFD	*o_dfd;		/* DFD this OFD refers to */
 	ulong	o_bytnum;	/* byte pointer within file */
 	uint	o_curcl;	/* current cluster pointer */
 	uint	o_currec;	/* rec number of current cluster */
@@ -303,6 +315,7 @@ OFD
 DFD
 {
 	DFD	*dfd_next;	/* next in unordered list of DFDs */
+	DFD	*dfd_prev;	/* prev in unordered list of DFDs */
 	int	dfd_use;
 
 	/* these items are in the same order as the FCB.  In memory, */
@@ -440,7 +453,7 @@ BCB
 struct block {
     struct block *b_next;	/* next block in the heap */
     char b_type;		/* see Bis* predicates below */
-    char b_callno;		/* used only if the block is big */
+    char b_unused;		/* unused */
     union {
 	char b_big[64];		/* either one big block, or... */
 	MD b_mem[4];		/* four small blocks */
@@ -461,6 +474,11 @@ struct block {
 #define Bmakeused(bp) ((bp)->b_type = -1)
 #define Bmakecut(bp)  ((bp)->b_type = 1)
 
+#if REAL
+#else
+#include <setjmp.h>
+#endif
+
 #include "proto.h"
 #include "gemerror.h"
 #include "fsdecl.h"
@@ -469,11 +487,9 @@ struct block {
  * prototypes for functions which aren't in C
  */
 
+long trap1 _P(( int,... ));
 long trap13 _P(( int,... ));
 long trap14 _P(( int,... ));
-
-int setjmp _P(( long *jmpbuf ));	/* takes three longs */
-voidfn longjmp _P(( long *jmpbuf,int error ));
 
 #if REAL
 /* these are in testbed.c until they are (more) real */
@@ -523,5 +539,3 @@ void *s, *d;
     (((dir)->dir_fcb++), \
      ((dir)->dir_recoffs += sizeof(FCB)), \
      (((dir)->dir_recoffs < (dmd)->m_recsiz) ? E_OK : _dirnext((dir),(dmd))))
-
-

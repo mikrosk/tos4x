@@ -1,12 +1,15 @@
 /*
 ***************************    DIR.C     ********************************
 *
-* $Revision: 1.1 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.2 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.2  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 1.1  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -32,6 +35,7 @@ long
 fn2dir(pname,dir,flag)
 char **pname;
 DIR *dir;
+int flag;
 
 Fills in (uninitialized) 'dir' with the info on the slot referenced by the
 string at *pname, and advances that pointer to the last component of the
@@ -66,12 +70,13 @@ dir2dir(dir)
 DIR *dir;
 
 Freshens (valid, stale) dir.  A dir can't be freshened across media-change
-on a drive, but this isn't checked.  All that happens is xgetrec() on the
+on a drive, but this isn't checked.  All that happens is getrec() on the
 record in question.  Uses only the dev, recno, and recoffs fields.
 
 long
-dirfirst(dir)
+dirfirst(dir,dmd)
 DIR *dir;
+DMD *dmd;
 
 Initializes (valid, stale) dir to the first slot in the dir specified
 in the dev and cl fields.  On zero return dir is fresh.  Returns errors.
@@ -79,6 +84,7 @@ in the dev and cl fields.  On zero return dir is fresh.  Returns errors.
 long
 dirnext(dir,dmd)
 DIR *dir;
+DMD *dmd;
 
 Partly a macro. Advances (fresh) dir to the next slot in the directory.
 'dmd' is &drvtbl[dir->dir_drv] (saves multiplying inside loops). Returns
@@ -162,7 +168,7 @@ int flags;
     else dev = run->p_curdrv;
 
     if (dev > MAXDEVS) return EDRIVE;
-
+    if (ckdrv(dev)) return EPTHNF;
     dmd = &drvtbl[dev];
 
     /* got d: out of the way */
@@ -242,11 +248,11 @@ long
 dir2dir(dir)
 DIR *dir;
 {
-    long err;
-    FCB *fcb;
+    char *fcb;
+    DMD *dmd = &drvtbl[dir->dir_dev];
 
-    if (err = xgetrec(dir->dir_dev,dir->dir_recno,&dir->dir_bcb,&fcb)) return err;
-    dir->dir_fcb = (FCB *)(((char *)fcb) + dir->dir_recoffs);
+    fcb = getrec(dir->dir_recno,dmd,0,&dir->dir_bcb);
+    dir->dir_fcb = (FCB *)(fcb + dir->dir_recoffs);
     return E_OK;
 }
 
@@ -257,7 +263,7 @@ DIR *dir;
  * This is a macro, as follows:
  * #define dirfirst(dir,dmd) \
  *     ((dir->dir_curcl = dir->dir_clust), \
- *      (dir->dir_recno = cl2rec(dir->dir_clust,dmd), \
+ *      (dir->dir_recno = realcl2rec(dir->dir_clust,dmd), \
  *      (dir->dir_recoffs = 0), \
  *      dir2dir(dir))
  */
@@ -285,12 +291,11 @@ DIR *dir;
  */
 
 long
-_dirnext(dir,dm)
+_dirnext(dir,dmd)
 DIR *dir;
 DMD *dmd;
 {
     uint xcl, curcl;
-    long err;
 
     /* you only call this if you fell off the end of this record */
 	"print -n (DMD) ; dmd lpeek(a6 + c);_c");
@@ -318,15 +323,13 @@ DMD *dmd;
 	 */
 
 	if (((dir->dir_recno - dmd->m_recdata) & dmd->m_clrm) == 0) {
-	    dir->dir_recno = cl2rec(dir->dir_curcl,dmd);
+	    /* fell off the end of this cluster: update curcl, recno */
 	    xcl = getcl(dir->dir_curcl,dmd);
 	    if (xcl == 0xffff) return EFILNF;
 	    if (!xcl || ((xcl & 0xfff0) == 0xfff0)) {
 		/* FAT error */
 		return ERROR;
-    if (err = xgetrec(dir->dir_dev,dir->dir_recno,
-		    &(dir->dir_bcb),&(dir->dir_fcb)))
-	return err;
+	    }
 	/* (else recno is fine; it's the next rec of this clust) */
     }
 
@@ -358,16 +361,14 @@ DIR *dir;
     if (!(cl = nextcl(dir->dir_curcl,dmd,TRUE,NULL))) return ERROR;
 
     /* Have to extend the directory. Allocate a new cluster. */
-    rec = cl2rec(cl,dmd);
+    /* Return ERROR on disk full. */
     if (!(cl = nextcl(dir->dir_curcl,dmd,TRUE))) {
 	DBCMD(0x20,"print dirslot can not extend dir;_c");
 	return ERROR;
     }
-	if (err = xgetrec(dir->dir_dev,rec+i,&bcb,&fcb)) {
-	    /* error getting newly-allocated sector */
-	    /* should probably clfix(cl,0) and clfix(dir->dir_curcl,-1) */
-	    return err;
-	}
+
+	/* and clfix(dir->dir_curcl,-1) */
+	fcb = getrec(rec+i,dmd,0,&bcb);
     /* zero out that cluster */
 	bcb->b_dirty = 1;
 

@@ -1,12 +1,15 @@
 /*
 ***************************     TIME.C     ******************************
 *
-* $Revision: 2.5 $	$Source: e:/tos/gd2\RCS\time.c,v $
+* $Revision: 2.6 $	$Source: e:/tos/gd2\RCS\time.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: time.c,v $
+* Revision 2.6  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.5  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -76,7 +79,7 @@ xgettime()
  */
 long
 xsettime(t)
-int t;
+uint t;
 {
 	if ((t & 0x001F) >= 30)
 		return(ERROR);

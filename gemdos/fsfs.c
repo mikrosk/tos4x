@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.9  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.8  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -56,7 +59,7 @@ DIR *dir;
 long
 ixcreat(name,attr,dir)
 char *name;
-char attr;
+int attr;
 DIR *dir;
 {
     char *namepart;
@@ -72,7 +75,7 @@ DIR *dir;
     namepart = name;
     err = fn2dir(&namepart,dir,FN_NORM);
 
-    /* Anything but EFILNF fails now */
+    /* Any error but EFILNF fails now */
     if (err && err != EFILNF) return err;
 
     /*
@@ -183,12 +186,12 @@ int mod;
     /* get an OFD first, because we know we'll need one */
     /* and failure should get us out of here NOW. */
 
-    if ((ofd = newofd()) == NULL) return ENHNDL;
+    if ((ofd = MGET(OFD)) == NULL) return ENHNDL;
 
     if ((dfd = getdfd(dir)) == NULL) {
 	/* no DFD for this file already; get a new one, fill it in */
-	if ((dfd = newdfd()) == NULL) {
-	    freeofd(ofd);
+	if ((dfd = MGET(DFD)) == NULL) {
+	    MFREE(ofd);
 	    return ENHNDL;
 	}
 
@@ -218,7 +221,6 @@ int mod;
     ofd->o_mode = mod;
     ofd->o_curcl = 0;	/* flag meaning r/w clust info uninitialized */
     ofd->o_currec = 0;
-    ofd->o_curbyt = 0;
     ofd->o_bytnum = 0;
 
     ofd->o_use = 1;
@@ -251,21 +253,25 @@ char attr;			/* attribute byte */
     char oattr;
     DIR dir;
     long err;
+    DFD *dfd;
 
     /* Will match anything but a label; return any error */
     if (err = fn2dir(&p,&dir,FN_NORM)) return err;
 
     oattr = dir.dir_fcb->f_attrib;
-    if (wrt) {
-	/* can't change FA_SUBDIR bit, or label bit of dir */
-	if (((attr & FA_SUBDIR) ^ (oattr & FA_SUBDIR)) ||
-	    ((attr & FA_LABEL) && (oattr & FA_LABEL)))
-		return EACCDN;
-	dir.dir_fcb->f_attrib = attr;
-	dirdirty(dir);
-	return (unsigned long)attr;
-    }
-    else return (unsigned long)oattr;
+    if (!wrt) return (ulong)oattr;	/* reading */
+
+    /* can't change FA_SUBDIR bit, or label bit of dir */
+    if (((attr & FA_SUBDIR) ^ (oattr & FA_SUBDIR)) ||
+	((attr & FA_LABEL) && (oattr & FA_SUBDIR)))
+	    return EACCDN;
+
+    if (dfd = getdfd(&dir)) dfd->dfd_attrib = attr;
+
+    dir.dir_fcb->f_attrib = attr;
+    dirdirty(dir);
+
+    return (unsigned long)attr;
 }
 
 
@@ -485,6 +491,7 @@ DIR *dir;
     }
     newcl = TRUE;			/* AKP: set this just in case */
 
+    fatdirty(dir->dir_dev);
     return E_OK;
 }
 
@@ -520,7 +527,7 @@ char *p2;			/* new name */
     attr = fcbhold.f_attrib;
     if (attr & FA_RO) return EACCDN;
 
-    /* try to find the dir of the new file; return any error but EFILNF */
+    /* try to find the new file; return any error but EFILNF */
     if ((err = fn2dir(&p2,&dir2,FN_NORM)) && err != EFILNF) return err;
 
     /* if there was NO error in the fn2dir above, the dest file exists! */
@@ -556,7 +563,7 @@ char *p2;			/* new name */
 	    /* construct a dir struct for the second slot of the dir */
 	    cl = fcbhold.f_clust;
 	    swp68(cl);
-	    dir1.dir_recno = cl2rec(cl,&drvtbl[dir1.dir_dev]);
+	    dir1.dir_recno = realcl2rec(cl,&drvtbl[dir1.dir_dev]);
 	    dir1.dir_recoffs = sizeof(FCB);
 
 	    /* "freshen" our constructed struct, change strtcl */
@@ -581,11 +588,12 @@ int h;
 int flg;
 {
     OFD *ofd;
-    int curnum,curflg;
-    int clnum;
-    int clx;
-    int i;
-    DMD *dm;
+    uint new;
+    uint old;
+    uint clcount;
+    uint rec;
+    DMD *dmd;
+    uint curcl;
 
     if ((h = syshnd(h)) < 0) return EIHNDL;
     ofd = sft[h].f_ofd;
@@ -601,53 +609,33 @@ int flg;
     if (n > ofd->o_dfd->dfd_fileln || n < 0)
 	return(ERANGE);
 
-    dm = &drvtbl[ofd->o_dfd->dfd_dev];
-    if (!n) {
-	clx = 0;
-	ofd->o_curbyt = 0;
-	goto fillin;
-    }
+    dmd = &drvtbl[ofd->o_dfd->dfd_dev];
 
-    /* do we need to start from the beginning ? */
-
-    curflg = (!ofd->o_curbyt) || (ofd->o_curbyt == dm->m_clsizb);
-    clnum = divmod(&ofd->o_curbyt,n,dm->m_clblog);
-
-    if (ofd->o_curcl && (n >= ofd->o_bytnum)) {
-	curnum = ofd->o_bytnum >> dm->m_clblog;
-	clnum -= curnum;
-	clnum += curflg;
-	clx = ofd->o_curcl;
-    }
+    /* set OFD r/w pointer fields to the right values */
+    if (!n) ofd->o_curcl = 0;
     else {
-      clx = ofd->o_dfd->dfd_strtcl;
-      swp68(clx);
-    }
-
-    /* stop looking (and leave file pointer alone) if you encounter a */
-    /* cluster value of zero or $FFFx.  One is also invalid. */
-    /* Something like this was put here, then backed out, before. */
-    /* Don't know why it was backed out... */
-
-    newcl = TRUE;			/* AKP: new loop of cluster calls */
-    for (i=1; i < clnum; i++) {
-	if (!(clx = getcl(clx,dm)) || ((clx & 0xfff0) == 0xfff0)) {
-	    newcl = TRUE;		/* AKP: set this just in case */
-	    return(ERROR);
+	new = n >> dmd->m_clblog;
+	old = ofd->o_bytnum >> dmd->m_clblog;
+	if (new < old) {
+	    curcl = ofd->o_dfd->dfd_strtcl;
+	    clcount = new;
 	}
+	else {
+	    /* (new >= old) */
+	    curcl = ofd->o_curcl;
+	    clcount = (old-new);
+	}
+	while (clcount--) {
+	    if (!(curcl = getcl(curcl,dmd))) return ERROR;
+	}
+
+	/* set rec to the record offset in this clust */
+	rec = (n & (dmd->m_clsizb-1)) >> dmd->m_rblog;
+
+	ofd->o_curcl = curcl;
+	ofd->o_currec = cl2rec(curcl,dmd) + rec;
     }
 
-    /* go one more except on cluster boundary */
-
-    if (ofd->o_curbyt && clnum)
-	clx = getcl(clx,dm);
-
-    newcl = TRUE;			/* AKP: set this just in case */
-
-fillin:
-    ofd->o_curcl = clx;
-    ofd->o_currec = cl2rec(clx,dm);
     ofd->o_bytnum = n;
-
     return(n);
 }

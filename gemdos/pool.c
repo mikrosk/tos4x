@@ -1,12 +1,15 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.10 $	$Source: e:/tos/gd2\RCS\pool.c,v $
+* $Revision: 2.11 $	$Source: e:/tos/gd2\RCS\pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
+* Revision 2.11  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.10  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -77,7 +80,7 @@ struct block *blockhead;	/* head of list of blocks in the system */
 
 char osmem[LENOSM];
 
-void
+voidfn
 poolinit()
 {
     Debug("print Enter xminit");
@@ -126,8 +129,6 @@ long size;
  * Failing that, look for new pool.
  *
  * Then try to compact the little block storage.
- *
- * Finally, call freleaf, and panic if that fails.
  *
  ***********************************************************************/
 
@@ -180,14 +181,7 @@ void
     }
     Debug("print not enough to try compact");
 
-    /* can't compact little blocks... Have to free a big one */
-    
-    Debug("print Last resort: call freleaf");
-
-    if (ptmp = (char *)freleaf()) {
-	ptr = (struct block *)(ptmp-HEADSIZE);
-	goto gotone;
-    }
+    /* can't compact little blocks... */
     
     /* panic with a message like "out of ospool, use FOLDR100" */
 abort:
@@ -206,7 +200,7 @@ gotone:
     for (ptmp = (char *)(&(ptr->b_data)); ptmp < (char *)(ptr+1); ptmp += 4)
     	*(long *)ptmp = 0L;
 
-    return (DND *)(&ptr->b_data);
+    return (void *)(&ptr->b_data);
 }
 
 /************************************************************************
@@ -326,12 +320,6 @@ MD
     /* there was no more pool */
     
     Debug("print newpool struck out");
-    if (ptmp = (char *)freleaf()) {
-	Debug("print -n Freleaf worked!");
-	ptr = (struct block *)(ptmp-HEADSIZE);
-	goto cutit;
-    }
-
     /* we struck out */
 
     return 0;

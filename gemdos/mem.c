@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\RCS\mem.c,v $
+* $Revision: 2.12 $	$Source: e:/tos/gd2\RCS\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.12  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.11  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -104,7 +107,7 @@ REG MD *p;
 REG long s;
 REG long adjust;
 
-    getmpb(&pmd);
+    (void)getmpb(&pmd);
 
     /* 
      * Make sure that each free block we got back 

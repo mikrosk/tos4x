@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.9  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.8  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -64,7 +67,7 @@ char *p;
     if (*(p+1) == ':') {
 	/* drive spec */
 	drv = uc(*p) - 'A';
-	if (drv < 0 || drv >= MAXDEVS) return EACCDN;
+	if (drv < 0 || drv >= MAXDEVS) return EDRIVE;
 	p += 2;
     }
     if (!*p) return E_OK;	/* Dsetpath("") or "c:" is a no-op */
@@ -113,7 +116,7 @@ uint drv;
     if (drv == 0) drv = run->p_curdrv;
     else {
 	drv--;
-	if (drv >= MAXDEVS) return EBADRQ;
+	if (drv >= MAXDEVS) return EDRIVE;
     }
 
     if (ckdrv(drv)) return EPTHNF;
@@ -197,7 +200,11 @@ DMD *dmd;
 	 count && *src != ' ';
 	 *buf++ = *src++, --len, --count) /* empty */;
 
-    if (!len) return (*buf = 0);    /* null-terminate & return 0 */
+    if (!len) {
+	/* null-terminate & return -- buffer too small */
+	*buf = 0;
+	return 0;
+    }
 
     if (*buf != ' ') *buf++ = '.', --len;
 
@@ -221,7 +228,6 @@ char *s;
     uint cl;
     uint rec;
     DMD *dmd;
-    BCB *bcb;
     FCB *fcb;
     FCB fcbhold;
     static char dotdotstr[12] = "..         ";
@@ -256,7 +262,7 @@ char *s;
     newcl = TRUE;
     rec = cl2rec(cl,dmd);
 
-    if (err = xgetrec(dir.dir_dev,rec,&bcb,&fcb)) return err;
+    fcb = getrec(rec,dmd,1,NULL);
 
     /* make 'dot' entry */
     xmovs(11,dotdotstr,fcb->f_name);
@@ -280,13 +286,11 @@ char *s;
     /* zero out the rest of the record */
     fcb++;
     clear(fcb,((char *)fcb)+dmd->m_recsiz);
-    bcb->b_dirty = 1;
 
     /* zero out the rest of the cluster */
     for (i=dmd->m_clsiz-1; i; --i) {
-	xgetrec(dir.dir_dev,rec+i,&bcb,&fcb);
+	fcb = getrec(rec+i,dmd,1,NULL);
 	clear(fcb,((char *)fcb)+dmd->m_recsiz);
-	bcb->b_dirty = 1;
     }
 
     /* code stolen from ixcreate; at this point we know what dir */
@@ -321,6 +325,7 @@ char *s;
     /* set the starting-cluster field of the entry */
     fcb->f_clust = cl;
 
+    fatdirty(dir.dir_dev);
     dirdirty(&dir);
     return E_OK;
 }
@@ -470,6 +475,8 @@ xsnext() /*+ search next, return into dta */
     dta = run->p_xdta;
 
     /* fill FCB with search info from DTA */
+
+    if (ckdrv(dta->dta_dev)) return EDRIVE;
 
     xmovs(11,dta->dta_sname,fcb.f_name);
 

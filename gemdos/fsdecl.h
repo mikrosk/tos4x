@@ -1,12 +1,15 @@
 /*
 ***************************    FSDECL.H    ******************************
 *
-* $Revision: 2.6 $	$Source: e:/tos/gd2\RCS\fsdecl.h,v $
+* $Revision: 2.7 $	$Source: e:/tos/gd2\RCS\fsdecl.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdecl.h,v $
+* Revision 2.7  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.6  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -36,6 +39,7 @@ extern long negone;
 extern unsigned int time;
 extern unsigned int date;
 extern BCB *bufl[];
+extern uint bootdev;
 extern long errbuf[3];
 extern FTAB sft[];
 extern char diruse[];

@@ -4,22 +4,32 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/04/30 18:39:36 $
+* $Date: 90/05/02 16:29:03 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.19  90/05/02  16:29:03  apratt
+* Fixed rsconf so when changing rsmode (flow-control mode): if txoff,
+* causes a bsr to sender (to wake up the transmission if anything's
+* buffered), and if rxoff, causes XON or raising RTS.  This didn't work
+* before.
+*
+* Changed sender and scc_sender to allow sending the byte at sendnow even
+* if txoff is set, so you can tell the host to XOFF even if he has told
+* you to XOFF.
+*
 * Revision 2.18  90/04/30  18:39:36  apratt
 * Changed some things in MFP serial port code.  Made kickstart, rsconf
 * more common to the two MFP's.
-*
+* 
 * When changing rsmode, always clears xoff state and sends XON 
 * or raises CTS if necessary.
-*
+* 
 * Also fixed rsconf for SCC ports, bits-per-word emulation was wrong.
-*
+* 
 * Revision 2.17  90/03/20  13:33:54  apratt
 * Bug in Bconmap causes it to fail to detect devno values which are
 * out of range (higher than maptabsize+6), fixed.
@@ -203,7 +213,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.18 $
+* $Revision: 2.19 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2305,16 +2315,19 @@ txecommon:
 *	Register Usage:
 *		d0, d1, and a1 destroyed
 *
+*	Externals:
 *		getbyte
+*
+* 2/18/87	works properly with getbyte modification
+* 5/01/90 akp	sends XOFF (via sendnow) even if txoff.
+
+sender:
+	move.l	a0,-(sp)
+	move.b	sendnow(a0),d0
 	beq	sendbuf
 	clr.b	sendnow(a0)
 	bra	sendwt
 
-	move.b	sendnow(a0),d0	* IF (Xon/Xoff Requested)
-	beq	sendbuf
-	clr.b	sendnow(a0)	* THEN Clear Flag & Send It Now!
-	bra	sendwt
-sendbuf:
 sendbuf:
 	move.b	rsmode(a0),d0
 	and.b	txoff(a0),d0
@@ -2326,6 +2339,7 @@ sendbuf:
 	beq	sendone		* IF (Buffer NOT Empty) THEN
 	bsr	getbyte		* Get Byte from Output Buffer
 
+sendwt:	tst.b	tsr(a2)		* WHILE (Xmit Buffer Full) DO Wait
 	bpl	sendwt
 	move.b	tsr(a2),tsrbyte	* Save Transmitter Status
 	move.b	d0,udr(a2)	* Put to MFP
@@ -2600,13 +2614,13 @@ devtab:
 
 .endc
 rsconf:
-	lea.l	mfp,a1
+	move.l	maprsconf.w,a0
 	jmp	(a0)
 
 auxrsconf:
 	lea.l	ribufptr.w,a0
 	lea.l	mfp,a2
-* EXPECTS: a0=iorec, a1=mfp.
+*	bra	rscommon	* FALL THROUGH
 
 *
 * rscommon: common rsconf entry point for STMFP and TTMFP.
@@ -2624,7 +2638,7 @@ rscommon:
 
 auxnorm:
 	ori.w	#$700,sr	;no interrupts for now (restored at rte)
-	movep.l	ucr(a1),d7
+
 *
 *	first, we grab the old ucr,rsr,tsr,scr contents
 *
@@ -2648,17 +2662,25 @@ auxnorm:
 	move.w	$6(sp),d0
 	cmp.w	#3,d0
 	bhi	auxc1		; if d0 unsigned greater than 3 then no-op.
-* changing rsmode clears txoff (makes it OK to send) and rxoff
-* (means sending XON or raising RTS if necessary).
-* (new as of 4/4/90)
+	bne	auxc0		; if d0 not equal to 3 then set mode to d0.
+	moveq.l	#1,d0		; else it's three, so set XON/XOFF as before.
+auxc0:	cmp.b	rsmode(a0),d0	; is this a change?
+	beq	auxc1		; no.
+
+* Changing rsmode (at all!) clears txoff (makes it OK to send) 
 * and rxoff (means sending XON or raising RTS if necessary).
-	clr.b	txoff(a0)
+* (new as of 5/90)
+* 
+* NOTE: this is done at IPL 7, so we shouldn't be getting race conditions
+* like characters received before we write rsmode's new value.
+
+	move.w	d0,-(sp)	; save new mode while checking
+
 	tst.b	txoff(a0)	; stopped sending?
-	beq	auxc0a		; no.
-	move.l	a1,a2		; aux_rxok expects MFP base in a2
+	beq	auxc0a
 	clr.b	txoff(a0)	; start sending
-auxc0a:
-	move.b	d0,rsmode(a0)
+	bsr	sender
+	move.w	(sp)+,rsmode(a0) ; get new mode off stack & write it
 	beq	auxc0b		; no.
 	bsr	aux_rxok
 auxc0b:
@@ -2668,40 +2690,38 @@ auxc0b:
 *	set timer baud rate
 
 auxc1:
-	bclr.b	#0,rsr(a1)	;disable the receiver
-	bclr.b	#0,tsr(a1)	;disable the transmitter
+	tst.w	$4(sp)		;if -1 then don't change
+	bmi.b	auxc2
 *
 *	next, we disable the receiver and transmitter enable bits
 	move.w	d1,brate(a0)	;shadow baud rate value now
-	lea	baudctrl,a2	;point to baudrate control register settings
-	move.b	0(a2,d1.w),d0	;get control mask
-	lea	bauddata,a2	;point to baudrate data register settings
-	move.b	0(a2,d1.w),d2	;get data reg value
+	bclr.b	#0,rsr(a2)	;disable the receiver
+	bclr.b	#0,tsr(a2)	;disable the transmitter
 
-	and.b	#%01110000,tcdcr(a1)	; stop the timer
-	move.b	d2,tddr(a1)
-	or.b	d0,tcdcr(a1)		; start the timer with the new rate
+	move.w	$4(sp),d1
+	move.b	d1,brate(a0)	;shadow baud rate value now
+	move.b	baudctrl(PC,d1.w),d0
 	move.b	bauddata(PC,d1.w),d2
 
 	and.b	#%01110000,tcdcr(a2)	; stop the timer
 	move.b	d2,tddr(a2)
-	bset.b	#0,rsr(a1)	;enable the receiver
-	bset.b	#0,tsr(a1)	;enable the transmitter
+	or.b	d0,tcdcr(a2)		; start the timer with the new rate
+
 *
 *	finally we re-enable the receiver and transmitter enable bits
 *
 	bset.b	#0,rsr(a2)	;enable the receiver
 	bset.b	#0,tsr(a2)	;enable the transmitter
-	move.b	$9(sp),ucr(a1)
+
 *	set rs-232 registers
 
-	move.b	$b(sp),rsr(a1)
+auxc2:	tst.w	$8(sp)		;if -1 then don't change
 	bmi.b	auxc3
 	move.b	$9(sp),ucr(a2)
-	move.b	$d(sp),tsr(a1)
+auxc3:	tst.w	$a(sp)		;if -1 then don't change
 	bmi.b	auxc4
 	move.b	$b(sp),rsr(a2)
-	move.b	$f(sp),scr(a1)
+auxc4:	tst.w	$c(sp)		;if -1 then don't change
 	bmi.b	auxc5
 	move.b	$d(sp),tsr(a2)
 auxc5:	tst.w	$e(sp)		;if -1 then don't change
@@ -3093,7 +3113,7 @@ tttxerror:
 	bra	txecommon
 
 *************************************************************************
-	lea	ttmfp,a1
+
 	.globl	ttrsconf
 
 ttrsconf:
@@ -3468,6 +3488,9 @@ rxdone:
 * or the next one from the buffer) out to the port.  This is called
 * when the tx interrupt *might* already have come in and been cleared.
 *
+* If txoff and rsmode are set, this returns: tx while txoff is a nono!
+* If device's tx buf not empty, returns (let the int level send it!).
+* If sendnow is zero and obuffer is empty, returns.
 * Else writes the char to the tx buf and returns.
 *
 * Addendum: if sendnow != 0, sends even if txoff flag is set, so you 
@@ -3476,9 +3499,14 @@ rxdone:
 * Fix: check the hardware state of CTS.
 *
 * The txoff software flag is not actually checked if your flow mode is
+* rts/cts.  It's still set & cleared by the cts interrupt handler, though.
+*
+
 	move.b	rsmode(a0),d0
 	and.b	txoff(a0),d0
 	bne	scc_nodata	; abort if txoff and rsmode set
+scc_sender:
+	beq	scc_notesttxoff	; no - don't test the txoff flag at all
 	SCCr	#0,d0		; yes - get status register
 	btst	#5,d0		; test CTS bit
 	beq	scc_nodata	; it's low - don't send.
@@ -3494,10 +3522,10 @@ scc_notesttxoff:
 	bra	scc_gotc
 scc_getc:
 	LOG	"sbuf"
-	sub.w	#(chaobufptr-chaibufptr),a0
 	add.w	#(chaobufptr-chaibufptr),a0	; advance to output iorec
 	move.w	bufhead(a0),d0
 	beq	scc_nodata	; abort if output buffer empty
+	bsr	getbyte		; else get byte (to d0)
 scc_gotc:
 	SCCw	#8,d0		; write the char to xmit it
 scc_nodata:
@@ -3724,7 +3752,8 @@ rsnorm:	or.w	#$700,sr	; no ints doing this (restore at RTE)
 	move.b	ucr_shadow(a0),d7
 	asl.w	#8,d7
 	swap	d7
-* d7.l is now our return value
+	move.b	wr5(a0),d7
+	lsr.b	#1,d7		; shift bit 4 into bit 3
 	and.b	#%00000100,d7	; clear other bits - they are don't-cares
 	asl.w	#8,d7		; shift to high byte of d7.w
 
@@ -3735,11 +3764,18 @@ rsnorm:	or.w	#$700,sr	; no ints doing this (restore at RTE)
 	cmp.w	#3,d0
 	bhi	rs1		; unsigned >3 is no-op
 	bne	rs0		; != 3 means set to this mode
-	clr.b	txoff(a0)
+	moveq	#1,d0		; else set xon/xoff
+rs0:
+	cmp.b	rsmode(a0),d0	; any change?
+	beq	rs1		; no
+
+	tst.b	txoff(a0)	; was tx stopped?
 	beq	rs0a
-	beq	rs0a
+	clr.b	txoff(a0)	; yes - clear flag...
+	bsr	scc_sender	; ...and really start sending
 
 rs0a:
+	tst.b	rxoff(a0)
 	beq	rs0b
 	move.w	d0,-(sp)
 	bsr	scc_rxok	; raise RTS, or send XON to allow sending

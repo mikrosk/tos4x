@@ -32,6 +32,18 @@
 * that is dummies.  mt_top is the actual end of the memory region, and thus
 * the end of the region to print dashes for.
 *
+* The test prints a dash for every block that passes, up to 32 dashes;
+* if you have more that 32*128K in your system you still get 32 dashes
+* and they come out slower.
+*
+
+*
+* configuration section: 
+* Set test to 1 if you want something you can run as a PRG.
+*
+
+test		equ	0
+
 
 * exports
 	.globl	mem_test_next
@@ -42,8 +54,6 @@
 	.globl	_ramtop
 	.globl	_memtop
 	.globl	_membot
-
-test	equ	0
 
 .if test
 
@@ -150,6 +160,13 @@ m1nodot:
 	bne	m1done
 
 * done with state 1; print the actual number of KB in ST RAM
+* but first back up by nine spaces (so this msg overlaps the dashes)
+
+	move.l	d7,-(sp)
+	moveq.l	#8,d7
+m1bs:	putchar	#8
+	dbra	d7,m1bs
+	move.l	(sp)+,d7
 
 	putchar	#' '
 	move.l	phystop,d0
@@ -216,7 +233,14 @@ m3nodot:
 	cmp.l	mt_end,d0
 	bne	m3done
 
-* end of state 3; print actual number of KB of TT RAM.
+* end of state 3; print actual number of KB of TT RAM
+* but back up by nine spaces first so number of KB overlaps dashes
+
+	move.l	d7,-(sp)
+	moveq.l	#8,d7
+m3bs:	putchar	#8
+	dbra	d7,m3bs
+	move.l	(sp)+,d7
 
 	putchar	#' '
 	move.l	_ramtop,d0
@@ -274,31 +298,31 @@ i128:	move.l	#(128*1024),mt_interval	; interval is 128K
 					; which is number of blocks
 
 gotnblocks:
+	move.l	d7,-(sp)		; save register
 	move.l	mt_interval,mt_countdown	; init countdown
+	move.l	d2,d7
 	move.l	d2,-(sp)		; save d2 for later
 blloop:
-	move.l	d2,-(sp)		; loop, emitting spaces
 	putchar	#' '			; until d2 expires
-	move.l	(sp)+,d2
-	subq.l	#1,d2
+	subq.l	#1,d7
 	bne	blloop
-	move.l	(sp)+,d2		; get d2 back
+	move.l	(sp)+,d7		; get original d2 back into d7
 
-bsloop:	move.l	d2,-(sp)		; emit backspaces
-	putchar	#8			; until d2 expires
-	move.l	(sp)+,d2
-	subq.l	#1,d2
+bsloop:	putchar	#8			; until d2 expires
+	subq.l	#1,d7
 	bne	bsloop
-
+	move.l	(sp)+,d7		; restore d7
 	clr.l	d0			; return EQ when not done
 	rts
 
-mtestmsg:	dc.b	      "Memory Test: ST RAM: ",27,"p",0
+mtestmsg:	dc.b	"Memory Test:",13,10
+		dc.b	"ST RAM ",27,"p",0
 
-mttmsg:		dc.b	13,10,"             TT RAM: ",27,"p",0
+mttmsg:		dc.b	13,10,"TT RAM ",27,"p",0
 mdonemsg:	dc.b	13,10,"Memory Test Complete.",13,10,0
+
 mkbmsg:		dc.b	" KB",27,"q",27,"K",0
-mabrtmsg:	dc.b	13,10,"Memory Test Aborted.",13,10,0
+mabrtmsg:	dc.b	13,10,"Memory Test Aborted.",27,"q",13,10,0
 
 .even
 

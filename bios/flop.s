@@ -4,16 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/11/30 11:14:27 $
+* $Date: 90/02/22 17:50:49 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.9  90/02/22  17:50:49  apratt
+* Worked around a MAS PC-relative bug, and added "and.w #3,d0" to
+* mask off the unwanted bits in denselect before using it.
+*
 * Revision 2.8  89/11/30  11:14:27  apratt
 * Removed a little hi-density debugging code I inadvertently left in.
-*
+* 
 * Revision 2.7  89/11/27  14:48:57  apratt
 * Added support for 1.44MB floppies ifne HI_DEN.  HI_DEN is
 * set to the same value as the TT flag, for now.
@@ -93,7 +97,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.8 $
+* $Revision: 2.9 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1176,9 +1180,10 @@ hseek1:	move.w	#e_seek,curr_err	; possible error = "seek error"
 
 	move.w	#datareg,(a6)		; seek out to track five
 	move.w	denselect,d0		; set the other density
-	eor.w	#3,d0
-	move.w	d0,denselect
-	move.w	d0,ddenflags(a1)
+	and.w	#3,d0			; mask of unused bits
+* a seek with no verify can't fail! Why do we bother to check?
+* have failed and we wouldn't know.
+	move.w	d0,ddenflags(a1)	; to control register and to dsb
 	move.w	#5,dcurtrack(a1)	; set current track#
 	bne	go2trr			; really failed! (den changed twice)
 *+
@@ -1233,7 +1238,8 @@ go2ok:
 
 	move.w	ctrack.w,dcurtrack(a1)	; update current track number
 	clr.w	d7			; return EQ for no error
-	move.b	rtmap(PC,d0.w),d0	; remap the rate
+go2trr:	rts				; return EQ/NE on succes/failure
+
 
 .endc
 	or.b	d0,d6

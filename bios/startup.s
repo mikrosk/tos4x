@@ -4,19 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/05 15:28:11 $
+* $Date: 91/08/15 15:31:41 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.74  91/08/15  15:31:41  apratt
+* Moved STPAD power-control initialization; it was in the wrong place.
+* Documented the _MCH cookie better and set it for STe/AT (see _MCH).  Added
+* "cart1" processing for STPAD; see cartscan.  Changed memory test and HD
+* delay completely; search for "spaghetti" for details.  Explained dmaboot
+* device-number sequence (see dmarfail).
+*
+* device-number sequence (see dmarfail).
+* 
+* 
 * Revision 2.73  91/08/05  15:28:11  apratt
 * Added a bad hack for STPAD: fifteen ms after enabling interrupts,
 * we clobber kbshift.  This way if you reset with ctl-alt-delete,
-* the dmaboot code won't see the alt key still down.  Don't know how
-* well this works yet.
-*
 * the dmaboot code won't see the alt key still down.  Don't know how
 * well this works yet.
 * 
@@ -138,7 +145,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.73 $
+* $Revision: 2.74 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -295,6 +302,7 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 
 .endc
 .endc
+	.globl	phystop
 .ifne TT
 .if TT
 .endc
@@ -1003,25 +1011,27 @@ vtend:	move.w	(a0)+,d0
 	move.b	#$c0,2(a0)
 	move.b	#$e,(a0)		; select port A
 	move.b	#7,2(a0)		; write %00000111
+
+
+* Used to clobber DMA sound here, but we don't know yet that we have it,
+* and we don't have RAM yet to catch the bus error.
+.endc
+* nuke the DMA sound.
+.endc
+.if systype == rom
+*+
+*  [ROM only]
 .ifne STPAD
 *  The hardware RESETs to 60hz.  Check a bit in the
 *  ROM configuration byte to see if we have to twiddle
 *  the hardware into 50hz mode.  According to JWT, you
 *  should not do this when in vblank, so we call 'noblank'
-* machines.
+*  which returns when it's sure we are NOT in a vblank.
+* again later when other machines' shiftmds are set.
  .else
-	moveq.l	#2,d1
-	move.b	d1,shiftmd
-	move.b	d1,sshiftmd
+	move.b	#2,shiftmd
 	move.b	#$80,$ffff827e		; write LCD and power control
-* end of STPAD
-.endc
-* else we're a TT
-.else
-	move.b	#$01,syncmode		; set external sync mode always
-* end of not TT/TT
-.endc
-* end of rom/ram
+	move.b	#$80,$889		; $889 is "shadow shadow"
 .endc
 .endif
 
@@ -1029,8 +1039,7 @@ vtend:	move.w	(a0)+,d0
 
 
 
-
-notpal:	lea	color0,a1		; a1 ->	hardware reg
+notpal:
 
 .if STPAD
 *
@@ -1515,6 +1524,15 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 	move.l	#_auxout,prv_aux.w
 
 * Initialize the cookie jar
+	move.w	#-1,_prtcnt.w		; initialize print-count
+	move.l	#_rts,swv_vec.w		; ignore monitor changes for now
+	clr.l	_drvbits.w		; clobber "drive-alive" bits
+*		00010000 	STe (.ifne STPLUS)
+*		    0001	STBOOK/STylus (.ifne STPAD)
+*		    0008	STe/AT (.ifne STPLUS and IDE bus exists)
+*		    0010	Mega STe (ifne STPLUS and SCU exists)
+*		00020000	TT (ifne TT)
+*
 .if systype == rom
 	bsr	copy_header		; kludge OS ROM header
 .endif
@@ -1533,7 +1551,7 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 *
 *	_MCH:
 *		00000000 or nonexistent is ST or Mega ST.
-	dc.w	$42c0		; move ccr,d0: illegal on 68000
+*		00010000 	STe (none of the below variants)
 *		    0001	STBOOK/STylus (.if STPAD)
 *		    0008	STe/AT (if IDE bus exists)
 *		    0010	Mega STe (if SCU exists)
@@ -1559,6 +1577,15 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 	clr.l	(a0)+			; ST machine
 .endc
 
+	moveq.l	#0,d1		; set cpu type == 68000
+* else decide what kind of STPLUS we are: STe, Mega STe, and STe-PLUS.
+	move.w	#$10,a2		; vector being used is now illegal-instruction
+.ifne STPAD
+	move.l	(a2),a3		; save old illegal instruction vector
+	move.l	a7,a1		; save ssp
+	move.l	#ill_1,(a2)	; game's over after first exception
+	move	ccr,d0		; illegal on 68000
+	moveq.l	#10,d1		; no exception; 68010 at least
 .ifne STPLUS
 	movec	d0,cacr		; (un-freeze data cache)
 	move.l	#$00010000+STPAD,(a0)+	; STE video w/stpad as minor rev
@@ -1569,13 +1596,25 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 	move.l	#$00010000+STPAD,d0	; load d0 for normal STe (plus STPAD)
 * STPAD is one kind of STPLUS -- if we're that kind, use those values,
 
-	move.l	#mste,$8
+	move.l	#"_VDO",(a0)+
 	move.l	#$00010001,(a0)+	; STe video w/minor 01 saying STPad.
 	move.l	#"_MCH",(a0)+
-mste:	move.l	a1,$8
+	move.l	#$00010001,(a0)+	; machine is STe w/minor 01
+.else
+.if SPARROW
+	move.l	#"_VDO",(a0)+
+	move.l	#$00030000,(a0)+	; Sparrow video
+	move.l	#"_MCH",(a0)+
+.else
+					; but leave the vector alone
+	beq	pickste
+	move.l	#"_VDO",(a0)+
+	clr.l	(a0)+
+	move.l	#"_MCH",(a0)+
 	clr.l	(a0)+
 	bra	cdone1
 
+.endc
 .endc
 
 .ifne TT
@@ -1982,6 +2021,9 @@ scuberr:
 
 	bsr	initmfp
 
+.ifne STPAD
+* Due to D. Getreu's code on the orginal release of the OS, the disable
+.endc
 * never got to the ikbd.  Therefore, the ikbd's mouse and joystick are ENABLED
 * to the reset default condition on powerup. For compatibility, we will not
 * disable the mouse and joystick on powerup.
@@ -2001,6 +2043,9 @@ scuberr:
 	move.w	#$0700,d0	; divide by 200, count 256 = 20ms
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
 	dbra	d1,ikbdlp1
+.ifne STPAD
+*
+*-
 .ifeq TT
 	bsr	cartscan		; execute cartridge aps
 .if STPAD
@@ -2013,8 +2058,8 @@ scuberr:
 *  If in medium resolution, make color 3 black (color 15 ==> color 3).
 *
 * This used to read the current rez out of the hardware & set the software
-.endif
-
+.endc
+.endc
 * a mono monitor, in which case we set high rez (read "ST LOW" at "TT HIGH"
 * when on a TT).
 .ifeq TT
@@ -2044,9 +2089,15 @@ setvb2:	move.l	#reseth,swv_vec.w	; RESET system on monitor change
 .else
 	moveq	#6,d1			; tt/mono: choose mode 6 (TT HIGH)
 .endif
+.ifne STPAD
+nomono:
+.endc
 .if (TT == 0)
 * on ST, you'd better not change mode during a vblank; what we do
 * is call noblank1, which returns when it's sure we are NOT in a vblank.
+.ifne STPAD
+
+.endc
 	bra	noblank			; wait until we're NOT in a vblank
 .ifne STPAD
 .endif
@@ -2599,11 +2650,6 @@ crcdone:
 .endif
 .ifeq systype-rom
 
-.else
-.globl mem_test_next
-.globl mem_abort
-mtl0:	bsr	mem_test_next		; test memory
-	beq	mtl0
 .endc
 	move.l	#$0808,d0
 	movec	d0,cacr
@@ -2718,6 +2764,9 @@ st_3:	move.b	(a0)+,(a1)+		; copy a byte
 
 	pea	the_env			; our enviroment string
 	move.l	a0,-(sp)		; push addr of PSP
+.ifne STPAD
+	move.w	#4,-(sp)		; just-go
+.endc
 	move.l	hdv_boot,a0		; go through boot vector
 	trap	#1			; do it
 .ifeq systype-rom
@@ -2782,12 +2831,6 @@ dskb1:	rts				; return status
 
 .if systype == rom
 
-* Before doing anything, dmaboot waits until 90 seconds after 200Hz 
-* started ticking.  If you hit a key, it falls into the dmaboot code, and
-* writes "90 seconds" into 200Hz so a quick warm boot won't wait again. 
-* During the delay, dmaboot calls mem_test_next repeatedly to test memory. 
-* See memtest.s.
-*
 *+
 *  dmaboot - attempt to boot from a device on the DMA bus
 *    Passed:	nothing
@@ -2802,37 +2845,178 @@ dskb1:	rts				; return status
 *		to the SCSI DMA bus, and eight devices connected to the
 *		ACSI bus.  If a sector is read, and it is executable (word
 *		checksum is $1234), then it is executed.  The search stops
+*		with the first one which is executable.
+*
+*		This code has some strange timeouts: it waits until at
+*		least 10 sec after power-up before giving up on a device.
+*		It waits until at least 40 sec after power-up for the data
+*		once the device accepts the command.
+*
+*		The old code is included here as comments;  _dmaread is
+*		from Minna Lai (thanks!). _dmaread is also available as an
+*		XBIOS call ($2a).
+*
+*		The register set-up when jmp'ing to the root sector is
+*		deliberate and should not change.
+*
+*
+* new DMA BOOT code: use _dmaread (in another file) to scan devices 8-15,
+* then 0-7 (that is, SCSI, then ACSI). First device which has an executable
+* root sector stops the process; if it returns, we return (i.e. just jmp to
+* it).
+*
+* (For STPAD, scan 16-23, then 0-7: IDE, then ACSI.  Never mind that IDE
+* can only have units 0 and 1; the others will return "unknown device" so
+* fast you won't notice.)
+*
+* The register set-up when calling the root sector is as follows:
+*	d3.l: magic number $444d4172 ("DMAR")
+*	d7.b: ACSI device number in hi 3 bits, for ACSI devs
+*	d4.w: _dmaread device number
+*	d5.w: user-preference value from NVM or input or something
+*		(zero for now)
+* and some other (negative) number for retryable errors (like
+* media change and reset error, which some drives use to signal
+*
+* USER PREFERENCE:
+* 
+* The high 5 bits of SCU general-purpose register 1 (ttscu1) can be
+* set (e.g. by a bootable floppy or a program in either OS) 
+* to a value which will be used as the low byte of the "user preference"
+* word in d5.  If it's zero, then NVM is checked for validity.  If NVM is
+* valid, the first word of NVM is used as the user preference value;
+* otherwise, zero is used.
+* 
+* The SCU value is a "temporary" preference, lost on power-down.
+* Since it is cleared only on power-off, you can cold- or warm-boot to your
+* heart's content and never lose this "temporary" preference.
+* 
+
+*
+* Boy, there is some serious spaghetti code here. Here's the deal:
+*
+*     endtime = 80 seconds;
+*     if (now >= endtime) goto all_done;	    (skip everything)
+* 	    if (!memtest_done) goto done_with_mt_and_bar;
+* 	    else {
+* 		(memtest just finished)
+* 		set bar_interval to one or two seconds; (d5)
 * 		set next_bar_time to bar_interval;	(d6)
-NINETY_SECONDS	equ	200*90		; ninety seconds at 200Hz
+* 		draw an inverse-video line across the screen;
 * 		place the cursor on the last char of this line;
 * 		fall through to continuation of bar shrinking;
-	move.l	#NINETY_SECONDS,d7
-	cmp.l	_hz_200,d7		; Have we already been up >= 90 sec?
-	blo	dmab_todone		; yes -- boot this popsicle stand!
+* 	    }
+* 	}
+* 	(continuation of bar shrinking here; label nomt)
 * 	if (now >= next_bar_time) {
-* Memory test here.  The memory test is done in pieces, by repeatedly
-* calling mem_test_next until it returns NE in the ccr (and -1 in d0). This
-* is so it can be interrupted.  However, at this point it's so fast (read
-* "wimpy") I don't see the point in making it interruptable, so we just run
-* through it until it's done.
+.ifeq STPAD
+* This whole timeout business only applies if you are not STPAD.
+
+	move.w	#0,a5
+
+* 	    next_bar_time += bar_interval;
+* 	}
+* 
+* (done with mt and bar; label dmab_ns):
+* 
+* 	if (memtest_done && now > end_time) goto dmab_todone;
+*	if (STPAD and you hit a STylus button) {
+*		goto dmab_abort;
+*	}
+* 	if (you hit a key) {
+* 	    gobble the key;
+* dmab_abort:
+* 	    if (!memtest_done) {
+* 		call mem_abort;
+* 		goto "all done";
+*             }
+*             (else fall through to dmab_todone to erase the bar)
+*         }
+* 	(didn't hit a key, not timed out yet)
+*         goto main_loop;
+* 
+* dmab_todone:
+*         erase the bar: send CR plus clear-to-end-of-line
+* all_done:
+* 	all done
+* 
+	tst.w	sshiftmd		; test (shadow) resolution register
+* shrink the line (if it's time), and in any case you check the keyboard and
+* clean up if the guy hit a key.  Something subtle here is that the line will
+* shrink one dot per loop until it has shrunk down to its correct remaining
+* size, given that the memory test took nonzero time to run.
+*
+* In the STPAD TOS that went to Dusseldorf in 8/91, this didn't happen;
+* the memory test did but the timeout didn't.  I now realize that you
+* can have an external ACSI device on an STPAD or STBOOK, so of course
+* we still have to do this.
+*
 
 .globl	mem_test_next
 .globl	mem_abort
 
-dmab_mt:
-	bsr	mem_test_next		; test next block of memory
-	beq	dmab_mt
-*		goto dmab_abort;
-.ifne STPAD
-	move.l	d7,_hz_200		; write 90 sec to _hz_200 so we don't
-					; wait at all (but do it here so we
-					; do get the memory test)
-.endc
-*             (else fall through to dmab_todone to erase the bar)
+DMAB_RETRIES	equ	2		; try each device twice total
+EIGHTY_SECONDS	equ	200*80		; eighty seconds at 200Hz
+
+dmaboot:
+	move.l	#EIGHTY_SECONDS,d7
+	cmp.l	_hz_200,d7		; Have we already been up >= 80 sec?
+	blo	dmab_skip		; yes -- boot this popsicle stand!
+
+	move.w	#0,a5
+
 dmab_to:
+	cmpa.w	#0,a5		; a5 is a flag: TRUE when the memory test
+				; is done
+	bne	nomt
+	bsr	mem_test_next
+	move.w	d0,a5		; mt returns ne and (d0 != 0) when done
+	beq	dmab_ns		; eq: not done, so don't draw the bar
+
+* memory test just finished: draw the bar and watch it shrink.
+* go into reverse video
+	move.w	#27,-(sp)
+	move.l	#$00030002,-(sp)
+	trap	#$d
+	move.w	#'p',4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d
+
+	move.w	#27,4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d
+	move.w	#'w',4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d			; Set discard at end of line flag
+
+	move.l	#200,d5			; d5 is increment for reporting
+	move.w	#79,d4			; d4 is count of intervals -1
+	tst.b	sshiftmd		; test (shadow) resolution register
+	bne	dmab_80			; OK, you're in an 80-column rez
+
+	move.l	#400,d5			; lo rez: report every 2 seconds
+	move.l	#39,d4			; only 40 intervals total
+
+dmab_80:
+	move.l	d5,d6			; d6 is next time to report at
+	move.l	d4,d3			; remember this: we use it twice
+
+dmab_sp:
+	move.w	#' ',4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d
+	dbra	d4,dmab_sp
+
+* output CR to return to left edge
+	move.w	#13,4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d
+
+* output N-1 spaces; this puts the (invisible) cursor over the last spot.
 * A simple backspace after the Nth one doesn't work because you may or may
 * not be on an N-column display, where the cursor is ALREADY on the
 * Nth one.  Sigh.
+
 	subq.l	#1,d3
 
 	move.l	#$00010002,-(sp)
@@ -2843,15 +3027,58 @@ dmab_to:
 
 nomt:
 
-	move.l	d7,_hz_200		; you broke out: write 90 sec
 * if (mt_done && _hz_200 >= d6)
+*   output a backspace
+*   add 200 to d6
+
+	bra	dmab_skip		; and we're done
+	move.l  #$00030002,-(sp)
 	trap	#$d
+	move.w	#'K',4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d
+	move.w	#8,4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d
+	addq	#6,sp
+	add.l	d5,d6
+
+dmab_ns:
+
 * this is the end of the memory-test/shrinking bar sequence.  We check
+* this else is the end of the timeout code, which is gone if you are STPAD.
+* If you are STPAD you do get the memory test, and you can interrupt it.
+.else
+dmab_mt:
+	bsr	mem_test_next		; test next block of memory
+	bne	dmab_mtdone		; memory test done
+	move.l	#$00010002,-(sp)
+	trap	#$d
+	addq.l	#4,sp
+	tst.l	d0
+	beq	dmab_mt			; no key; loop.
+
+	move.l	#$00020002,-(sp)
+	trap	#$d			; Bconin(2) -- get the char.
+	addq.l	#4,sp
+
+	bsr	mem_abort		; aborted memory test
+
+dmab_mtdone:
+	move.l	#EIGHTY_SECONDS,_hz_200	; so we don't test RAM again
+.endc
+
+* to see if we're actually done (gasp!) and also for user interruption.
+
+* Begin scanning DMA devices for a bootable one.  The place in the
+* sequence where you start scanning varies from machine to machine,
+* and is described in dmarfail where the device number is updated.
+
 .ifne TT
 * Check the keyboard for a user aborting the timeout
 	moveq.l	#8,d4			; start with SCSI device 0
 .else
-.ifne STPAD
+.ifne STPLUS
 	moveq.l	#16,d4			; start with IDE device 0
 .else
 	moveq.l	#0,d4			; start with ACSI device 0
@@ -2913,12 +3140,28 @@ dmab_skip:
 * move boot preference into _upref: hi 5 bits of ttscu1, or
 * first word of NVM if valid, else zero.
 *
-* dma failed or sector isn't bootable ($1234) or didn't change hdv_rw:
+
+	move.b	ttscu1,d0
+	and.w	#$f8,d0
+	move.w	d0,_upref.w	; move ttscu1 to _upref, usually zero.
+	bne	gotpref
+*  ST: 		0-7		(ACSI only)
+
+	pea	_upref.w
+	clr.l	-(sp)
+	jsr	NVMaccess	; NVMaccess(op=0,start=0,count=2,buf=_upref)
+	add.w	#$a,sp
+	tst.w	d0
+	beq	gotpref
+* The sequencing is taken care of by adding one to the device number, then
+* aborting if it's 8, and setting it to zero if it ends in 8 or 0.  If the
+* TT ever gets an IDE bus this'll have to change.
+
 dmaloop:
 	move.w	#DMAB_RETRIES-1,d1	; retry count (usually 2 total)
 	addq.w	#1,d4			; read failed or no exec or no boot
 	move.w	d4,d0			; try next dev
-	and.w	#7,d0			; if d4 hasn't wrapped to 8 or $10...
+	and.w	#7,d0			; if d4 hasn't wrapped (modulo 8)...
 	bne	dmaloop			; carry on
 	cmp.w	#$8,d4			; at dev 8?
 	beq	dmafail			; yes, total failure
@@ -2954,9 +3197,21 @@ dmaloop:
 * The sequencing is taken care of using a table to turn the sequence number
 * into a device number.  A device number of $ff ends the table.  The
 * sequence counter is kept in the first word of "the_env" as scratch space.
+*
+
+dmarfail:
+	move.w	the_env,d4
 	addq.w	#1,d4
+	move.w	d4,the_env
+.ifne STPAD
+	bne	dmaloop			; yes, total failure
+
+dmafail:
+.endc
+
 .if TT
 boot_dev_tab:	dc.b	8,9,$a,$b,$c,$d,$e,$f,0,1,2,3,4,5,6,7,$ff
+.else
 .if SPARROW
 boot_dev_tab:	dc.b	$10,$11,8,9,$a,$b,$c,$d,$e,$f,$ff
 .else
@@ -4083,9 +4338,25 @@ dm3:	bsr	wvbl
 *mindex:
 *dc.w   100*160,  100*160,  200*80,   0, 240*320,  0, 480*160,   240*320
 
+mcount:
+dc.w    3,        1,        0,        0, 3,        0, 0,         7
+mwidth:
+dc.w    160,      160,      80,       0, 320,      0, 160,       320
+
+*+
+* _fastcpy - "fast" 512-byte copy
+* Synopsis:	fastcpy(src, dest)
+*
+*		Used by _rwabs to fake disk DMA to odd addresses.  Therefore,
 *		disk I/O on odd addresses is very slow.  Lose, lose.
-	.globl	_auto			; for debugging
-_auto:	lea	autopath(pc),a0		; -> path
+*
+*-
+_fastcpy:
+	move.l	4(sp),a0		; a0 -> src
+	move.l	8(sp),a1		; a1 -> dest
+	move.w	#63,d0			; d0 = move count (64*8 = 512)
+fast1:	move.b	(a0)+,(a1)+		; copy 8 bytes at a time
+
 *+
 * Go through hard-disk initialization vector
 *
@@ -4117,7 +4388,7 @@ autofile:	dc.b	'*.PRG',0
 * Note:		If _drvbits%%_bootdev is zero, _auto simply quits (since
 *		the device isn't active....)
 *
-	rts
+* Uses:		everything
 *
 
 * (i.e. doesn't exist).  Moved from inside _auto1 so we could

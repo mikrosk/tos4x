@@ -4,13 +4,18 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/15 14:12:08 $
+* $Date: 1991/10/21 19:03:30 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.35  1991/10/21  19:03:30  apratt
+* Fixed a comment: flopwr to sector 0 sets MC mode to "changed" not
+* "unsure."  It always has, but this was commented and documented
+* incorrectly for a long time.
+*
 * Revision 2.34  1991/10/15  14:12:08  apratt
 * Changed to probe for FDC every time you call, not just at boot time.
 * This is STPAD only, of course.  This way you can boot without a
@@ -111,7 +116,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.34 $
+* $Revision: 2.35 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $
@@ -578,7 +583,7 @@ _flopwr:
 	beq	noflop1			; no floppies!
 .endif
 
-* set the media change mode to "unsure".
+	bsr	change			; check for disk swap
 	moveq	#e_write,d0		; set default error number
 	bsr	wrfast
 	bsr	floplock		; lock floppies

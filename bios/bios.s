@@ -4,13 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/22 19:25:30 $
+* $Date: 1991/11/14 23:42:20 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.41  1991/11/14  23:42:20  apratt
+* Fixed two bugs reported from Germany.  First, the wrong argument was
+* pulled off the stack in the SCC Rsconf code, so you couldn't cause a
+* break as documented.  Second, the "wait 5ms using a trick" code in
+* ikbdwc had two problems, one of logic and one of implementation.
+* Now both work.
+*
 * Revision 2.40  1991/10/22  19:25:30  apratt
 * Added a moveq to pre-clear d0 in the Midi Bconin code.  Until now,
 * Bconin on MIDI always returned $FFFFFFxx.  Sadly this didn't make it
@@ -110,7 +117,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.40 $
+* $Revision: 2.41 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\bios.s,v $
@@ -1421,24 +1428,27 @@ ikbdwc:
 ikbdput:
 	lea	keyboard,a1	;point to ikbd register base
 ikput1:
-* wait 5ms using a trick: assume that Timer C is still programmed as
-* we set it up.  Read the Timer C countdown register, then wait for
-* a new read which is GREATER than that one.  That means (at least)
-* 5ms have gone by.  (If we initially get >190, keep trying, to avoid
-* fringe cases.)
+	move.b	comstat(a1),d2	;grab keyboard status
+	btst.l	#$1,d2
+	beq.b	ikput1		; not ready
 
-	lea	mfp,a0
-ikput2:	cmp.b	#190,tcdr(a0)	; while (tcdr >= 190)
-	bhs	ikput2		; ...loop
-	move.b	tcdr(a0),d0	; get that value
-ikput3:	cmp.b	tcdr(a0),d0	; while (tcdr <= d0)
-	bhs	ikput3		; ...loop
+.if (TT == 0)
+*
+* We used to wait 5ms using a trick.  There were two bugs in that trick,
+* one in design and one in implementation.  So here's a new trick.
+* 
+* Assume that Timer C is still set up the way we set it up: counting down
+* from $C0 every 5ms (200Hz).  To wait one tick, we read the countdown
+* register and wait for it to change.  To wait 5ms, we do this 192 times.
+* We might wait MORE than 5ms this way (if we miss some transitions) but
+* we'll never wait less.
+*
+	lea	mfp+tcdr,a0
 	move.w	#191,d0		; do this loop 192 times
 ikput2:	move.b	(a0),d2		; get a value
 ikput3:	cmp.b	(a0),d2		; changed?
 	beq	ikput3		; no - loop
 	dbra	d0,ikput2	; yes - load a new value and loop
-ikbdret:
 .else
 	move.w	#$0400,d0	; 256 * 20us = 5ms
 	bsr	ttwait
@@ -3853,10 +3863,18 @@ rsnoflip:
 rs2a:	bset	#1,d2
 rs2b:	and.b	#%00000011,d2
 	or.b	d2,d1		; d1 is now old d1 with bits 0,1 reversed.
+	or.b	#%01000000,d1	; OR in the x16 clock value
 	SCCw	#4,d1		; and write it to the chip
-* decode tsr: bit 3 means send break until you write a zero
+
 rs3:
-	move.w	$a(sp),d0
+
+*
+* decode rsr (no-op)
+*
+
+*
+* decode tsr: bit 3 means send break until you write a zero there.
+*
 * There was a bug here, where we used bit 3 of rsr, not tsr, to cause
 * or clear the break condition.  Just a question of getting the wrong
 * thing off the stack -- oops.

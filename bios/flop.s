@@ -3,17 +3,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/03/28 11:45:48 $
+* $Date: 88/04/04 15:39:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.4  88/04/04  15:39:24  apratt
+* Didn't do anything: don't know why it was locked.
+*
 * Revision 1.3  88/03/28  11:45:48  apratt
 * Added check-floppy-state Xbios call.  Can cause "insert other floppy"
 * message, so use this only when you would cause a swap anyway.
-*
+* 
 * Revision 1.2  88/03/25  11:49:50  apratt
 * This version has more index information per Intel controller spec
 * in the format-track code.  THIS IS UNTESTED AND MIGHT NOT WORK.
@@ -24,7 +27,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.3 $
+* $Revision: 1.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1158,7 +1161,7 @@ rate1:	move.w	dseekrt(a1),d0		; get the old rate
 	move.w	6(sp),d1		; get the desired rate
 	cmp.w	#-1,d1			; no change?
 
-flopwp:
+_flopwp:
 	sub.w	#$c,sp		; "push" 3 dummy longs
 	bsr	change		; get right disk in drive
 	beq	clrspinup

@@ -1,12 +1,17 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\sup.c,v $
+* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/29 14:21:06 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/31 17:28:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.16  1991/05/31  17:28:36  apratt
+* Fixed a bug in osif: the pw variable wasn't being forced
+* out of a register correctly.  Also, created ppw as a
+* register form of this variable, set after the setjmp.
+*
 * Revision 2.15  1991/05/29  14:21:06  apratt
 * Added &ni for Flock, for future reference.  Made NFUNCS a constant
 * derived from the size of the function-pointer array.
@@ -253,9 +258,11 @@ int *pw;
     long rc;
     BCB *bx;
     uint i;
+    int *ppw;
 
 restrt:
-    *(&fn) = *(&pw[0]);	/* take addr so these are not put in regs */
+    &fn, &pw;		/* take addr so these are not put in regs */
+    fn = pw[0];
 
     if (fn >= NFUNCS)
 	return(EINVFN);
@@ -284,27 +291,30 @@ restrt:
 	return rc;
     }
 
-    /* end of setjmp/longjmp handling */
+    /* end of setjmp/longjmp handling; put pw in a register */
+
+    ppw = pw;
 
     /*
      * I used to copy the max number of args from the stack, but this is
      * bad news if the stack abuts the end of memory, and in some cases it
      * does (e.g. GEMDOS call from the startup of a program which loads in
-     * alternative RAM.
+     * alternative RAM.)
      *
      * So instead, we copy as many words as matter.  This uses the
      * companion array of bytes (ever thrifty) which match up with
      * function call numbers.
      */
 
-    switch(funcwords[pw[0]]) {
-	case 0: return (funcs[pw[0]])();
-	case 1: return (funcs[pw[0]])(pw[1]);
-	case 2: return (funcs[pw[0]])(pw[1],pw[2]);
-	case 3: return (funcs[pw[0]])(pw[1],pw[2],pw[3]);
-	case 4: return (funcs[pw[0]])(pw[1],pw[2],pw[3],pw[4]);
-	case 5: return (funcs[pw[0]])(pw[1],pw[2],pw[3],pw[4],pw[5]);
-	case 7: return (funcs[pw[0]])(pw[1],pw[2],pw[3],pw[4],pw[5],pw[6],pw[7]);
+    switch(funcwords[ppw[0]]) {
+	case 0: return (funcs[ppw[0]])();
+	case 1: return (funcs[ppw[0]])(ppw[1]);
+	case 2: return (funcs[ppw[0]])(ppw[1],ppw[2]);
+	case 3: return (funcs[ppw[0]])(ppw[1],ppw[2],ppw[3]);
+	case 4: return (funcs[ppw[0]])(ppw[1],ppw[2],ppw[3],ppw[4]);
+	case 5: return (funcs[ppw[0]])(ppw[1],ppw[2],ppw[3],ppw[4],ppw[5]);
+	case 6: return (funcs[ppw[0]])(ppw[1],ppw[2],ppw[3],ppw[4],ppw[5],ppw[6]);
+	case 7: return (funcs[ppw[0]])(ppw[1],ppw[2],ppw[3],ppw[4],ppw[5],ppw[6],ppw[7]);
 	default: ASSERT(0);
     }
 }

@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.22 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/09 17:40:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/30 16:07:56 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.22  1991/05/30  16:07:56  apratt
+* Added uchar data type and made "attrib" fields that type.
+*
 * Revision 2.21  1991/05/09  17:40:38  apratt
 * General stuff.
 *
@@ -151,6 +154,7 @@ extern volatile void __assert(const char *exp,const char *file,long line);
  */
 #define uint unsigned int
 #define ulong unsigned long
+#define uchar unsigned char
 #define	REG		register
 #define MGET(x)		((x*)getbig())
 #define GETMD()		((MD *)getsmall())
@@ -235,7 +239,7 @@ DTA
 {
     /* the private part: 21 bytes */
     char dta_sname[11];	/* name-part of FCB to use in search */
-    char dta_attr;	/* attrib to use in search */
+    uchar dta_attr;	/* attrib to use in search */
     uint dta_clust;	/* strtcl of dir slot was found in */
     uint dta_curcl;
     uint dta_recno;
@@ -243,7 +247,7 @@ DTA
     char dta_dev;
 
     /* the public part */
-    char fattrib;	/* attribute of found file */
+    uchar fattrib;	/* attribute of found file */
     uint ftime, fdate;	/* time & date of found file */
     ulong flength;	/* length of found file */
     char fname[14];	/* name of found file as "base.ext\0" */
@@ -369,7 +373,7 @@ DFD
 	uint	dfd_time, dfd_date, dfd_strtcl;
 	ulong	dfd_fileln;
 
-	char	dfd_attrib;	/* attributes, here for setting FA_ARCHIVE */
+	uchar	dfd_attrib;	/* attributes, here for setting FA_ARCHIVE */
 	char	dfd_dirty;	/* flag: set when dirty */
 	uint	dfd_dev;	/* device this file's on */
 	uint	dfd_dircl;	/* strtcl of dir this file's in */
@@ -420,7 +424,7 @@ DIR
 FCB
 {
 	char	f_name[11];
-	char	f_attrib;
+	uchar	f_attrib;
 	char	f_fill[10];
 	uint	f_time;
 	uint	f_date;

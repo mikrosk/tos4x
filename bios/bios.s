@@ -3,17 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/27 18:01:56 $
+* $Date: 89/09/12 12:57:08 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.6  89/09/12  12:57:08  apratt
+* Fixed bad initialization of serial port; added dummy read of TSR
+* at end of txerror as 68901 book suggests; changed use of bclr
+* when clearing ISR into move with all bits 1 except the one to clear:
+* this is also required by the 68901 book.
+*
 * Revision 2.5  89/07/27  18:01:56  apratt
 * Added kcl_hook and bell_hook usage here (usu. they're def_click
 * and def_bell).
-*
+* 
 * Revision 2.4  89/07/20  15:45:17  apratt
 * Added code to initialize TTMFP (to totally disabled) and make
 * its interrupt vectors start at $140, right after STMFP.
@@ -122,7 +128,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.5 $
+* $Revision: 2.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -170,7 +176,7 @@ NORWAY		equ    11 ***DON'T  CHANGE***
 DENMARK		equ    12
 
 COUNTRY	equ	USA	;set country of origin @check@
-TT	equ	0	; set to 1 for TT, zero for ST and STE @check@
+TT	equ	1	; set to 1 for TT, zero for ST and STE @check@
 
 
 *	Revision B Upgrades:
@@ -1512,7 +1518,9 @@ TT_mfp	equ	$fffffa81
 	move.w	#$1,baudrate	;9600 is baud rate number 1 - shadow this.
 	moveq	#dtimer,d0	;select the d timer
 	moveq	#c9600,d1	;init for /4 for 9600 baud
+	moveq	#d9600,d2	;init for 9600 baud
 *
+*	Also, I've added initializing the TTMFP's port and set it to 9600 too.
 	move.l	#$00880101,d0
 *	The TT's two SCC channels are initialized here, too.
 
@@ -1894,7 +1902,12 @@ disint:
 	bclr	d1,(a1)		;and clear the bit...
 	bclr	d1,(a1)		;and clear the bit...
 	lea	iera(a0),a1	;set a1 for another mskoff call
-	bclr	d1,(a1)
+	bsr.b	bselect
+	bclr	d1,(a1)		;and clear the bit...
+
+	moveq	#%11111110,d0
+	asl.b	d1,d0
+* Changed 9/89 to write all 1's except d1's bit.
 * Fixed 9/91: we were clearing the bit we wanted and all the lower ones
 * in the same ISR, using asl not rol.  Oops.
 	move.b	#%11111110,d0	;;q
@@ -2009,7 +2022,8 @@ rcvxof	move.b	#xoff,sendnow(a0)	* ELSE Send "Xoff"
 	bsr	rtsoff		* THEN Withdraw RTS (NOT Ready to Receive)
 rcvxof:	move.b	#xoff,sendnow(a0)	* ELSE Send "Xoff"
 rcvrkick:
-	bclr.b	#4,isra(a2)	* Reset Interrupt
+	tst.b	tsr(a2)
+	bpl	rcvrxit		* IF (MFP Empty) THEN
 *				* a0,a2 are already set up for sender
 	bsr	sender		* Kick-Start the MFP Xmitter Interrupt
 rcvrxit:
@@ -2023,7 +2037,8 @@ rcvrxit:
 *	transmit buffer empty interrupt routine				*
 	lea	mfp,a2
 	lea	ribufptr.w,a0	* load up queue pointer for sender
-	bclr.b	#2,isra(a2)	* Reset Interrupt
+
+* entry point used by tttrxint
 txrcommon:
 	bsr	sender		* Send a Byte from Output Buffer
 
@@ -2052,7 +2067,9 @@ ctsint:
 	bpl	ctsxit		* IF (MFP Empty) THEN
 *				* a0,a2 already set up for sender
 	bsr	sender		* Kick-Start the MFP Xmitter Interrupt
-ctsxit:	bclr.b	#2,isrb(a2)	* Reset Interrupt
+	bra	ctsxit
+
+ctsoff:	move.b	#-1,txoff(a0)	* ELSE Disable Transmission
 	bclr.b	#2,aer(a2)	* Rising Edge Trigger
 
 ctsxit:
@@ -2064,7 +2081,8 @@ ctsxit:
 *************************************************************************
 	movem.l	d0/a0,-(sp)
 	lea	mfp,a0
-	bclr	#$3,isra(a0)	* Clear Interrupt
+
+* entry point used by ttrxerror
 rxecommon:
 	move.b	rsr(a0),rsrbyte	* Save Receiver Error Status
 	move.b	udr(a0),d0	* dummy read
@@ -2072,8 +2090,10 @@ rxecommon:
 	move.b	#%11110111,isra(a0)	; was bclr but that's wrong
 	movem.l	(sp)+,d0/a0
 	move.l	a0,-(sp)
-	bclr	#$1,isra(a0)	* Clear Interrupt
+	lea	mfp,a0
+
 * entry point used by tttxerror
+txecommon:
 	move.b	tsr(a0),tsrbyte	* Save Transmitter Error Status
 *	bclr	#$1,isra(a0)	* Clear Interrupt
 	move.b	#%11111101,isra(a0)	; was bclr but that's wrong
@@ -2489,7 +2509,8 @@ bauddata:
 	movem.l d0-d3/a0-a3,-(sp)	;save all registers (8/16/85 dbg)
 	btst.b	#$4,gpip+mfp(a5) ;check for pending interrupt occurance
 	movea.l	midisys.w,a2	;load in system midi handler
-	bclr.b	#$6,isrb+mfp(a5) ;clear in-service bit
+*	bclr.b	#$6,isrb+mfp(a5) ;clear in-service bit
+	move.b	#%10111111,isrb+mfp(a5) ; was bclr but that's wrong
 	movem.l (sp)+,d0-d3/a0-a3/a5	;restore all registers
 	btst.b	#$4,gpip+mfp.w ;check for pending interrupt occurance
 	beq.b	keymidi		;repeat this interrupt processing
@@ -3972,7 +3993,9 @@ kr1	subi.b	#1,kdelay2(a5)
 *	table if enabled and the user is 'using'...
 
 	tst.b	keyrep.w
-t_punt:	bclr.b	#5,isrb+mfp	;clear the interrupt channel
+	beq.b	krexit
+	tst.b	kdelay1.w
+	beq.b	kr1
 	subi.b	#1,kdelay1.w
 	bne.b	krexit
 kr1:	subi.b	#1,kdelay2.w

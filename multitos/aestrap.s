@@ -64,6 +64,7 @@ NOERR	=	0
 	.globl	_currpd
 	.globl	_systopd
 	.globl	_get_aespd
+	.globl	_consfd
 
 *************************************
 *	Restore Trap 2 vector	    *	
@@ -374,6 +375,8 @@ exok:
 
 
 _newchkkbd:
+	tst.w	_gl_multi
+	bne	usegemdos
 	move.w	#2,-(sp)
 	move.w	#1,-(sp)
 	trap	#13
@@ -389,6 +392,20 @@ achar:
 	addq.l	#4,sp
 	rts
 
+usegemdos:
+	move.w	_consfd,-(sp)
+	move.w	#$105,-(sp)
+	trap	#1		; Finstat(consfd)
+	addq.l	#4,sp
+	tst.l	d0
+	beq.b	acharout
+	move.w	#0,-(sp)
+	move.w	_consfd,-(sp)
+	move.w	#$107,-(sp)	; Fgetchar(consfd, RAW)
+	trap	#1
+	lea	6(sp),sp
+acharout:
+	rts
 
 _vdicode:
 	move.l	4(sp),d0

@@ -134,8 +134,7 @@ VOID	Debug( WORD level, BYTE *str );
 #endif
 
 #if SOFTLOAD
-MLOCAL BYTE	*DESKRSC = "C:\\MULTITOS\\DESKTOP.RSC";
-MLOCAL BYTE	*FDESKRSC = "DESKTOP.RSC";
+MLOCAL BYTE	DESKRSC[40]; /* = "C:\\MULTITOS\\DESKTOP.RSC"; */
 
 /*
  *	->> These message have to get internationalized!
@@ -456,8 +455,8 @@ ini_rsc()
 		*verstring++ = '0' + tosvers/256;
 		tosvers &= 0xff;
 		*verstring++ = '.';
-		*verstring++ = '0' + (tosvers/10);
-		*verstring++ = '0' + (tosvers % 10);
+		*verstring++ = '0' + (tosvers/16);
+		*verstring++ = '0' + (tosvers % 16);
 	}
 	Debug1( "Ini_rsc done\r\n" );	
 	return( TRUE );
@@ -516,7 +515,8 @@ VOID deskrsc()			/* load the desk rsc from disk */
 #endif
 	UWORD	*rscaddr;
 
-	*DESKRSC = ( isdrive() & 0x4 ) ? 'C' : 'A';
+	strcpy("C:\\MULTITOS\\DESKTOP.RSC", DESKRSC);
+	DESKRSC[0] = ( isdrive() & 0x4 ) ? 'C' : 'A';
 
 	/*
  	 * Before loading the resource file, check its version

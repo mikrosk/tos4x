@@ -62,13 +62,14 @@ EXTERN	LONG    gl_mntree;
 EXTERN	PD	*shellpd, *scr_pd;
 EXTERN	WORD	gl_multi;
 
-EXTERN	WORD	gl_handle;
+EXTERN WORD	gl_handle;
 EXTERN WORD	gl_wchar, gl_hchar;	/* char size in pixels */
 EXTERN WORD	gl_wbox, gl_hbox;	/* char box size in pixels */
 EXTERN WORD	gl_width, gl_height;
 EXTERN GRECT	gl_rfull;
 EXTERN GRECT	gl_rscreen;
 EXTERN GRECT	gl_offscreen;
+EXTERN WORD	gl_nplanes;
 
 WORD	deskwind;		/* Background 0 window handle	*/
 WORD	phanwind;		/* phantom window handle	*/
@@ -135,8 +136,8 @@ setmenu( p )
 	{
 	  Debug1( "Setmenu\r\n" );
 
-	  /* Pass the address of the PD structure here */
-	  mn_bar( ( LONG )p, TRUE|0x0100 );
+	  /* if 0x100 is set, mn_bar wants a process id */
+	  mn_bar( ( LONG )p->p_pid, TRUE|0x0100 );
 	}
 	else
 	{
@@ -162,10 +163,10 @@ w_setslide( wp, field )
 	if (field == WF_HSLIDE || field == WF_HSLSIZE) 
 	{
 	  blen = (LONG)wp->obj[W_HSLIDE].ob_width;
-	  if ( wp->hslsz == -1 || (sz = ( UWORD )( blen * (LONG)wp->hslsz / 1000L )) < gl_wbox) 
+	  if ( wp->hslsz == -1 || (sz = ( UWORD )( (blen * (LONG)wp->hslsz) / 1000L )) < gl_wbox) 
 	    sz = gl_wbox;
 
-	  if ( sz >= ( ADJ3DPIX << 1 ) ) 
+	  if ( sz > ( ADJ3DPIX << 1 ) ) 
 	    wp->obj[W_HELEV].ob_width = sz - (ADJ3DPIX << 1);
 
 	  wp->obj[W_HELEV].ob_x = ( WORD )(((blen - (LONG)sz) * (LONG)wp->hslpos / 1000L) + (LONG)ADJ3DPIX );
@@ -173,10 +174,11 @@ w_setslide( wp, field )
 	else	/* field == WF_VSLIDE || field == WF_VSLSIZE */ 
 	{	
 	  blen = (LONG)wp->obj[W_VSLIDE].ob_height;
-	  if ( wp->vslsz == -1 || (sz = ( UWORD )( blen * (LONG)wp->vslsz / 1000L )) < gl_hbox) 
+	  if ( wp->vslsz == -1 ||
+	       (sz = ( UWORD )( (blen * (LONG)wp->vslsz) / 1000L )) < gl_hbox) 
 	    sz = gl_hbox;
 
-	  if ( sz >= ( ADJ3DPIX << 1 ) )
+	  if ( sz > ( ADJ3DPIX << 1 ) )
 	    wp->obj[W_VELEV].ob_height = sz - (ADJ3DPIX << 1);
 
 	  wp->obj[W_VELEV].ob_y = ( WORD )( ((blen - (LONG)sz) * (LONG)wp->vslpos / 1000L) + (LONG)ADJ3DPIX );
@@ -283,13 +285,30 @@ w2:		  win = win->wnext;
 wm_init()
 {
     REG	WORD	i;	/* counter */
+    WORD numcolors;
 
+    numcolors = (gl_nplanes < 2) ? 2 : 16;
+ 
     for (i = 0; i < MAXOBJ; i++) {
-	wtcolor[i] = wbcolor[i] = 0x1101;
+    	if (numcolors < 16)
+		wtcolor[i] = wbcolor[i] = 0x1101;
+	else {
+		wtcolor[i] = 0x9178;
+		wbcolor[i] = 0x9078;
+	}
     }
-    wtcolor[W_NAME] |= 0xa0;
-    wtcolor[W_VSLIDE] = wtcolor[W_HSLIDE] |= 0x10;
-    wbcolor[W_VSLIDE] = wbcolor[W_HSLIDE] |= 0x10;
+
+    if (numcolors < 16) {
+	wtcolor[W_NAME] |= 0xa0;
+	wtcolor[W_VSLIDE] = wtcolor[W_HSLIDE] |= 0x10;
+	wbcolor[W_VSLIDE] = wbcolor[W_HSLIDE] |= 0x10;
+    } else {
+	wtcolor[W_INFO] = 0x9948;
+	wtcolor[W_HSLIDE] = wtcolor[W_VSLIDE] = 0x9179;
+	wbcolor[W_HSLIDE] = wbcolor[W_VSLIDE] = 0x9079;
+	wtcolor[W_VBAR] = wbcolor[W_VBAR] = 0x8068;
+	wtcolor[W_HBAR] = wbcolor[W_HBAR] = 0x8068;
+    }
 
     return( wm_start() );
 }
@@ -1089,11 +1108,13 @@ wg_1:
 	    break;
 
 	case WF_COLOR:				/* Feb 26 1992 ml. */
+	    ow[0] = iw[0];
 	    ow[1] = wp->tcolor[iw[0]];
 	    ow[2] = wp->bcolor[iw[0]];
 	    break;
 
 	case WF_DCOLOR:
+	    ow[0] = iw[0];
 	    ow[1] = wtcolor[iw[0]];
 	    ow[2] = wbcolor[iw[0]];
 	    break;
@@ -1360,10 +1381,11 @@ ws_2:
 	    else
 	    {
 	      gl_newroot = iw[2];
-	      if ( aesDDD )
+	      if ( aesDDD && gl_newdesk[0].ob_type != G_USERDEF )
 	      {
 		gl_newdesk[0].ob_type = G_USERDEF;
-		gl_newdesk[0].ob_spec = ( LONG )aesDDD; 
+		gl_newdesk[0].ob_spec = ( LONG )aesDDD;
+		dk_newdraw(&gl_rfull);
 	      }	
 	    }
 
@@ -2206,7 +2228,7 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
     WORD	lry;	    /* y offset from lower right corner */
     WORD	inx, iny;   /* x and y increments */
     WORD	blen;	    /* length of base bar */
-    WORD	sz;	    /* slider size */
+    UWORD	sz;	    /* slider size */
     WORD	w3dbox, h3dbox;
 
     /***
@@ -2344,14 +2366,11 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	    }
 	    else
 	    {
-#if 1
-		sz = ( WORD )( ( (long)sz * (LONG)wp->vslsz ) / 1000L );
-#else
-		sz = ( WORD )(( (LONG)sz * (LONG)wp->vslsz ) / 1000L );
-#endif
+	        sz = ( UWORD )( ( (LONG)sz * (LONG)wp->vslsz ) / 1000L );
+		if (sz < gl_hbox)
+		  sz = gl_hbox;
 		if ( sz > ( ADJ3DPIX << 1 ) ) 	
 		  sz = sz - (ADJ3DPIX << 1);
-
 		w_obrect(wp, W_VELEV, ADJ3DPIX, ADJ3DPIX, gl_wbox, 
 		    sz );
 	    }
@@ -2389,15 +2408,11 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	    } 	
 	    else
 	    {
-#if 1
-		sz = ( WORD )(( (long)sz * (LONG)wp->hslsz ) / 1000L );
-#else
-		sz = ( WORD )( (LONG)sz * (LONG)wp->hslsz / 1000L );
-#endif			 
-
+		sz = ( UWORD )(( (LONG)sz * (LONG)wp->hslsz ) / 1000L );
+		if (sz < gl_wbox)
+		  sz = gl_wbox;
 		if ( sz > ( ADJ3DPIX << 1 ) ) 	
 		  sz = sz - (ADJ3DPIX << 1);
-
 		w_obrect(wp, W_HELEV, ADJ3DPIX, ADJ3DPIX, sz, gl_hbox );
 	    }
 	}
@@ -2583,12 +2598,12 @@ VOID
 w_hideparts(wp)
 WINDOW	*wp;
 {
-	REG OBJECT  	*obaddr;
+	LONG		obaddr;
 	WORD		hparts, vparts;
 	WORD		kind;
 
 	/* initialize object */
-    	obaddr = wp->obj;
+    	obaddr = (LONG)wp->obj;
 	kind = wp->kind;
 
 	hparts = kind & HPARTS;	/* mask for vertical slider elements */
@@ -2654,11 +2669,11 @@ WINDOW	*wp;
 VOID w_showparts(wp)
 WINDOW	*wp;
 {
-	REG OBJECT  	*obaddr;
+	REG LONG  	obaddr;
 	WORD		hparts, vparts;
 	WORD		kind;
 	/* initialize object */
-    	obaddr = wp->obj;
+    	obaddr = (LONG)wp->obj;
 	kind = wp->kind;
 
 	hparts = kind & HPARTS;	/* mask for vertical slider elements */
@@ -2882,9 +2897,10 @@ dk_newdraw( px )
 
 	Debug1( "Dk_newdraw\r\n" );
 
+	*(WORD *)(&((USERBLK *)aesDDD)->ub_parm) = gl_handle;
 	gsx_moff();
 
-	*((WORD*)&par.pb_parm) = gl_handle;
+	par.pb_parm = ((USERBLK *)aesDDD)->ub_parm;
 	Debug1( "Dk_resdraw vdi handle is " );
 	Ndebug1( (LONG)gl_handle );
 	par.pb_prevstate = NORMAL;
@@ -2930,7 +2946,7 @@ dk_redraw( obj, root, px )
 	  type = obj[0].ob_type;	/* swap the new user define background */
 	  spec = ( BYTE *)obj[0].ob_spec;
 	  obj[0].ob_type = G_USERDEF;
-	  obj[0].ob_spec = ( LONG )aesDDD;	
+	  obj[0].ob_spec = ( LONG )aesDDD;
 	  set = TRUE;
 	}
 

@@ -27,13 +27,13 @@ deskmisc.c
 deskmn.c
 deskopen.c
 deskpref.c
+deskrom.c
 desksear.c
 desksele.c
 deskshel.c
 deskshow.c
 deskspa.inf
 deskstar.s
-deskswe.inf
 desktop.c
 desktop.inf
 deskupda.c
@@ -72,7 +72,6 @@ gemoblib.c
 gempd.c
 gemqueue.c
 gemrlist.c
-gemrom.c
 gemrslib.c
 gemsclib.c
 gemshlib.c

@@ -36,16 +36,11 @@
 #include "dispvars.h"
 #include "windlib.h"
 #include "message.h"
-#if 0
-#include "aesmint.h"
-#else
+#include "osbind.h"
 #include "mintbind.h"
-#endif
 #include "signal.h"
 
 #define KEYSTOP 0x2b1c0000L		/* control backslash	*/
-EXTERN  LONG	trap();
-EXTERN  LONG	trap13();
 
 EXTERN	WORD	gl_multi;
 EXTERN	WORD	gl_mfid;
@@ -222,9 +217,9 @@ Debug( level, str )
 	{
 #if 1
 	  while( *str )
-	    trap13( 3, gl_port, *str++ );
+	    Bconout( gl_port, *str++ );
 #else
-	  trap(9, str);
+	  Cconws(str);
 #endif
 	}
 }
@@ -269,7 +264,9 @@ pdterm( ret )
 	if ( p = systopd( (WORD)(ret >> 16) ) )
 	{
 	  p->p_exitcode = (WORD)(ret & 0x0000FFFFL);
- 
+ 	  if (p == shellpd) {
+	    shellpd = 0;
+	  }
 	  switch( p->p_state )
 	  {
 	    case PS_MWAIT:
@@ -419,7 +416,7 @@ swap_next( p, pterm )
 	Debug7("swap_next called");
 	changed = chgback = FALSE;
 
-	/* if it owns the phanom winodw then close it first */
+	/* if it owns the phanom window then close it first */
 
 	if ( srchwp( phanwind )->cowner == p )
 	{
@@ -429,6 +426,7 @@ swap_next( p, pterm )
 
 	if ( p == scr_pd )	/* if screen manager is exiting	*/	
 	  return;		/* don't send message to itself */
+
 
 	/* If the background owned by this process, 	*/
 	/* then it needs to be redrawn			*/
@@ -447,7 +445,8 @@ swap_next( p, pterm )
 	      newp = win->owner;
 
 	      if ( ( newp != p ) && ( newp->p_mnaddr ) && ( !newp->p_sleep ) &&
-		   ( newp->p_type & (AESAPP|AESSHELL) ) )
+		   ( newp->p_type & (AESAPP|AESSHELL) ) &&
+		   ( newp->p_state != PS_DEAD ) )
 	        break;
 	    }
 
@@ -461,7 +460,8 @@ swap_next( p, pterm )
 	  {
 	    newp = scr_pd;	/* set to the screen manager	*/
 				/* is the shell still alive?	*/
-	    if ( ( shellpd ) && ( !shellpd->p_sleep ) ) 	
+	    if ( ( shellpd ) && ( !shellpd->p_sleep ) &&
+		 ( shellpd->p_state != PS_DEAD ) ) 	
 	    {			/* yes				*/
 	      if ( ( shellpd != p ) && shellpd->p_mnaddr )
 	        newp = shellpd;

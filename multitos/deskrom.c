@@ -8,7 +8,8 @@
 /*	02/23/93	cjg	Force the use of prototypes		*/
 /*	Add sofloaded resources			02/93   H.M.Krober	*/
 /*	Renamed to DESKROM.C			03/18/93 C.Gee		*/
-
+/*	Extensive brain-surgery and support for compressed resources	*/
+/*						05/12/93 E.Smith	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -72,6 +73,8 @@
 #include "rslib.h"
 #include "gemdos.h"
 
+#undef UBYTE
+#define UBYTE unsigned char
 
 EXTERN	LONG	rs_global;
 EXTERN	LONG	rs_hdr;
@@ -89,15 +92,16 @@ MLOCAL	LONG		gemptr;		/* GEM's rsc pointer		*/
 MLOCAL	LONG		rgemptr;	/* GEM's rsc pointer (ROM vers)	*/
 MLOCAL	WORD		romuse;
 #endif
-MLOCAL	UWORD		*tosrsc;
+MLOCAL	LONG		rgemsiz;	/* GEM's rsc size */
+MLOCAL	BYTE		*romrsdata;
 
-MLOCAL VOID		rom_read( VOID );
+VOID		rom_read( VOID );
 
 #if SOFTLOAD
 
 MLOCAL UWORD		*rscaddr; 	/* addr of the loaded rsc file */
 MLOCAL LONG		rsc_load( VOID );
-MLOCAL BYTE *GEMRSC = 	"C:\\MULTITOS\\GEM.RSC"; /* fname of rsc file */
+MLOCAL BYTE GEMRSC[20]; /*  = 	"C:\\MULTITOS\\GEM.RSC"; */
 #endif
 
 #if ONERSC
@@ -126,6 +130,11 @@ GLOBAL	LONG		infptr;
 GLOBAL	LONG		rdeskptr;	/* DESKTOP'S rsc pointer	*/
 GLOBAL	LONG		rinfptr;	/* ROM version			*/
 #endif
+MLOCAL	LONG		rdesksiz;	/* DESKTOP's rsc size */
+MLOCAL	LONG		rinfsiz;	/* DESKTOP's inf size */
+
+MLOCAL	WORD		uncrunch( UBYTE *inbuf, LONG insize, UBYTE *outbuf,
+					LONG outsize );
 
 /* do this whenever the Gem or desktop is ready		*/
 
@@ -135,33 +144,19 @@ rom_ram( which, pointer )
 	REG LONG	pointer;
 {
 	WORD		size;
-	BYTE		*ptr;
 
 	switch( which )
 	{
 #if !DESKPRG
 	  case 0:		/* get the gem resource	*/
-#if SOFTLOAD
-	    if (rgemptr == gemptr) {	/* we only have to do this, if the */
-					/* rom version is used */ 
-	   	 ptr = (BYTE *)tosrsc;
-	   	 ptr += 10;
-	   	 size = tosrsc[0];
-	    	 LBCOPY( (BYTE *)gemptr, ptr, size );
-	    }
-#else
-	   	 ptr = (BYTE *)tosrsc;
-	   	 ptr += 10;
-	   	 size = tosrsc[0];
-	    	 LBCOPY( (BYTE *)gemptr, ptr, size );
-#endif
 	    rs_global = pointer;
 	    rs_hdr = gemptr;
 	    LLSET( pointer + 14, rs_hdr );
+	    size = ((WORD *)gemptr)[17];
 	    LWSET( pointer + 18, size );
 	    do_rsfix( rs_hdr, size ); 
 	    rs_fixit( pointer );
-	    break;
+	    return (WORD)rgemsiz;
 #endif
 
 
@@ -178,10 +173,9 @@ rom_ram( which, pointer )
 	    if (pointer == NULL)
 		pointer = deskptr;
 #endif
-	    ptr = ( BYTE *)tosrsc;
-	    ptr += tosrsc[0];
-	    LBCOPY( ( BYTE *)pointer, ptr, tosrsc[1] - tosrsc[0] );
-	    break;
+	    if (pointer != rdeskptr)
+	        LBCOPY( ( BYTE *)pointer, (BYTE *)rdeskptr, (WORD)rdesksiz );
+	    return (WORD)rdesksiz;
 
 	  case 3:		/* read in desktop.inf		*/
 #if SOFTLOAD
@@ -193,9 +187,12 @@ rom_ram( which, pointer )
 	    if (pointer == NULL)
 		pointer = infptr;
 #endif
-	    LBCOPY( ( BYTE *)pointer, ( BYTE *)infptr, tosrsc[2] - tosrsc[1] );
-	    return( tosrsc[2] - tosrsc[1] );
+	    if (pointer != rinfptr)
+	    LBCOPY( ( BYTE *)pointer, (BYTE *)rinfptr, rinfsiz );
+	    return (WORD)rinfsiz;
 	}
+
+	return 0;
 }
 
 
@@ -266,9 +263,9 @@ rsc_read( VOID )
 
 #if SOFTLOAD
 #if ONERSC
-	tosrsc = ( UWORD *)RSCTABLE[0];	/* only US version in roms */
+	romrsdata = (BYTE *)RSCTABLE[0];	/* only US version in roms */
 #else
-	tosrsc = ( UWORD *)RSCTABLE[st_lang];
+	romrsdata = (BYTE *)RSCTABLE[st_lang];
 #endif
 
 #if DESKPRG
@@ -286,7 +283,7 @@ rsc_read( VOID )
 
 
 #else /* #else SOFLOAD */
-	tosrsc = ( UWORD *)RSCTABLE[st_lang];
+	romrsdata = (BYTE *)RSCTABLE[st_lang];
 	rom_read();
 #endif
 	
@@ -294,54 +291,71 @@ rsc_read( VOID )
 }
 
 
-
-
-
 MLOCAL VOID
+die_with_msg( BYTE *s )
+{
+	trap(9, s);
+	trap(9, "Please reboot the machine!");
+	while (!trap13( 1,2 ) );
+}
+
+#define GLUEHEADERSIZE 12
+
+VOID
 rom_read( VOID )
 {
-	REG UWORD	*intptr;
-	UWORD		size;
-	BYTE		*a;
-	BYTE		*b;
+	LONG		totsize, insize;
+	UBYTE		*a;
+	UBYTE		*b;
+	LONG		*longptr;
+
+
+	totsize = *((LONG *)(romrsdata+2));
+	insize = *((LONG *)(romrsdata+6));
 
 #if DESKPRG
-	if ( !( gl_pglue = ( LONG )lmalloc( (LONG)tosrsc[2] ) ) )
+	if ( !( gl_pglue = (LONG) lmalloc( totsize + 4096 ) ) )
 #else
-	if ( !( gl_pglue = dos_xalloc( (LONG)tosrsc[2], 3 ) ) )
+	if ( !( gl_pglue = dos_xalloc( totsize + 4096, 3 ) ) )
 #endif
 	{
-	    trap( 9, "Unable to install AES resource!\r\n" );
-	    trap( 9, "Please reboot the machine!" );
-	    while( !trap13( 1,2 ) );
-	  return;
+	  die_with_msg( "Unable to install AES resource!\r\n" );
 	}
 
-	intptr = tosrsc;
-				/* copy the resource to RAM	*/
-	size = intptr[2];
-	a = ( BYTE *)tosrsc;
-	b = ( BYTE *)gl_pglue;
+	a = ( UBYTE *)(romrsdata+10);	/* 2 bytes magic + 2 long words */
+	b = ( UBYTE *)gl_pglue;
 
-	while( size )
+	if (*((WORD *)romrsdata) == 0)
 	{
-	  *b++ = *a++;
-	  size--;	   
+	  while( totsize )
+	  {
+	    *b++ = *a++;
+	    totsize--;	   
+	  }
+	} else {
+	  if ( *((UWORD *)romrsdata) != 0xab08U ) {
+		die_with_msg("Unknown compression in ROM resource\r\n");
+	  }
+	  if (!uncrunch(a, insize, b, totsize)) {
+		die_with_msg("Decompression failure\r\n");
+		return;
+	  }
 	}
-
-	intptr = ( UWORD *)gl_pglue;
+	longptr = (LONG *)gl_pglue;
+	rgemsiz = longptr[0];
+	rdesksiz = longptr[1];
+	rinfsiz = longptr[2];
 
 #if SOFTLOAD
-	rgemptr = (LONG)(gl_pglue + 10);	/* Gem Resource */
-	rdeskptr = (LONG)(gl_pglue + intptr[0]);/* Desktop Resource */
-	rinfptr = (LONG)( gl_pglue + intptr[1] );/* Inf file resource */
+	rgemptr = (LONG)(gl_pglue + GLUEHEADERSIZE);	/* Gem Resource */
+	rdeskptr = rgemptr + rgemsiz;		/* Desktop Resource */
+	rinfptr = rdeskptr + rdesksiz;		/* Inf file resource */
 	romuse = TRUE;
 #else
-	gemptr = (LONG)(gl_pglue + 10);	/* Gem Resource */
-	deskptr = (LONG)(gl_pglue + intptr[0]);/* Desktop Resource */
-	infptr = (LONG)( gl_pglue + intptr[1] );/* Inf file resource */
+	gemptr = (LONG)(gl_pglue + GLUEHEADERSIZE);	/* Gem Resource */
+	deskptr = gemptr + rgemsiz;		/* Desktop Resource */
+	infptr = deskptr + rdesksiz;		/* Inf file resource */
 #endif
-
 }
 
 
@@ -359,10 +373,11 @@ LONG rsc_load()
 	UWORD	hdr_buff[HDR_LENGTH/2];
 	BYTE	vers;
 
-	*GEMRSC = ( isdrive() & 0x4 ) ? 'C' : 'A';
+	strcpy("C:\\MULTITOS\\GEM.RSC", GEMRSC);
+	GEMRSC[0] = ( isdrive() & 0x4 ) ? 'C' : 'A';
 	if ( ( fd = dos_open(GEMRSC, RMODE_RD) ) >= 0 )
 	{
-	  if ( dos_read( fd, HDR_LENGTH, &hdr_buff[0] ) > 0 )
+	  if ( dos_read( fd, HDR_LENGTH, (LONG)&hdr_buff[0] ) > 0 )
 	  {
 	     /*
  	      *	Check the version number in the 1st byte of the rsc header.
@@ -396,7 +411,7 @@ LONG rsc_load()
 	         goto rs_end;
 	       }
 						/* read the size	*/
-	       if ( dos_read( fd, sizeof(LONG), &rslsize ) != sizeof(LONG) )
+	       if ( dos_read( fd, sizeof(LONG), (LONG)&rslsize ) != sizeof(LONG) )
 	       {
 	         goto rs_end;
 	       }
@@ -424,3 +439,158 @@ rs_end:
 }
 #endif
 #endif
+
+
+
+/*
+ * uncompression routines
+ * the algorithm used to compress is fairly straight-forward:
+ * (1) first, we find the least frequently occuring bytes
+ * (2) next, we use 8 of those bytes, as follows:
+ *       (a) to mark 0000
+ *       (b) to mark ffff
+ *       (c) to mark a run of 0s (next byte gives the run length)
+ *       (d) to mark a run of ffs (next byte gives the run length)
+ *       (e) to mark a run of arbitrary characters (next byte is the char,
+ *            and the one following that is the run length)
+ *	 (f) to mark 00000000
+ *	 (g) to mark ffffffff
+ *	 (h) to mark a token
+ *
+ * The run character is also used as an escape character, i.e. to output
+ * one of the reserved bytes, we output a 1-length run.
+ *
+ * The compressed file contains a header giving the size of the uncompressed
+ * data (as a LONG), followed by the 8 special bytes above, followed by
+ * the number of tokens (1 byte), followed by the token table, followed
+ * by the compressed data.
+ * Each token table entry consists of a length (1 byte) followed by n bytes of
+ * token. When a token marker is found in the compressed data, the next
+ * byte is used as an index into the token table to find the corresponding
+ * data for the token.
+ */
+
+MLOCAL WORD zeroc, ffffc, zerorunc, ffffrunc, runc;
+MLOCAL WORD longzeroc, longffffc;
+MLOCAL WORD tokenesc;
+
+MLOCAL WORD numtokens;
+
+/*
+ * untokenize function:
+ * returns # of bytes in the untokenized version
+ */
+MLOCAL long
+untokenize(unsigned char *inp, long insize, unsigned char *outp)
+{
+	unsigned char **tokenptr;
+	unsigned char *ptr;
+	long outsize = 0;
+	int c;
+	int j;
+
+	tokenptr = (unsigned char **)dos_xalloc(1024,3);
+
+	for (j = 1; j < numtokens; j++) {
+		tokenptr[j] = inp;
+		insize -= (*inp)+1;
+		inp += (*inp)+1;
+	}
+
+	while (insize > 0) {
+		c = *inp++; insize--;
+		if (c == tokenesc) {
+			c = *inp++; insize--;
+			if (c == 0)
+				outp[outsize++] = tokenesc;
+			else {
+				ptr = tokenptr[c];
+				if (!ptr) {
+					die_with_msg("bad compression in RSC\r\n");
+					return 0;
+				}
+				j = *ptr++;
+				while (j-- > 0)
+					outp[outsize++] = *ptr++;
+			}
+		} else {
+			outp[outsize++] = c;
+		}
+	}
+	dos_free((LONG)tokenptr);
+	return outsize;
+}
+
+MLOCAL WORD
+uncrunch( UBYTE *inbuf, LONG insize, UBYTE *outbuf, LONG outsize )
+{
+	int j, c;
+	long i;
+	long cursize;
+	UBYTE *tmpbuf;
+
+	tmpbuf = (UBYTE *) dos_xalloc(outsize+4096, 3);
+	if (!tmpbuf) {
+		die_with_msg("out of memory\r\n");
+		return(0);
+	}
+
+/* now do the decompression */
+	i = 0;
+	zeroc = inbuf[i++];
+	ffffc = inbuf[i++];
+	zerorunc = inbuf[i++];
+	ffffrunc = inbuf[i++];
+	runc = inbuf[i++];
+	longzeroc = inbuf[i++];
+	longffffc = inbuf[i++];
+	tokenesc = inbuf[i++];
+	numtokens = inbuf[i++] + 1;
+
+	insize = untokenize(&inbuf[i], insize-i, tmpbuf);
+
+	i = 0;
+	cursize = 0;
+
+#define nextchar() tmpbuf[i++]
+#define output(c) outbuf[cursize++] = c
+
+	while (i < insize) {
+		c = nextchar();
+		j = 0;
+		if (c == runc) {
+			c = nextchar();
+			j = nextchar();
+		} else if (c == zeroc) {
+			c = 0;
+			j = 1;
+		} else if (c == ffffc) {
+			c = 0xff;
+			j = 1;
+		} else if (c == zerorunc) {
+			c = 0;
+			j = nextchar();
+		} else if (c == ffffrunc) {
+			c = 0xff;
+			j = nextchar();
+		} else if (c == longzeroc) {
+			c = 0;
+			j = 3;
+		} else if (c == longffffc) {
+			c = 0xff;
+			j = 3;
+		}
+		while (j >= 0) {
+			output(c);
+			--j;
+		}
+		if (cursize > outsize) {
+			die_with_msg("TOO MUCH DATA in resources\r\n");
+			return 0;
+		}
+	}
+
+	dos_free((LONG)tmpbuf);
+
+	return 1;
+}

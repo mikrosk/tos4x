@@ -774,7 +774,7 @@ hctl_timer( VOID )
 	    {
 	      if (gl_multi && !(p->p_type & AESSYSTEM))
 	      {
-	        Pkill( p->p_sysid, SIGKILL );
+	        Pkill( p->p_sysid, SIGTERM );
 		ret = FALSE;
 	      } else if (!(p->p_type & AESSYSTEM)) {
 			forkq((WORD(*)())pdterm, ((LONG) p->p_sysid << 16L));
@@ -794,7 +794,7 @@ hctl_timer( VOID )
 /*	Process 1 - Screen manager 	*/
 
 	VOID
-screenmgvr( VOID )
+screenmgr( VOID )
 {
 	REG WORD	ev_which;
 	WORD		rets[6];
@@ -978,7 +978,7 @@ hctl_mesag( msgbuff )
 
 	      if ( ( p->p_mnaddr ) && ( p->p_pid != gl_mnpid ) ) {
 		Debug1("hctl_msg(): select menu to swap prg\r\n");	     
-		menu_bar( ( OBJECT *)p, TRUE|0x0100 );
+		menu_bar( ( OBJECT *)p->p_pid, TRUE|0x0100 );
 	     }
 
 	      break;
@@ -998,9 +998,9 @@ hctl_mesag( msgbuff )
 		if ( *bptr == '1' )
 		{
 	      	   if ( ( p->p_mnaddr ) && ( p->p_pid != gl_mnpid ) )
-	             menu_bar( ( OBJECT *)p, TRUE|0x0100 );
+	             menu_bar( ( OBJECT *)p->p_pid, TRUE|0x0100 );
 	      	   else
-	             menu_bar( (OBJECT*)0, TRUE|0x0200 );
+	             menu_bar( (OBJECT*)-1, TRUE|0x0200 );
 
 	           form_dial( 3, 0, 0, 0, 0, gl_rfull.g_x, gl_rfull.g_y, 
 			      gl_rfull.g_w, gl_rfull.g_h );
@@ -1041,7 +1041,7 @@ l_1:
 		     			/* If already did, then let it fall 	*/
  					/* through				*/
 	    case 5:
-		menu_bar( (OBJECT*)0, TRUE|0x0200 );
+		menu_bar( (OBJECT*)-1, TRUE|0x0200 );
 	      break;
  					/* someone did a menu register	*/
 					/* update the menu, please	*/
@@ -1064,11 +1064,13 @@ l_1:
 	      **/	
 	      if (p->p_mnaddr == NULL)
 		p = shellpd;		/* use desktop's menu bar */
-	      menu_bar( ( OBJECT *)p, TRUE|0x0100 );
+	      menu_bar( ( OBJECT *)p->p_pid, TRUE|0x0100 );
 	      break;
 
 	    case 9:			/* swap out the menu bar */
-	      menu_bar( ( OBJECT *)p, 0x0200 );
+	      if ( shutdown )
+		break;
+	      menu_bar( ( OBJECT *)p->p_pid, 0x0200 );
 	      break;
 	    default:
 	      break;

@@ -74,7 +74,7 @@ show_file( file )
 	BYTE	*tail,*bptr;
 
 	shel_envrn( (LONG)&bptr, (LONG)SHSHOW );
-	if ( bptr )
+	if ( bptr && d_multi )
 	{
 	  if ( tail = bld_par(1,1) )
 	  {
@@ -134,7 +134,7 @@ printit( str )
 	BYTE	*bptr;
 
 	shel_envrn((LONG)&bptr,(LONG)SHPRINT );	/* user defined print program */
-	if ( bptr )
+	if ( bptr && d_multi )
 	{
 	  if ( !m_sfirst( bptr, 0x31 ) )
 	  {
@@ -166,7 +166,7 @@ print_file( )
 
 	shel_envrn( (LONG)&bptr, (LONG)SHPRINT );
 
-	if ( bptr )
+	if ( bptr && d_multi )
 	{
 	  if ( !m_sfirst( bptr, 0x31 ) )
 	  {
@@ -534,12 +534,14 @@ run_it( file, tail, graphic, setdir, code, limit )
 		free( appnode );		/* free app buffer	*/
 		free( backid );
 		free( q_addr );		/* update inf file on disk	*/
+
 		Debug5("NEWDESK after freeing windows\r\n");
 #if 0
 		/* not need sine we do a save_/read_inf */
 		hide_windows(TRUE); 
 #endif
 		wind_update(0);		/* make sure screen is free */
+		menu_bar( menu_addr, FALSE );
 	}
 	if ( !shel_write( code, graphic, 1,(LONG)&ptrs[0],(LONG)tail ) )
 	  fill_string( file, FTOLAUNC ); /* was FTOLAUNCH, changed for LC */
@@ -549,6 +551,7 @@ run_it( file, tail, graphic, setdir, code, limit )
 		 * Do all the stuff the desktop does when it starts.
 		 */
 		Debug5("NEWDESK restoring windows\r\n");
+		menu_bar( menu_addr, TRUE );
 		appnode = (APP*)0;	/* No app buffer yet		*/
 		applist = (APP*)0;	/* No app list yet		*/
 		apsize = 0;		/* Initalize app size		*/

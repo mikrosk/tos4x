@@ -120,7 +120,7 @@ c_2:
 
 	do_finish( SSCREEN );
 
-	if ( background[0].ob_spec != newdesk )
+	if ( background[0].ob_type != G_USERDEF && background[0].ob_spec != newdesk )
 	{
 	  background[0].ob_spec = newdesk;
 	  do_redraw( 0, &full, 0 );

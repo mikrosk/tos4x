@@ -22,7 +22,8 @@ extern	long	gemdos();
 #define	Bcostat(a)	bios(8,a)
 #define	Mediach(a)	bios(9,a)
 #define	Drvmap()	bios(10)
-#define	Getshift(a)	bios(11,a)
+#define	Kbshift(a)	bios(11,a)
+#define Getshift()	Kbshift(-1)
 
 /*	XBIOS	(trap14)	*/
 #define	Initmous(a,b,c)	xbios(0,a,b,c)

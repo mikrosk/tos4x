@@ -1,6 +1,9 @@
 /* kballoc.c - fast allocator for LC5 based on AKP's nalloc2.c
  * ===========================================================================
  * $Log: kballoc.c,v $
+ * Revision 1.8  1993/06/09  23:47:00  ersmith
+ * Another check in to save work.
+ *
  * Revision 1.7  1993/05/12  15:50:18  ersmith
  * Check in to save work
  *

@@ -277,9 +277,10 @@ WORD	ddcreate( WORD apid, WORD winid, WORD msx, WORD msy, WORD kstate,
 WORD	ddstry( WORD fd, BYTE *ext, BYTE *name, LONG size );
 VOID	ddclose( WORD fd );
 WORD	ddopen( WORD ddnam, BYTE *preferext );
-WORD	ddrtry( WORD fd, BYTE *name, BYTE *whichext, LONG *size );
+WORD	ddrtry( WORD fd, BYTE *name, BYTE **fname, BYTE *whichext, LONG *size );
 WORD	ddreply( WORD df, WORD ack );
 VOID	rec_ddmsg( WORD msg[]  );
+WORD	copypipe(WORD ifd, LONG size, BYTE *path, BYTE *filename, BYTE *ext);
 
 /* deskapp.c */
 APP		*app_icon( REG BYTE *name, WORD type, WORD *icon );

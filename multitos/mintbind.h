@@ -41,7 +41,7 @@
 #define Psigpending()		gemdos(0x123)
 #define Dpathconf(name, which)	gemdos(0x124, name, which)
 #define Pmsg(a,b,c)		gemdos(0x125,a,b,c)
-#define Psemaphore(a,b,c)	gemdos(0x134,a,b,c)
+#define Prenice(id,value)	gemdos(0x127,id,value)
 
 #define Dopendir(name, flag)					\
 		gemdos(0x128, (long)(name), (short)(flag))
@@ -63,6 +63,7 @@
 		gemdos(0x130, (short)(cmd), (long)(name), (long)(arg))
 #define Dlock(mode, drive)					\
 		gemdos(0x135, (short)(mode), (short)(drive))
+#define Psemaphore(a,b,c)	gemdos(0x134,a,b,c)
 #define Dgetcwd(path, drv, size)				\
 		gemdos(0x13b, (long)(path), (short)(drv), (short)(size))
 #define Salert(msg)						\
@@ -287,6 +288,63 @@ struct kerinfo {
    (or is limited only by available memory) */
 
 #define _UNLIMITED	0x7fffffffL
+
+/* kernel mode bits -- the user can't set these! */
+#define O_TTY		0x2000
+
+/* structures for terminals */
+struct tchars {
+	char t_intrc;
+	char t_quitc;
+	char t_startc;
+	char t_stopc;
+	char t_eofc;
+	char t_brkc;
+};
+
+struct ltchars {
+	char t_suspc;
+	char t_dsuspc;
+	char t_rprntc;
+	char t_flushc;
+	char t_werasc;
+	char t_lnextc;
+};
+
+struct sgttyb {
+	char sg_ispeed;
+	char sg_ospeed;
+	char sg_erase;
+	char sg_kill;
+	short sg_flags;
+};
+
+struct winsize {
+	short	ws_row;
+	short	ws_col;
+	short	ws_xpixel;
+	short	ws_ypixel;
+};
+
+struct xkey {
+	short	xk_num;
+	char	xk_def[8];
+};
+
+struct tty {
+	short		pgrp;		/* process group of terminal */
+	short		state;		/* terminal status, e.g. stopped */
+	short		use_cnt;	/* number of times terminal is open */
+	short		res1;		/* reserved for future expansion */
+	struct sgttyb 	sg;
+	struct tchars 	tc;
+	struct ltchars 	ltc;
+	struct winsize	wsiz;
+	long		rsel;		/* selecting process for read */
+	long		wsel;		/* selecting process for write */
+	char		*xkey;		/* extended keyboard table */
+	long		resrvd[3];	/* for future expansion */
+};
 
 /* defines and declarations for Dcntl operations */
 

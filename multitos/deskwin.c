@@ -1547,17 +1547,17 @@ blit( dir, win, box, pixel)
 	switch( dir )
 	{
 	  case 0:		/* move contents up */
-	    if ( pixel > box->g_h )
+	    if ( pixel >= box->g_h )
 	      pixel = box->g_h;
 	    else
 	    {
 		pxyarray[0] = box->g_x;
 		pxyarray[1] = box->g_y;
-		pxyarray[2] = box->g_x+box->g_w;
-		pxyarray[3] = box->g_y+box->g_h-pixel;
+		pxyarray[2] = box->g_x+box->g_w-1;
+		pxyarray[3] = box->g_y+box->g_h-pixel-1;
 		pxyarray[4] = box->g_x;
 		pxyarray[5] = box->g_y+pixel;
-		pxyarray[6] = box->g_x+box->g_w;
+		pxyarray[6] = box->g_x+box->g_w-1;
 		pxyarray[7] = pxyarray[3]+pixel;
 		d_vro_cpyfm(3, pxyarray, (LONG *)&x[0],(LONG *)&x[0]);
 	    }
@@ -1567,17 +1567,17 @@ blit( dir, win, box, pixel)
 	     break;
 
 	  case 1:
-	    if ( pixel > box->g_h )
+	    if ( pixel >= box->g_h )
 	      pixel = box->g_h;
 	    else
 	    {
 		pxyarray[0] = box->g_x;
 		pxyarray[1] = box->g_y+pixel;
-		pxyarray[2] = box->g_x+box->g_w;
+		pxyarray[2] = box->g_x+box->g_w-1;
 		pxyarray[3] = box->g_y+box->g_h-1;
 		pxyarray[4] = box->g_x;
 		pxyarray[5] = box->g_y;
-		pxyarray[6] = box->g_x+box->g_w;
+		pxyarray[6] = box->g_x+box->g_w-1;
 		pxyarray[7] = pxyarray[3]-pixel;
 		d_vro_cpyfm( 3, pxyarray,(LONG *)&x[0],(LONG *)&x[0]);
 	     }
@@ -1587,18 +1587,18 @@ blit( dir, win, box, pixel)
 	     break;
 
 	  case 2:		/* Move contents to right */
-	    if ( pixel > box->g_w )
+	    if ( pixel >= box->g_w )
 	      pixel = box->g_w;
 	    else
 	    {
 		pxyarray[0] = box->g_x;	/* source */
 		pxyarray[1] = box->g_y;
-		pxyarray[2] = box->g_x+box->g_w-pixel;
-		pxyarray[3] = box->g_y+box->g_h;
+		pxyarray[2] = box->g_x+box->g_w-pixel-1;
+		pxyarray[3] = box->g_y+box->g_h-1;
 		pxyarray[4] = box->g_x+pixel;
 		pxyarray[5] = box->g_y;
-		pxyarray[6] = box->g_x+box->g_w;
-		pxyarray[7] = box->g_y+box->g_h;
+		pxyarray[6] = box->g_x+box->g_w-1;
+		pxyarray[7] = box->g_y+box->g_h-1;
 		d_vro_cpyfm( 3, pxyarray,(LONG *)&x[0],(LONG *)&x[0]);
 	    }
 
@@ -1607,19 +1607,19 @@ blit( dir, win, box, pixel)
 	     break;
 
 	   case 3:		/* Move contents to left	*/
-	     if ( pixel > box->g_w )
+	     if ( pixel >= box->g_w )
 	       pixel = box->g_w;
 	     else
 	     {   	
 	     	pxyarray[0] = box->g_x+pixel;
 	      	pxyarray[1] = box->g_y;
 		pxyarray[2] = box->g_x+box->g_w - 1;
-	      	pxyarray[3] = box->g_y+box->g_h;
+	      	pxyarray[3] = box->g_y+box->g_h - 1;
 	 	pxyarray[4] = box->g_x;
 		pxyarray[5] = box->g_y;
 		pxyarray[6] = pxyarray[2]-pixel;
-		pxyarray[7] = box->g_y+box->g_h;
-		d_vro_cpyfm( 3, pxyarray,(LONG *)&x[0],(LONG *)x[0]);
+		pxyarray[7] = box->g_y+box->g_h - 1;
+		d_vro_cpyfm( 3, pxyarray,(LONG *)&x[0],(LONG *)&x[0]);
 	     }
 
 	     objc_draw( (LONG)win->w_obj, 0, MAX_DEPTH, box->g_x+box->g_w

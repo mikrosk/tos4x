@@ -160,7 +160,7 @@ _ctrl_cnts:			 	* Application Manager
 	.dc.b	5, 1, 0			* func 101	wind_open	
 	.dc.b	1, 1, 0			* func 102	wind_close	
 	.dc.b	1, 1, 0			* func 103	wind_delete	
-	.dc.b	2, 5, 0			* func 104	wind_get	
+	.dc.b	5, 5, 0			* func 104	wind_get	
 	.dc.b	6, 1, 0			* func 105	wind_set	
 	.dc.b	2, 1, 0			* func 106	wind_find	
 	.dc.b	1, 1, 0			* func 107	wind_update	

@@ -1006,6 +1006,7 @@ hd_window( msgbuff )
 	REG WORD	handle;
 	REG WINDOW	*win;	
 	REG OBJECT	*obj;
+	WINDOW		*win2;
 	WORD		shrink,x,dodraw;
 	GRECT		pt,px;
 	GRECT		*pc;
@@ -1016,10 +1017,13 @@ hd_window( msgbuff )
 	  return;
 	}
 
-	if ( !( win = get_win( msgbuff[3] ) ) )
+	if ( msgbuff[0] != AP_DRAGNDROP && !( win = get_win( msgbuff[3] ) ) )
 	    return;		/* illegal window handle */
 
-	obj = win->w_obj;
+	if (win)
+	  obj = win->w_obj;
+	else
+	  obj = 0;
 	handle = msgbuff[3];
 	pc = ( GRECT *)&msgbuff[4];	/* pc == msgbuff[4,5,6,7]	*/
 
@@ -1039,8 +1043,13 @@ hd_window( msgbuff )
 	      if ( winhead != win )	/* if not already on top in my list */
 	        clr_allwin();
 	      wind_set( handle, WF_TOP, 0, 0, 0, 0 );
-	      if (!win->w_iconified)	/* only top the window if it isn't iconified */
+	      /* next line commented out: since we already did top the window,
+		 (with the wind_set), we should keep track of that fact,
+		 shouldn't we??
+	       */
+	      /* if (!win->w_iconified)	/* only top the window if it isn't iconified */
 	      	make_top( win );
+
 	      /* fall through */
 	    case WM_ONTOP:
 	      desk_mice( M_ON );
@@ -1051,6 +1060,13 @@ hd_window( msgbuff )
 	    case WM_BOTTOMED:
 	      clr_allwin();
 	      wind_set( handle, WF_BOTTOM, 0, 0, 0, 0);
+	      win2 = w_gfirst();
+	      if (win2 == win)
+	      {
+		win = w_gnext();
+		if (win)
+		  make_top( win );
+	      }
 	      break;
 	      
 	    case WM_CLOSE:		/* close one path	*/
@@ -1184,6 +1200,11 @@ hd_window( msgbuff )
 					
 	      break;
 			  	
+	    case AP_DRAGNDROP:
+	      wind_update(0);
+	      rec_ddmsg( msgbuff );
+	      break;
+
 	    default:
 	      break;
 	}

@@ -601,6 +601,10 @@ wind_get(w_handle, w_field, pw1, pw2, pw3, pw4)
 {
 	WM_HANDLE = w_handle;
 	WM_WFIELD = w_field;
+	WM_IX = *pw1;
+	WM_IY = *pw2;
+	WM_IW = *pw3;
+	WM_IH = *pw4;
 	crys_if( WIND_GET );
 	*pw1 = WM_OX;
 	*pw2 = WM_OY;

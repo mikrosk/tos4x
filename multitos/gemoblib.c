@@ -453,6 +453,7 @@ LONG spec;
 
     if (type == G_STRING || type == G_TITLE || type == G_IBOX) return 1;
     if (type == G_IMAGE || (flags & IS3DOBJ)) return 0;
+    if (type == G_CICON) return 0;
     if (gl_ws[13] <= 16) return 1;
 
 /* Get color word */
@@ -1225,7 +1226,8 @@ ob_change(tree, obj, new_state, redraw)
 		ob_user(tree, obj, pt, spec, curr_state, new_state);
 		redraw = FALSE;
 	  }
-	  else if (obtype != G_ICON && ((new_state ^ curr_state) & SELECTED) )
+	  else if (obtype != G_ICON && obtype != G_CICON &&
+			 ((new_state ^ curr_state) & SELECTED) )
 	  {
 	    /* For non-icon objects, see if we can toggle selection by XOR.
 	     * G_IMAGE objects must be DEselected by XOR draw, *and*
@@ -1319,6 +1321,7 @@ ob_offset(tree, obj, pxoff, pyoff)
 	REG WORD		obj;
 	REG WORD		*pxoff, *pyoff;
 {
+	if (obj == NIL) return;
 	*pxoff = *pyoff = 0;
 	do
 	{
@@ -1788,6 +1791,8 @@ get_color_rsc( cicondata )
 	while (*array_ptr++ != ( CICONBLK *)-1L) 
 	  totalicons++;
 
+	Debug5("COLOR ICONS: #="); Ndebug5((LONG)totalicons);
+
 	ptr = (CICONBLK *) array_ptr;
 
 	fixup_cicon( ( WORD *)ptr, totalicons, (CICONBLK **)cicondata ); /* fixup pointers */
@@ -1860,6 +1865,7 @@ CICONBLK **carray;
 		databuffer = (WORD *)dos_xalloc( tot_size, 3 );
 		if ( !tempbuffer || !databuffer ) {
 		    ciconblk->mainlist = 0L;
+		    Debug1("Out of memory for trans_cicon()\r\n");
 		    return;	/* just quit */
 		}
 		expand_data( ( BYTE *)ctemp->col_data,( BYTE *)tempbuffer, ( BYTE *)ctemp->mask,

@@ -1,13 +1,16 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.4 $	$Source: f:\multitos/RCS/large.s,v $
+*  $Revision: 1.5 $	$Source: f:\multitos/RCS/large.s,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/12 19:51:12 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/04/14 22:19:54 $	$Locker:  $
 * =======================================================================
 *  $Log: large.s,v $
-*  Revision 1.4  1993/03/12  19:51:12  ersmith
-*  Merged HMK's loadable resource stuff
+*  Revision 1.5  1993/04/14  22:19:54  ersmith
+*  Incorporated more single/multitasking changes.
+*
+* Revision 1.4  1993/03/12  19:51:12  ersmith
+* Merged HMK's loadable resource stuff
 *
 * Revision 1.3  1993/03/10  20:12:42  ersmith
 * Lattice port
@@ -67,7 +70,7 @@ h	equ $1a
 
 _reverse:
  	movem.l	d2-d3,-(sp)		; Save d3 since we clobber it
-	move.w	8(sp),d3		; d3 = source
+	move.w	12(sp),d3		; d3 = source
 	clr.w	d1			; target bit position
 	clr.w	d0			; target
 	move.w	#15,d2			; source bit position

@@ -15,7 +15,7 @@
 EXTERN	LONG	trap();
 
 GLOBAL	WORD	DOS_AX;
-
+EXTERN	WORD	gl_multi;
 
 /*  I know what this does, but I don't
 *  know why it's supposed to do it.
@@ -27,12 +27,12 @@ isdrive( VOID )
 }
 
 
-	WORD
+	LONG
 dos_pexec( mode, name, tail, envr )
 	WORD	mode;
 	BYTE	*name,*tail,*envr;
 {
-	return( (WORD)trap( X_EXEC,mode,name,tail,envr ) );
+	return( trap( X_EXEC,mode,name,tail,envr ) );
 }
 	
 
@@ -47,7 +47,13 @@ pgmld( pname, ldaddr, tail, envrn )
 	if ( *ldaddr = ( LONG *)trap( X_EXEC, 3, pname, tail, envrn ) )
 	{
   	  temp = *ldaddr;		/* code+data+bss lengths */
-  	  length = temp[3] + temp[5] + temp[7] + 0x150;
+	  if (gl_multi)
+  	    length = temp[3] + temp[5] + temp[7] + 0x150;
+	  else
+	  {
+	    length = temp[3] + temp[5] + temp[7] + 0x1100;	/* gives 4K of stack, +256 bytes for basepage */
+	    temp[1] = temp[0] + length;		/* save top of TPA for user stack */
+	  }
 	  if ( !trap( X_MSHRINK, 0, *ldaddr, length ) )
   	    return( TRUE );
 	}
@@ -158,9 +164,13 @@ dos_xalloc(nbytes, type)
 {
 	LONG		ret;
 
+	if (!gl_multi) {
+		type &= 0x03;
+	}
 	ret = trap( X_XMALLOC, nbytes, type );
 	Debug1( "AES Dos_xalloc " );
 	Ndebug1( nbytes );
+
 	return( ret );
 }
 

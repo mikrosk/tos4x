@@ -2,14 +2,17 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.4 $	$Source: f:\multitos/RCS/gemflag.c,v $
+*  $Revision: 1.5 $	$Source: f:\multitos/RCS/gemflag.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/12 19:51:12 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/04/14 22:19:54 $	$Locker:  $
 * =======================================================================
 *  $Log: gemflag.c,v $
-*  Revision 1.4  1993/03/12  19:51:12  ersmith
-*  Merged HMK's loadable resource stuff
+*  Revision 1.5  1993/04/14  22:19:54  ersmith
+*  Incorporated more single/multitasking changes.
 *
+ * Revision 1.4  1993/03/12  19:51:12  ersmith
+ * Merged HMK's loadable resource stuff
+ *
  * Revision 1.3  1993/03/10  20:12:42  ersmith
  * Lattice port
  *
@@ -63,6 +66,7 @@
 #include "aesmint.h"
 
 
+EXTERN	WORD	gl_multi;
 EXTERN	WORD	aesid;
 EXTERN	WORD	gl_smid;
 EXTERN	GRECT	gl_rscreen;
@@ -147,6 +151,11 @@ unsync( VOID )
 	  spdid = p->p_pid;
 	  p->p_state = PS_READY;
 	  link_tail( &drl, p );
+#if 0
+	  if (!gl_multi)
+                dsptch();
+#endif
+
 	}
 	else
 	  spdid = 0;
@@ -219,10 +228,15 @@ wm_update( flag )
 
 	WORD	ret;
 
+	Debug6("Wm_update called, flag="); Ndebug6((LONG)flag);
+
 	if ( ( !currpd ) || ( currpd == errpd ) || ( currpd->p_pid == aesid ) 
 	     || ( currpd->p_state == PS_DEAD ) 
-	     || ( currpd->p_state == PS_ZOMBIE ) )
+	     || ( currpd->p_state == PS_ZOMBIE ) ) {
+	  Debug6("Wm_update returns FALSE\r\n");
 	  return( FALSE );
+	}
+
 
 	ret = TRUE;
 
@@ -247,10 +261,10 @@ wm_update( flag )
 	      {				/* No		*/
 		currpd->p_prvstate = currpd->p_state;
 		currpd->p_state = PS_BLOCKED;
-/*		Debug0( "wm_update call dsptch\r\n" );	*/
+		Debug1( "wm_update call dsptch\r\n" );	
 		if ( !dsptch( currpd ) )
 		{
-	  	  Debug1( "Wm_update calls dsptch fails\r\n" );
+	  	  Debug6( "Wm_update calls dsptch fails\r\n" );
 		  while(1)
 		  {
 		  }
@@ -269,8 +283,10 @@ wm_update( flag )
 	 case 3:         
 	    if ( flag & 0x0100 )/* just checking */
 	    {
-	      if ( ( spdid ) && ( currpd->p_pid != spdid ) )		
+	      if ( ( spdid ) && ( currpd->p_pid != spdid ) ) {
+		Debug6("Wm_update returns FALSE (checking mode)\r\n");	
 		return( FALSE );
+	      }
 	    }
 
            take_ownership( 1 );
@@ -282,7 +298,8 @@ wm_update( flag )
 		
 	   break;		 	
         }
-	
+
+	Debug6("Wm_update returns TRUE\r\n");	
 	return( ret );
 }
 

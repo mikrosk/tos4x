@@ -66,6 +66,7 @@ EXTERN	LONG	trap();
 EXTERN	WORD	gl_rschange;
 EXTERN	UWORD	a_rezword;
 EXTERN	UWORD	b_rezword;
+EXTERN	WORD	gl_multi;
 EXTERN	WORD	gl_width;
 EXTERN	WORD	gl_height;
 EXTERN	WORD	gl_handle;
@@ -256,6 +257,30 @@ sh_reschg( mode, res )
 	return( ret );
 }
 
+/*
+ * close all accessories
+ */
+	VOID
+close_accs()
+{
+	PD *p1;
+	WORD code = 0;	/* dunno if this is right */
+
+	p1 = plr;
+	while( p1 )
+	{
+	  if ( (p1->p_type & AESACC) && currpd != p1 )
+	  {
+	    
+	    wm_clspd( p1, TRUE ); 	  
+	    ap_sendmsg( AC_CLOSE, p1->p_pid, p1->p_accid, p1->p_accid, 
+			code, 0, 0 );	    
+	  }
+	  p1 = p1->p_thread;
+	}
+	all_run();
+	accwait();
+}
 
 /*	Set the system into shutdown mode
 *	isgem -1 to check to see if the current process can do shut down
@@ -408,7 +433,12 @@ sh_draw( lcmd )
 	upperstr( lcmd );
 	tree = ad_stdesk;
 	LLSET( LLGET(OB_SPEC(TITLE)), ( LONG )lcmd );
-	ob_draw( tree, ASCREEN, MAX_DEPTH );
+
+	if (gl_multi)
+		ob_draw( tree, ASCREEN, MAX_DEPTH );
+	else
+		ob_draw( tree, 0, MAX_DEPTH );
+
 }
 
 
@@ -433,6 +463,24 @@ sh_draw( lcmd )
 	return( ++pname );
 }
 
+#if 0
+	VOID
+execBP( PD *p, BYTE *basepage )
+{
+	WORD i;
+	WORD pid = p->p_pid;
+
+	i = dos_pexec(6, 0L, basepage, 0L);
+Debug7("Back from pexec()\r\n");
+        if ( !forkq( (WORD(*)())pdterm, ( ((LONG)pid)<<16 ) | i ) )  
+  	{
+	  Debug1( "Failed to register terminate\r\n" );
+	}
+Debug7("Back from forkq()\r\n");
+}
+#else
+extern VOID execBP(BYTE *, BYTE *);
+#endif
 
 /*	New routine to launch an application	*/
 
@@ -441,15 +489,18 @@ sh_fork( program, tail, envrn )
 	BYTE	*program,*tail,*envrn;
 {
 	PD	*p;
-	WORD	i;
+	LONG	i;
 	BYTE	*bptr;
 	BYTE	savechr;
+	WORD	msgbuf[8];
 
 	if ( p = get_pd( sh_name( program ), AESAPP ) )
 	{
 	  Debug1( "Shel exec -> " );
 	  Debug1( program );
 	  Debug1( "\r\n" );
+
+	  p->p_ppid = currpd->p_pid;	  
 
 	  Debug1( "Tail length -> " );
 	  Ndebug1( (LONG)tail[0] );
@@ -463,13 +514,13 @@ sh_fork( program, tail, envrn )
 	  else
 	    Debug1( "No tail\r\n" );
 
-	  Debug1( "Environment: -> " );
+	  Debug7( "Environment: -> " );
 
 	  bptr = envrn;
 	  while( *bptr )
 	  {
-	    Debug1( bptr );	
-	    Debug1( "\r\n" );
+	    Debug7( bptr );	
+	    Debug7( "\r\n" );
 	    i = strlen( bptr ) + 1;
 	    bptr += i;
 	  }
@@ -484,19 +535,41 @@ sh_fork( program, tail, envrn )
 	  savechr = tail[CMDLEN-1];
 	  tail[CMDLEN-1] = 0;
 		
-	  i = dos_pexec( 100, program, tail, envrn );
-
-	  tail[CMDLEN-1] = savechr;
-
-	  if ( ( p->p_sysid = i ) < 0 )	/* fail */
+	  if (gl_multi)
+	    i = dos_pexec( 100, program, tail, envrn );
+	  else
 	  {
-	    Debug1( "Dos_pexec fails\r\n" );
+	    Debug1("Free memory: "); Ndebug1((LONG)dos_xalloc(-1L, 3))
+	    i = dos_pexec( 3, program, tail, envrn );
+	  }
+	  tail[CMDLEN-1] = savechr;
+	  Debug1( "After dos_exec\r\n" );
+
+	  if ( i < 0 )	/* fail */
+	  {
+	    Debug1( "Dos_pexec fails: error code " );
+	    Ndebug1( i );
 	    unlink_pd( &alr, p );
 	    free_pd( p );
 	  }
 	  else
 	  {
-	    p->p_ppid = currpd->p_pid;	  
+	    if (gl_multi)
+	      p->p_sysid = (WORD)i;
+	    else
+	    {
+	/* schedule the child's execution */
+		Debug1( "sh_fork: doing pstart\r\n" );
+		pstart(p, (BYTE *)execBP, (BYTE *)i);
+		Debug1( "sh_fork: after pstart, going into while loop now\r\n" );
+	/* now wait for the child to finish */
+		if (!(currpd->p_type & AESSYSTEM)) {
+			do {
+				ev_mesag( (BYTE *) msgbuf );
+			} while (msgbuf[0] != CH_EXIT);
+		}
+		Debug1( "sh_fork: after while loop\r\n" );
+	    }
 	    return( p->p_pid );
 	  }
 	}
@@ -561,6 +634,7 @@ sh_read(pcmd, ptail)
 	LBCOPY( ( BYTE *)ptail, ad_shtail, CMDLEN);
 	return(TRUE);
 }
+
 
 
 /*	Exec a file	*/
@@ -676,7 +750,7 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 	    if ( ptr[3] )
 	    {
 	      Debug1( "1 Set default dir at " );
-	      Debug1( ptr[3] ); 	
+	      Debug1( (BYTE *)ptr[3] ); 	
 	      Debug1( "\r\n" );	
 	      dos_setdir( ( BYTE *)ptr[3], 1 );
 	    }
@@ -710,14 +784,41 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
  
 	switch( doex & 0x00FF )
 	{
+
 	  case 1:
 	  case 2:
 	    if ( isgem )		/* run graphic program */
+	    {
+	      if (gl_multi == 0)
+	      {
+	        close_accs();
+
+		mn_bar(0x0L, 0x200);
+		/*sh_background();*/
+		set_desk(scr_pd);
+	        sh_draw( sh_name(ad_shcmd) );
+		
+	      }
 	      ret = sh_fork( ad_shcmd, ad_shtail, envrn );
+	      if (gl_multi == 0)
+	      {
+		w_drawchange(&gl_rscreen, NIL, NIL);
+		mn_bar(0x0L, 0x200 | TRUE);
+	      }
+	    }
 	    else			/* run tos program	*/
 	    {
-		
 
+	      if (gl_multi == 0)
+	      {
+		close_accs();
+		sh_toalpha();
+		ret = sh_fork( ad_shcmd, ad_shtail, envrn );
+		sh_tographic();
+		gr_arrow( aesid );
+		w_drawchange(&gl_rscreen, NIL, NIL);
+		break;
+	      }
 	      if ( ( handle = dos_open( "u:\\pipe\\tosrun", 2 ) ) >= 0 )
 	      {				/* put in dir path	*/
 
@@ -782,7 +883,6 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 	        sh_envrn( ( LONG *)&cptr, TOSRUN );	
 	        if ( cptr )				
 	        {
-#if 1
 /*
  * Copy the old ad_shcmd over into the first argument
  * slot; to do this, we need to create a new command
@@ -812,7 +912,6 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 		     changed = FALSE;
 		   }
  		   LBCOPY( ad_shcmd, cptr, CMDLEN );
-#endif
 		   if ( !changed )
 		   {
 		     if ( ad_shtail[0] )
@@ -879,7 +978,8 @@ ex_exit:
 /* Don't stay in the subdirectory, or else the kernel will think that
  * the directory is busy: ++ ERS 12/21/92
  */
-	dos_chdir( (LONG)"\\");
+	if (gl_multi)
+	    dos_chdir( (LONG)"\\");
 
 	return( ret );
 }
@@ -1030,7 +1130,7 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 	      i = sh_len( ad_envrn );
 	      lbintoasc( (LONG)i, ( BYTE *)buffer );
 	      Debug7( "Sh_len -> " );
-	      Debug7( buffer );
+	      Debug7( (BYTE *)buffer );
 	      Debug7( "\r\n" );	
 	      return( i );
 	    }
@@ -1101,7 +1201,7 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 		if ( currpd->p_type & AESSHELL )/* shell go to sleep */
 		  shellpd = scr_pd;		/* swap the background */
 
-		swap_next( currpd, 0 );
+		swap_next( currpd, FALSE );
 	      }
 	    }	 	 	
 

@@ -27,12 +27,17 @@
 #include "dispvars.h"
 #include "objaddr.h"
 #include "windlib.h"
+#ifdef MB_STATE
+/* mn_tools has a definition, but we want the one from crysbind.h */
+#undef MB_STATE
+#endif
 #include "crysbind.h"
 #include "aesmint.h"
 #include "gemusa.h"
 
 #define GB_STATE 	int_in[3]
 
+EXTERN	WORD	gl_multi;
 EXTERN	BYTE	PATHEQUAL[];
 EXTERN	GRECT	gl_rzero;
 EXTERN	GRECT	gl_rscreen;
@@ -290,6 +295,11 @@ crysbind( pcrys_blk )
 		ob_change(OB_TREE, OB_DRAWOB, OB_NEWSTATE, OB_REDRAW);
 		break;
 				
+/* June 26 1992 - ml.   New call for new object extensions */
+	  case OBJC_SYSVAR:
+		ret = ob_sysvar(OB_MODE, OB_WHICH, OB_I1, OB_I2, &OB_O1, &OB_O2 );
+		break;
+
 	  case FORM_DO:			/* Form Manager	*/
 		Debug7( "form_do\r\n" ); 
 		ret = fm_do(FM_FORM, FM_START);
@@ -497,6 +507,8 @@ crysbind( pcrys_blk )
 		break;
 	  default:
 	 	value = (LONG)OP_CODE;
+		Debug1( "illegal function call: number " );
+		Ndebug1( value );
 		fm_show( ALRTNOFU, ( UWORD *)&value, 1 );
 		ret = -1;
 		break;
@@ -527,7 +539,7 @@ chkbind( pcrys_blk, what )
 	WORD		ret,wait;
 	UWORD		*control;
 
-	if ( currpd->p_state & PS_NEW )
+	if ( (currpd->p_state & PS_NEW) && !gl_multi )
 	  return( TRUE );
 
 	ret = TRUE;		/* set up correct return code	*/
@@ -537,9 +549,11 @@ chkbind( pcrys_blk, what )
 	  goto c_out;
 
 	if ( ( what & 0x0000FFFFL ) == 201 )	/* just dispatch	*/
+	{
+	  if (!gl_multi) wait = TRUE;
 	  goto c_out; 
+	}
 
-		  
  	control = (UWORD *)(pcrys_blk->cb_pcontrol);
 	global_in = (LONG *)(pcrys_blk->cb_pglobal);
 	int_in = (WORD *)(pcrys_blk->cb_pintin);
@@ -824,6 +838,11 @@ c_out:
 	{
 	  int_out[0] = ret;
 	  wake_up(0);
+	} else if (gl_multi == 0) {	/* not multitasking, do the call anyway */
+		yieldcpu();
+		crysbind(pcrys_blk);
+		wait = FALSE; /* pretend we didn't have to wait */
+		wake_up(0);
 	}
 
 	forker();

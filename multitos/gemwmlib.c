@@ -58,7 +58,8 @@ EXTERN	WORD	gl_kbid;
 EXTERN	OBJECT	*ad_stdesk;
 EXTERN	PD      *gl_mowner;
 EXTERN	LONG    gl_mntree;
-EXTERN	PD	*shellpd;
+EXTERN	PD	*shellpd, *scr_pd;
+EXTERN	WORD	gl_multi;
 
 EXTERN	WORD	gl_handle;
 EXTERN WORD	gl_wchar, gl_hchar;	/* char size in pixels */
@@ -127,9 +128,11 @@ GLOBAL	OBJECT	w_tree;		/* default window background structure	*/
 setmenu( p )
 	PD	*p;
 {
+	if (!gl_multi && !gl_mnpid)
+		return;
 	if ( ( p->p_mnaddr ) && ( p->p_pid != gl_mnpid ) ) 
 	{
-	  Debug7( "Setmenu\r\n" );
+	  Debug1( "Setmenu\r\n" );
 
 	  /* Pass the address of the PD structure here */
 	  mn_bar( ( LONG )p, TRUE|0x0100 );
@@ -137,10 +140,10 @@ setmenu( p )
 	else
 	{
 	  if ( !p->p_mnaddr )
-	    Debug7( "Setmenu has no menu bar address\r\n" );  
+	    Debug1( "Setmenu has no menu bar address\r\n" );  
 
 	  if ( p->p_pid == gl_mnpid )
-	    Debug7( "Setmenu menu id is same\r\n" );
+	    Debug1( "Setmenu menu id is same\r\n" );
 	}
 }
 
@@ -206,7 +209,7 @@ set_desk( p )
 	WORD	ret;
 
 	if ((p->p_newdesk == ( BYTE *)gl_wtree) && shellpd)	/* Default background 	*/
-	  p = shellpd;					/* Use the shell's	*/
+	  p = gl_multi ? shellpd : scr_pd;				/* Use the shell's	*/
 
 	ret = ( gl_newid != p->p_pid ) ? TRUE : FALSE;
 
@@ -408,8 +411,10 @@ wm_create( kind, rect )
 
     /* find next available window structure and handle	*/
     /* if none available, return with a FAILURE		*/
-    if( ( wp = newwp() ) == ( WINDOW *)NULLPTR || newhndl(wp) == FAILURE)
+    if( ( wp = newwp() ) == ( WINDOW *)NULLPTR || newhndl(wp) == FAILURE) {
+	Debug5("wm_create fails\r\n");
 	return FAILURE;
+    }
 
 
     wp->type = 0;
@@ -540,10 +545,10 @@ wm_create( kind, rect )
 
     storewp(wp);	/* store window structure into database */
     w_adjust( wp, rect);
-/*    Debug0( wp->owner->p_name );
-    Debug0( " creates " );
-    Ndebug0( (LONG)wp->handle );  		
-*/
+    Debug5( wp->owner->p_name );
+    Debug5( " creates " );
+    Ndebug5( (LONG)wp->handle );  		
+
     return(wp->handle);	/* returns a handle */
 }
 
@@ -566,13 +571,15 @@ wmopen(handle, rect)
     				/* if window structure can't be found		*/
 				/* or window already opened, return error	*/
 
-    if ((wp = srchwp(handle)) == ( WINDOW *)NULLPTR || wp->status.opened)
+    if ((wp = srchwp(handle)) == ( WINDOW *)NULLPTR || wp->status.opened) {
+	Debug5("wm_open fails\r\n");
 	return ( FALSE );
+    }
 
-/*    Debug0( wp->owner->p_name );
-    Debug0( " opens " );
-    Ndebug0( (LONG)handle );
-*/	
+    Debug5( wp->owner->p_name );
+    Debug5( " opens " );
+    Ndebug5( (LONG)handle );
+	
     if ( handle != phanwind )
       wmclose( phanwind );
 
@@ -593,7 +600,7 @@ wmopen(handle, rect)
     ret = totop( handle, WMOPEN );	/* top it	*/
 
     if ( ( ret ) && ( handle != phanwind ) )
-      setmenu( wp->owner );
+      	setmenu( wp->owner );
 
     return ( ret );
 }
@@ -632,10 +639,10 @@ wmclose( handle )
 	if ( ( handle == deskwind ) || ( wp = srchwp(handle)) == ( WINDOW *)NULLPTR || !wp->status.opened )
 	  return FALSE;
 
-/*	Debug0( wp->owner->p_name );
-	Debug0( "closes " );
-	Ndebug0( (LONG)handle );
-*/
+	Debug5( wp->owner->p_name );
+	Debug5( "closes " );
+	Ndebug5( (LONG)handle );
+
 	closetop = FALSE;		/* assume not closing the top win */
 					    
 	wp->prev = wp->curr;		/* save previous coords */
@@ -741,8 +748,8 @@ wm_close( handle )
 	WORD	ret;
 	WINDOW	*wp;
 					/* illegal handle */	
-	Debug7( currpd->p_name );
-	Debug7( " close window " );
+	Debug5( currpd->p_name );
+	Debug5( " close window " );
 
 	if ( !( wp = srchwp( handle ) ) )
 	  return( FALSE );
@@ -794,10 +801,10 @@ wmdelete(handle)
     if ( ( handle == deskwind ) || (wp = srchwp(handle)) == ( WINDOW *)NULLPTR)
 	return FALSE;
 
-/*    Debug0( wp->owner->p_name );
-    Debug0( " deletes " );
-    Ndebug0( (LONG)handle );
-*/
+    Debug5( wp->owner->p_name );
+    Debug5( " deletes " );
+    Ndebug5( (LONG)handle );
+
     /* delete window's rectangle list if there is one */
 
     if (wp->fxywh)
@@ -931,7 +938,7 @@ wm_get(handle, field, ow, iw)
 	 
     if ((wp = srchwp(handle)) == ( WINDOW *)NULLPTR )
     {
-	Debug1( "Wind_get illegal handle\r\n" );	
+	Debug1(currpd->p_name); Debug1( ": Wind_get illegal handle=" );Ndebug1((LONG)handle); 	
 	return FALSE;
     } 		
 
@@ -2651,3 +2658,4 @@ dk_redraw( obj, root, px )
 	gsx_mon();
 }
 
+          

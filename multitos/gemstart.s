@@ -21,7 +21,7 @@
 	.globl	gemstart
 	.globl	_sysbase
 	.globl	longframe
-	.globl	_cMiNt
+	.globl	_cMiNT
 ;	.globl	_setuser
 	.globl	_gl_port
 	.globl	_gl_debug
@@ -61,16 +61,17 @@ gemstart:
 
 ;	Check the MiNT cookie at here
 
-	jsr	_cMiNt		; check the MiNt
-	bne	g1
-	move.l	#NoMiNt,-(sp)
-	move.w	#9,-(sp)
-	trap	#1
-	addq.l	#6,sp
-	bra	exit
-g1:
+	jsr	_cMiNT		; check the MiNt
+; Old code: if MiNT not present, print error message and exit
+;	bne	g1
+;	move.l	#NoMiNt,-(sp)
+;	move.w	#9,-(sp)
+;	trap	#1
+;	addq.l	#6,sp
+;	bra	exit
+;g1:
 ;
-; There's no need to set exec_os, MiNT already did so
+; There's no need to set exec_os, MiNT or TOS already did so
 ; ++ERS 2/17/93
 ;
 ;	move.l	gemstart,$4fe	; exec_os 6/23/92

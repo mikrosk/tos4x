@@ -43,6 +43,7 @@
 EXTERN  LONG	trap();
 EXTERN  LONG	trap13();
 
+EXTERN	WORD	gl_multi;
 EXTERN	WORD	gl_mfid;
 EXTERN	WORD	reschid;
 EXTERN	PD	*tlr;
@@ -63,6 +64,7 @@ EXTERN	PD	*shellpd;
 EXTERN	LONG	shel_magic;
 EXTERN	WORD	aesid;
 EXTERN	PD	*scr_pd;
+EXTERN	PD	*errpd;
 EXTERN	WORD	kstate;
 EXTERN	WORD	gl_recd;
 EXTERN	WORD	gl_rlen;
@@ -190,8 +192,12 @@ Debug( level, str )
 {
 	if ( gl_debug >= level )
 	{
+#if 1
 	  while( *str )
 	    trap13( 3, gl_port, *str++ );
+#else
+	  trap(9, str);
+#endif
 	}
 }
 
@@ -216,6 +222,7 @@ Debug( level, str )
   	  p = p->p_thread;   	
 	}
 
+	Debug1("systopd failed, id=");Ndebug1((LONG)i);
 	return( (PD*)0 );
 }
 
@@ -317,11 +324,12 @@ sigchld( VOID )
 /*	Process to be put on wait state	*/
 
 	WORD
-dsptch( p )
-	PD	*p;
+dsptch()
 {
 	WORD	ret;
+	PD	*p;
 
+	p = currpd;
 	if ( p )
 	{		/* some of the starting prcoess */
 			/* may be either on rlr or alr	*/
@@ -339,8 +347,10 @@ dsptch( p )
 	    Debug1( "Dsptch unlink fails\r\n" );
 	    showall();
 	  }
+	} else {
+		Debug1("*** Dsptch: currpd == 0\r\n");
+		showall();
 	}
-
 	return( 0 );
 }
 
@@ -377,6 +387,7 @@ swap_next( p, pterm )
 	WINDOW		*win;
 	WORD		item,changed,chgback;
 
+	Debug7("swap_next called");
 	changed = chgback = FALSE;
 
 	/* if it owns the phanom winodw then close it first */
@@ -442,14 +453,15 @@ swap_next( p, pterm )
 	if ( gl_mfid == p->p_pid )
 	  gr_arrow( newp->p_pid );	/* Change back to arrow		*/
 
-				/* get this process's top window*/
-				/* if not on top then ask him to do so */
-	set_desk( newp );	/* set the background screen owner */
-				/* and pointer 			   */
+	if (gl_multi || pterm) {
+					/* get this process's top window*/
+					/* if not on top then ask him to do so */
+		set_desk( newp );	/* set the background screen owner */
+					/* and pointer 			   */
 
-/*	mn_bar( newp, TRUE|0x0100 );	*/
-	send_ctrl( newp, 8 );	/* update the menu		*/
-
+		Debug1("swap_next() does send_ctrl(8)\r\n");
+		send_ctrl( newp, 8 );	/* update the menu		*/
+	}
 	if ( pterm )		/* process termination, let the	*/
 	  send_ctrl( newp, 2 );	/* screen manager decides what  */
 	else			/* to do			*/
@@ -457,6 +469,7 @@ swap_next( p, pterm )
 	  if ( chgback )
 	    send_ctrl( newp, 3 );
 	}
+
 }
 
 
@@ -469,7 +482,7 @@ make_ready( VOID )
 
 	if ( p = tlr )		/* terminating process list */
 	{
-	  if ( Pgetpid() == idtopd( aesid )->p_sysid )
+	  if ( Pgetpid() == idtopd( aesid )->p_sysid || gl_multi == 0 )
 	  {
 	    unlink_pd( &tlr, p );
 	    currpd = idtopd( aesid );
@@ -481,9 +494,12 @@ make_ready( VOID )
 	{
 	  if ( ( !cpdid ) || ( cpdid == -1 ) ) 
 	  {
-	    cpdid = p->p_pid;			
+	    if (gl_multi)
+	      cpdid = p->p_pid;			
 	    alr = p->p_link;
 	    scheduler( p );
+	  } else {
+	    Debug1("alr couldn't be removed\r\n");
 	  }
 	}
 
@@ -505,7 +521,9 @@ make_ready( VOID )
 
 /*	Send a message to the AES	*/
 /*	Receiver id should be 0		*/
-
+/* called from aestrap.s; if gl_multi is 0, aestrap should
+ * make sure that sendmsg is never called
+ */
 	VOID	
 sendmsg( d1, d0 )
 	LONG	d0,d1;
@@ -644,8 +662,10 @@ link_tail( list, p )
 scheduler( p )
 	REG PD		*p;
 {      
-	if ( !p )	/* No process, better return	*/
+	if ( !p ) {	/* No process, better return	*/
+	  Debug1("No process specified!\r\n");
 	  return;
+	}
 again:
 	switch( p->p_state )
 	{
@@ -663,7 +683,7 @@ again:
 	    }
 	    else			/* ready to run	*/
 	    {
-	      p->p_state = p->p_prvstate;
+ 	      p->p_state = p->p_prvstate;
  	      goto again;
 	    }
 
@@ -702,8 +722,14 @@ again:
 
 	  case PS_ALLRUN:		/* accessories	all run		*/
 	  case PS_CRITICAL:		/* critical section		*/
-	  case PS_RUN:
 	    link_head( &rlr, p );
+	    break;
+
+	  case PS_RUN:
+	    if (gl_multi)
+	      link_head( &rlr, p );
+	    else
+	      link_tail( &rlr, p );
 	    break;
 
 	}
@@ -793,7 +819,7 @@ wake_up( wakeup )
 	    case PS_ZOMBIE:
 	    case PS_DEAD:
 	    case PS_RUN:
-	      if ( wakeup )
+	      if ( wakeup ) /* will be true only if gl_multi is */
 	      {
 	        temp = (LONG)currpd->p_sysid;
 	        temp |= 0xFFFF0000L;
@@ -820,6 +846,8 @@ wake_up( wakeup )
 *	start executing. If the process doesn't has a PD, we will
 *	create one for him as long as his first call is ap_init
 *	After the get_pd, we need to queue it to rlr right the way
+*
+*	Called from toaes, which is only called if gl_multi is non-zero.
 */
 
 	PD
@@ -884,13 +912,26 @@ g_2:	     value = (LONG)mintid;
 disp( VOID )
 {
 	AES		msg;
+	VOID (*startfunc)(PD *, BYTE *);
 
 	while( TRUE )		/* keep looking for AES requests */
 	{
+	  if (!gl_multi && !currpd) {
+		currpd = rlr;
+		startfunc = (VOID (*)(PD *,BYTE *))currpd->p_textaddr;
+		if (startfunc) {
+			currpd->p_textaddr = 0;
+Debug1("*** Starting new process: ");
+Debug1(currpd->p_name);
+			(*startfunc)(currpd, currpd->p_baseaddr);
+		}
+	  }
 	  if ( scr_exit ) 	/* screen manager exits?	*/
 	  {			/* wait for coming back AES context */
-	    if ( Pgetpid() == idtopd( aesid )->p_sysid )
+	    if ((gl_multi == 0) || ( Pgetpid() == idtopd( aesid )->p_sysid )) {
+	      Debug7("Screen exits\r\n");
 	      break;
+	    }
 	  }
 
 	  chkkbd();		/* poll the keyboard		*/
@@ -901,10 +942,13 @@ disp( VOID )
 	  make_ready();		/* get ready to run process	*/	
 	  releaes();
 				/* check for AES request in the Pmsg */
-	  if ( !(UWORD)(Pmsg( 0x8000, 100L, &msg ) ) )
+	  if ( gl_multi && !(UWORD)(Pmsg( 0x8000, 100L, &msg ) ) )
 	    toaes( msg.aes_func, msg.aes_blk, msg.aes_id );
 	  			/* aes will not return to here	*/
-	  Syield();
+	  if (gl_multi)
+	    Syield();
+	  else
+	    dsptch();
 	}
 
 	dispret();		/* jump back to geminit	*/
@@ -1064,4 +1108,42 @@ ps_term( p )
 	}
 	
 	Debug1( "Termination done\r\n" );
+}
+
+/*
+ * function to give up the CPU, so that other processes can run;
+ * especially important for single-tasking!!
+ */
+
+VOID
+yieldcpu()
+{
+	PD *p;
+	int giveup;	/* should we give up the CPU? */
+
+	if (gl_multi) {
+	  Syield();
+	  return;
+	}
+
+	if (drl)
+	  giveup = TRUE;
+	else
+	{
+	  giveup = FALSE;
+	  p = currpd->p_link;
+	  while (p)
+	  {
+	    if (p->p_pid == aesid || p == errpd)
+	    {
+	      p = p->p_link;
+	    } else {
+	      giveup = TRUE;
+	      break;
+	    }  
+	  }
+	}
+
+	if (giveup)
+	  ev_timer(20);
 }

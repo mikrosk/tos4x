@@ -118,9 +118,11 @@ BYTE
 		}	 
 	}
 	
-	Debug1( "The bld_par is " );
-	Debug1( ret );
-	Debug1( "\r\n" );
+	if (ret) {
+		Debug1( "The bld_par is " );
+		Debug1( ret );
+		Debug1( "\r\n" );
+	}
 	return( ret );
 }
 

@@ -18,7 +18,7 @@
 #include "pdesk.h"
 #include "pmisc.h"
 
-
+EXTERN	WORD	d_multi;
 EXTERN	WORD	desk_id;
 EXTERN	WINDOW	*get_win();
 EXTERN	WINDOW	*get_top();
@@ -205,9 +205,11 @@ a_1:
 	  o_select();			/* update the search routine	*/
 	  x_select();
 
-	  if ( clicks == 2 )		/* double clicks	*/
+	  if ( clicks == 2 ) {		/* double clicks	*/
+	    if (!d_multi)	/* maybe not only in single tasking mode??? */
+	    	clr_allwin();
 	    open_item( item, type, win );
-	  else				/* button still down	*/
+	  } else				/* button still down	*/
  	    hd_down( item, type, win );
 
 	}/* nothing is found	*/

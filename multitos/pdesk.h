@@ -453,6 +453,8 @@ VOID	launch_pref(VOID);
 WORD	set_dir(BYTE *);
 VOID	exec_file(BYTE *, WINDOW *, WORD, BYTE *);
 VOID	run_it(BYTE *, BYTE *, WORD, WORD, WORD);
+VOID	hide_windows(WORD);
+VOID	show_windows(WINDOW *);
 
 /*	----------------------------------------------------------
  *	desksele.c
@@ -507,3 +509,4 @@ VOID	upfdesk(BYTE *, BYTE *);
 VOID	locate_item(WORD, BYTE *, WORD);
 
 
+         

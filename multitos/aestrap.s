@@ -33,6 +33,7 @@ NOERR	=	0
 
 	.text
 
+	.globl	_gl_multi
 	.globl	_seterr
 	.globl	_Bigstack
 	.globl	_vdicode
@@ -181,12 +182,15 @@ err2:
 *****************************************
 
 _releaes:
+	tst.w	_gl_multi
+	beq	relout
 	clr.l	-(sp)
 	move.l	#'_MUI',-(sp)
 	move.w	#3,-(sp)
 	move.w	#$134,-(sp)
 	trap	#1
 	add.l	#12,sp
+relout:
 	rts
 
 ;	clr.b	_inaes
@@ -198,12 +202,15 @@ _releaes:
 *****************************************
 
 _waitforaes:
+	tst.w	_gl_multi
+	beq	waitout
 	move.l	#-1,-(sp)
 	move.l	#'_MUI',-(sp)
 	move.w	#2,-(sp)	; get semaphore 
 	move.w	#$134,-(sp)
 	trap	#1
 	add.l	#12,sp
+waitout:
 	rts
 
 ;	tas	_inaes		; check the flag
@@ -242,6 +249,16 @@ goaes:
 	move.l	usp,a0
 	movem.l	d1-d7/a0-a6,-(a0)
 	move.l	a0,usp
+;
+; NEXT LINES ADDED FOR SINGLE TASKING AES
+;
+	tst.w	_gl_multi
+	bne	mtsk0
+	move.l	usp,a5
+	move.l	(sp),-(a5)	; save pc and status register info
+	move.l	4(sp),-(a5)	; since in single tasking, everyone shares 1 stack
+mtsk0:
+;
 	move.l	d0,-(sp)	; AES function		
 	move.l	d1,-(sp)	; Control Block	
 ;	tst.l	_cpd		; someone is in critical section
@@ -269,15 +286,17 @@ c_4:
 	bra	_chk1bind	; wait again
 c_6:
 	move.l	d0,a0		; save the pd
-	move.l	(sp),d0		; get the control block
+	move.l	4(sp),d0	; get the AES function #
+	move.l	(sp),d1		; get the control block
 	move.l	a0,_currpd	
 	move.l	8(a0),a0
 	move.l	2(a0),a0	; get the new stack pointer
 	move.l	sp,(a0)		; save old stack
 	move.l	a0,sp		; swap the stack
-	move.l	d0,-(sp)	; D1 is on the stack
+	move.l	d0,-(sp)	; push AES function
+	move.l	d1,-(sp)	; push control block	
 	jsr	_chkbind
-	addq.l	#4,sp
+	addq.l	#8,sp
 	move.l	(sp),sp		; reswap the stack
 	move.w	d0,-(sp)	; save the return code
 	jsr	_releaes	; release AES lock
@@ -291,6 +310,16 @@ c_2:
 	jsr	_sendmsg
 c_3:	
 	addq.l	#8,sp
+;
+; NEXT LINES ADDED TO SINGLE TASKING TOS
+;
+	tst.w	_gl_multi
+	bne	mtsk1
+	move.l	(a5)+,4(sp)	; restore pc and sr
+	move.l	(a5)+,(sp)	; for this process
+	move.l	a5,usp
+mtsk1:
+;
 	move.l	usp,a0
 	movem.l	(a0)+,d1-d7/a0-a6
 	move.l	a0,usp

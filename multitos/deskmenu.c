@@ -39,6 +39,14 @@
 #include "pdesk.h"
 #include "pmisc.h"
 
+/* #define DEBUGGING */
+#ifdef DEBUGGING
+#include "pdstruct.h"
+EXTERN	PD	*currpd;
+EXTERN	WORD	d_multi;
+EXTERN VOID Debug(WORD, BYTE *);
+#endif
+
 EXTERN	LONG	gl_vdo;
 EXTERN	WORD	q_change;
 EXTERN	WORD	pref_save;
@@ -54,7 +62,7 @@ EXTERN	BYTE	restable[];
 EXTERN	WORD	ftab[];
 
 EXTERN	WORD	st_keybd;
-
+EXTERN	WORD	d_multi;
 
 WORD	icn_whandle;
 WORD	d_exit;		/* desktop exit flag	*/
@@ -661,7 +669,7 @@ opt1:	      ins_icons();
 
 	  case PREFITEM:		/* desktop preference	*/
 	    mdesk_pref();		/* cjg 07/07/92 */
-/*	    desk_pref();	*/
+	    /*desk_pref();*/
 	    break;
 
 	  case READINF:
@@ -1277,7 +1285,14 @@ actions( VOID )
 			      &kstate,
 			      &kreturn,
 			      &clicks );
-	
+
+#ifdef DEBUGGING
+if (!d_multi) {
+Debug1(currpd->p_name);
+Debug1(" desktop woke up\r\n");
+}
+#endif
+
 	/* Don't change the following order, the wind_update call is selective */
 
 	  if ( event & MU_MESAG )
@@ -1315,12 +1330,14 @@ actions( VOID )
 	LONG
 av_mem( VOID )
 {
-#if 0
+
+
+if (!d_multi) {
 	REG BYTE	*start;
 	REG BYTE	*addr;
 	REG BYTE	**new;
 	LONG		total,size;
-	
+
 	total = 0L;
 	start = (BYTE*)0;
 
@@ -1359,7 +1376,7 @@ av_mem( VOID )
 	}
 
 	return( total );
-#else
+} else {
 /* do this the polite way under MultiTOS, i.e. ask U:\PROC how much
  * memory is free
  */
@@ -1378,7 +1395,7 @@ av_mem( VOID )
 	Dsetpath(oldpath);	/* restore old path for U: */
 	Dsetdrv(olddrv);	/* restore old drive */
 	return meminfo[0] * meminfo[2];
-#endif
+}
 }
 
 #if 0

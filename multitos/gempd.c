@@ -26,7 +26,7 @@
 #include "aesmint.h"
 
 
-
+EXTERN	WORD	gl_multi;
 EXTERN	OBJECT	*gl_wtree;
 EXTERN	PD	*alr;
 EXTERN	WORD	shutdown;
@@ -140,6 +140,7 @@ free_pd( p )
 	PD	*p;
 {
 	REG PD	*p1;
+	LONG	*ptr;
 
 	if ( plr )		/* find the process on the thread pointer */
 	{
@@ -162,6 +163,13 @@ free_pd( p )
 
 	  Debug7( p->p_name );
 	  Debug7( "'s pd is freed\r\n" );
+	  if (!gl_multi && ( p->p_type & AESACC ) && 
+	  ( ptr = ( LONG *)p->p_baseaddr ) )
+     	  {				
+		 if ( ptr[11] )		/* free envr string	*/
+		 	dos_free( ptr[11] );
+	 	 dos_free( ( LONG )p->p_baseaddr );	/* free progra, space	*/	
+	  }
 	  dos_free( ( LONG )p );
 	}
 }
@@ -178,10 +186,7 @@ p_nameit(p, pname)
  	BYTE c;
  
 	bfill(PSNAME, ' ',  &p->p_name[0]);
-#if 0
-	strscn( pname, &p->p_name[0], '.' );
-#else
-	/* someone could send us a longer name! */
+	/* someone could send us a long name, don't copy the whole thing */
  	/* ++ERS 2/11/93 */
  
  	for (i = 0; i < PSNAME; i++)
@@ -190,7 +195,6 @@ p_nameit(p, pname)
  	  if (c == '.' || c == 0) break;
  	  p->p_name[i] = c;
  	}
-#endif
 }
 
 
@@ -242,7 +246,7 @@ p_nameit(p, pname)
 #endif
 	  Debug7( p1->p_name );
 	  Debug7( "allocated at " );
-	  Ndebug7( p1 );
+	  Ndebug7( (LONG) p1 );
 
 	  if ( gl_curpid < 0 )		/* negative number? 	*/
 	    gl_curpid = 0;	
@@ -272,6 +276,8 @@ p_nameit(p, pname)
 	  }
 	
 	  p1->p_pid = gl_curpid++;
+	  if (!gl_multi)
+	    p1->p_sysid = p1->p_pid;
 	  link_tail( &alr, p1 );	/* start up processes list */
 
 	  Debug1( p1->p_name );
@@ -305,10 +311,14 @@ p_nameit(p, pname)
 	WORD		(*pcode)( PD *, BYTE * );	/* first line of code	*/
 	BYTE		*ldaddr;	/* load address		*/
 {
-	px->p_textaddr = ldaddr;
-	px->p_sysid = (*pcode)( px, ldaddr );
-
+	if (gl_multi)
+	{
+	  px->p_textaddr = ldaddr;
+	  px->p_sysid = (*pcode)( px, ldaddr );
+	} else {
+	  px->p_textaddr = (BYTE *)pcode;
+	  px->p_baseaddr = ldaddr;
+/*	  px->p_sysid was set up along with the PD */
+	}
 	return( px );
 }
-
-

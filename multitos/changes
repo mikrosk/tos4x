@@ -1,3 +1,21 @@
+Changes made 4/14/93:
+
+gem*.rsc:
+	Changed the "Please insert system disk..." alert to read
+	"Please insert MultiTOS disk...".
+
+Changes made 4/7/93:
+
+gemoblib.c:
+	Color icons shouldn't be XOR'd when selected!
+gemaplib.c:
+	Added wm_update() calls to ap_exit(), since appl_exit can
+	(indirectly) result in changes to the screen.
+gemfmalt.c:
+	Added wm_update(1)/wm_update(0) calls to lock the screen while
+	an alert box is displayed. Also: made all the text strings
+	TOUCHEXIT so that the box may be moved by grabbing any part of it.
+
 Changes made 3/10/93:
 
 deskopen.c:

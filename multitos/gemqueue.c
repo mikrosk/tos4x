@@ -25,9 +25,13 @@
 
 #include "machine.h"
 #include "aesmint.h"
+
+#include "message.h"
+
 						/* in PD88.C		*/
 EXTERN	PD	*currpd;
 EXTERN	WORD	spdid;
+EXTERN	WORD	gl_multi;
 
 
 	VOID
@@ -37,7 +41,7 @@ doq( donq, p, m )
 	QPB		*m;
 {
 	REG WORD	n;
-
+	REG WORD	index, *om, *nm;
 
 
 	n = m->qpb_cnt;
@@ -50,25 +54,28 @@ doq( donq, p, m )
 						/*   matching msg and	*/
 						/*   union the redraw	*/
 						/*   rects together	*/
-/*	  nm = (WORD *) &p->p_queue[p->p_qindex];
+/*
+	  if (!gl_multi) {
+		  nm = (WORD *) &p->p_queue[p->p_qindex];
 
-	  if ( nm[0] == WM_REDRAW )
-	  {
-	    index = 0;
-	    while ( (index < p->p_qindex) &&
-		    (n) )
-	    {
-	      om = (WORD *) &p->p_queue[index];
-	      if ( (om[0] == WM_REDRAW) &&
-		   (nm[3] == om[3]) )
-	      {
-		rc_union(&nm[4], &om[4]);
-	        n = 0;
-	      }
-	      else
-	        index += (om[2] + 16);
-	    }
-	  }
+		  if ( nm[0] == WM_REDRAW )
+		  {
+		    index = 0;
+		    while ( (index < p->p_qindex) &&
+			    (n) )
+		    {
+		      om = (WORD *) &p->p_queue[index];
+		      if ( (om[0] == WM_REDRAW) &&
+			   (nm[3] == om[3]) )
+		      {
+			rc_union(&nm[4], &om[4]);
+		        n = 0;
+		      }
+		      else
+		        index += (om[2] + 16);
+		    }
+		  }
+	}
 */
 	  p->p_qindex += n;
 	}
@@ -107,8 +114,8 @@ aqueue( isqwrite, e, lm )
 	}
 
 	if ( isqwrite )
-	  qready = ( lm->qpb_cnt <= (QUEUE_SIZE - p->p_qindex) );
-	else
+	  qready = ( lm->qpb_cnt < (QUEUE_SIZE - p->p_qindex) );
+	else		  /* was <=, changed 4/12/93 hmk */
 	  qready = ( p->p_qindex > 0 );
 
 	ppe = (isqwrite ^ qready) ? &p->p_qnq : &p->p_qdq;
@@ -156,8 +163,10 @@ q_1:	  if ( e1 = *ppe )
 	  else
 	  {			/* if queue is full and it is writing to */
 				/* itself, then return error		 */	
-	    if ( p == currpd )
+	    if ( p == currpd ) {
+	      Debug1(currpd->p_name); Debug1(": Event queue is full.\r\n");
 	      return( FALSE );
+	    }
 	  }
 
 	  if ( spdid != currpd->p_pid )

@@ -133,8 +133,9 @@ tpollmb:
 
 * addr in gsx in rat draw routine
 
-_gl_xrat:	.ds.w	1
-_gl_yrat:	.ds.w	1
+;_gl_xrat:	.ds.w	1		; commented out by HMK 03/24/93 since they 
+;_gl_yrat:	.ds.w	1		; redefined in gemsigna.c !!!
+
 _drwaddr:	.ds.l	1		; initialized to _justretf
 _tikaddr:	.ds.l	1		; initialized to _tikcod
 gstksave:	.ds.l	1

@@ -4,22 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/02 13:37:53 $
+* $Date: 90/02/16 16:43:07 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.11  90/02/16  16:43:07  apratt
+* Added SCC serial-port code to the bconmap section.  All works.
+*
+* Added initializing registers 9 and 10 to zero in the keyclick-sound
+* data list, in the hopes that this would fix it: some sounds cause
+* subsequent keyclicks to come out wrong.  Don't know if this fixes
+* it or not, because my TT has no speaker!
+*
 * Revision 2.10  90/02/02  13:37:53  apratt
 * Added conmap code, and TTMFP serial port code.  The conmap code
 * should really be dependent on a separate conditional, not TT
 * as it is now, because it will go in new STe's.  SCC serial-port
 * driver doesn't exist here yet.
-*
+* 
 * Also changed coldboot to clobber fast RAM, too, again up to
 * a bus error.
-*
+* 
 * Revision 2.9  89/12/08  15:46:16  apratt
 * Changed rsconf so it enables & disables tx and rx just by
 * changing the one bit, not by setting and clearing the whole
@@ -156,7 +164,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.10 $
+* $Revision: 2.11 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -1247,7 +1255,7 @@ lst1:	rts
 *									*
 *		auxillary port input status routine			*
 *									*
-	lea	ribufptr,a0	* ptr to RS232 input buffer record
+*************************************************************************
 
 	.globl	auxistat
 
@@ -1272,7 +1280,7 @@ instxit:
 * 02/18/87	Conform to old spec where we put at tail and pull	*
 *		from the head. The tail points to the LAST char to	*
 *		enter the buffer.					*
-	lea	ribufptr,a0	* ptr to RS232 input buffer record
+*************************************************************************
 	lea	kickstart(PC),a2
 	.globl	auxin
 * entry point used by ttin
@@ -1310,7 +1318,7 @@ xinxon:	move.b	#xon,sendnow(a0)
 *									*
 *		auxillary port output status routine			*
 *									*
-	lea	robufptr,a0	* ptr to RS232 output buffer record
+*************************************************************************
 
 	.globl	_auxostat
 
@@ -1332,7 +1340,7 @@ ostxit:	rts
 *		auxillary output routine				*
 *									*
 *************************************************************************
-	lea	robufptr,a0	* ptr to RS232 output buffer record
+
 	.globl	_auxout
 	move.w	6(sp),d0	* get data
 	lea	robufptr.w,a0	* ptr to RS232 output buffer record
@@ -1361,7 +1369,7 @@ ostxit:	rts
 *	Externals:
 *		sender
 *
-	lea	ribufptr,a0	* load up queue pointer for sender
+	lea	ribufptr.w,a0	* load up queue pointer for sender
 kickstart:
 	tst.b	tsr(a2)
 	bpl	kikxit		* IF (MFP Empty) THEN
@@ -1570,7 +1578,7 @@ ttmfp	equ	$fffffa81
 	bsr	initint
 
 *	init the "d" timer
-	move.w	#$1,brate+ribufptr	;9600 is baud rate number 1
+	move.w	#$1,(brate+ribufptr).w	;9600 is baud rate number 1
 	moveq	#dtimer,d0	;select the d timer
 	moveq	#c9600,d1	;init for /4 for 9600 baud
 	moveq	#d9600,d2	;init for 9600 baud
@@ -1581,8 +1589,8 @@ ttmfp	equ	$fffffa81
 *	(reload a0 with ST MFP base)
 *
 * 10/89	The init value for tsr was 01, now 05: this means the output state
-*	TTMFP has no control lines, so that doesn't matter.  TT's two
-*	SCC ports should also be initialized here, but they aren't.
+* 	when the transmitter is enabled but idle is "high" not "Hi-Z"
+*	(open collector)... This (finally!) gets rid of the spurious
 *	$ff which used to be transmitted when you reset an ST.
 *
 *	Also, I've added initializing the TTMFP's port and set it to 9600 too.
@@ -1596,7 +1604,9 @@ ttmfp	equ	$fffffa81
 
 .if TT
 	lea.l	ttmfp,a0
-	move.w	#1,brate+ttribufptr	; save in ttmfp's iorec
+	move.w	#1,(brate+ttribufptr).w	; save in ttmfp's iorec
+
+	bsr	_setupscc
 .endc
 
 	tst.b	_iamanst		; if you're an ST don't do this
@@ -2082,7 +2092,7 @@ bslct0:	addq.l	#2,a1		* ELSE Point to Alternate Register Set
 *		gets data from the rs-232 receiver port			*
 *									*
 * 02/18/87	Conform to old spec where we put at tail and pull	*
-	lea	ribufptr,a0
+*		from the head. The tail points to the LAST char to	*
 *		enter the buffer.					*
 *************************************************************************
 rcvrint:
@@ -2143,7 +2153,7 @@ rcvrxit:
 *************************************************************************
 *									*
 *	transmit buffer empty interrupt routine				*
-	lea	ribufptr,a0	* load up queue pointer for sender
+*									*
 *************************************************************************
 txrint:
 	movem.l	d0-d1/a0-a2,-(sp)
@@ -2162,7 +2172,7 @@ txrcommon:
 *************************************************************************
 *									*
 *		Clear-To-Send interrupt routine				*
-	lea	ribufptr,a0
+*									*
 *									*
 *************************************************************************
 ctsint:
@@ -2516,6 +2526,7 @@ devtab:
 
 .endc
 
+* EXPECTS: a0=iorec, a2=mfp.
 * RETURNS: see above for rsconf return values
 *
 	move.w	auxbrate,d0
@@ -2524,7 +2535,7 @@ rscommon:
 	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
 	bne	auxnorm		;no: act normally
 	move.b	brate(a0),d0
-	lea	ribufptr,a0
+	lea	ribufptr.w,a0
 	lea	mfp,a1
 
 	rts
@@ -2752,9 +2763,9 @@ defmaptab:	ds.l	$18 * deftabsize
 * The last entry here is not a routine pointer, it's an iorec pointer.
 *
 
-	dc.l	bistat,bin,bostat,bout,brsconf,biorec
+.text
 
-	dc.l	aistat,ain,aostat,aout,arsconf,aiorec
+.if TT
 imapvecs:
 	dc.l	auxistat,auxin,_auxostat,_auxout,auxrsconf,ribufptr
 	dc.l	bistat,bin,bostat,bout,brsconf,chbibufptr
@@ -2853,16 +2864,6 @@ mapend:	rts
 	move.l	(a1)+,(a0)
 	move.l	(a1)+,$20(a0)
 	move.l	(a1)+,$40(a0)
-
-
-*
-* stubs for unimplemented devices
-*
-
-bistat: bin: bostat: bout: brsconf: biorec:
-aistat: ain: aostat: aout: arsconf: aiorec:
-	moveq.l	#0,d0			; at least "stat" won't return TRUE!
-	rts
 .endc
 	move.l	(a1)+,$60(a0)
 .ifne TT
@@ -2890,7 +2891,7 @@ aistat: ain: aostat: aout: arsconf: aiorec:
 * code.
 * 
 
-	lea	ttribufptr,a0	* ptr to RS232 input buffer record
+*************************************************************************
 
 	.globl	ttistat
 
@@ -2905,7 +2906,7 @@ ttistat:
 	lea	ttribufptr.w,a0	* ptr to RS232 input buffer record
 	bra	inscommon
 
-	lea	ttribufptr,a0	* ptr to RS232 input buffer record
+*************************************************************************
 	lea	ttkickstart(PC),a2
 	.globl	ttin
 
@@ -2918,7 +2919,7 @@ ttin:
 	lea	ttmfp,a2
 	bra	incommon
 
-	lea	ttrobufptr,a0	* ptr to RS232 output buffer record
+*************************************************************************
 
 	.globl	_ttostat
 
@@ -2931,7 +2932,7 @@ _ttostat:
 	bra	ostcommon
 
 *************************************************************************
-	lea	ttrobufptr,a0	* ptr to RS232 output buffer record
+
 	.globl	_ttout
 *
 *	NOTE: Fall Thru to KICKSTART for Exit!!
@@ -2959,7 +2960,7 @@ _ttout:
 	bpl	kikxit		* IF (MFP Empty) THEN
 	move	sr,-(sp)
 	ori	#$700,sr	* Lock-Out Interrupts
-	lea.l	ttribufptr,a0
+	lea.l	ttribufptr.w,a0
 	bsr	sender		* Kick-Start the MFP Interrupt Channel
 	move	(sp)+,sr
 ttkikxit:	rts
@@ -3011,7 +3012,7 @@ ttrs232init:
 *************************************************************************
 *									*
 *		ttmfp receiver buffer full interrupt routine		*
-	lea	ttribufptr,a0
+*		gets data from the rs-232 receiver port			*
 *									*
 *************************************************************************
 ttrcvrint:
@@ -3023,7 +3024,7 @@ ttrcvrint:
 *************************************************************************
 *									*
 *	ttmfp transmit buffer empty interrupt routine			*
-	lea	ttribufptr,a0
+*									*
 *************************************************************************
 tttxrint:
 	movem.l	d0-d1/a0-a2,-(sp)
@@ -3083,7 +3084,7 @@ tttxerror:
 ttauxnorm:
 	ori.w	#$700,sr	;no interrupts for now (restored at rte)
 
-	lea	ttribufptr,a0
+*************************************************************************
 	lea	ttmfp,a1
 
 *
@@ -3209,6 +3210,796 @@ ttrirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 ttrisendnow:	ds.b	1
 .endc
 ttmask:		ds.b	1		; not used
+.ifne TT
+
+**********************************************************************
+*
+* This section contains the code to hook the TT SCC ports into
+* the Bconmap structure.  It should also be enabled for STe
+* when it gets 8530's.
+*
+**********************************************************************
+*									*
+* It's short-circuited if we're actually on a ST or STPLUS,		*
+* because maptabsize is reset to 1, so this code is never called.	*
+*									*
+*************************************************************************
+
+.macro LOG arg
+*	move.l	#arg,([logger])
+*	add.l	#4,logger
+.endm
+
+* DMA SCC control register - this is used only to zero the DMA control 
+* so it's not active.
+
+sccctl		equ	$ffff8c14	; DMA control
+
+* SCC register equates
+
+sccac		equ	$ffff8c81	; SCC1 A control (odd-byte)
+sccad		equ	$ffff8c83	; SCC1 A data
+sccbc		equ	$ffff8c85	; SCC1 B control
+sccbd		equ	$ffff8c87	; SCC1 B data
+
+* SCU locations for enabling interrupts
+ttvmeintmsk	equ	$ffff8e0d	; "vme" int mask in SCU
+ttsysintmsk	equ	$ffff8e01	; "st" int mask in SCU
+
+sccvecval	equ	$60		; value to program for int vector
+sccvecbase	equ	$180		; base of interrupt vectors
+
+*
+* In addition to the normal and extended fields in the iorec, scc iorecs
+* use the 'status' byte to shadow the last incoming ucr from Rsconf,
+* so they can return that value when asked; the next byte is wr5, 
+* which must be shadowed so we can change pieces of it (e.g.
+* word length, stop bits, send break) independently.
+*
+
+ucr_shadow	equ	status
+wr5		equ	status+1
+
+*
+* macros to read/write registers in the SCC pointed to by a2
+*
+
+	.macro SCCw xreg,value
+	move.b	xreg,(a2)
+	move.b	value,(a2)
+	.endm
+
+	.macro SCCr xreg,dest
+	move.b	xreg,(a2)
+	move.b	(a2),dest
+	.endm
+
+**********************************************************************
+* 
+* sccinit: call this routine with inittab in a1 and the channel address
+* in a0; the the table is register/value pairs, ending with a
+* register number of -1.
+*
+
+sccinit:
+	move.b	(a1)+,d0
+	bmi	sccidone
+	move.b	d0,(a0)
+	move.b	(a1)+,(a0)
+	bra	sccinit
+sccidone:
+	rts
+
+**********************************************************************
+*
+* inittab: this table initializes the channel as a normal serial port
+* at 9600 baud with rx, tx, and ext interrupts.  See brtab for
+* derivation of the baud rate countdown value.
+
+.text
+inittab:
+	dc.b	$4,$44
+	dc.b	$1,%00000100	; parity is special condition
+	dc.b	$2,sccvecval	; vector base $180
+	dc.b	$3,%11000000	; 8 bits/char rx
+	dc.b	$5,%11100010	; 8 bits/char tx, DTR on, RTS on
+	dc.b	$6,$00
+	dc.b	$7,$00
+	dc.b	$9,$01		; vector includes status
+	dc.b	$a,$00
+	dc.b	$b,$50
+	dc.b	$c,$18		; BR countdown low byte
+	dc.b	$d,$00		; hi byte
+	dc.b	$e,$02		; BR source is PCLK
+* enables
+	dc.b	$e,$03		; enable BR generator (copy plus %1)
+	dc.b	$3,%11000001	; enable receiver (copy plus %1)
+	dc.b	$5,%11101010	; enable transmitter (copy plus %1000)
+*				; this number should also be the default wr5
+	dc.b	$1,%00010011	; int enables (tx,ext (like CTS))
+* interrupts
+	dc.b	$f,%00100000	; CTS IE
+	dc.b	$0,$10		; reset ext/status
+	dc.b	$0,$10		; and again
+	dc.b	$1,%00010111	; int enables (tx,ext (like CTS))
+	dc.b	$9,%00001001	; MIE, VIS
+	dc.b	-1
+.even
+.text
+
+**********************************************************************
+*
+* set the PSG bit which selects LAN vs NOT LAN to the NOT LAN position.
+*
+
+nolan:
+	move.w	sr,d1
+	or.w	#$0700,sr
+	move.b	#porta,giselect
+	move.b	giselect,d0
+	bset	#7,d0
+	move.b	#porta,giselect
+	move.b	d0,giselect+2
+	move.w	d1,sr
+	rts
+* On TT's with no SCC DMA chip, even talking to the SCC chip will
+* cause a bus error.  This code catches that error and returns,
+* but you'd better not try to use the SCC ports for anything!
+* This also short-circuits if you're on an STPLUS, not Mega STe.
+	clr.w	sccctl		; disable DMA
+	move.l	#sccberr,$8
+* on real TT's and Mega STe's.
+
+	tst.b	sccad		; read from data byte
+
+	move.l	a0,$8		; un-catch bus error
+* the next instruction (clear sccctl) disables SCC DMA on TT, but
+* can't be executed on (Mega-) STe because there's no SCC DMA chip.
+
+	clr.w	sccctl		; disable DMA
+.endif
+
+	bsr	nolan		; select DB9, not lan connector
+
+	moveq	#rssize,d0
+* two differences: the input and output buffer pointers
+
+	lea.l	chaibufptr.w,a0
+	moveq	#rssize,d0
+	moveq	#rssize+2,d0
+	bsr	lbmove		; do block move
+	lea.l	chbibufptr.w,a0
+	lea.l	iorecinit(PC),a1
+	moveq	#rssize+2,d0
+	bsr	lbmove		; do block move
+	move.l	#chbibuffer,chbibufptr.w	; fix up the differences
+	move.l	#chbobuffer,chbobufptr.w
+
+	jsr	ttwait
+	SCCw	#9,#%11000000	; software reset both channels
+
+* wait four PCLK's after resetting SCC - something over 4us should do.
+	move.w	#$0104,d0	; 4 * 1.6us > (4*PCLK)
+	jsr	dowait
+
+	lea.l	sccac,a0
+	lea.l	inittab(PC),a1
+	bsr	sccinit		; initialize channel A
+
+	lea.l	sccbc,a0
+	lea.l	inittab(PC),a1
+sccberr:
+	move.l	a0,$8
+	move.l	a1,sp
+	rts
+
+**********************************************************************
+*
+* Interrupt routines; these all save appropriate regs, load
+* the channel pointer into a2, the iorec address into a0, then
+* branch to the common handler for that interrupt.
+*
+* The "special" interrupts vector to the same address as the
+* receive interrupts: the handling is the same (if you choose
+* to ignore the special receive conditions, which we do).
+*
+* Furthermore, cts interrupts are handled (& ignored) even when
+* RTS/CTS flow control is disabled; it would be better to disable
+* this interrupt, but it complicates matters some.
+*
+
+intbtx:
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea.l	sccbc,a2	; channel ptr
+	lea.l	chbibufptr.w,a0	; iorec ptr
+	bra	scctxempty	; jump to common handler
+
+intbex:
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea.l	sccbc,a2	; channel ptr
+	lea.l	chbibufptr.w,a0	; iorec ptr
+	bra	sccext		; jump to common handler
+
+intbrx:
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea.l	sccbc,a2
+	lea.l	chbibufptr,a0
+	bra	sccrxerr
+
+intatx:
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea.l	sccac,a2	; channel ptr
+	lea.l	chaibufptr.w,a0	; iorec ptr
+	bra	scctxempty	; jump to common handler
+
+intaex:
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea.l	sccac,a2	; channel ptr
+	lea.l	chaibufptr.w,a0	; iorec ptr
+	bra	sccext		; jump to common handler
+
+intarx:
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea.l	sccac,a2
+	lea.l	chaibufptr,a0
+	bra	sccrxerr
+
+**********************************************************************
+*
+* Common interrupt handlers begin here.
+
+sccrxfull:
+	LOG	"_RX_"
+	SCCr	#8,d0		; read the incoming data byte
+	and.b	mask(a0),d0	; AND with incoming byte mask
+	btst.b	#0,rsmode(a0)	; XON/XOFF flow control?
+	beq	rxins		; nope - add to buffer & return
+	cmp.b	#xoff,d0	; XOFF?
+	bne	notxoff		; no
+	LOG	"rxof"
+	st	txoff(a0)	; yes: set txoff so we stop sending
+	bra	rxdone		; and exit
+
+notxoff:
+	cmp.b	#xon,d0		; XON?
+	bne	rxins		; nope - add to buffer & return
+	LOG	"rxon"
+	tst.b	txoff(a0)	; yes: test and clear txoff
+	sf	txoff(a0)	; clear txoff so we can send
+	bne	rxkick		; go kick the transmitter if txoff was set
+
+* no flow control, or not XON or XOFF
+* (or XON when we hadn't received XOFF)
+rxins:	move.w	buftail(a0),d1
+	bsr	bumptr
+	cmp.w	bufhead(a0),d1
+	beq	rxdone		; buffer full - can't insert the char
+	bsr	putbyte		; insert the char
+
+	tst.b	rsmode(a0)	; any flow control?
+	beq	rxdone		; nope - return
+	tst.b	rxoff(a0)	; already tried shutting off flow?
+	bne	rxdone		; yes - don't try again.
+
+	move.w	buftail(a0),d0	; check for high water
+	sub.w	bufhead(a0),d0
+	bpl	rxnowrap
+	add.w	bufsize(a0),d0
+rxnowrap:
+	cmp.w	bufhigh(a0),d0
+	blt	rxdone		; not over high-water; quit.
+	LOG	"high"
+	st	rxoff(a0)	; say we've tried to stop flow
+	btst.b	#0,rsmode(a0)	; flow mode XON/XOFF?
+	bne	rxxoff		; yes - handle it
+	move.b	wr5(a0),d0	; get last value written
+	bclr	#1,d0		; clear RTS bit
+	move.b	d0,wr5(a0)	; save in shadow
+	SCCw	#5,d0		; write this new WR5 value
+	bra	rxdone
+
+rxxoff:	move.b	#xoff,sendnow(a0)
+rxkick:	SCCr	#0,d0		; get status
+	btst	#2,d0		; check tx buf empty
+	beq	rxdone		; not empty - forget it
+	LOG	"rkik"
+	bsr	scc_sender	; empty - send already
+
+* all receive interrupt handling ends up here
+rxdone:
+	SCCr	#1,d0		; read status (don't care what it is)
+	SCCr	#8,d0		; read char (don't care what it is)
+	SCCw	#0,#%00110000	; error reset
+	bra	rxdone		; go reset highest IUS and rte.
+
+**********************************************************************
+*
+* scc_sender -- routine to send a byte (either the one in sendnow
+* or the next one from the buffer) out to the port.  This is called
+* when the tx interrupt *might* already have come in and been cleared.
+*
+* Else writes the char to the tx buf and returns.
+*
+* Addendum: if sendnow != 0, sends even if txoff flag is set, so you 
+* can say XOFF even when host has said XOFF to you.
+*
+* Fix: check the hardware state of CTS.
+*
+* The txoff software flag is not actually checked if your flow mode is
+	move.b	rsmode(a0),d0
+	and.b	txoff(a0),d0
+	bne	scc_nodata	; abort if txoff and rsmode set
+	SCCr	#0,d0		; yes - get status register
+	btst	#5,d0		; test CTS bit
+	beq	scc_nodata	; it's low - don't send.
+				; else it's high - fall through
+scc_notesttxoff:
+	SCCr	#0,d0
+	btst	#2,d0		; abort if SCC tx buf not empty
+	beq	scc_sdone	; (because tx int will come)
+	move.b	sendnow(a0),d0	; use sendnow if not zero
+	beq	scc_getc
+	LOG	"snow"
+	clr.b	sendnow(a0)	; clear sendnow (only send it once!)
+	bra	scc_gotc
+scc_getc:
+	LOG	"sbuf"
+	sub.w	#(chaobufptr-chaibufptr),a0
+	add.w	#(chaobufptr-chaibufptr),a0	; advance to output iorec
+	move.w	bufhead(a0),d0
+	beq	scc_nodata	; abort if output buffer empty
+scc_gotc:
+	SCCw	#8,d0		; write the char to xmit it
+scc_nodata:
+	LOG	"sabt"
+	rts
+
+scc_nodata:
+scc_sdone:
+	move.l	(sp)+,a0
+	rts
+
+**********************************************************************
+*
+* tx buffer empty interrupt handler
+*
+* The 8530 book says to use "reset IUS" at the end of the routine,
+* but I think that masks the interrupt caused when you write the first
+* byte into an empty tx fifo - the int comes right away, and the
+* subsequent "reset IUS" command clears it!
+*
+
+scctxempty:
+	LOG	"_TX_"
+	SCCw	#0,#%00101000	; clear the Tx int
+	SCCw	#0,#%00111000	; reset highest IUS
+	bsr	scc_sender
+	LOG	"_tx_"
+	movem.l	(sp)+,d0-d1/a0-a2
+	rte
+
+**********************************************************************
+*
+* external interrupt handler
+*
+* The only external interrupt which is enabled is CTS, and that is
+* only enabled if you ask for it.  This simplifies external interrupt
+* handling, as it means we don't have to save the state & compare against
+* it to see what changed.
+*
+* Note that this is enabled even when not using rts/cts - wasteful, but
+* shouldn't be so bad...
+
+sccext:
+	btst.b	#1,rsmode(a0)
+	beq	ext_done
+	SCCr	#0,d0		; get status register
+	btst	#5,d0		; test CTS bit
+	seq	txoff(a0)	; set txoff if CTS went low
+	beq	ext_done	; if CTS now low, we're done
+	bsr	scc_sender	; else call sender
+ext_done:
+	SCCw	#0,#%00010000	; reset ext/status interrupts
+	SCCw	#0,#%00111000	; reset highest IUS
+	movem.l	(sp)+,d0-d1/a0-a2
+	rte
+
+**********************************************************************
+*
+* Bconin, Bconout, Bconstat, Bcostat handlers for SCCs
+*
+
+.globl bistat
+bistat:
+	lea.l	chbibufptr.w,a0
+	lea.l	sccbc,a2
+	bra	sccistat
+
+.globl bin
+bin:	lea.l	chbibufptr.w,a0
+	lea.l	sccbc,a2
+	bra	sccin
+
+.globl bostat
+bostat:
+	lea.l	chbibufptr.w,a0
+	lea.l	sccbc,a2
+	bra	sccostat
+
+.globl bout
+bout:
+	lea.l	chbibufptr.w,a0
+	lea.l	sccbc,a2
+	bra	sccout
+
+.globl aistat
+aistat:
+	lea.l	chaibufptr.w,a0
+	lea.l	sccac,a2
+	bra	sccistat
+
+.globl ain
+ain:
+	lea.l	chaibufptr.w,a0
+	lea.l	sccac,a2
+	bra	sccin
+
+.globl aostat
+aostat:
+	lea.l	chaibufptr.w,a0
+	lea.l	sccac,a2
+	bra	sccostat
+
+.globl aout
+aout:
+	lea.l	chaibufptr.w,a0
+	lea.l	sccac,a2
+	bra	sccout
+
+**********************************************************************
+
+sccistat:
+	moveq.l	#0,d0
+	lea	bufhead(a0),a1
+	lea	buftail(a0),a0
+	cmpm.w	(a0)+,(a1)+
+	beq	sccisdone
+	moveq.l	#-1,d0
+sccisdone:
+	rts
+
+**********************************************************************
+
+sccostat:
+	move.w	buftail(a0),d1
+	bsr	bumptr
+	cmp.w	bufhead(a0),d1
+	beq	osfull
+	moveq.l	#-1,d0
+	rts
+osfull:	moveq.l	#0,d0
+	rts
+
+**********************************************************************
+
+sccin:
+	LOG	"_IN_"
+	bsr	getbyte
+	move.w	d0,-(sp)
+	tst.b	rsmode(a0)		; flow control?
+	beq	indone			; no - done
+	tst.b	rxoff(a0)		; flow stopped?
+	beq	indone			; no - done
+
+	move.w	buftail(a0),d0
+	sub.w	bufhead(a0),d0
+	bpl	innowrap
+	sf	rxoff(a0)		; yes - start flow again
+
+**********************************************************************
+
+scc_rxok:
+	bsr	scckickstart		; go do kickstart
+	bra	indone
+	btst	#0,rsmode(a0)		; flow xon/xoff?
+	beq	inrts			; no - it's rts/cts
+	LOG	"sxon"
+	move.b	#xon,sendnow(a0)	; yes - send xon
+	bra	scckickstart		; go do kickstart (bra=bsr/rts)
+indone:	move.w	(sp)+,d0		; retrieve char
+	LOG	"_in_"
+	rts				; and return
+inrts:	move.b	wr5(a0),d0		; get old wr5 value
+	bset	#1,d0			; set RTS
+	move.b	d0,wr5(a0)		; save shadow of new value
+	SCCw	#5,d0			; write new value
+	rts
+
+**********************************************************************
+
+sccout:
+	LOG	"_OUT"
+	move.w	6(sp),d0
+	add.w	#(chaobufptr-chaibufptr),a0
+	bsr	putbyte			; put the byte in the output buffer
+	sub.w	#(chaobufptr-chaibufptr),a0
+
+scckickstart:
+	SCCr	#0,d0			; read status
+	btst	#2,d0			; if tx buf not empty 
+	beq	nokick			;   skip this
+	LOG	"kick"
+	move.w	sr,-(sp)		; save IPL
+	or.w	#$0700,sr		; go to IPL 7
+	bsr	scc_sender		; kick transmitter if necessary
+	move.w	(sp)+,sr		; restore IPL
+nokick:
+	LOG	"_out"
+	rts
+
+**********************************************************************
+
+.globl arsconf
+arsconf:
+	lea	chaibufptr.w,a0
+	lea	sccac,a2
+	bra	sccrsconf
+
+.globl arsconf
+brsconf:
+	lea	chbibufptr.w,a0
+	lea	sccbc,a2
+*	bra	sccrsconf	; bra (to next insn)
+	move.w	brate(a0),d0
+sccrsconf:
+	moveq.l	#0,d0		;pre-clear hi word of return value
+	cmp.w	#-2,4(sp)
+	bne	rsnorm
+	move.b	brate(a0),d0
+	rts
+
+rsnorm:	or.w	#$700,sr	; no ints doing this (restore at RTE)
+
+* set the appropriate bits in d7 for the return from this call:
+* for UCR we return the value we saved from the last call to here;
+* for TSR we return the "break" bit value from the shadowed wr5.
+
+	moveq	#0,d7
+	move.b	ucr_shadow(a0),d7
+	asl.w	#8,d7
+	swap	d7
+* d7.l is now our return value
+	and.b	#%00000100,d7	; clear other bits - they are don't-cares
+	asl.w	#8,d7		; shift to high byte of d7.w
+
+* d7.l is now our return value; set rsmode if nonnegative
+* See comments at rscommon for some detail.
+
+rs0:	move.b	d0,rsmode(a0)
+	bne	rs0		; != 3 means set to this mode
+	bsr	scc_rxok	; raise RTS, or send XON to allow sending
+	move.w	(sp)+,d0
+rs0b:
+	move.b	d0,rsmode(a0)
+	move.w	d0,brate(a0)
+* set baud rate
+rs1:	move.w	4(sp),d0
+	cmp.w	#$f,d0
+	bhi	rs2		; unsigned >15 is no-op
+	move.b	d0,brate(a0)
+	asl.w	#1,d0		; *2 for word index
+	lea.l	brtab,a1
+	move.w	(a1,d0.w),d0	; get BR value
+	SCCw	#$c,d0		; write low byte
+	lsr.w	#8,d0
+	SCCw	#$d,d0		; write high byte
+
+* interpret bits in UCR: word length, number of stop bits, parity
+
+rs2:	move.w	8(sp),d0
+	bmi	rs3		; negative is no change
+
+* save incoming ucr value in our iorec so we can return it later
+	move.b	d0,d1
+* We have 0,1,2 or 3 in bits 6-5 of d1.  These represent 8, 7, 6, and 5
+	beq	rsflip		; 00 and 11 must be flipped
+	cmp.b	#%01100000,d1
+	bne	rsnoflip
+rsflip:	eor.b	#%01100000,d1
+rsnoflip:
+	move.b	wr5(a0),d2	; get shadow of wr5
+	and.b	#%10011111,d2	; clear word-length bits
+	or.b	d1,d2		; OR in new word-length bits
+	move.b	d2,wr5(a0)	; save new value in shadow
+	SCCw	#5,d2		; write new value
+
+	asl.b	#1,d1		; shift word-length bits up
+	or.b	#1,d1		; or in the Rx enable bit
+	SCCw	#3,d1		; write rx word size & rx enable
+
+* decode number of stop bits 4-3, plus parity enable (2) plus parity o/e (1)
+
+	move.b	d0,d1
+	and.b	#%00011110,d1
+	lsr.b	#1,d1		; shift into position
+
+* reverse the order of bits 0 and 1
+	bclr	#1,d1		; clear-and-test bit 1
+	sne	d2		; set d2 bit 0 to the result
+	bclr	#0,d1		; clear-and-test
+	bne	rs2a
+	bclr	#1,d2
+	bra	rs2b
+rs2a:	bset	#1,d2
+rs2b:	and.b	#%00000011,d2
+	or.b	d2,d1		; d1 is now old d1 with bits 0,1 reversed.
+	SCCw	#4,d1		; and write it to the chip
+* decode tsr: bit 3 means send break until you write a zero
+rs3:
+	move.w	$a(sp),d0
+* There was a bug here, where we used bit 3 of rsr, not tsr, to cause
+* or clear the break condition.  Just a question of getting the wrong
+* thing off the stack -- oops.
+*
+	move.w	$c(sp),d0
+	bmi	rs4
+
+	btst	#3,d0
+	beq	rs3a
+
+* user wants us to send break (no-op if already sending one)
+
+	bset.b	#4,wr5(a0)	; test & set: was it set before?
+	bne	rs4		; yes - this is no-op.
+	SCCw	#5,wr5(a0)	; no - write new value
+	bra	rs4		; done.
+
+* user wants us to stop sending break (no-op if not sending one)
+
+rs3a:	bclr.b	#4,wr5(a0)	; test & clear: was it clear before?
+	beq	rs4		; yes - this is no-op.
+	SCCw	#5,wr5(a0)	; no - write new value
+rs4:
+
+* finished with the things we can decode.  End of rsconf.
+
+	move.l	d7,d0		; d7 is computed return value from above
+	rts
+
+
+**********************************************************************
+*
+* Tables that stuff is initilized from.
+*
+* These are in the text seg so they can be referenced as PC-relative
+*
+
+.text
+
+*
+* The baud rate table; these numbers are put in WR12/13 as the baud-rate
+* countdown value.  They assume you have BR source = PCLK and /16,
+* and that PCLK is 32215905Hz/4.
+*
+* The errors are wrt the ideal baud rate; they should be in spec for
+* all devices, I guess.  You could get closer by using the other sources
+* for the BR clock, but that would mean two tables, because the sources
+* are different for channels A and B.
+*
+
+brtab:	dc.w	11	; 19200 -.83%
+	dc.w	24	; 9600	-.83%
+	dc.w	50	; 4800	-.83%
+	dc.w	68	; 3600	+.12%
+	dc.w	103	; 2400	+.12%
+	dc.w	124	; 2000	+.12%
+	dc.w	138	; 1800	+.12%
+	dc.w	208	; 1200	+.12%
+	dc.w	417	; 600	-.11%
+	dc.w	837	; 300	+.005%
+	dc.w	1256	; 200	-.03%
+	dc.w	1676	; 150	+.005%
+	dc.w	1869	; 134	-.01%
+	dc.w	2286	; 110	-.002%
+	dc.w	3354	; 75	+.005%
+	dc.w	5032	; 50	+.005%
+
+intvecs:	dc.l	intbtx,0,intbex,0,intbrx,0,intbrx,0
+		dc.l	intatx,0,intaex,0,intarx,0,intarx,0
+
+iorecinit:	dc.l	chaibuffer	; ibufptr
+		dc.w	rbufsize	; ibufsiz
+		dc.w	0,0		; ibufhead,ibuftail
+		dc.w	rbufsize/2	; ibuflow
+		dc.w	rbufsize*3/4	; ibufhi
+
+		dc.l	chaobuffer	; ditto, obuf
+		dc.w	rbufsize
+		dc.w	0,0
+		dc.b	1,0		; flow,sendnow
+		dc.b	%11101010	; wr5 shadow: dtr/8bits/txen/rts
+		dc.b	0,0		; rxoff,txoff
+		dc.b	1,0		; flow,sendnow (rssize ends here)
+		dc.b	1		; initial baud rate
+		dc.b	$ff		; initial mask
+
+**********************************************************************
+*
+* BSS
+*
+
+.bss
+
+*
+*	Channel A Buffers and I/O Buffer Records
+*
+chaibuffer:	ds.b	rbufsize	;rs-232 input buffer
+chaobuffer:	ds.b	rbufsize	;rs-232 output buffer
+
+*
+*	Channel A I/O Buffer Record
+*
+.globl chaibufptr
+chaibufptr:	ds.l	1		* Input Buffer Record
+chaibufsiz:	ds.w	1
+chaibufhead:	ds.w	1
+chaibuftail:	ds.w	1
+chaibuflow:	ds.w	1
+chaibufhigh:	ds.w	1
+*
+*	NOTE: THESE TWO BUFFERS MUST REMAIN CONTIGUOUS
+*		(Don't Thank Me, Thank Dave!)
+*
+chaobufptr:	ds.l	1		* Output Buffer Record
+chaobufsiz:	ds.w	1
+chaobufhead:	ds.w	1
+chaobuftail:	ds.w	1
+chaobuflow:	ds.w	1
+chaobufhigh:	ds.w	1
+
+charsrbyte:	ds.b	1		* Other Associated Variables
+chawr5:		ds.b	1		* shadow of WR5
+chabrate:	ds.w	1		* saved baud rate for Rsconf(-2)
+chairsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
+*					* Bit 1 = Handshake (0=Disabled)
+chaisendnow:	ds.b	1
+chabrate:	ds.b	1		* saved baud rate for Rsconf(-2)
+chamask:	ds.b	1		* mask for incoming chars
+
+*
+*	channel B Buffers and I/O Buffer Record
+*
+chbibuffer:	ds.b	rbufsize	;rs-232 input buffer
+chbobuffer:	ds.b	rbufsize	;rs-232 output buffer
+
+*
+*	channel B I/O Buffer Record
+*
+.globl chbibufptr
+chbibufptr:	ds.l	1		* Input Buffer Record
+chbibufsiz:	ds.w	1
+chbibufhead:	ds.w	1
+chbibuftail:	ds.w	1
+chbibuflow:	ds.w	1
+chbibufhigh:	ds.w	1
+*
+*	NOTE: THESE TWO BUFFERS MUST REMAIN CONTIGUOUS
+*		(Don't Thank Me, Thank Dave!)
+*
+chbobufptr:	ds.l	1		* Output Buffer Record
+chbobufsiz:	ds.w	1
+chbobufhead:	ds.w	1
+chbobuftail:	ds.w	1
+chbobuflow:	ds.w	1
+chbobufhigh:	ds.w	1
+
+chbrsrbyte:	ds.b	1		* Other Associated Variables
+chbwr5:		ds.b	1		* shadow of WR5
+chbbrate:	ds.w	1		* saved baud rate for Rsconf(-2)
+chbirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
+*					* Bit 1 = Handshake (0=Disabled)
+.endc
+.text
 
 *	revised 05/01/86	Mike Schmal
 *	Worked in spanish key board
@@ -5529,6 +6320,8 @@ keycl:
 *
 	.even
 bellsnd:
+	.dc.b	0,$34
+	.dc.b	1,0
 	.dc.b	2,0
 	.dc.b	3,0
 	.dc.b	4,0

@@ -1,16 +1,25 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: unknown $
 * =======================================================================
 *
-* $Date: 1992/02/28 08:25:02 $
+* $Date: 1992/05/18 23:08:08 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.39  1992/05/18  23:08:08  unknown
+* Added USE_DISK_CHANGE to use that bit.  It's sparrow-only; TT has the bit
+* in a different place, and besides, TT can have external floppies that don't
+* supply this bit.  The consequence of USE_DISK_CHANGE is that the floppy
+* vblank handler gets smaller and never selects a drive (thus no blink).
+*
+* Also, for Sparrow, the bit which was Drive One Select is no longer touched
+* in this code; it's a no-connect for now, but somebody'll find a use for it.
+*
 * Revision 2.38  1992/02/28  08:25:02  apratt
 * Changed TT to M68030 in some places, where it's really CPU dependency we're
 * talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
@@ -133,7 +142,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.38 $
+* $Revision: 2.39 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $
@@ -156,8 +165,19 @@
 
 * SPARROW and TT are both M68030.
 
-*M68030		equ	(SPARROW | TT)	; normallly, but see below:
-.include "m68030.s"
+M68030		equ	(SPARROW | TT)
+
+*
+* There is a new switch as of 5/92: USE_DISK_CHANGE means use the "disk
+* changed" output from the drive to determine media change state. In this
+* file that just DISABLES the old method, which involved polling the
+* write-protect state of each drive.  In order to USE_DISK_CHANGE you have
+* to assume that there is only one drive.  Thus it's there for SPARROW and
+* FALCON but not TT, even though TT has a (different) disk-change line
+* available for Drive A: (only).
+*
+
+USE_DISK_CHANGE	equ SPARROW
 
 *
 * There used to be a switch called SLOWACSI which was used when you reset
@@ -1130,13 +1150,14 @@ _flopvbl:
 	beq	fvblr			; no floppies!
 .endif
 
-*------ write-protect monitor:
 	move.l	_frclock.w,d0		; check a drive every 8 jiffies
 	move.b	d0,d1			; (save jiffy count)
 	and.b	#7,d1			; time yet?
-	bne	fvbl1			; (no)
+	bne	fvblr			; (no)
 	move.w	#cmdreg,(a6)		; select 1770 command/status register
 
+.if (USE_DISK_CHANGE == 0)
+*------ write-protect monitor:
 *--- select drive, record its WP status:
 	lsr.b	#3,d0			; use bit 4 as drive# to check
 	and.w	#1,d0			; (keep only bit 0)
@@ -1159,9 +1180,13 @@ fvbl2:	addq.b	#1,d0			; turn into drive-select bits
 
 fvbl1:	move.w	_wpstatus.w,d0		; or _wpstatus into _wplatch
 	or.w	d0,_wplatch.w		; (catch any WP transitions)
-
+.endif
 
 *------ floppy deselect test:
+*
+* Note: if dselflg is nonzero, then we know that one floppy is selected, so
+* we don't need to go through the selection process.
+*
 	tst.w	deselflg.w		; floppies already deselected?
 	bne	fvblr1			; (yes, so don't do it again)
 
@@ -1627,6 +1652,12 @@ select1:
 * Returns:	d1 = value written to port A
 *		d2 = old value read from port A
 * Uses:		d1
+*
+* External entry point for C: _setporta() takes arg on stack, returns in d0.
+*
+* If not sparrow, we allow this call to mess with the three low bits
+* of PSG port A, but leave the rest alone.  If sparrow, we can only
+* mess with two bits (there is no Drive 1 select any more).
 *-
 setporta:
 	move	sr,-(sp)		; save our IPL
@@ -1634,10 +1665,24 @@ setporta:
 	move.b	#giporta,giselect	; select port on GI chip
 	move.b	giread,d1		; get current bits
 	move.b	d1,d2			; save old bits for caller
-	and.b	#$ff-7,d1		; strip	low three bits there
+.if SPARROW
+	and.b	#$fc,d1			; zero low two bits of current value
+	and.b	#$3,d0			; zero all but two bits of new value
+.else
+	and.b	#$f8,d1			; zero low three bits of current value
+	and.b	#$7,d0			; zero all but three bits of new value
+.endif
 	or.b	d0,d1			; or-in	our new	bits
+	move.b	#giporta,giselect	; re-select port A (AKP 5/92)
 	move.b	d1,giwrite		; and write 'em	back out there
 	move	(sp)+,sr		; restore IPL to terminate CS, return
+	rts
+
+.globl _setporta
+_setporta:
+	move.w	4(sp),d0
+	bsr	setporta
+	move.w	d2,d0
 	rts
 
 
@@ -2007,7 +2052,7 @@ getf2:	addq.l	#8,sp			; pop 2 levels of bsr's
 	rts				; to caller (usu. Rwabs)
 
 *--------------	Floppy RAM usage:
-	bss
+	.bss
 retrycnt:	ds.w	1		; retry	counter		(used)
 _wpstatus:	ds.b	2		; WP status (2 drives)	status
 _wplatch:	ds.b	2		; WP latch (2 drives)	status

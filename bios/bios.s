@@ -4,20 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/10/03 10:03:02 $
+* $Date: 89/12/08 15:46:16 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.9  89/12/08  15:46:16  apratt
+* Changed rsconf so it enables & disables tx and rx just by
+* changing the one bit, not by setting and clearing the whole
+* tsr/rsr.  This preserves the $5 mode set previously,
+* so reset & baud-rate changes don't cause spurious chars to be sent.
+*
 * Revision 2.8  89/10/03  10:03:02  apratt
 * Changed initialization of MFP's TSR to make the output state
 * "High" not "Hi-Z" (open collector) when the transmitter is idle.
 * This finally gets rid of the spurious $ff character transmitted
 * when you reset an ST.  Also added code to initialize TTMFP's serial
 * port and set it to 9600 baud.  (No other non-ST serial support yet.)
-*
+* 
 * Revision 2.7  89/09/22  16:39:12  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
@@ -141,7 +147,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.8 $
+* $Revision: 2.9 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2428,6 +2434,9 @@ auxnorm:
 *
 * I broke this code in TOS 1.4 such that you could never set CTS/RTS
 * flow control.  The behavior of this code now is that 0 sets no flow
+* control, 1 sets XON/XOFF, 2 sets RTS/CTS, 3 sets XON/XOFF (all as before).
+* ANY OTHER VALUE IS NO-OP.  Previously, some other values set XON/XOFF
+* and others set no flow control. -1 is the only documented,
 * guaranteed no-op, though.
 *
 * Enabling tx and rx now means setting only the enable bit, not the whole
@@ -2444,9 +2453,8 @@ auxc0b:
 *	set timer baud rate
 
 auxc1:
-	moveq	#$0,d0		;pre-init to zero
-	move.b	d0,rsr(a1)	;disable the receiver
-	move.b	d0,tsr(a1)	;disable the transmitter
+	bclr.b	#0,rsr(a1)	;disable the receiver
+	bclr.b	#0,tsr(a1)	;disable the transmitter
 *
 *	next, we disable the receiver and transmitter enable bits
 	move.w	d1,baudrate	;shadow baud rate value now
@@ -2460,9 +2468,8 @@ auxc1:
 
 	and.b	#%01110000,tcdcr(a2)	; stop the timer
 	move.b	d2,tddr(a2)
-	moveq	#$1,d0		;pre-init to one
-	move.b	d0,rsr(a1)	;enable the receiver
-	move.b	d0,tsr(a1)	;enable the transmitter
+	bset.b	#0,rsr(a1)	;enable the receiver
+	bset.b	#0,tsr(a1)	;enable the transmitter
 *
 *	finally we re-enable the receiver and transmitter enable bits
 *

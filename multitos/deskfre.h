@@ -610,4 +610,3 @@
 #define NOSHUT   125 /* Alert String */
 
 #define FCNOWRK  126 /* Alert String */
-

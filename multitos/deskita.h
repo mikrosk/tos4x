@@ -223,7 +223,7 @@
 #define WQUIT    16  /* BUTTON in Baum INWICON */
 
 #define HELP1    19  /* Formular/Dialog */
-#define MOREHELP 14  /* BUTTON in Baum HELP1 */
+#define MOREHELP 13  /* BUTTON in Baum HELP1 */
 
 #define HELP2    20  /* Formular/Dialog */
 

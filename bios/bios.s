@@ -3,16 +3,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/05 17:42:30 $
+* $Date: 88/04/08 17:41:07 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.5  88/04/08  17:41:07  apratt
+* Added baud-rate interrogation code: Rsconf(-2) will return old baud
+* rate index (0-15).
+*
+* Also changed key repeat code so it doesn't stop repeating when you
+* hit a new key: the new key restarts the cdelay1/cdelay2 cycle, and
+* doesn't stop until the repeating key comes up.
+*
 * Revision 1.4  88/04/05  17:42:30  apratt
 * Fixed ctl-alt-delete sensing.  Produces a warm boot.
-*
+* 
 * Revision 1.3  88/02/25  17:25:33  apratt
 * Added keyboard reset on CONTROL-ALT-DELETE
 * 
@@ -26,7 +34,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.4 $
+* $Revision: 1.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -1368,9 +1376,8 @@ initmfp:
 	moveq	#$5,d0		;point to the timer C interrupt number
 	bsr	initint
 
-*	moveq	#c1200,d1	;init for /4 for 9600 baud
-*	moveq	#d1200,d2	;init for 9600 baud
 *	init the "d" timer
+	move.w	#$1,baudrate	;9600 is baud rate number 1 - shadow this.
 	moveq	#dtimer,d0	;select the d timer
 	moveq	#c9600,d1	;init for /4 for 9600 baud
 *
@@ -2177,9 +2184,9 @@ devtab:
 *************************************************************************
 *	void	rsconf(baudrate,flow,ucr,rsr,tsr,scr)			*
 *		configure rs-232 port of MFP				*
-*	word	baudrate - baud rate setting (value for timer D control	*
-*			   and data registers)		 		*
-*			   xxxxxxxx/xxxxxCCC/xxxxxxxx/DDDDDDDD		*
+*									*
+*	entry:								*
+
 *	long	rsconf(baudrate,flow,ucr,rsr,tsr,scr)			*
 *									*
 *	word	baudrate - baud rate setting (table index to get	*
@@ -2210,15 +2217,18 @@ auxnorm:
 *
 
 * guaranteed no-op, though.
-	tst.w	$6(sp)		;if -1 then don't change
-	bmi.b	auxc1
-	move.b	$7(sp),rsmode(a0)
-	move.b	rsmode(a0),d0
-	beq	auxc1
-	and.b	#$0fd,d0
-	beq	auxc1		* IF (Anything but Pure RTS/CTS)
-	move.b	#1,rsmode(a0)	* THEN Must be XON/XOFF Protocol
+*
+	cmp.w	#$-1,d0
+	beq.b	auxc1
 
+	move.b	d0,rsmode(a0)
+	beq	auxc0
+	and.b	#$0fd,d0
+	beq	auxc0		* IF (Anything but Pure RTS/CTS)
+	move.b	#1,d0
+
+auxc0:	move.b	d0,rsmode(a0)	* THEN Must be XON/XOFF Protocol
+	bhi	auxc1		; if d0 unsigned greater than 3 then no-op.
 	bsr	aux_rxok
 auxc0b:
 	move.w	(sp)+,d0	; get new mode off stack (as word!)
@@ -2542,20 +2552,25 @@ ari9	cmpi.b	#$3A,d0		;CAPS LOCK
 ari9a	bchg	#KBCL,d1	;toggle CAPS LOCK state
 ari10	move.b	d1,kbshift(a5)	;restore new kbshift(a5) value
 	jsr	(a0)
-ari11	btst.l	#7,d0		;is it a break code?
-	bne.b	ari12		;no... a break code!
-	tst.b	keyrep(a5)		;yes
-	bne.b	ari15
+ari11	btst.l	#7,d0		;make or break?
+
+ari9a:	bchg	#KBCL,d1	;toggle CAPS LOCK state
+ari10:	move.b	d1,kbshift.w	;restore new kbshift.w value
+	rts			;ignore CAPS LOCK break
+ari11:	btst.l	#7,d0		;make or break?
+	bne.b	ari12		;break
+
 	move.b	d0,keyrep(a5)	;save for repeat purpose
 	move.b	cdelay1,kdelay1(a5)
 	move.b	cdelay2,kdelay2(a5)
 * (This is a change from 11/20 and 4/22: they didn't repeat that second key.)
-ari15	move.b	#0,kdelay1(a5)
-	move.b	#0,kdelay2(a5)
+
+ari12	move.b	d0,d1		; d1 = make code corresponding to d0
+	move.b	cdelay1,kdelay1.w
+	cmp.b	keyrep(a5),d1	; is this break code for the repeating key?
 	bra.b	ari16
-ari12	tst.b	keyrep(a5)
-	beq.b	ari18
-	moveq	#0,d1
+
+ari12:	move.b	d0,d1		; d1 = make code corresponding to d0
 	move.b	d1,keyrep(a5)
 	move.b	d1,kdelay1(a5)
 	move.b	d1,kdelay2(a5)
@@ -4417,7 +4432,6 @@ bellsnd:
 	.end
 	.dc.b	9,0
 	.dc.b	10,0
-
 	.dc.b	11,0
 	.dc.b	12,$10
 	.dc.b	13,9		;envelope single attack

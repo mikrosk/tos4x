@@ -1,18 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: lozben $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/25 12:23:16 $
+* $Date: 89/08/25 15:38:36 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.21  89/08/25  15:38:36  apratt
+* Added new dma boot code which calls _dmaread, and added _dmaread
+* as XBIOS call $2a.
+*
 * Revision 2.20  89/08/25  12:23:16  lozben
 * EsetShift() now always returns old shift mode register value.
-*
+* 
 * Revision 2.19  89/08/24  16:54:58  lozben
 * Added EgetShift() and EsetShft() xbios function calls. Deleted
 * EsetRez() and EsetPhysBase() xbios function calls.
@@ -284,7 +288,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.20 $
+* $Revision: 2.21 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -374,7 +378,7 @@ STPLUS		=	0	; @check@
 
 LONGFRAME	=	1	; @check@
 
-systype		=	ram	; 'rom' or 'ram' @check@
+systype		=	rom	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
@@ -2316,182 +2320,256 @@ st_3:	move.b	(a0)+,(a1)+		; copy a byte
 * of the software.  Fixing the bug made the system behave strangely,
 * so we left it in.  The string should be "PATH=#:\\\0\0", not
 *
-*		to the DMA bus.  If a sector is read, and it is executable
-*		(word checksum is $1234), then it is executed.
+*		to the SCSI DMA bus, and eight devices connected to
+*		the ACSI bus.  If a sector is read, and it is executable
+*		(word checksum is $1234), then it is executed.  The search
+*		stops with the first one which is executable.
 	  dc.b	$ff			; end of env string (for our copy)
-*		This code should take about 0.5 sec to execute if nothing
-*		is connected to the DMA bus.  Of course, if something IS
-*		hooked up, it should provide us with a boot sector, right?
+
+
+*		It waits until at least 40 sec after power-up for the
+*		data once the device accepts the command.
 nullenv: dc.b	0,0			; null string (and enviroment)
+*		The old code is included here as comments; the new code,
+*		which calls _dmaread, is from Minna Lai (thanks!).
+*		_dmaread is also an XBIOS call.
 sizeikbd	equ	*-ikbreset-1
-* 7/89: expanded to provide a long timeout for the ack of the first command
-* byte, and an even longer one for the data following a fully-acked command.
-* The times are 10 sec for the ack of the first command byte (too long?)
-* and 40 sec for the data.
-* 	These times are global, in that we wait up to 10/40 sec from the
-* time we first started looking for DMA devices.  We still wait
-* a minimum of time appropriate to the shortest reasonable timeout, 
-* even if we've been looking for more that 10/40 sec.
-*-
+*		The register set-up when jmp'ing to the root sector
+*		is deliberate and should not change.
 
-dmaboot:
-	moveq	#0,d7		; start with dev #0
-	move.l	_hz_200,-(sp)	; remember when we started looking
-dmb_1:	clr.l	a4		; quick zeropage (inside loop!)
-	bsr	dmaread		; attempt to read boot sector
-	bne	dmb_2		; (failed -- try next dev)
-	move.l	_dskbufp(a4),a0	; a0 -> disk buffer
-	move.w	#$00ff,d1	; checksum $100 words
-	moveq	#0,d0		; checksum = 0
-dmb_3:	add.w	(a0)+,d0	; add (next) word
-	dbra	d1,dmb_3
-	cmp.w	#bootmagic,d0	; is the sector executable?
-	bne	dmb_2		; (nope)
-	move.l	_dskbufp(a4),a0	; a0 -> disk buffer
+* Begin old code
+**
+** 7/89: expanded to provide a long timeout for the ack of the first command
+** byte, and an even longer one for the data following a fully-acked command.
+** The times are 10 sec for the ack of the first command byte (too long?)
+** and 40 sec for the data.
+** 	These times are global, in that we wait up to 10/40 sec from the
+** time we first started looking for DMA devices.  We still wait
+** a minimum of time appropriate to the shortest reasonable timeout, 
+** even if we've been looking for more that 10/40 sec.
+**-
+*+
+*dmaboot:
+*	moveq	#0,d7		; start with dev #0
+*	move.l	_hz_200,-(sp)	; remember when we started looking
+*dmb_1:	clr.l	a4		; quick zeropage (inside loop!)
+*	bsr	dmaread		; attempt to read boot sector
+*	bne	dmb_2		; (failed -- try next dev)
+*	move.l	_dskbufp(a4),a0	; a0 -> disk buffer
+*	move.w	#$00ff,d1	; checksum $100 words
+*	moveq	#0,d0		; checksum = 0
+*dmb_3:	add.w	(a0)+,d0	; add (next) word
+*	dbra	d1,dmb_3
+*	cmp.w	#bootmagic,d0	; is the sector executable?
+*	bne	dmb_2		; (nope)
+*	move.l	_dskbufp(a4),a0	; a0 -> disk buffer
+*	jsr	(a0)
+*dmb_2:	add.b	#$20,d7		; next devno
+*	bne	dmb_1		; (do all eight devs)
+*	addq.l	#4,sp		; pop the memory of when we started
+*	rts
+*
+*
+**+
+**  dmaread - attempt to read boot sector from DMA bus device
+**    Passed:	d7.b = ddd00000
+**		('ddd' is the ACSI device number, 0..7)
+**		a4.l = 0 for low-RAM and I/O space access
+**
+**    Returns:	NE: read failed;
+**		EQ: successful read,
+**		    sector data in (*_dskbufp)[];
+**
+**    Preserves:	d7.w
+**
+**    Uses:	everything else
+**
+**
+** Changed 5/88 by Allan Pratt: always retry the operation on a read error.
+** This is because some removable media signal media change this way.
+** This code does NOT retry on a timeout from the DMA or drive controller.
+** (Should it? TBD.) (This code uses a4 as quick zeropage, not a5.)
+**
+** At 4(sp) when we get here is a long which is the _hz_200 time when
+** this whole thing began.  Timeout for acking command bytes is at least
+** 10 sec later than this, and timeout for data is at least 40 sec later.
+**-
+*dmaread:
+*	moveq	#1,d5		; set for two iterations (dbra at end)
+*
+*dmaagain:
+*	lea	fifo(a4),a6	; a6 -> DMA control register
+*	lea	diskctl(a4),a5	; a5 -> DMA data register
+*	st	flock(a4)	; lock up DMA against vblank
+*
+*	move.l	_dskbufp(a4),-(sp)	; setup DMA pointer
+*	move.b	3(sp),dmalow(a4)
+*	move.b	2(sp),dmamid(a4)
+*	move.b	1(sp),dmahigh(a4)
+*	addq	#4,sp
+*
+*	move.w	#$098,(a6)	; toggle R/W, leave in Read state
+*	move.w	#$198,(a6)
+*	move.w	#$098,(a6)
+*	move.w	#1,(a5)		; write sector count register (= 1)
+*
+*	move.w	#$088,(a6)	; select dma bus (not SCR)
+*
+*	move.b	d7,d0		; setup d0.L with devno+command
+*	or.b	#$08,d0		; d0.b = devno<<5 .OR. "READ" command bits
+*	swap	d0
+*	move.w	#$08a,d0
+** timeout for the command bytes to ack is max(2000 - _hz_200,10)
+*	move.l	#2000,d1
+*	sub.l	_hz_200,d1	; d1 = (2000 - _hz_200)
+*	moveq.l	#10,d2
+*	cmp.l	d2,d1
+*	bgt	dmr_wc
+*	move.l	d2,d1
+*dmr_wc:	move.l	d1,d2		; save in d2 for use later on
+** timeout computation done, value in d1 (and d2)
+*
+*	bsr	wcbyte		; d0.L = xxxxxxxxDDD01000xxxxxxx010001010
+*	bne	dmr_q		; (punt on timeout)
+*
+*	moveq	#3,d6		; (count = 4)
+*	lea	dmr_st(pc),a0	; a0 -> bytestream for commands
+*dmr_lp:	move.l	(a0)+,d0	; get next command byte
+*	move.l	d2,d1		; get timeout value again
+*	bsr	wcbyte		; write it
+*	bne	dmr_q		; (punt on timeout)
+*	dbra	d6,dmr_lp	; (loop for more bytes)
+*
+*	move.l	#$0000000a,(a5)	; write byte 5 (controlByte = $00)
+** timeout for the read to complete is max(8000 - _hz_200,400)
+*	move.l	#8000,d1
+*	sub.l	_hz_200,d1	; d1 = 8000 - _hz_200
+*	move.l	#400,d2
+*	cmp.l	d2,d1
+*	bgt	dmr_w		; if d1 > 400 use d1 (signed compare!)
+*	move.l	d2,d1		; else use 400
+*dmr_w:
+** timeout computation done, value in d1
+*	bsr	wwait		; wait for completion
+*	bne	dmr_q		; (punt on timeout)
+*
+*	move.w	#$08a,(a6)	; select status reg
+*	move.w	(a5),d0		; get return code from DMA device
+*	and.w	#$00ff,d0	; strip crufty bits
+*	beq.s	dmr_r		; zero, so it's good.
+*
+*	dbra	d5,dmaagain	; bad read - retry (once)
+*
+** Fall through if we've already tried twice: give up (return -1).
+*
+**--- reset DMA, return NE
+*dmr_q:
+*	moveq	#-1,d0		; return -1 (error)
+*dmr_r:	move.w	#$080,(a6)	; cleanup DMA chip for floppy driver
+*	tst.b	d0		; (test for NE on return)
+*	sf	flock(a4)	; unlock DMA chip
+*	rts			; return
+*
+*
+**--- bytes in the command packet:
+*dmr_st:	dc.l	$0000008a	; byte 1 (devno = 0, blockno = 0)
+*	dc.l	$0000008a	; byte 2 (blockno = 0)
+*	dc.l	$0000008a	; byte 3 (blockno = 0)
+*	dc.l	$0001008a	; byte 4 (count = 1)
+*
+*
+**+
+**  wcbyte - write ACSI command byte, wait for IRQ
+**    Passed:	D0.L = command byte and FIFO control
+**			bits 16..23 = command byte,
+**			bits 0..7 = FIFO control bits
+**		d1.l = time to wait in 200Hz ticks before failing
+**		a5 -> $ff8604
+**		a4 =  $0 (for low-ram access)
+**
+**
+**    Returns:	NE on failure (timeout)
+**		EQ on successful ACK
+**
+**    Uses:	d1
+**
+**-
+*wcbyte:
+*	move.l	d0,(a5)		; write WDC, WDL [due to jwt]
+*wwait:	add.l	_hz_200(a4),d1	; d1 = time to quit at...
+*ww_1:	btst.b	#5,gpip(a4)	; disk done?
+*	beq	ww_w		; (yes, return)
+*	cmp.l	_hz_200(a4),d1	; timeout?
+*	bhi	ww_1		; (not yet -- wait some more...)
+*	moveq	#-1,d1		; ensure NE (timeout error) return
+*ww_w:	rts
+* endc
+** end old code
+
+*
+* new DMA BOOT code: use _dmaread (in another file) to scan
+* devices 8-15, then 0-7 (that is, SCSI, then ACSI).
+* First device which has an executable root sector stops the
+* process; if it returns, we return (i.e. just jmp to it).
+* _dskboot - boot (or return diagnostics)
+	move.l	hdv_boot.w,a0		; go through boot vector
 	jsr	(a0)
-dmb_2:	add.b	#$20,d7		; next devno
-	bne	dmb_1		; (do all eight devs)
-	addq.l	#4,sp		; pop the memory of when we started
-	rts
-
-
-*+
-*  dmaread - attempt to read boot sector from DMA bus device
-*    Passed:	d7.b = ddd00000
-*		('ddd' is the ACSI device number, 0..7)
-*		a4.l = 0 for low-RAM and I/O space access
-*+
-*    Returns:	NE: read failed;
-*		EQ: successful read,
-*		    sector data in (*_dskbufp)[];
-*
-*    Preserves:	d7.w
-*
-*    Uses:	everything else
-*
-*
-* Changed 5/88 by Allan Pratt: always retry the operation on a read error.
-* This is because some removable media signal media change this way.
-* This code does NOT retry on a timeout from the DMA or drive controller.
-* (Should it? TBD.) (This code uses a4 as quick zeropage, not a5.)
-*
-* At 4(sp) when we get here is a long which is the _hz_200 time when
-* this whole thing began.  Timeout for acking command bytes is at least
-* 10 sec later than this, and timeout for data is at least 40 sec later.
-*-
-dmaread:
-	moveq	#1,d5		; set for two iterations (dbra at end)
-
-dmaagain:
-	lea	fifo(a4),a6	; a6 -> DMA control register
-	lea	diskctl(a4),a5	; a5 -> DMA data register
-	st	flock(a4)	; lock up DMA against vblank
+.if systype == rom
+	tst.w	d0			; any errors?
+	bne	dskb1			; (yes -- punt)
+	move.l	_dskbufp.w,a0		; a0 -> disk buffer
+.endif
 *		checksum is $1234), then it is executed.  The search stops
-	move.l	_dskbufp(a4),-(sp)	; setup DMA pointer
-	move.b	3(sp),dmalow(a4)
-	move.b	2(sp),dmamid(a4)
-	move.b	1(sp),dmahigh(a4)
-	addq	#4,sp
+* 		fall through to continuation of bar shrinking;
+* Check the keyboard for a user aborting the timeout
+	moveq.l	#8,d4			; start with SCSI device 0
+dmab_todone:
+	move.w	d4,-(sp)		; device number
+	move.l	_dskbufp,-(sp)		; buffer
+	move.w	#1,-(sp)		; count of one
+	clr.l	-(sp)			; sector zero
+	jsr	_dmaread
+	addq.l	#6,sp
+dmab_skip:
+	bne	dmarfail
 	jsr	_resetscsi		; reset the SCSI bus
-	move.w	#$098,(a6)	; toggle R/W, leave in Read state
-	move.w	#$198,(a6)
-	move.w	#$098,(a6)
-	move.w	#1,(a5)		; write sector count register (= 1)
+; read won; checksum the sector, look for $1234 (bootmagic)
+	move.l	_diskbufp,a0
+	clr.w	the_env			; zero our device sequencer
+
+.if TT
 *
-	move.w	#$088,(a6)	; select dma bus (not SCR)
+* move boot preference into _upref: hi 5 bits of ttscu1, or
+	beq.s	dmafound		; success!
+*
+	move.w	#DMAB_RETRIES-1,d1	; retry count (usually 2 total)
+	addq.w	#1,d4			; read failed or no exec...
+	move.w	d4,d0			; try next dev
+	and.w	#7,d0			; if d4 hasn't wrapped to 8 or $10...
+	bne	dmaloop			; carry on
+	cmp.w	#$8,d4			; at dev 8?
+	beq	dmafail			; yes, total failure
+	moveq.l	#0,d4			; no, try ACSI bus
+	bra	dmaloop
 	move.l	_dskbufp.w,-(sp)	;  "  buffer		"
-	move.b	d7,d0		; setup d0.L with devno+command
-	or.b	#$08,d0		; d0.b = devno<<5 .OR. "READ" command bits
-	swap	d0
-	move.w	#$08a,d0
-* timeout for the command bytes to ack is max(2000 - _hz_200,10)
-	move.l	#2000,d1
-	sub.l	_hz_200,d1	; d1 = (2000 - _hz_200)
-	moveq.l	#10,d2
-	cmp.l	d2,d1
-	bgt	dmr_wc
-	move.l	d2,d1
-dmr_wc:	move.l	d1,d2		; save in d2 for use later on
-* timeout computation done, value in d1 (and d2)
+	move.w	#1,-(sp)		;  "  count of one	"
+	clr.l	-(sp)			;  "  sector zero	"
 	jsr	_dmaread		; read the sector
-	bsr	wcbyte		; d0.L = xxxxxxxxDDD01000xxxxxxx010001010
-	bne	dmr_q		; (punt on timeout)
+* We get here if the _dmaread call worked and gave an executable sector.
+* We load up the registers and jump to that sector.  If it returns,
+* it will return to our caller and we'll carry on booting TOS (with
+* the AUTO folder, etc.).
 	cmp.w	#bootmagic,d1
-	moveq	#3,d6		; (count = 4)
-	lea	dmr_st(pc),a0	; a0 -> bytestream for commands
-dmr_lp:	move.l	(a0)+,d0	; get next command byte
-	move.l	d2,d1		; get timeout value again
-	bsr	wcbyte		; write it
-	bne	dmr_q		; (punt on timeout)
-	dbra	d6,dmr_lp	; (loop for more bytes)
+	beq	dmafound		; success!
+	move.l	_diskbufp,a0
+*
+* dmarfail:  DMAread failed or sector isn't bootable ($1234) or didn't
+* change hdv_rw; try the next device.
+	moveq.l	#0,d5			; zero user-preference value
+	jmp	(a0)			; when it returns, we return
+.endc
 * Note 9/91: since ST and STPLUS are now the same ROM, we start at IDE in
-	move.l	#$0000000a,(a5)	; write byte 5 (controlByte = $00)
-* timeout for the read to complete is max(8000 - _hz_200,400)
-	move.l	#8000,d1
-	sub.l	_hz_200,d1	; d1 = 8000 - _hz_200
-	move.l	#400,d2
-	cmp.l	d2,d1
-	bgt	dmr_w		; if d1 > 400 use d1 (signed compare!)
-	move.l	d2,d1		; else use 400
-dmr_w:
-* timeout computation done, value in d1
-	bsr	wwait		; wait for completion
-	bne	dmr_q		; (punt on timeout)
-
-	move.w	#$08a,(a6)	; select status reg
-	move.w	(a5),d0		; get return code from DMA device
-	and.w	#$00ff,d0	; strip crufty bits
-	beq.s	dmr_r		; zero, so it's good.
-
-	dbra	d5,dmaagain	; bad read - retry (once)
-
-* Fall through if we've already tried twice: give up (return -1).
-
-*--- reset DMA, return NE
-dmr_q:
-	moveq	#-1,d0		; return -1 (error)
-dmr_r:	move.w	#$080,(a6)	; cleanup DMA chip for floppy driver
-	tst.b	d0		; (test for NE on return)
-	sf	flock(a4)	; unlock DMA chip
-	rts			; return
-
-
-*--- bytes in the command packet:
-dmr_st:	dc.l	$0000008a	; byte 1 (devno = 0, blockno = 0)
-	dc.l	$0000008a	; byte 2 (blockno = 0)
-	dc.l	$0000008a	; byte 3 (blockno = 0)
-	dc.l	$0001008a	; byte 4 (count = 1)
-
-
 * all non-TT systems.  It will fail fast for all machines with no IDEbus.
-*  wcbyte - write ACSI command byte, wait for IRQ
-*    Passed:	D0.L = command byte and FIFO control
-*			bits 16..23 = command byte,
-*			bits 0..7 = FIFO control bits
-*		d1.l = time to wait in 200Hz ticks before failing
-*		a5 -> $ff8604
-*		a4 =  $0 (for low-ram access)
-*
-*
-*    Returns:	NE on failure (timeout)
-*		EQ on successful ACK
-*
-*    Uses:	d1
-*
-*-
-wcbyte:
-	move.l	d0,(a5)		; write WDC, WDL [due to jwt]
-wwait:	add.l	_hz_200(a4),d1	; d1 = time to quit at...
-ww_1:	btst.b	#5,gpip(a4)	; disk done?
-	beq	ww_w		; (yes, return)
-	cmp.l	_hz_200(a4),d1	; timeout?
-	bhi	ww_1		; (not yet -- wait some more...)
-	moveq	#-1,d1		; ensure NE (timeout error) return
-ww_w:	rts
- endc
-
-
-*+
 *
 * The sequencing is taken care of using a table to turn the sequence number
 * into a device number.  A device number of $ff ends the table.  The
@@ -3062,8 +3140,8 @@ trp13tab:
 	dc.l	unimpl			; 40: used by AKP's DB alpha vers.
 
 
-	dc.l	unimpl			; 42: unused (0x2a)
-	dc.l	unimpl			; 43: unused
+*------ jump table for Atari BIOS extensions:
+	dc.l	unimpl			; 43: unused (0x2b)
 	dc.l	unimpl			; 44: unused
 	dc.l	unimpl			; 45: unused
 	dc.l	unimpl			; 46: unused

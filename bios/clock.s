@@ -4,13 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/03 17:53:24 $
+* $Date: 1991/10/04 17:58:30 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.19  1991/10/04  17:58:30  apratt
+* This version folds in those things which are new since I put most of clock.s
+* into power.prg for quick-turnaround testing.  The key difference is that
+* calling Waketime(1) less than 14 seconds into the minute the alarm is set
+* for causes a return of -1.  See other comments for discussion of this.
+*
 * Revision 2.18  1991/10/03  17:53:24  apratt
 * More revs; this is the last rev before putting Waketime in power.prg
 * for testing.  It'll get folded back into here soon... :-)
@@ -110,7 +116,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.18 $
+* $Revision: 2.19 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\clock.s,v $
@@ -604,6 +610,8 @@ dytbl:	dc.w	0					; Jan 1
 *	1: your time is in the past.
 *	2: your time is in the future, but later than waketime.
 *	3: you requested that waketime be zeroed and unset, so it was.
+*	4: had to set the alarm for the first of that month (see below).
+*	5: had to set the alarm for this time tomorrow (see below).
 *
 * If you call this with "1" as the arg (to set the alarm), the returns are:
 *	 0: Success.  Either waketime was zero and no alarm is set,
@@ -612,6 +620,37 @@ dytbl:	dc.w	0					; Jan 1
 *	   This return is treated specially in power.prg, the only
 *	   legitimate caller of Waketime(1).
 *
+* Screw cases:
+* 
+* If you try to set the alarm for THIS MINUTE, on THIS DATE, but in some
+* other month, you get in trouble.  Since the alarm only knows
+* date/hour/minute, you'd be setting the alarm for RIGHT NOW. (OK, the day of
+* week participates, but we haven't computed that yet.)  So we hack this: if
+* it's the first of the month, we set the alarm for this time tomorrow (the
+* second).  Otherwise we set the alarm for this time on the first of the
+* month you're actually trying to set the alarm for.
+* 
+* We could do this in Waketime(1), so we never end up waking you up when it
+* isn't necessary, and in fact we should, but for now it's in
+* Waketime(datime).
+* 
+* If you call Waketime(1) and you are actually in the first 14 seconds of the
+* minute it's set for, then we can't turn you off: some program that's
+* waiting for this minute might want to run, and besides, setting the alarm
+* for "now" makes it fire right away.  So instead we clear waketime and
+* return -1, signalling this event.  The code is expected NOT to shut down,
+* and instead to crank the event loop so the things that are waiting for this
+* minute will see that it's time and do their things, and the ones that are
+* waiting for later times will call Waktime(datime).  If none do, then no
+* alarm is set (because we cleared waketime).  The user mashes the power
+* button again and we really shut down.
+* 
+* If you're more than 14 seconds into the minute, it's OK to shut down. This
+* is because those programs that wanted to know the time have run, and those
+* that wanted to set waketime have also run.  In that case, the only way
+* waketime could still be "this minute" is if nobody called waketime at all,
+* in which case there just isn't any alarm to set.
+* 
 
 .bss
 waketime: ds.l	1
@@ -621,15 +660,13 @@ waketime: ds.l	1
 _waketime:
 	move.l	4(sp),d0
 	beq	clralarm	; Waketime(0): clear the alarm
-	moveq.l	#-1,d1
-	cmp.l	d0,d1
+	cmp.l	#-1,d0
 	beq	readalarm	; Waketime(-1): read the current value
-	addq.l	#2,d1
-	cmp.l	d0,d1
+	cmp.l	#1,d0
 	beq	setalarm	; Waketime(1): set the alarm
 
 *
-* OK, it's really a time & date.  Compare with the globals _date and _time
+* OK, it's really a time & date.  Compare with the real time from the RTC
 * to see if it's really in the future.  If it is, then check to see if this
 * time "wins."   This time "wins" if (A) waketime is currently zero, or (B)
 * waketime is in the past (has already happened), or (C) the new time is
@@ -661,10 +698,50 @@ _waketime:
 	cmp.l	d2,d1		; is the new time same or sooner than waketime?
 	bhs	islater		; no: you lose.
 
-* You win!
+* You win!  There's a hitch: if you're setting the time for THIS MINUTE, on
+* THIS DAY, but in some other month or year, we have to be tricky. What we
+* do is set the alarm for (A) this time tomorrow or (B) the first day of
+* the month you're trying to set the alarm in.  Either will happen before
+* the alarm you're asking for.  We pick (A) if you ask for the first
+* day of the month you're worried about.  This gets us out of rollover
+* computations.
+
 youwin:
+	move.l	d0,a0		; temp storage for "now"
+	move.l	d1,d2		; get your time to d2
+	and.l	#$1fffff,d2	; get rid of year & month
+	and.l	#$1fffff,d0	; ditto for "now"
+	cmp.l	d2,d0		; same?
+	beq	wkspecial	; yes - do special stuff
+
 	move.l	d1,waketime	; set waketime to your request
 	moveq.l	#0,d0		; return 0: you won.
+	rts
+
+wkspecial:
+	and.l	#$1f0000,d2	; d2 is now just date you want
+	cmp.l	#$010000,d2	; first of the month?
+	beq	wkfirst		; yes.
+
+* You are setting the alarm for THIS MINUTE, THIS DATE, but not the first.
+* Set the alarm for "the first of that month."
+
+	and.l	#$ffe0ffff,d1	; mask out date field of your request
+	or.l	#$00010000,d1	; set date to "the first"
+	move.l	d1,waketime	; set waketime to this value
+	moveq.l	#4,d0		; signal success
+	rts
+
+* wkfirst: you are setting the alarm for THIS MINUTE, THIS DATE, in a
+* different month, and it's the first of that month. Set the alarm for
+* "this time tomorrow" which is guaranteed possible just by incrementing
+* the date field of "now."
+
+wkfirst:
+	move.l	a0,d0		; get "now" back to d0
+	add.l	#$00010000,d0	; add one to the date.
+	move.l	d0,waketime
+	moveq.l	#5,d0		; set to "this time tomorrow"
 	rts
 
 inpast:
@@ -693,34 +770,45 @@ clralarm:
 * chip alarm out.  Sets the alarm for "waketime".  This calls week_day to
 * compute the day of week it will be and write that, too.
 *
-* Note that the day and day of week participate, but the month doesn't.
+* Note that the date and day of week participate, but the month doesn't.
 * You're setting the alarm for a Monday which is the 12th, you'll get it
-* the next time there's a Monday the 12th, not necessarily the particular
+* the next time there's any Monday the 12th, not necessarily the particular
 * one you want.
 *
-* If you set the alarm for "right now" (within the same minute) this code
-* does not set the alarm and it returns -1.  Otherwise it returns zero.
-* power.prg uses this return for special things.
+* If waketime is set in the past, we set no alarm and return zero.  If
+* waketime is set for "right now" (within the first 14 seconds of this same
+* minute) this code does not set the alarm and it returns -1.  If waketime
+* is set for this minute and you're more than 14 seconds into the minute,
+* waketime is cleared, no alarm is set, and we return zero. Otherwise we
+* set the alarm and return zero.  power.prg uses this return for special
+* things.
 *
 
 setalarm:
-	bsr	_getclock		; get RTC date & time into _date & _time
+	bsr	_getclock		; get RTC date & time into d0
 	cmp.l	#-1,d0			; did it fail?
 	beq	noalarm			; can't set the alarm. Sorry!
-
-	move.l	#RTCBASE,a0		; a0 -> base of registers
-	bset.b	#0,RTMODE(a0)		; select alarm bank (preserve EN's)
 
 	move.l	waketime,d1
 	beq	noalarm			; no waketime to set! Bye!
 	and.b	#%11100000,d1		; round down to minute boundary
-	and.b	#%11100000,d0		; round "now" (from _getclock) down
-	cmp.l	d0,d1
-	beq	badnews			; you're trying to set alarm to "now"
+	move.l	d1,d2			; save true time away
+	and.b	#%11100000,d0		; round "now" down to minute boundary
+	cmp.l	d1,d0			; is waketime in the past?
+	bhi	noalarm			; yes: set no alarm and return.
+	bne	alok			; not the same minute at all: fine.
+* waketime is set for "this minute" -- compare seconds
+	and.b	#$1f,d2			; mask only seconds from "now"
+	cmp.b	#7,d2			; seconds < 14?
+	blo	badnews			; yes: flag the special case
+alok:
 
 *
 *  Convert time to chip format
 *
+	move.l	#RTCBASE,a0		; a0 -> base of registers
+	bset.b	#0,RTMODE(a0)		; select alarm bank (preserve EN's)
+
 	move.l	waketime,d1		; d1 = GEMDOS format time
 
 	move.w	d1,d0			; d1 = (time >> 5) & $3f
@@ -759,10 +847,12 @@ noalarm:
 	moveq.l	#0,d0			; return 0 "I set the alarm."
 	rts
 
+*
 * Bad News: You are trying to set the alarm, but the alarm would be set for
 * the very minute you're in.  We clear waketime and return a flag saying
 * this happened.  (We clear waketime because that way, if nobody calls
 * Waketime and you shut down, you don't fall into this case again.)
+*
 
 badnews:
 	clr.l	waketime

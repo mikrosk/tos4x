@@ -8,6 +8,8 @@
 /* 8/7/92 - 8/10/92	Fix w_adjust to accomdate 3D buttons		*/
 /* 8/13/92	D.Mui	Fix at wm_start for opening background window	*/
 /* 8/13/92	D.Mui	Check minimum window size before open		*/
+/* 9/3/92	D.Mui	Implement WF_BEVENT and WF_BOTTOM		*/
+/* 9/10/92	D.Mui	Return WM_ONTOP or WM_UNTOPPED message		*/
 
 #include <portab.h>
 #include <machine.h>
@@ -188,6 +190,7 @@ REG GRECT   *rect;	/* x, y, width and height of full size window */
     if ((wp = newwp()) == NULLPTR || newhndl(wp) == FAILURE)
 	return FAILURE;
 
+    wp->type = 0;
     wp->status.opened = FALSE;		/* window has not been opened yet */
     wp->owner = rlr;		    	/* init owner of window */
     wp->mowner = NIL;			/* no mouse owner FOR NOW */
@@ -338,8 +341,9 @@ REG GRECT   *rect;	    /* x, y, width and height of opened window */
       rect->g_h = h;
 
     w_adjust(wp, rect);	    	    /* init window components */
+    wp->prev = wp->curr;
+    wp->status.opened = TRUE;	    /* Grand opening!		*/
 
-    wp->status.opened = TRUE;	    /* remember that this is opened */
     ret = totop(handle, WMOPEN);    /* top it */
     wm_update(FALSE);
     return ret;
@@ -387,8 +391,12 @@ WORD	handle;			/* handle of window to be closed */
 
     /* maintain linked list of opened windows */
     if (handle == topw) {
-	if ((topw = wp->under) != NIL) {
+	if ((topw = wp->under) != NIL) 
+	{
 	    totop(topw, WMCLOSE);
+	    wp = srchwp(topw);  	
+    	    ap_sendmsg(wind_msg, WM_ONTOP, wp->owner->p_pid, topw, 
+		       0, 0, 0, 0 );
 	} else {
 	    botw = NIL;
 	}
@@ -430,7 +438,7 @@ WORD	handle;		/* handle of window to be deleted */
     if (wp->fxywh)
 	delrect(0L, wp->fxywh);
 
-#if	0
+#if	1
     if (wp->status.opened)	/* if not already closed, */
 	wm_close(handle);	/* close the window first */
 #endif
@@ -508,10 +516,11 @@ WORD	handle;		/* handle of window to be deleted */
  *
  */
 WORD
-wm_get(handle, field, ow)
-REG WORD    handle;	/* window handle */
-WORD	    field;	/* flag to identify what info to be returned */
-REG WORD    ow[];	/* return values */
+wm_get(handle, field, ow, iw)
+	REG WORD    handle;	/* window handle */
+	WORD	    field;	/* flag to identify what info to be returned */
+	REG WORD    ow[];	/* return values */
+	WORD	    iw[];
 {
     int		ret, i;
     REG WINDOW	*wp;
@@ -519,8 +528,15 @@ REG WORD    ow[];	/* return values */
     WINDOW	*srchwp();
     RLIST	*genrlist();
 
+
+    if ( ( field == WF_DCOLOR ) || ( field == WF_TOP ) || ( field == WF_SCREEN ) ||
+	 ( field == WF_BOTTOM )	)
+      goto wg_1;
+
     if ((wp = srchwp(handle)) == NULLPTR)
 	return FALSE;
+
+wg_1:
 
     ret = TRUE;
 
@@ -563,7 +579,12 @@ REG WORD    ow[];	/* return values */
 	    break;
 
 	case WF_TOP:
+	    wp = srchwp( topw );
 	    ow[0] = topw;
+	    ow[1] = wp->owner->p_pid;
+	    ow[2] = wp->under;
+	    break;
+
 	    break;
 
 	case WF_FIRSTXYWH:
@@ -601,18 +622,33 @@ REG WORD    ow[];	/* return values */
 	    ow[2] = newroot;
 	    break;
 
+	case WF_SCREEN:
+	    gsx_mret(&ow[0], &ow[2]);
+	    break;
+
 	case WF_COLOR:
-	    ow[1] = wp->tcolor[ow[0]];
-	    ow[2] = wp->bcolor[ow[0]];
+	    ow[1] = wp->tcolor[iw[0]];
+	    ow[2] = wp->bcolor[iw[0]];
 	    break;
 
 	case WF_DCOLOR:
-	    ow[1] = wtcolor[ow[0]];
-	    ow[2] = wbcolor[ow[0]];
+	    ow[1] = wtcolor[iw[0]];
+	    ow[2] = wbcolor[iw[0]];
 	    break;
 
-	case WF_SCREEN:
-	    gsx_mret(&ow[0], &ow[2]);
+	case WF_OWNER:
+	    ow[0] = wp->owner->p_pid;
+	    ow[1] = wp->status.opened;
+	    ow[2] = wp->ontop;
+	    ow[3] = wp->under;
+	    break;
+
+	case WF_BEVENT:
+	    ow[0] = wp->type;
+	    break;
+	
+	case WF_BOTTOM:
+	    ow[0] = srchwp(0)->ontop; 
 	    break;
 
 	case WF_RESVD:
@@ -646,12 +682,17 @@ REG WORD    iw[];	    /* values to change to */
     REG	OBJECT	*work;
     GRECT	rect, rect1;
 
+    if ( ( field == WF_NEWDESK ) || ( field == WF_DCOLOR ) )
+      goto ws_1;
+	
     if ((wp = srchwp(handle)) == NULLPTR)
 	return FALSE;	
 
+ws_1:
+
     ret = TRUE;		    /* assume everything will be ok */
 
-    wm_update(TRUE);	    /* grab the window sync */
+    wm_update(1);	    /* grab the window sync */
 
     switch (field) {
 	case WF_NAME:
@@ -667,7 +708,11 @@ REG WORD    iw[];	    /* values to change to */
 	    break;
 
 	case WF_CURRXYWH:
+	    if ( iw[1] < gl_hbox )
+	      iw[1] = gl_hbox;
+
 	    rect = *(GRECT *)iw;
+
 	    w_adjust(wp, &rect);
 
 	    if (wp->status.opened) {
@@ -705,11 +750,23 @@ REG WORD    iw[];	    /* values to change to */
 	    }
 	    break;
 
+ 	case WF_HSLSIZE:
 	case WF_HSLIDE:
-	case WF_VSLIDE:
-	case WF_HSLSIZE:
-	case WF_VSLSIZE:
+	    if ( !( wp->kind & HSLIDE ) )
+	    {
+	       ret = FALSE;
+	       break;
+	    }
+	    goto ws_2;
 
+	case WF_VSLSIZE:
+	case WF_VSLIDE:
+	    if ( !( wp->kind & VSLIDE ) )
+	    {
+	       ret = FALSE;
+	       break;
+	    }
+ws_2:
 	    if (iw[0] > 1000)
 		iw[0] = 1000;
 	    else if (iw[0] < -1)
@@ -783,9 +840,6 @@ REG WORD    iw[];	    /* values to change to */
 		ret = totop(handle, WMSET);
 	    break;
 
-	case WF_BOTTOM:
-	    ret = tobot(handle);
-	    break;
 
 	case WF_NEWDESK:
 	    newdesk = *(LONG *)&iw[0];
@@ -804,8 +858,10 @@ REG WORD    iw[];	    /* values to change to */
 		setcol(wp, iw[0], FALSE);
 
 	    /* if window is already opened, redraw it */
+
 	    if (wp->status.opened)
 		w_clipdraw(wp, iw[0], NULLPTR);
+
 	    break;
 
 	case WF_DCOLOR:
@@ -815,13 +871,21 @@ REG WORD    iw[];	    /* values to change to */
 		wbcolor[iw[0]] = iw[2];
 	    break;
 
+	case WF_BEVENT:
+	    wp->type = iw[0];
+	    break;
+	
+	case WF_BOTTOM:
+	    ret = tobot(handle);
+	    break;
+
 	case WF_RESVD:	    /* old WMLIB has code, but doc says RESERVED */
 	default:
 	    ret = FALSE;
 	    break;
     }
 
-    wm_update(FALSE);	    /* give up the window sync */
+    wm_update(0);	    /* give up the window sync */
     return ret;
 }
 
@@ -854,7 +918,7 @@ int my;		/* mouse's y position */
  *		 his current rectangle list.
  *
  */
-VOID
+	WORD
 wm_update(code)
 int code;	/* flag for the call's function */
 {
@@ -869,7 +933,7 @@ int code;	/* flag for the call's function */
 	code -= 2;
 	take_ownership(code);
     }
-    return(code);
+    return(TRUE);
 }
 
 
@@ -878,7 +942,7 @@ int code;	/* flag for the call's function */
  *		window's border area or work area
  *
  */
-VOID
+	WORD
 wm_calc(type, kind, ix, iy, iw, ih, ox, oy, ow, oh)
 int type;	/* the type of calculation to perform */
 int kind;	/* components present in the window */
@@ -895,30 +959,24 @@ int *oh;	/* output height of work/border area */
     REG	WORD	yinc, xinc;
     int		hparts, vparts;
 
-    tb = bb = rb = lb = 1;
-
-    xinc = gl_wbox - 1 + (ADJ3DPIX << 1);
-    yinc = gl_hbox - 1 + (ADJ3DPIX << 1);
-/*
-    yinc = ob_hbox - 1;
-/**/
-/* June 19 1992 - ml
-    yinc = ob_hbox;
-    xinc = ob_wbox;
-/**/
+    tb = bb = rb = 0;
+    lb = 1;
+	
+    xinc = gl_wbox + (ADJ3DPIX << 1);
+    yinc = gl_hbox + (ADJ3DPIX << 1);
 	
     if (kind & (NAME | CLOSER | FULLER))
 	tb += yinc;
     if (kind & INFO)
-	tb += yinc;
+	tb += gl_hbox;
     if (kind & MNBAR)
 	tb += yinc;
 
     vparts = kind & (UPARROW | DNARROW | VSLIDE);
     hparts = kind & (LFARROW | RTARROW | HSLIDE);
 
-    if ((kind & SIZER) && (!vparts && !hparts))
-	rb += xinc;
+    if ( ( kind & SIZER ) && (!vparts && !hparts) )
+	rb += xinc;	
 
     if (vparts)
 	rb += xinc;
@@ -926,8 +984,17 @@ int *oh;	/* output height of work/border area */
     if (hparts)
 	bb += yinc;
 
-					/* negate values to calc*/
-					/*   Border Area	*/
+    if ( !rb )	/* if no right elements */
+      rb = 1;
+
+    if ( !bb )	/* if no bottom elements */
+      bb = 1;
+	
+    if ( !tb )	/* if no top elements	*/
+      tb = 1;
+			
+    /* negate values to calc Border Area	*/
+
     if (type == WC_BORDER) {
 	lb = -lb;
 	tb = -tb;
@@ -939,6 +1006,8 @@ int *oh;	/* output height of work/border area */
     *oy = iy + tb;
     *ow = iw - lb - rb;
     *oh = ih - tb - bb;
+
+    return TRUE;
 }
 
 
@@ -1044,7 +1113,7 @@ wm_min( kind, ow, oh )
  * future multitasking system.
  *	
  */
-VOID
+	WORD
 wm_new()
 {
 	REG SPB	*sy;
@@ -1066,11 +1135,13 @@ wm_new()
 
 	sy = ad_windspb;
 
-	if ( !sy->sy_tas )	/* anybody owning the screen ? */
-	  return;		/* No ..		       */
-				
-	while( sy->sy_tas )	/* in gemflag.c	*/
-	  unsync( sy );
+	if ( sy->sy_tas )	/* anybody owning the screen ? */
+	{	 
+	  while( sy->sy_tas )	/* in gemflag.c	*/
+	    unsync( sy );
+	}
+
+	return TRUE;
 }
 
 
@@ -1278,9 +1349,13 @@ WORD	caller;		/* WMOPEN: called by wm_open() */
     topw = handle;
 
     /* draw the untopped window if there is one */
-    if (twp) {
+    if (twp) 
+    {
 	activate(twp, NO);
     	w_clipdraw(twp, W_BOX, NULLPTR);
+	if ( twp->handle )		/* send untopped message */
+	    ap_sendmsg( wind_msg, WM_UNTOPPED, twp->owner->p_pid, twp->handle,
+		        0, 0, 0, 0 );
     }
 
     /* draw border of the newly topped window */
@@ -1358,9 +1433,8 @@ WORD	handle;		/* handle of window to be bottmed */
     w_drawchange(&dirty, handle,NIL);
 
     /* notify owner of newly topped window */
-    ap_sendmsg(wind_msg, WM_TOPPED, unnbwp->owner->p_pid, unnbwp->handle, 
-	unnbwp->curr.g_x, unnbwp->curr.g_y, unnbwp->curr.g_w, 
-	unnbwp->curr.g_h);
+    ap_sendmsg(wind_msg, WM_ONTOP, unnbwp->owner->p_pid, unnbwp->handle, 
+	       0, 0, 0, 0 );
 
     return TRUE;
 }

@@ -405,7 +405,6 @@ m_2:	  desknoerr();
 	Mfree( q_addr );		/* update inf file on disk	*/
 	menu_bar( 0x0L, FALSE );
 	wind_update( FALSE );		/* release window	*/
-
 m_1:
 	ap_exit();
 					/* Loop again		*/

@@ -4,19 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/05/22 14:53:27 $
+* $Date: 91/06/13 16:27:51 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.71  91/06/13  16:27:51  apratt
+* changed date to 6/16/91; this is 3.06d.  Also backed out the check that
+* said, "If you have a diagnostic cartridge, don't install the bomb vectors."
+* Also enabled the cache during CRC checks on TT so they're faster.  Also
+* changed the comment for XBIOS call 11 to the effect that it's used by AKP's
+* debugger, and XBIOS call 40 as the one KBAD and John Towns will use for a
+* cookie call.
+*
+* debugger, and XBIOS call 40 as the one KBAD and John Townsend will use for a
+* cookie call.
+* 
 * Revision 2.70  91/05/22  14:53:27  apratt
 * Changed date to today.  This is 3.06c.  3.06b had a bug
 * in flop.s: some QD debug code was left in, so seeks happened
-* at 6ms/step and write precompensation was turned off (both
-* only in high density mode).
-*
 * at 6ms/step and write precompensation was turned off (both
 * only in high density mode).
 * 
@@ -116,7 +124,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.70 $
+* $Revision: 2.71 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -184,20 +192,20 @@ DMASND		equ	0
 ONLY_LONGFRAME	equ	TT
 .ifne STPLUS
 version		equ	$0206		; version number
-date		equ	$05221991	; date MMDDYYYY
+date		equ	$06161991	; date MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010110110 ; Mar 22, 1991
+dosdate		equ	%0001011011010000 ; Jun 16, 1991
 .else
 .ifne TT
 version		equ	$0306		; version number (need not be even)
-date		equ	$05221991	; date MMDDYYYY
+date		equ	$06161991	; date MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010110110 ; Mar 22, 1991
+dosdate		equ	%0001011011010000 ; Jun 16, 1991
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
 version		equ	$0146
-date		equ	$05221991	; date MMDDYYYY
+date		equ	$06161991	; date MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010110110 ; Mar 22, 1991
+dosdate		equ	%0001011011010000 ; Jun 16, 1991
 .endc
 .endc
 
@@ -1808,9 +1816,14 @@ xfpudone:
 	add.l	#$10000,d0		; move up by 64K
 	move.l	d0,_membot.w		; write new _membot
 	move.l	d0,end_os.w		; write new end_os
-*--- diagnostic cartridge check:
-	cmp.l	#diagmagic,cartbase	; check cartridge magic
-	beq	sei2			; (it's there -- leave vectors alone)
+* diagnostic cartridge check removed 6/91 by AKP: it was a lose from the
+* start, but nobody realized it.  There's no chance for a diag cart to set
+* useful vectors in a way that won't get trashed by memory sizing, and not
+* installing any bomb vectors is bad too.  If you're desperate you can set
+* a bit to get control later and install your vectors then.
+*
+*	cmp.l	#diagmagic,cartbase	; check cartridge magic
+*	beq	sei2			; (it's there -- leave vectors alone)
 .endif
 *--- setup 62 vectors:
 .ifeq TT
@@ -2388,6 +2401,7 @@ icondone:
 	tst.b	sshiftmd.w
 	bne	gotd7
 	moveq	#12+' ',d7	; code for line 12 (STLOW)
+	move.l	#$00030002,d6
 	move.w	#27,-(sp)
 	move.w	d7,4(sp)
 .ifeq systype-ram
@@ -2408,6 +2422,10 @@ crcstride	equ	0
 * this file. It's also conditional on crcstride.
 *
 
+.ifne TT
+	move.l	#$3111,d0
+	movec	d0,cacr
+.endc
 	move.l	#(128*1024)-2,d7	; checksum this many bytes
 .if systype == ram
 crcstride	equ	0	; no CRC computation if you're in RAM
@@ -2467,8 +2485,13 @@ badcrc:	move.l	a5,d5			; put addr in d5 for chip identification
 	move.w	#$9,-(sp)
 	trap	#1			; Cconws (God help you if you hit ^C!)
 	move.b	#'E',d0
+.ifne TT
+	move.l	#$0808,d0
+	movec	d0,cacr
 .endc
 	beq	eok1
+.endc
+
 	move.b	#'O',d0			; low bit odd, say 'O'
 eok1:
 	move.w	d0,2(sp)
@@ -3317,8 +3340,8 @@ b_exit:	move.l	savptr,a1		; a1 -> register save area
 	beq	b_exit1
 .endif
 	clr.w	-(sp)			; push a zero frame word
-	dc.l	_getdsb			; 11: get device status block ptr
-
+b_exit1:
+	move.l	(a1)+,-(sp)		; push return address
 	move.w	(a1)+,-(sp)		; push old SR
 	move.l	a1,savptr		; update save-pointer
 	rte				; return to caller
@@ -3351,7 +3374,7 @@ trp13tab:
 	dc.l	_drvmap			; 10: get active-drive bit vector
 	dc.l	_shift			; 11: get/set keyboard shift bits
 
-	dc.l	unimpl			; 40: used by AKP's DB alpha vers.
+* BIOS function $11 is assigned for DIAB630 unless I can get around it.
 
 
 *------ jump table for Atari BIOS extensions:

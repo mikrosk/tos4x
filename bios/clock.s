@@ -1,16 +1,20 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: ersmith $
 * =======================================================================
 *
-* $Date: 1992/08/11 00:34:42 $
+* $Date: 1993/02/25 00:39:44 $
 * =======================================================================
 *
-* $Locker:  $
+* $Locker: ersmith $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.24  1993/02/25  00:39:44  ersmith
+* Changed NVRAM re-initialize to reset to default values, instead of all
+* zeros.
+*
 * Revision 2.23  1992/08/11  00:34:42  kbad
 * TOS 4.00 Falcon030 first production version
 *
@@ -128,10 +132,10 @@
 *
 * =======================================================================
 *
-* $Revision: 2.23 $
+* $Revision: 2.24 $
 * =======================================================================
 *
-* $Source: d:/tos/bios\rcs\clock.s,v $
+* $Source: d:\tos\bios/RCS/clock.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -166,6 +170,7 @@ MOTO	equ	(TT + SPARROW)
 	.globl	_setclock	; setclock() BIOS call
 	.globl	_getclock	; getclock() BIOS call
 	.globl	_date,_time	; GEMDOS date and time variables
+	.globl	nv_defs		; default NVM configuration
 
 .if RICOH
 
@@ -1215,6 +1220,17 @@ nvmil:	move.b	d1,(a1)		; clear all 50 RAM locations
 
 	move.b	#48+$e,(a1)	; write FF to location 48
 	move.b	#$ff,(a2)
+
+* FIX: added 2/22/93: set up USA factory configuration
+
+	pea	nv_defs		; use our defaults
+	move.w	#16,-(sp)	; write 16 bytes
+	move.w	#0,-(sp)	; start at value 0
+	move.w	#1,-(sp)	; write NVRAM opcode
+	jsr	NVMaccess
+	add.l	#10,sp
+* end of FIX
+
 	rts			; return no error (d0 is still 0)
 
 *

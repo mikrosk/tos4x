@@ -4,16 +4,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/22 11:30:18 $
+* $Date: 91/08/26 17:48:29 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.78  91/08/22  11:30:18  apratt
-* fixed an oops for ste mch setting; this is 2.06i
+* Revision 2.79  91/08/26  17:48:29  apratt
+* Changed most uses of _diskbuf into _dskbufp, and exported _dskbufp
+* so rwabs.c could use it.
 *
+* There is some version-control problem here; recent versions seem to have
+* the 80-second timeout code in STPAD as well, when the real thing splits off
+* STPAD so you get memory test but no timeout, as in this version.  To get
+* 2.06h and i, apply patches by hand and be careful changing the stuff in the
+* timeout code.
+*
+* This is 2.06j of 8/26/91.
+*
+* 
+* This is 2.06j of 8/26/91.
+* 
 * Revision 2.78  91/08/22  11:30:18  apratt
 * fixed an oops for ste mch setting; this is 2.06i
 * 
@@ -167,7 +179,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.78 $
+* $Revision: 2.79 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -298,6 +310,7 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	_vbclock		; count of unblocked vblank interrupts
 	.globl	_frclock		; count of all vblank interrupts
 	.globl	_v_bas_ad		; video base addr
+	.globl	con_state		; state of conout() parser
 	.globl	save_row		; saved row# for cursor X-Y addressing
 	.globl	_bufl			; two buffer-list headers
 	.globl	_bootdev		; default boot device [0]
@@ -1659,6 +1672,7 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 	move.l	#$00010100,(a0)+	; STe w/minor 0100
 .else
 * else decide what kind of ST/STPLUS we are: ST, STe, Mega STe, and STe-PLUS.
+	tst.b	_iamanst
 	beq	pickste
 	move.l	#"_VDO",(a0)+
 	clr.l	(a0)+
@@ -2833,12 +2847,12 @@ st_3:	move.b	(a0)+,(a1)+		; copy a byte
 .ifne STPAD
 	move.w	#4,-(sp)		; just-go
 .endc
-	move.l	hdv_boot,a0		; go through boot vector
+st_x:	move.w	#$4b,-(sp)		; function = exec
 	trap	#1			; do it
 .ifeq systype-rom
 
 
-	lea	_diskbuf,a0		; a0 -> disk buffer
+*+
 * When startup fails (or if the exec returns,
 .endc
 *-
@@ -2979,8 +2993,11 @@ dskb1:	rts				; return status
 * 	}
 * 	(continuation of bar shrinking here; label nomt)
 * 	if (now >= next_bar_time) {
-	move.w	#0,a5			; a5 is the memory-test-done flag
+.ifeq STPAD
+* This whole timeout business only applies if you are not STPAD.
 
+* 	    kill-to-end-of-line (erase the next dot)
+* 	    send backspace (move to previous dot)
 * 	    next_bar_time += bar_interval;
 * 	}
 * 
@@ -3086,9 +3103,6 @@ dmab_sp:
 
 	subq.l	#1,d3
 
-	move.l	#$00010002,-(sp)
-	trap	#$d			; poll for char: Bconstat(2)
-	addq.l	#4,sp
 .ifne STPAD
 	move.w	#' ',4(sp)
 
@@ -3096,21 +3110,22 @@ dmab_sp:
 	bne	dmab_abrt		; yes, abort
 .endc
 	move.w	#'q',4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d
+	addq.l	#6,sp
 
 * we jump here when we're counting time and the memory test is done.
 
 nomt:
 
 * if (mt_done && _hz_200 >= d6)
+*   output "clear to end of line"
 *   output a backspace
 *   add 200 to d6
 
-dmab_abort:
-	move.l	d7,_hz_200		; set the time to EIGHTY_SECONDS
-					; so we don't do all this again
-	bra	dmab_skip		; and we're done
 	cmp.l	_hz_200,d6
 	bhi	dmab_ns
+	move.w	#27,-(sp)
 	move.l  #$00030002,-(sp)
 	trap	#$d
 	move.w	#'K',4(sp)
@@ -3125,7 +3140,27 @@ dmab_abort:
 dmab_ns:
 
 * this is the end of the memory-test/shrinking bar sequence.  We check
-* this else is the end of the timeout code
+* this else is the end of the timeout code, which is gone if you are STPAD.
+* If you are STPAD you do get the memory test, and you can interrupt it.
+.else
+dmab_mt:
+	bsr	mem_test_next		; test next block of memory
+	bne	dmab_mtdone		; memory test done
+	move.l	#$00010002,-(sp)
+	trap	#$d
+	addq.l	#4,sp
+	tst.l	d0
+	beq	dmab_mt			; no key; loop.
+
+	move.l	#$00020002,-(sp)
+	trap	#$d			; Bconin(2) -- get the char.
+	addq.l	#4,sp
+
+	bsr	mem_abort		; aborted memory test
+
+dmab_mtdone:
+	move.l	#EIGHTY_SECONDS,_hz_200	; so we don't test RAM again
+.endc
 
 * to see if we're actually done (gasp!) and also for user interruption.
 

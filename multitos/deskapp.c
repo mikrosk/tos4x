@@ -125,6 +125,7 @@ again:
 	  list->a_argu[0] = 0;
 	  list->a_key = 0;
 	  list->a_pref = 0;
+	  list->a_limit = 0;
 	  list->a_name = Nostr;		/* Point to no string	*/
 	}
 	else

@@ -981,3 +981,41 @@ l_1:
 	  lp_collect();
 	}
 }
+
+	WORD
+winsmall( WINDOW *win, WORD x, WORD y )
+{
+	char *path;
+	BYTE buffer[14];
+	WORD temp, i;
+	WORD isfolder;
+
+	path = win->w_path;
+
+/* if it's a top level window, we make a drive icon */
+	if (ch_level(path) <= 1) {
+	  i = make_icon( path[0], 0, DISK, get_fstring( DEVICE ) );
+	  isfolder = 0;
+	} else {
+/* else we make a folder icon */
+	  save_mid( path, buffer);
+	  app_icon( buffer, FOLDER, &temp );
+	  i = make_icon( 0, temp, XDIR, buffer );
+	  isfolder = 1;
+	}
+	if (i == -1)
+	{
+		do1_alert( NOICON );
+		return 0;
+	}
+	app_mtoi( x, y, &background[i].ob_x, &background[i].ob_y );
+	if (isfolder) {
+	  lp_fill( path, &backid[i].i_path );
+	  if (!backid[i].i_path) {
+		do1_alert( NOICON );
+		return 0;
+	  }
+	}
+	do_redraw( 0, &full, i );
+	return 1;
+}

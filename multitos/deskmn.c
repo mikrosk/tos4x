@@ -62,6 +62,7 @@
  * 09/21/92  - cjg - Configuration Popup - Look for longest string first
  * 09/24/92  - cjg - Fixed bug with MKUP and MKDOWN pausing for a scroll.
  * 02/17/93  - cjg - Converted to Lattice C 5.51
+ * 05/06/93  - ers - Added Memory popup in Install Application dialog
  */
 
 
@@ -114,6 +115,7 @@ EXTERN  WORD	tb3[];
 EXTERN  BYTE	mentable[];
 
 EXTERN  UWORD    d_rezword;	/* set_mode() value ( system ) */
+EXTERN	WORD	 d_multi;
 EXTERN  VOID XDeselect();
 
 EXTERN  WORD	strlen();	/* cjg 09/21/92 */
@@ -580,6 +582,7 @@ mins_app( VOID )
 	WORD		fstart;		/* Current Obj - File Type  */
 	WORD		dstart;		/* Current Obj - Default Dir*/
 	WORD		pstart;		/* Current Obj - Parameter  */
+	WORD		mstart;		/* Current Obj - Memory Limit */
         WORD		i;
 	WORD		done;
 
@@ -758,6 +761,46 @@ ins_1:	      	fill_string( str, NOTPRG );
 	  }
 	  menu_icheck( dtree, istart, TRUE );
 		
+/* set up the memory limits tree */
+/* don't show any memory limit if we're not multitasking */
+	  for (i = MEM128K; i < MEMNOLIM; i++)
+	  {
+	    dtree[i].ob_state = NORMAL;
+	    menu_icheck( dtree, i, FALSE );
+	  }
+
+	  if (!d_multi)
+	  {
+	    obj[MPMBOX].ob_flags |= HIDETREE;
+	  }
+	  else
+	  {
+	    obj[MPMBOX].ob_flags &= ~HIDETREE;
+	    if (!app->a_limit || app->a_limit > 8192*1024L)
+		mstart = MEMNOLIM;
+	    else if (app->a_limit > 4096*1024L)
+		mstart = MEM8MEG;
+	    else if (app->a_limit > 3072*1024L)
+	  	mstart = MEM4MEG;
+	    else if (app->a_limit > 2048*1024L)
+		mstart = MEM3MEG;
+	    else if (app->a_limit > 1024*1024L)
+		mstart = MEM2MEG;
+	    else if (app->a_limit > 512*1024L)
+		mstart = MEM1MEG;
+	    else if (app->a_limit > 256*1024L)
+		mstart = MEM512K;
+	    else if (app->a_limit > 128*1024L)
+		mstart = MEM256K;
+	    else
+		mstart = MEM128K;
+
+	    menu_icheck( dtree, mstart, TRUE );
+
+	/* fix up the button text to match the menu selection */
+	    obj[MPMBUTTN].ob_spec = (LONG)get_fstring(FS128K+(mstart-MEM128K));
+	  }
+
 	  dr_dial_w( MNINSAPP, FALSE, 0 );
 	  where = 0;
 ins_2:
@@ -808,6 +851,11 @@ ins_2:
 					 SIFULL, FSFULL, FALSE );
 				break;
 
+		case MPMBUTTN: /* Memory: */
+				DoPopup( obj, MPMBUTTN, MPMTITLE, dtree,
+					 MPMBASE, mstart, &mstart, FALSE,
+					 MEM128K, FS128K, FALSE );
+				break;
 		case MPOK:  done = TRUE;  /*Install */
 	    		    l = (LONG)(istart - MPINONE);	/* Get 1 - 20 */
 			    if( ( istart >= MPIF1 ) && ( istart <= MPIF20 ) )
@@ -934,6 +982,29 @@ ins_4:				   sapp = ( APP *)sapp->a_next;
 					/* get the Function key definiton*/
 			    app->a_key = (UWORD)l;
 
+			    if (d_multi)
+			    {
+			      switch(mstart) {
+				case MEM128K:	app->a_limit = 128*1024L;
+						break;
+			        case MEM256K:  	app->a_limit = 256*1024L;
+						break;
+				case MEM512K:	app->a_limit = 512*1024L;
+						break;
+			        case MEM1MEG:	app->a_limit = 1024*1024L;
+						break;
+				case MEM2MEG:	app->a_limit = 2048*1024L;
+						break;
+			        case MEM3MEG:	app->a_limit = 3072*1024L;
+						break;
+				case MEM4MEG:	app->a_limit = 4096*1024L;
+						break;
+				case MEM8MEG:	app->a_limit = 8192*1024L;
+						break;
+			        default:	app->a_limit = 0;
+						break;
+			      }
+			    }
 			    lp_fill( str, &app->a_name );
 			    lp_collect();
 		  	    break;
@@ -1837,3 +1908,4 @@ wait_up( VOID )
       graf_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
   }while( mk.buttons );
 }
+

@@ -193,7 +193,7 @@ _releaes:
 ;relout:
 ;	rts
 
-	clr.w	_inaes
+	clr.w	__inaes
 	rts
 
 
@@ -215,7 +215,7 @@ _waitforaes:
 ;	rts
 
 w_spin:
-	tas	_inaes		; check the flag
+	tas	__inaes		; check the flag
 	beq	waitout
 	move.w	#$00ff,-(sp)	; Syield
 	trap	#1
@@ -426,7 +426,8 @@ big:		.ds.l	1
 savea7:		.ds.l	1
 timestack:	.ds.l	1
 _crit_err:	.ds.l	1
-_inaes:		.ds.w	1
+		.globl	__inaes
+__inaes:	.ds.w	1
 _dk_err:	.ds.l	1
 savestk:	.ds.l	1
 _SAV2TRP:	.ds.l	1	; Save current trap 2 vector.

@@ -272,7 +272,7 @@ launch_pref()
 		  }
 		}
 	    }
-	    run_it( progname, comtail, graphic, s_defdir, 0 );
+	    run_it( progname, comtail, graphic, s_defdir, 0, 0L );
 	  }
 	}
 }
@@ -336,11 +336,7 @@ exec_file( infile, win, item, intail )
 	WORD	dofull,setdir,which;		
 	OBJECT	*obj;
 	BYTE	*tail,*file,*newtail;
-
-#if 0 /* NOT USED: */
-	WORD	id;
-	BYTE	*bptr;
-#endif
+	LONG	limit;
 
 	app = app_xtype( infile, &install );
 	type = app->a_type;
@@ -364,11 +360,13 @@ exec_file( infile, win, item, intail )
 	{
 	  dofull = ( app->a_pref & 0x2 ) ? TRUE : FALSE; 
 	  setdir = ( app->a_pref & 0x1 ) ? TRUE : FALSE;
+	  limit = app->a_limit;
 	}
 	else
 	{
 	  dofull = s_fullpath;
 	  setdir = s_defdir;
+	  limit = 0;
 	}
 
 	newtail = (BYTE*)0;
@@ -407,9 +405,7 @@ exec_file( infile, win, item, intail )
 	  case ACCESSORY:		/* run an accessory	*/
 	    code = 3;
 	    break;
-/*	    shel_write( 3, 0, 0, file, Nostr ); 	*/
-/*	    return;					*/
-		
+                      		
 	  case TTP:		/* TOS takes parameter	*/
 	    graphic = FALSE;
 
@@ -449,7 +445,7 @@ exec_file( infile, win, item, intail )
 	 }
 
 	do_box( win, item, ( win ) ? FALSE : TRUE, TRUE, TRUE );
-	run_it( file, ( newtail ) ? newtail : comtail, graphic, setdir, code );  
+	run_it( file, ( newtail ) ? newtail : comtail, graphic, setdir, code, limit );  
 
 e_3:
 	if ( newtail )
@@ -460,9 +456,10 @@ e_3:
 /*	Run the application	*/
 
 	VOID
-run_it( file, tail, graphic, setdir, code )
+run_it( file, tail, graphic, setdir, code, limit )
 	BYTE	*file,*tail;
 	WORD	graphic, setdir,code;
+	LONG	limit;
 {
 	LONG	ptrs[5];
 	BYTE	*ptr;
@@ -512,6 +509,9 @@ run_it( file, tail, graphic, setdir, code )
 	  *(ptr+1) = 0;
 
 	code |= 0x0400;
+	if (limit)
+		code |= 0x0100;
+
 	if (!d_multi)
 		code |= 0x1000;	/* special way to launch programs */
 				/* in single tasking mode 	  */
@@ -519,6 +519,7 @@ run_it( file, tail, graphic, setdir, code )
 				/* See sh_write, sh_exec, sh_fork */
 		
 	ptrs[0] = (LONG) file;		/* file name */
+	ptrs[1] = limit;
 	ptrs[3] = (LONG) g_buffer;	/* default directory */
 
 	if (!d_multi) {

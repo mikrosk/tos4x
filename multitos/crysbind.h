@@ -1,29 +1,3 @@
-/*
-*************************************************************************
-*			Revision Control System
-* =======================================================================
-*  $Revision: 1.6 $	$Source: f:\multitos/RCS/crysbind.h,v $
-* =======================================================================
-*  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
-* =======================================================================
-*  $Log: crysbind.h,v $
-*  Revision 1.6  1993/04/27  23:00:14  ersmith
-*  Merged Cary's and Hans-Martin's changes
-*
- * Revision 1.4  1993/03/12  19:51:12  ersmith
- * Merged HMK's loadable resource stuff
- *
- * Revision 1.3  1993/03/10  20:12:42  ersmith
- * Lattice port
- *
-* Revision 2.1  89/02/22  05:18:27  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.1  88/06/02  12:26:45  lozben
-* Initial revision
-* 
-*************************************************************************
-*/
 /*	CRYSBIND.H	05/05/84 - 02/02/85	Lee Lorenzen		*/
 /*	Trying 1.2	10/11/85 - 10/16/85	Derek Mui		*/
 /*	Included fsel_exinput, shel_spath, wind_new	2/1/88	D.Mui	*/
@@ -86,6 +60,7 @@
 #define OBJC_CHANGE 	47
 /* June 26 1992 - ml */
 #define	OBJC_SYSVAR	48
+#define OBJC_XFIND	49
 
 				/* Form Manager				*/
 #define FORM_DO 	50

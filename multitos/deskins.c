@@ -409,8 +409,8 @@ ins_wicon( VOID )
 	  inf_sset( (LONG)obj, WNAME, Nostr );
 	  obj[WFOLDER].ob_state = NORMAL;
 	  obj[WNONE].ob_state = SELECTED;
-	  obj[WFOLDER].ob_flags = SELECTABLE|RBUTTON|IS3DOBJ|IS3DACT;
-	  obj[WNONE].ob_flags = SELECTABLE|RBUTTON|IS3DOBJ|IS3DACT;
+	  obj[WFOLDER].ob_flags = SELECTABLE|RBUTTON|IS3DOBJ;
+	  obj[WNONE].ob_flags = SELECTABLE|RBUTTON|IS3DOBJ;
 
 	  pref = 0;
 
@@ -565,6 +565,7 @@ k_1:
 		  lp_fill( Nostr, &app->a_name );
 		  app->a_dicon = index;
 		  app->a_icon = index;
+		  app->a_limit = 0L;
 /*		  sort_show( 0, TRUE );	*/
 
 	        }/* if there is something	*/

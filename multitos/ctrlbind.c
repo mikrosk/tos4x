@@ -488,6 +488,18 @@ objc_find(tree, startob, depth, mx, my)
 	return( crys_if( OBJC_FIND ) );
 }
 
+	WORD
+objc_xfind(tree, startob, depth, mx, my)
+	OBJECT		*tree;
+	WORD		startob, depth, mx, my;
+{
+	OB_TREE = (LONG)tree;
+	OB_STARTOB = startob;
+	OB_DEPTH = depth;
+	OB_MX = mx;
+	OB_MY = my;
+	return( crys_if( OBJC_XFIND ) );
+}
 
 	WORD
 objc_offset(tree, obj, poffx, poffy)

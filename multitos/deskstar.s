@@ -4,7 +4,7 @@
 *	Set the DESK_PROGRAM (DESKPRG) flag to compile this file for a
 *	replacement Desktop. Clear it for making GEM.SYS
 *       DESK_PROGRAM (DESKPRG) must also be set/cleared in
-*	      DESKTOP.C, DESKVARI.C, DESKROM.C
+*	      SOFTLOAD.H
 *	See the Defines in the makegem/makedesk files.
 
 

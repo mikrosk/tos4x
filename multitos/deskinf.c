@@ -8,6 +8,7 @@
 /*      Added another 0x00 to mkeys[] for VIDITEM obj  07/07/92 C.Gee   */
 /*	The #E will save 10 fields instead of 4	7/17/92	D.Mui		*/ 
 /*	Converted to Lattice C 5.51		2/18/93 C.Gee		*/
+/*	Saving also window iconifying inform.	5/11/93 H.M.Krober	*/
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -249,6 +250,8 @@ uhex_dig(wd)
 {
 	REG APP		*app;
 	REG WORD	type;
+	LONG		limit;
+	WORD		temp;
 	
 	pcurr -= 2;			/* important	*/
 
@@ -308,8 +311,18 @@ uhex_dig(wd)
 	pcurr = escan_str( pcurr, app->a_doc );
 	pcurr++;
 
+ 	limit = 0;
 	if ( *pcurr != 0x0d )
+	{
 	  pcurr = escan_str( pcurr, app->a_argu );
+	  pcurr++;
+	  while ((*pcurr >= '0' && *pcurr <= '9') ||
+	         (*pcurr >= 'A' && *pcurr <= 'F'))
+	  {
+	    limit = (limit << 4) + hex_dig(*pcurr);
+	    pcurr++;
+	  }
+	}
 
 	/********** Kludge **********/
 	/* make the old inf works with the new one	*/
@@ -317,6 +330,8 @@ uhex_dig(wd)
 	  app->a_type = TEXT;
 
 	/***************************/
+
+	app->a_limit = limit;
 	return( pcurr );
 }
 
@@ -428,8 +443,33 @@ inf_scan( buffer )
 
 		do_xyfix( &pws->w_sizes );
 	  	rc_copy( (WORD *)&pws->w_sizes, (WORD *)&pws->w_work );
+		rc_copy((WORD *) &pws->w_sizes, (WORD *)&pws->w_normsizes);
+						/* +++ HMK 5/11/93	     */
+						/* window's iconified status */
+		pcurr = scan_2( pcurr, &pws->w_iconified );
 
-		pcurr = scan_2( pcurr, &envr );
+		if (pws->w_iconified & 0x01) {
+						/* icon window's x position */
+			pcurr = scan_2( pcurr, &pws->w_sizes.g_x );
+			if ( pws->w_sizes.g_x >= gl_ncols )
+				  pws->w_sizes.g_x = gl_ncols - 4;
+
+			pws->w_sizes.g_x *= gl_wchar;
+
+						/* icon window's y position */
+			pcurr = scan_2( pcurr, &pws->w_sizes.g_y );
+			if ( pws->w_sizes.g_y >= gl_nrows )
+				  pws->w_sizes.g_y = gl_nrows - 1;
+		
+			pws->w_sizes.g_y *= gl_hchar;
+
+						/* icon window's width	*/
+			pcurr = scan_2( pcurr, &pws->w_sizes.g_w );
+			
+						/* icon window's height	*/
+			pcurr = scan_2( pcurr, &pws->w_sizes.g_h );
+
+		}
 
 		ptr = scasb( pcurr, '@' );
 		*ptr = 0;		/* take out the @ */	
@@ -509,6 +549,8 @@ read_inf( VOID )
 	UWORD		size;
 	BYTE		buffer[20];
 	BYTE		*afile;
+	WORD		have_acc, have_gtp;
+
 					/* Inquire the shell size */
 	size = shel_get( (BYTE*)0, -1 );
 
@@ -578,24 +620,41 @@ re_1:	    afile = malloc( (LONG)INFSIZE );
 
 	app = applist;
 
+	have_gtp = have_acc = 0;
+
 	while( app )
 	{
 	  if ( app->a_type == PTP )
 	  {
 	    if ( strcmp( app->a_name, "*.GTP" ) )
-	      return;
+	      have_gtp = 1;
 	  }
-
+	  else if ( app->a_type == ACCESSORY )
+	  {
+	    if ( strcmp( app->a_name,"*.ACC" ) )
+	      have_acc = 1;
+	  }
 	  app = ( APP *)app->a_next;
 	}
 
-	if ( app = app_alloc( ) )
+	if ( !have_gtp && (app = app_alloc( )) )
 	{
 	  app->a_type = PTP;
 	  app->a_key = 0;
 	  app->a_icon = 3;
 	  app->a_dicon = 4;
+	  app->a_limit = 0;
 	  lp_fill( "*.GTP", &app->a_name ); 
+	}
+
+	if ( !have_acc && (app = app_alloc( )) )
+	{
+	  app->a_type = ACCESSORY;
+	  app->a_key = 0;
+	  app->a_icon = 3;
+	  app->a_dicon = 4;
+	  app->a_limit = 0;
+	  lp_fill( "*.ACC", &app->a_name ); 
 	}
 }
 
@@ -629,13 +688,30 @@ hex_dig(achar)
 	*pcurr++ = 'W';
 	*pcurr++ = ' ';
 
-	pcurr = save_2( pcurr, win->w_coli );	/* horizontal slide bar  */
-	pcurr = save_2( pcurr, win->w_rowi );
-	pcurr = save_2( pcurr, win->w_sizes.g_x / gl_wchar );
-	pcurr = save_2( pcurr, win->w_sizes.g_y / gl_hchar );
-	pcurr = save_2( pcurr, win->w_sizes.g_w / gl_wchar );
-	pcurr = save_2( pcurr, win->w_sizes.g_h / gl_hchar );
-	pcurr = save_2( pcurr, 0 );
+	if (win->w_iconified) {				/* +++ 5/11/93 HMK */         
+		pcurr = save_2( pcurr, win->w_coli );	/* horizontal slide bar  */
+		pcurr = save_2( pcurr, win->w_rowi );
+						/* window coords & size */
+		pcurr = save_2( pcurr, win->w_normsizes.g_x / gl_wchar );
+		pcurr = save_2( pcurr, win->w_normsizes.g_y / gl_hchar );
+		pcurr = save_2( pcurr, win->w_normsizes.g_w / gl_wchar );
+		pcurr = save_2( pcurr, win->w_normsizes.g_h / gl_hchar );
+						/* window status (iconified) */
+		pcurr = save_2( pcurr, win->w_iconified);
+						/* icon window coords & size */
+		pcurr = save_2( pcurr, win->w_sizes.g_x / gl_wchar );
+		pcurr = save_2( pcurr, win->w_sizes.g_y / gl_hchar );
+		pcurr = save_2( pcurr, win->w_sizes.g_w ); /* max w == 255!! */
+		pcurr = save_2( pcurr, win->w_sizes.g_h ); /* max h == 255!! */
+	} else {
+		pcurr = save_2( pcurr, win->w_coli );	/* horizontal slide bar  */
+		pcurr = save_2( pcurr, win->w_rowi );
+		pcurr = save_2( pcurr, win->w_sizes.g_x / gl_wchar );
+		pcurr = save_2( pcurr, win->w_sizes.g_y / gl_hchar );
+		pcurr = save_2( pcurr, win->w_sizes.g_w / gl_wchar );
+		pcurr = save_2( pcurr, win->w_sizes.g_h / gl_hchar );
+		pcurr = save_2( pcurr, win->w_iconified); /* == 0 */
+	}
 
 	if ( win->w_id != -1 )
 	{
@@ -865,6 +941,14 @@ if_1:
 	  pcurr = save_str( pcurr, app->a_name );
 	  pcurr = save_str( pcurr, app->a_doc );
 	  pcurr = save_str( pcurr, app->a_argu );
+	  if (app->a_limit)
+	  {
+	    ULONG limit = app->a_limit;
+	    for (i = 0; i < 8; i++) {
+	      *pcurr++ = uhex_dig((limit & 0xF0000000L) >> 28);
+	      limit = limit << 4;
+	    }
+	  }
 	  *pcurr++ = 0x0d;
 	  *pcurr++ = 0x0a;
 

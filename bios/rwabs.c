@@ -4,13 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/05 15:15:33 $
+* $Date: 91/08/26 16:37:14 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.8  91/08/26  16:37:14  apratt
+* Changed to checksum only 6 sectors; diskbuf is under 4K in size in
+* STe VDI.  Also changed to use dskbufp the pointer, not diskbuf
+* the buffer, so changing the pointer really changes where this stuff
+* goes.
+*
 * Revision 2.7  91/08/05  15:15:33  apratt
 * Added code to compute checksums on the first N sectors of a disk
 * and compare with the old values, improving media-change detection
@@ -18,7 +24,7 @@
 * MSDOS versions 5.0 (4.0?) and newer is checked.  (This is all moot
 * if your GEMDOS discards cached information when there are no open
 * files and the media-change state is "maybe.")
-*
+* 
 * Revision 2.6  91/06/20  14:09:52  apratt
 * Added another bit in the flags word of the BPB: set flags & 2 when
 * the floppy claims to have fewer than two FATs.  New GEMDOSes
@@ -76,7 +82,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.7 $
+* $Revision: 2.8 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -263,7 +269,7 @@ extern WORD motoron;		/* motor-on status (for both drives) */
  */
 extern long hz_200;		/* system timer tick, for rand() */
 extern long frclock;		/* video frame counter, for mediach() */
-extern char diskbuf[];		/* disk buffer somewhere in BSS */
+extern char *dskbufp;		/* disk buffer somewhere in BSS */
 extern int nflops;		/* number of active floppies {0,1,2} */
 extern long acctim[];		/* time of last floppy access */
 long maxacctim;			/* delay for floppy to turn UNSAFE */
@@ -288,7 +294,7 @@ int curflop;			/* current floppy# inserted */
  * sectors per track.
  */
 
-#define CKSECTS 8		/* check first 8 sectors */
+#define CKSECTS 6		/* check first 6 sectors -- dskbufp is 3K */
 
 #if CKSECTS
 WORD cksum[CKSECTS*2];		/* One word per sector per drive */
@@ -357,9 +363,9 @@ WORD dev;
      */
     do {
 #if CKSECTS
-	ret = floprd(diskbuf, 0L, dev, 1, 0, 0, CKSECTS);
+	ret = floprd(dskbufp, 0L, dev, 1, 0, 0, CKSECTS);
 #else
-	ret = floprd(diskbuf, 0L, dev, 1, 0, 0, 1);
+	ret = floprd(dskbufp, 0L, dev, 1, 0, 0, 1);
 #endif
 	if (ret < 0) ret = critic((WORD)ret, dev);
     } while (ret == CRITICAL_RETRY);
@@ -370,8 +376,8 @@ WORD dev;
      * If recsiz or clsiz are <= 0 then
      * don't attempt to use the BPB:
      */
-    if ((i = u2i(diskbuf + IBM_BPS)) <= 0 ||
-	(j = low8bits(diskbuf[IBM_SPC])) <= 0)
+    if ((i = u2i(dskbufp + IBM_BPS)) <= 0 ||
+	(j = low8bits(dskbufp[IBM_SPC])) <= 0)
 	    return NULL;
 
 
@@ -380,33 +386,33 @@ WORD dev;
      */
     p->recsiz = i;
     p->clsiz = j;
-    p->fsiz = u2i(diskbuf + IBM_SPF);
+    p->fsiz = u2i(dskbufp + IBM_SPF);
     p->fatrec = p->fsiz + 1;
     p->clsizb = p->recsiz * p->clsiz;
-    p->rdlen = (u2i(diskbuf + IBM_NDIRS) << 5) / p->recsiz;
+    p->rdlen = (u2i(dskbufp + IBM_NDIRS) << 5) / p->recsiz;
     p->datrec = p->fatrec + p->rdlen + p->fsiz;
-    p->numcl = (u2i(diskbuf + IBM_NSECTS) - p->datrec) / p->clsiz;
+    p->numcl = (u2i(dskbufp + IBM_NSECTS) - p->datrec) / p->clsiz;
     p->bflags = 0;	/* Floppies always have 12-bit FATs */
 
     /* if the disk has only one FAT, set a flag in bflags saying so. */
     /* Newer GEMDOSes check this and only write the FAT once if set. */
-    if (diskbuf[IBM_NFATS] < 2) p->bflags |= 2;
+    if (dskbufp[IBM_NFATS] < 2) p->bflags |= 2;
 
-    q->dnsides = u2i(diskbuf + IBM_NSIDES);		/* "extra" info */
-    q->dspt = u2i(diskbuf + IBM_SPT);
+    q->dnsides = u2i(dskbufp + IBM_NSIDES);		/* "extra" info */
+    q->dspt = u2i(dskbufp + IBM_SPT);
     q->dspc = q->dnsides * q->dspt;
-    q->dhidden = u2i(diskbuf + IBM_NHID);
-    q->dntracks = u2i(diskbuf + IBM_NSECTS) / q->dspc;
+    q->dhidden = u2i(dskbufp + IBM_NHID);
+    q->dntracks = u2i(dskbufp + IBM_NSECTS) / q->dspc;
 
     for (i = 0; i < 3; ++i)				/* copy serial# */
-	q->dserial[i] = diskbuf[VOL_SERIAL + i];
+	q->dserial[i] = dskbufp[VOL_SERIAL + i];
     for (i = 0; i < 4; ++i)
-	q->dmsd5_ser[i] = diskbuf[MSDOS5_SER + i];
+	q->dmsd5_ser[i] = dskbufp[MSDOS5_SER + i];
 
 
 #if CKSECTS
     /* compute checksums */
-    ckptr = diskbuf;
+    ckptr = dskbufp;
     for (i=0; i<CKSECTS; i++) {
 	cksum[i] = checksum(ckptr,0x100);
 	ckptr += 0x200;
@@ -479,13 +485,13 @@ WORD dev;
     else if (i == UNSURE) {
 	/* read the first CKSECTS sectors and check serial # & cksum */
 	do {
-	    ret = floprd(diskbuf,0L,dev,1,0,0,CKSECTS);
+	    ret = floprd(dskbufp,0L,dev,1,0,0,CKSECTS);
 	    if (ret < 0) ret = critic((WORD)ret,dev);
 	} while (ret == CRITICAL_RETRY);
 	if (ret < 0) return ret;
 
 	/* check old-style 3-byte serial number first */
-	ckptr = &diskbuf[VOL_SERIAL];
+	ckptr = &dskbufp[VOL_SERIAL];
 	ptr2 = &p->dserial[0];
 	if (*ckptr != *ptr2 ||
 	    *(ckptr+1) != *(ptr2+1) ||
@@ -493,7 +499,7 @@ WORD dev;
 		return CHANGED;
 
 	/* check 4-byte MSDOS serial number */
-	ckptr = &diskbuf[MSDOS5_SER];
+	ckptr = &dskbufp[MSDOS5_SER];
 	ptr2 = &p->dmsd5_ser[0];
 	if (*ckptr != *ptr2 ||
 	    *(ckptr+1) != *(ptr2+1) ||
@@ -502,7 +508,7 @@ WORD dev;
 		return CHANGED;
 
 	/* for each sector, perform a checksum & compare */
-	ckptr = diskbuf;
+	ckptr = dskbufp;
 	ckval = &cksum[dev ? CKSECTS : 0];
 	for (i=0; i<CKSECTS; i++) {
 	    if (checksum(ckptr,0x100) != ckval[i]) return CHANGED;
@@ -550,16 +556,16 @@ WORD dev;
 	     * the one in the DSB.
 	     */
 	    do {
-		ret = floprd(diskbuf, 0L, dv, 1, 0, 0, 1);
+		ret = floprd(dskbufp, 0L, dv, 1, 0, 0, 1);
 		if (ret < 0) ret = critic((WORD)ret, dv);
 	    } while (ret == CRITICAL_RETRY);
 	    if (ret < 0) return ret;
 
 	    for (i = 0; i < 3; ++i)
-		if (diskbuf[VOL_SERIAL + i] != p->dserial[i])
+		if (dskbufp[VOL_SERIAL + i] != p->dserial[i])
 			return CHANGED;
 	    for (i = 0; i < 4; ++i)
-		if (diskbuf[MSDOS5_SER + i] != p->dmsd5_ser[i])
+		if (dskbufp[MSDOS5_SER + i] != p->dmsd5_ser[i])
 			return CHANGED;
 
 	    /* Reset write-protect latch */
@@ -651,7 +657,7 @@ WORD recno, dev, count;
      */
     while (count)
     {
-	bf = oddflag ? diskbuf : buf;		/* choose a buffer */
+	bf = oddflag ? dskbufp : buf;		/* choose a buffer */
 	track = recno / p->dspc;		/* compute track# */
 	sect = recno % p->dspc;			/* compute sector# */
 	if (sect < p->dspt)
@@ -690,9 +696,9 @@ WORD recno, dev, count;
 
 		if (!ret && fverify)			/* verify */
 		{
-		    ret = flopver(diskbuf, 0L,
+		    ret = flopver(dskbufp, 0L,
 				  dev, sect, track, side, cnt);
-		    if (!ret && u2i(diskbuf))
+		    if (!ret && u2i(dskbufp))
 			ret = BAD_SECTORS;
 		}
 	    }
@@ -766,7 +772,7 @@ LONG rand()
 
 /*
  * Boot from floppy.
- * Returns OK if diskbuf[] contains an executable
+ * Returns OK if dskbufp[] contains an executable
  * boot sector.
  *
  * Used to boot from floppy only if bootdev < 2... and never booted
@@ -792,7 +798,7 @@ boot()
     if (nflops)
     {
         err = COULDNT_LOAD;
-	if (!floprd(diskbuf, 0L, 0, 1, 0, 0, 1))
+	if (!floprd(dskbufp, 0L, 0, 1, 0, 0, 1))
 	    err = OK;
 	    else if (!wpstatus[0]) return UNREADABLE;
     }
@@ -804,7 +810,7 @@ boot()
      * Successfully loaded boot sector from somewhere,
      * check it out:
      */
-    return (checksum(diskbuf, 0x100) == BOOT_MAGIC) ? OK : NOT_VALID_BS;
+    return (checksum(dskbufp, 0x100) == BOOT_MAGIC) ? OK : NOT_VALID_BS;
 }
 
 

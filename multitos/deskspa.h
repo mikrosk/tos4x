@@ -1,456 +1,612 @@
-#define STNOAPPL 69  	/* STRING */
-#define STNOWIND 70  	/* STRING */
-#define ADDINFO 1  	/* TREE */
-#define STFOEXIS 71  	/* STRING */
-#define STDISKFU 72  	/* STRING */
-#define STFO8DEE 73  	/* STRING */
-#define STBADCOP 74  	/* STRING */
-#define DEOK 11  	/* OBJECT in TREE #1 */
-#define TRSINFO 75  	/* STRING */
-#define FCNOMEM 76  	/* STRING */
-#define FCFAIL 77  	/* STRING */
-#define FCSIZE 78  	/* STRING */
-#define FCNOTYPE 79  	/* STRING */
-#define SAVETOP 80  	/* STRING */
-#define PRINTTOP 81  	/* STRING */
-#define ABORTCON 82  	/* STRING */
-#define NOICON 83  	/* STRING */
-#define NOAPP 84  	/* STRING */
-#define ADMENU 0  	/* TREE */
-#define DESKMENU 3  	/* OBJECT in TREE #0 */
-#define FILEMENU 4  	/* OBJECT in TREE #0 */
-#define VIEWMENU 5  	/* OBJECT in TREE #0 */
-#define OPTNMENU 6  	/* OBJECT in TREE #0 */
-#define ABOUITEM 9  	/* OBJECT in TREE #0 */
-#define OPENITEM 18  	/* OBJECT in TREE #0 */
-#define SHOWITEM 19  	/* OBJECT in TREE #0 */
-#define NEWFITEM 24  	/* OBJECT in TREE #0 */
-#define CLSFITEM 25  	/* OBJECT in TREE #0 */
-#define CLSWITEM 26  	/* OBJECT in TREE #0 */
-#define FORMITEM 31  	/* OBJECT in TREE #0 */
-#define ICONITEM 33  	/* OBJECT in TREE #0 */
-#define TEXTITEM 34  	/* OBJECT in TREE #0 */
-#define NAMEITEM 36  	/* OBJECT in TREE #0 */
-#define DATEITEM 37  	/* OBJECT in TREE #0 */
-#define SIZEITEM 38  	/* OBJECT in TREE #0 */
-#define TYPEITEM 39  	/* OBJECT in TREE #0 */
-#define IDSKITEM 46  	/* OBJECT in TREE #0 */
-#define IAPPITEM 47  	/* OBJECT in TREE #0 */
-#define PREFITEM 51  	/* OBJECT in TREE #0 */
-#define SAVEITEM 56  	/* OBJECT in TREE #0 */
-#define PRINTITE 57  	/* OBJECT in TREE #0 */
-#define BITBLT 60  	/* OBJECT in TREE #0 */
-#define L3ITEM 30  	/* OBJECT in TREE #0 */
-#define L4ITEM 35  	/* OBJECT in TREE #0 */
-#define L5ITEM 50  	/* OBJECT in TREE #0 */
-#define L6ITEM 58  	/* OBJECT in TREE #0 */
-#define NOSORT 40  	/* OBJECT in TREE #0 */
-#define NODRIVE 85  	/* STRING */
-#define NOOUTPUT 86  	/* STRING */
-#define DELMENU 22  	/* OBJECT in TREE #0 */
-#define SIZEFIT 42  	/* OBJECT in TREE #0 */
-#define BOTTOP 27  	/* OBJECT in TREE #0 */
-#define CNTOPEN 87  	/* STRING */
-#define CNTCRTDR 88  	/* STRING */
-#define WRERROR 89  	/* STRING */
-#define RDERROR 90  	/* STRING */
-#define CNTCRTFL 91  	/* STRING */
-#define CNTDELF 92  	/* STRING */
-#define CNTDELD 93  	/* STRING */
-#define PRINTINF 94  	/* STRING */
-#define RENAME 95  	/* STRING */
-#define NOBUF 96  	/* STRING */
-#define REMVICON 49  	/* OBJECT in TREE #0 */
-#define DELDISK 97  	/* STRING */
-#define NOTPRG 98  	/* STRING */
-#define NOAUTO 100  	/* STRING */
-#define NOSETDIR 99  	/* STRING */
-#define NOWINMEM 101  	/* STRING */
-#define NOTYPE 102  	/* STRING */
-#define ICONTYPE 103  	/* STRING */
-#define NODIRCOP 104  	/* STRING */
-#define SELALL 28  	/* OBJECT in TREE #0 */
-#define INSDISK 48  	/* OBJECT in TREE #0 */
-#define READINF 53  	/* OBJECT in TREE #0 */
-#define SCOLTYPE 43  	/* OBJECT in TREE #0 */
-#define SEAMENU 20  	/* OBJECT in TREE #0 */
-#define NOINSTAL 105  	/* STRING */
-#define NOMORE 106  	/* STRING */
-#define NOID 107  	/* STRING */
-#define ILLMAT 108  	/* STRING */
-#define NOCART 109  	/* STRING */
-#define NOMATCH 110  	/* STRING */
-#define DELITEM 111  	/* STRING */
-#define MCFAIL 112  	/* STRING */
-#define FNOTFIND 113  	/* STRING */
-#define SNEXT 114  	/* STRING */
-#define NOHELP 115  	/* STRING */
-#define NOSEA 116  	/* STRING */
-#define EXTMENU 29  	/* OBJECT in TREE #0 */
-#define MEMMENU 54  	/* OBJECT in TREE #0 */
-#define KEYUSED 117  	/* STRING */
-#define CARTNOSH 118  	/* STRING */
-#define BADKEY 119  	/* STRING */
-#define XNFILE 120  	/* STRING */
-#define SUPERITE 59  	/* OBJECT in TREE #0 */
-#define NORESCHG 121  	/* STRING */
-#define FTOLAUNC 122  	/* STRING */
-#define VIDITEM 52  	/* OBJECT in TREE #0 */
-#define WINICON 2  	/* TREE */
-#define ADFILEIN 3  	/* TREE */
-#define ADDISKIN 4  	/* TREE */
-#define ADOPENAP 5  	/* TREE */
-#define ADINSDIS 6  	/* TREE */
-#define ADMKDBOX 7  	/* TREE */
-#define ADFORMAT 8  	/* TREE */
-#define DRID 2  	/* OBJECT in TREE #6 */
-#define DRLABEL 3  	/* OBJECT in TREE #6 */
-#define DROK 14  	/* OBJECT in TREE #6 */
-#define DRCNCL 15  	/* OBJECT in TREE #6 */
-#define MKNAME 1  	/* OBJECT in TREE #7 */
-#define MKOK 2  	/* OBJECT in TREE #7 */
-#define FINAME 5  	/* OBJECT in TREE #3 */
-#define FISIZE 6  	/* OBJECT in TREE #3 */
-#define FIDATE 7  	/* OBJECT in TREE #3 */
-#define FITIME 8  	/* OBJECT in TREE #3 */
-#define FIATTRS 13  	/* OBJECT in TREE #3 */
-#define FIOK 14  	/* OBJECT in TREE #3 */
-#define FISKIP 15  	/* OBJECT in TREE #3 */
-#define DIDRIVE 2  	/* OBJECT in TREE #4 */
-#define DIVOLUME 3  	/* OBJECT in TREE #4 */
-#define DINFOLDS 4  	/* OBJECT in TREE #4 */
-#define DINFILES 5  	/* OBJECT in TREE #4 */
-#define DIUSED 6  	/* OBJECT in TREE #4 */
-#define DIAVAIL 7  	/* OBJECT in TREE #4 */
-#define DIOK 8  	/* OBJECT in TREE #4 */
-#define APPLNAME 1  	/* OBJECT in TREE #5 */
-#define APPLPARM 3  	/* OBJECT in TREE #5 */
-#define APPLOK 4  	/* OBJECT in TREE #5 */
-#define APPLCNCL 5  	/* OBJECT in TREE #5 */
-#define FINFOLDS 9  	/* OBJECT in TREE #3 */
-#define FINFILES 10  	/* OBJECT in TREE #3 */
-#define FIRONLY 11  	/* OBJECT in TREE #3 */
-#define FIRWRITE 12  	/* OBJECT in TREE #3 */
-#define FCCOPY 7  	/* OBJECT in TREE #8 */
-#define FCFORMAT 18  	/* OBJECT in TREE #8 */
-#define FCSINGLE 16  	/* OBJECT in TREE #8 */
-#define FCDOUBLE 15  	/* OBJECT in TREE #8 */
-#define FCOK 23  	/* OBJECT in TREE #8 */
-#define FCCNCL 24  	/* OBJECT in TREE #8 */
-#define BARA 20  	/* OBJECT in TREE #8 */
-#define FCLABEL 13  	/* OBJECT in TREE #8 */
-#define PRINTFIL 10  	/* TREE */
-#define PFILE 1  	/* OBJECT in TREE #10 */
-#define BDRIVE 12  	/* OBJECT in TREE #8 */
-#define ADRIVE 11  	/* OBJECT in TREE #8 */
-#define SRCDRA 4  	/* OBJECT in TREE #8 */
-#define SRCDRB 5  	/* OBJECT in TREE #8 */
-#define LINEBOX 8  	/* OBJECT in TREE #8 */
-#define FCBOXF 9  	/* OBJECT in TREE #8 */
-#define DRIVE 10  	/* OBJECT in TREE #8 */
-#define FCBOX4 1  	/* OBJECT in TREE #8 */
-#define BARB 22  	/* OBJECT in TREE #8 */
-#define INFTITLE 1  	/* OBJECT in TREE #3 */
-#define FCBOXC 2  	/* OBJECT in TREE #8 */
-#define DESTDR 6  	/* OBJECT in TREE #8 */
-#define ADICON 9  	/* TREE */
-#define BACKGROU 11  	/* TREE */
-#define SSCREEN 12  	/* TREE */
-#define PATTERN 18  	/* OBJECT in TREE #12 */
-#define SOK 36  	/* OBJECT in TREE #12 */
-#define SCANCEL 37  	/* OBJECT in TREE #12 */
-#define PAT0 9  	/* OBJECT in TREE #12 */
-#define PAT1 10  	/* OBJECT in TREE #12 */
-#define PAT2 11  	/* OBJECT in TREE #12 */
-#define PAT3 12  	/* OBJECT in TREE #12 */
-#define PAT4 13  	/* OBJECT in TREE #12 */
-#define PAT5 14  	/* OBJECT in TREE #12 */
-#define PAT6 15  	/* OBJECT in TREE #12 */
-#define PAT7 16  	/* OBJECT in TREE #12 */
-#define COLOR0 20  	/* OBJECT in TREE #12 */
-#define COLOR1 21  	/* OBJECT in TREE #12 */
-#define COLOR2 22  	/* OBJECT in TREE #12 */
-#define COLOR3 23  	/* OBJECT in TREE #12 */
-#define COLOR4 24  	/* OBJECT in TREE #12 */
-#define COLOR5 25  	/* OBJECT in TREE #12 */
-#define COLOR6 26  	/* OBJECT in TREE #12 */
-#define COLOR7 27  	/* OBJECT in TREE #12 */
-#define COLOR8 28  	/* OBJECT in TREE #12 */
-#define COLOR9 29  	/* OBJECT in TREE #12 */
-#define COLOR10 30  	/* OBJECT in TREE #12 */
-#define COLOR11 31  	/* OBJECT in TREE #12 */
-#define COLOR12 32  	/* OBJECT in TREE #12 */
-#define COLOR13 33  	/* OBJECT in TREE #12 */
-#define COLOR14 34  	/* OBJECT in TREE #12 */
-#define COLOR15 35  	/* OBJECT in TREE #12 */
-#define FILEOPTI 13  	/* TREE */
-#define DLAUNCH 14  	/* TREE */
-#define OPTNAME 2  	/* OBJECT in TREE #13 */
-#define OPTOK 3  	/* OBJECT in TREE #13 */
-#define ICON0 1  	/* OBJECT in TREE #9 */
-#define ICON1 2  	/* OBJECT in TREE #9 */
-#define ICON2 3  	/* OBJECT in TREE #9 */
-#define ICON3 4  	/* OBJECT in TREE #9 */
-#define ICON4 5  	/* OBJECT in TREE #9 */
-#define LAUNCHOK 7  	/* OBJECT in TREE #14 */
-#define RUNNAME 2  	/* OBJECT in TREE #14 */
-#define LGRAPHIC 5  	/* OBJECT in TREE #14 */
-#define TEXTLINE 15  	/* TREE */
-#define TSTYLE 1  	/* OBJECT in TREE #15 */
-#define IDRIVE 6  	/* OBJECT in TREE #6 */
-#define ITRASH 7  	/* OBJECT in TREE #6 */
-#define IPRINTER 8  	/* OBJECT in TREE #6 */
-#define IBOX 9  	/* OBJECT in TREE #6 */
-#define IUP 11  	/* OBJECT in TREE #6 */
-#define IDOWN 13  	/* OBJECT in TREE #6 */
-#define IICON 10  	/* OBJECT in TREE #6 */
-#define SAMENAME 16  	/* TREE */
-#define COPY 4  	/* OBJECT in TREE #16 */
-#define SKIP 5  	/* OBJECT in TREE #16 */
-#define QUIT 6  	/* OBJECT in TREE #16 */
-#define EDFNAME 3  	/* OBJECT in TREE #16 */
-#define CPBOX 17  	/* TREE */
-#define FNAME 2  	/* OBJECT in TREE #16 */
-#define OKCP 14  	/* OBJECT in TREE #17 */
-#define CCANCEL 15  	/* OBJECT in TREE #17 */
-#define CPDIR 8  	/* OBJECT in TREE #17 */
-#define CPFILE 7  	/* OBJECT in TREE #17 */
-#define HIDECBOX 6  	/* OBJECT in TREE #17 */
-#define TITLE 1  	/* OBJECT in TREE #17 */
-#define NUMDIR 2  	/* OBJECT in TREE #17 */
-#define NUMFILE 3  	/* OBJECT in TREE #17 */
-#define INWICON 18  	/* TREE */
-#define WBOX 5  	/* OBJECT in TREE #18 */
-#define WICON 6  	/* OBJECT in TREE #18 */
-#define WOK 14  	/* OBJECT in TREE #18 */
-#define WNAME 3  	/* OBJECT in TREE #18 */
-#define WUP 7  	/* OBJECT in TREE #18 */
-#define WDOWN 8  	/* OBJECT in TREE #18 */
-#define WREMOVE 13  	/* OBJECT in TREE #18 */
-#define WNONE 11  	/* OBJECT in TREE #18 */
-#define OUTBOX 17  	/* OBJECT in TREE #12 */
-#define WFOLDER 10  	/* OBJECT in TREE #18 */
-#define SNAME 1  	/* OBJECT in TREE #16 */
-#define IBOX1 2  	/* OBJECT in TREE #18 */
-#define CSDRIVE 4  	/* OBJECT in TREE #17 */
-#define CDDRIVE 5  	/* OBJECT in TREE #17 */
-#define FICNCL 16  	/* OBJECT in TREE #3 */
-#define DIQUIT 9  	/* OBJECT in TREE #4 */
-#define DRQUIT 16  	/* OBJECT in TREE #6 */
-#define STITLE 1  	/* OBJECT in TREE #12 */
-#define PYES 11  	/* OBJECT in TREE #17 */
-#define WQUIT 16  	/* OBJECT in TREE #18 */
-#define HELP1 19  	/* TREE */
-#define DATEBOX 9  	/* OBJECT in TREE #17 */
-#define SEAFILE 21  	/* TREE */
-#define SFILE 2  	/* OBJECT in TREE #21 */
-#define CHBOX1 13  	/* OBJECT in TREE #17 */
-#define MKCNCL 4  	/* OBJECT in TREE #7 */
-#define SEAOK 3  	/* OBJECT in TREE #21 */
-#define SEACNCL 4  	/* OBJECT in TREE #21 */
-#define LNCNCL 8  	/* OBJECT in TREE #14 */
-#define DESKPREF 4  	/* OBJECT in TREE #12 */
-#define WINPREF 5  	/* OBJECT in TREE #12 */
-#define FCHIGH 17  	/* OBJECT in TREE #8 */
-#define FIRIGHT 4  	/* OBJECT in TREE #3 */
-#define FILEFT 3  	/* OBJECT in TREE #3 */
-#define FIFILE 2  	/* OBJECT in TREE #3 */
-#define HELP2 20  	/* TREE */
-#define MOREHELP 14  	/* OBJECT in TREE #19 */
-#define SIDEBOX 14  	/* OBJECT in TREE #8 */
-#define MORE 0		/* FREE STRING */
-#define ENDFILE 1		/* FREE STRING */
-#define CART 2		/* FREE STRING */
-#define CPYSTR 3		/* FREE STRING */
-#define DELSTR 4		/* FREE STRING */
-#define FILEINFO 5		/* FREE STRING */
-#define FOLDINFO 6		/* FREE STRING */
-#define MOVESTR 7		/* FREE STRING */
-#define READERRO 8		/* FREE STRING */
-#define CANTOPEN 9		/* FREE STRING */
-#define NOMEM 10		/* FREE STRING */
-#define CACHETXT 11		/* FREE STRING */
-#define BLTTXT 12		/* FREE STRING */
-#define NCONFLIC 13		/* FREE STRING */
-#define RNAME 14		/* FREE STRING */
-#define CRENSTR 15		/* FREE STRING */
-#define MRENSTR 16		/* FREE STRING */
-#define ISTR 17		/* FREE STRING */
-#define ISELS 18		/* FREE STRING */
-#define ISEL 19		/* FREE STRING */
-#define ISTRS 20		/* FREE STRING */
-#define DEVICE 21		/* FREE STRING */
-#define SINF 22		/* FREE STRING */
-#define LITEM 23		/* FREE STRING */
-#define FSTOS 24		/* FREE STRING */
-#define FSTOSTTP 25		/* FREE STRING */
-#define FSGEM 26		/* FREE STRING */
-#define FSGEMTTP 27		/* FREE STRING */
-#define FSAPP 28		/* FREE STRING */
-#define FSTOP 29		/* FREE STRING */
-#define FSFULL 30		/* FREE STRING */
-#define FSFILE 31		/* FREE STRING */
-#define FS40 32		/* FREE STRING */
-#define FS80 33		/* FREE STRING */
-#define FSYES 34		/* FREE STRING */
-#define FSNO 35		/* FREE STRING */
-#define FS2C 36		/* FREE STRING */
-#define FS4C 37		/* FREE STRING */
-#define FS16C 38		/* FREE STRING */
-#define FS256C 39		/* FREE STRING */
-#define FSTRUEC 40		/* FREE STRING */
-#define FSAUTO 41		/* FREE STRING */
-#define FSNORMAL 42		/* FREE STRING */
-#define FSON 43		/* FREE STRING */
-#define FSOFF 44		/* FREE STRING */
-#define FSNONE 45		/* FREE STRING */
-#define FSF1 46		/* FREE STRING */
-#define FSF2 47		/* FREE STRING */
-#define FSF3 48		/* FREE STRING */
-#define FSF4 49		/* FREE STRING */
-#define FSF5 50		/* FREE STRING */
-#define FSF6 51		/* FREE STRING */
-#define FSF7 52		/* FREE STRING */
-#define FSF8 53		/* FREE STRING */
-#define FSF9 54		/* FREE STRING */
-#define FSF10 55		/* FREE STRING */
-#define FSF11 56		/* FREE STRING */
-#define FSF12 57		/* FREE STRING */
-#define FSF13 58		/* FREE STRING */
-#define FSF14 59		/* FREE STRING */
-#define FSF15 60		/* FREE STRING */
-#define FSF16 61		/* FREE STRING */
-#define FSF17 62		/* FREE STRING */
-#define FSF18 63		/* FREE STRING */
-#define FSF19 64		/* FREE STRING */
-#define FSF20 65		/* FREE STRING */
-#define DLTEXT 66		/* FREE STRING */
-#define ITEXT 67		/* FREE STRING */
-#define MNINSAPP 22  	/* TREE */
-#define MNSETPRE 23  	/* TREE */
-#define MNSETVID 24  	/* TREE */
-#define MNVIDEO 25  	/* TREE */
-#define SVOK 10  	/* OBJECT in TREE #24 */
-#define SVCANCEL 11  	/* OBJECT in TREE #24 */
-#define SVTTOK 9  	/* OBJECT in TREE #25 */
-#define SVTTCAN 10  	/* OBJECT in TREE #25 */
-#define SVMODES 8  	/* OBJECT in TREE #24 */
-#define SVSTLOW 3  	/* OBJECT in TREE #25 */
-#define SVCTITLE 2  	/* OBJECT in TREE #24 */
-#define IBASE 9  	/* OBJECT in TREE #24 */
-#define MNMENU 26  	/* TREE */
-#define MNSYSTEM 27  	/* TREE */
-#define SPDBUTTN 4  	/* OBJECT in TREE #23 */
-#define SPCBUTTN 6  	/* OBJECT in TREE #23 */
-#define SPOBUTTN 8  	/* OBJECT in TREE #23 */
-#define MNSPOK 9  	/* OBJECT in TREE #23 */
-#define MNSPCAN 10  	/* OBJECT in TREE #23 */
-#define SDBUTTON 3  	/* OBJECT in TREE #27 */
-#define SIBUTTON 5  	/* OBJECT in TREE #27 */
-#define MFKEY 11  	/* OBJECT in TREE #27 */
-#define MFLEFT 8  	/* OBJECT in TREE #27 */
-#define MFRIGHT 10  	/* OBJECT in TREE #27 */
-#define MFFILE 9  	/* OBJECT in TREE #27 */
-#define MFUP 12  	/* OBJECT in TREE #27 */
-#define MFDOWN 13  	/* OBJECT in TREE #27 */
-#define MKITEM 17  	/* OBJECT in TREE #27 */
-#define MKKEYS 20  	/* OBJECT in TREE #27 */
-#define MKUPS 18  	/* OBJECT in TREE #27 */
-#define MKDOWNS 19  	/* OBJECT in TREE #27 */
-#define MKCLEAR 21  	/* OBJECT in TREE #27 */
-#define MKMEMORY 22  	/* OBJECT in TREE #27 */
-#define MOK 23  	/* OBJECT in TREE #27 */
-#define MCANCEL 24  	/* OBJECT in TREE #27 */
-#define MPFNAME 2  	/* OBJECT in TREE #22 */
-#define MPARGS 3  	/* OBJECT in TREE #22 */
-#define MPDTYPE 4  	/* OBJECT in TREE #22 */
-#define MPIBUTTN 6  	/* OBJECT in TREE #22 */
-#define MPBBUTTN 8  	/* OBJECT in TREE #22 */
-#define MPFBUTTN 10  	/* OBJECT in TREE #22 */
-#define MPDBUTTN 12  	/* OBJECT in TREE #22 */
-#define MPPBUTTN 14  	/* OBJECT in TREE #22 */
-#define MPOK 15  	/* OBJECT in TREE #22 */
-#define MPREMOVE 16  	/* OBJECT in TREE #22 */
-#define MPCANCEL 17  	/* OBJECT in TREE #22 */
-#define MPQUIT 18  	/* OBJECT in TREE #22 */
-#define SVSTMED 4  	/* OBJECT in TREE #25 */
-#define SVSTHIGH 5  	/* OBJECT in TREE #25 */
-#define MPIBASE 1  	/* OBJECT in TREE #26 */
-#define MPINONE 2  	/* OBJECT in TREE #26 */
-#define MPIF1 3  	/* OBJECT in TREE #26 */
-#define MPIF2 4  	/* OBJECT in TREE #26 */
-#define MPIF3 5  	/* OBJECT in TREE #26 */
-#define MPIF4 6  	/* OBJECT in TREE #26 */
-#define MPIF5 7  	/* OBJECT in TREE #26 */
-#define MPIF6 8  	/* OBJECT in TREE #26 */
-#define MPIF7 9  	/* OBJECT in TREE #26 */
-#define MPIF8 10  	/* OBJECT in TREE #26 */
-#define MPIF9 11  	/* OBJECT in TREE #26 */
-#define MPIF10 12  	/* OBJECT in TREE #26 */
-#define MPFI11 13  	/* OBJECT in TREE #26 */
-#define MPIF12 14  	/* OBJECT in TREE #26 */
-#define MPIF13 15  	/* OBJECT in TREE #26 */
-#define MPIF14 16  	/* OBJECT in TREE #26 */
-#define MPIF15 17  	/* OBJECT in TREE #26 */
-#define MPIF16 18  	/* OBJECT in TREE #26 */
-#define MPIF17 19  	/* OBJECT in TREE #26 */
-#define MPIF18 20  	/* OBJECT in TREE #26 */
-#define MPIF19 21  	/* OBJECT in TREE #26 */
-#define MPIF20 22  	/* OBJECT in TREE #26 */
-#define MPFBASE 23  	/* OBJECT in TREE #26 */
-#define MPFTOS 24  	/* OBJECT in TREE #26 */
-#define MPFTTP 25  	/* OBJECT in TREE #26 */
-#define MPFGEM 26  	/* OBJECT in TREE #26 */
-#define MPFGMTTP 27  	/* OBJECT in TREE #26 */
-#define SDBASE 28  	/* OBJECT in TREE #26 */
-#define SDAPP 29  	/* OBJECT in TREE #26 */
-#define SDTOP 30  	/* OBJECT in TREE #26 */
-#define SIBASE 31  	/* OBJECT in TREE #26 */
-#define SIFULL 32  	/* OBJECT in TREE #26 */
-#define SIFILE 33  	/* OBJECT in TREE #26 */
-#define SVLBASE 49  	/* OBJECT in TREE #26 */
-#define SVL40 50  	/* OBJECT in TREE #26 */
-#define SVL80 51  	/* OBJECT in TREE #26 */
-#define SPBASE 37  	/* OBJECT in TREE #26 */
-#define SPYES 38  	/* OBJECT in TREE #26 */
-#define SPNO 39  	/* OBJECT in TREE #26 */
-#define VIDBASE 40  	/* OBJECT in TREE #26 */
-#define VID2 41  	/* OBJECT in TREE #26 */
-#define VID4 42  	/* OBJECT in TREE #26 */
-#define VID16 43  	/* OBJECT in TREE #26 */
-#define VID256 44  	/* OBJECT in TREE #26 */
-#define VIDTRUE 45  	/* OBJECT in TREE #26 */
-#define MPBBASE 34  	/* OBJECT in TREE #26 */
-#define MPBAUTO 35  	/* OBJECT in TREE #26 */
-#define MPBNORML 36  	/* OBJECT in TREE #26 */
-#define SVIBASE 46  	/* OBJECT in TREE #26 */
-#define SVION 47  	/* OBJECT in TREE #26 */
-#define SVIOFF 48  	/* OBJECT in TREE #26 */
-#define SDTITLE 2  	/* OBJECT in TREE #27 */
-#define SITITLE 4  	/* OBJECT in TREE #27 */
-#define MPITITLE 5  	/* OBJECT in TREE #22 */
-#define MPBTITLE 7  	/* OBJECT in TREE #22 */
-#define MPFTITLE 9  	/* OBJECT in TREE #22 */
-#define MPDTITLE 11  	/* OBJECT in TREE #22 */
-#define MPPTITLE 13  	/* OBJECT in TREE #22 */
-#define SPDTITLE 3  	/* OBJECT in TREE #23 */
-#define SPCTITLE 5  	/* OBJECT in TREE #23 */
-#define SPOTITLE 7  	/* OBJECT in TREE #23 */
-#define SVCBUTTN 3  	/* OBJECT in TREE #24 */
-#define SVLBUTTN 5  	/* OBJECT in TREE #24 */
-#define SVDBUTTN 7  	/* OBJECT in TREE #24 */
-#define SVLTITLE 4  	/* OBJECT in TREE #24 */
-#define SVDTITLE 6  	/* OBJECT in TREE #24 */
-#define MFBASE 7  	/* OBJECT in TREE #27 */
-#define WSKIP 12  	/* OBJECT in TREE #18 */
-#define LTOS 4  	/* OBJECT in TREE #14 */
-#define FCBARA 25  	/* OBJECT in TREE #8 */
-#define FCBARB 26  	/* OBJECT in TREE #8 */
-#define SAVEINF 68		/* FREE STRING */
-#define TTMEDIUM 6  	/* OBJECT in TREE #25 */
-#define TTHIGH 7  	/* OBJECT in TREE #25 */
-#define TTLOW 8  	/* OBJECT in TREE #25 */
-#define NODROP 123  	/* STRING */
-#define NOSHUT 124  	/* STRING */
-#define FCNOWRK 125  	/* STRING */
-
+/* Resource Datei Indizes fÅr DESKSPA */
+
+#define ADMENU   0   /* Menuebaum */
+#define DESKMENU 3   /* TITLE in Baum ADMENU */
+#define FILEMENU 4   /* TITLE in Baum ADMENU */
+#define VIEWMENU 5   /* TITLE in Baum ADMENU */
+#define OPTNMENU 6   /* TITLE in Baum ADMENU */
+#define ABOUITEM 9   /* STRING in Baum ADMENU */
+#define OPENITEM 18  /* STRING in Baum ADMENU */
+#define SHOWITEM 19  /* STRING in Baum ADMENU */
+#define SEAMENU  20  /* STRING in Baum ADMENU */
+#define DELMENU  22  /* STRING in Baum ADMENU */
+#define NEWFITEM 24  /* STRING in Baum ADMENU */
+#define CLSFITEM 25  /* STRING in Baum ADMENU */
+#define CLSWITEM 26  /* STRING in Baum ADMENU */
+#define BOTTOP   27  /* STRING in Baum ADMENU */
+#define SELALL   28  /* STRING in Baum ADMENU */
+#define EXTMENU  29  /* STRING in Baum ADMENU */
+#define L3ITEM   30  /* STRING in Baum ADMENU */
+#define FORMITEM 31  /* STRING in Baum ADMENU */
+#define ICONITEM 33  /* STRING in Baum ADMENU */
+#define TEXTITEM 34  /* STRING in Baum ADMENU */
+#define L4ITEM   35  /* STRING in Baum ADMENU */
+#define NAMEITEM 36  /* STRING in Baum ADMENU */
+#define DATEITEM 37  /* STRING in Baum ADMENU */
+#define SIZEITEM 38  /* STRING in Baum ADMENU */
+#define TYPEITEM 39  /* STRING in Baum ADMENU */
+#define NOSORT   40  /* STRING in Baum ADMENU */
+#define SIZEFIT  42  /* STRING in Baum ADMENU */
+#define SCOLTYPE 43  /* STRING in Baum ADMENU */
+#define IDSKITEM 46  /* STRING in Baum ADMENU */
+#define IAPPITEM 47  /* STRING in Baum ADMENU */
+#define INSDISK  48  /* STRING in Baum ADMENU */
+#define REMVICON 49  /* STRING in Baum ADMENU */
+#define L5ITEM   50  /* STRING in Baum ADMENU */
+#define PREFITEM 51  /* STRING in Baum ADMENU */
+#define VIDITEM  52  /* STRING in Baum ADMENU */
+#define READINF  53  /* STRING in Baum ADMENU */
+#define MEMMENU  54  /* STRING in Baum ADMENU */
+#define SAVEITEM 56  /* STRING in Baum ADMENU */
+#define PRINTITE 57  /* STRING in Baum ADMENU */
+#define L6ITEM   58  /* STRING in Baum ADMENU */
+#define SUPERITE 59  /* STRING in Baum ADMENU */
+#define BITBLT   60  /* STRING in Baum ADMENU */
+
+#define ADDINFO  1   /* Formular/Dialog */
+#define DEOK     11  /* BUTTON in Baum ADDINFO */
+
+#define SMILEY   2   /* Formular/Dialog */
+
+#define ADFILEIN 3   /* Formular/Dialog */
+#define INFTITLE 1   /* TEXT in Baum ADFILEIN */
+#define FIFILE   2   /* FTEXT in Baum ADFILEIN */
+#define FILEFT   3   /* BOXCHAR in Baum ADFILEIN */
+#define FIRIGHT  4   /* BOXCHAR in Baum ADFILEIN */
+#define FINAME   5   /* FTEXT in Baum ADFILEIN */
+#define FISIZE   6   /* FTEXT in Baum ADFILEIN */
+#define FIDATE   7   /* FTEXT in Baum ADFILEIN */
+#define FITIME   8   /* FTEXT in Baum ADFILEIN */
+#define FINFOLDS 9   /* FTEXT in Baum ADFILEIN */
+#define FINFILES 10  /* FTEXT in Baum ADFILEIN */
+#define FIRONLY  11  /* BUTTON in Baum ADFILEIN */
+#define FIRWRITE 12  /* BUTTON in Baum ADFILEIN */
+#define FIATTRS  13  /* STRING in Baum ADFILEIN */
+#define FIOK     14  /* BUTTON in Baum ADFILEIN */
+#define FISKIP   15  /* BUTTON in Baum ADFILEIN */
+#define FICNCL   16  /* BUTTON in Baum ADFILEIN */
+
+#define ADDISKIN 4   /* Formular/Dialog */
+#define DIDRIVE  2   /* FTEXT in Baum ADDISKIN */
+#define DIVOLUME 3   /* FTEXT in Baum ADDISKIN */
+#define DINFOLDS 4   /* FTEXT in Baum ADDISKIN */
+#define DINFILES 5   /* FTEXT in Baum ADDISKIN */
+#define DIUSED   6   /* FTEXT in Baum ADDISKIN */
+#define DIAVAIL  7   /* FTEXT in Baum ADDISKIN */
+#define DIOK     8   /* BUTTON in Baum ADDISKIN */
+#define DIQUIT   9   /* BUTTON in Baum ADDISKIN */
+
+#define ADOPENAP 5   /* Formular/Dialog */
+#define APPLNAME 1   /* FTEXT in Baum ADOPENAP */
+#define APPLPARM 3   /* FTEXT in Baum ADOPENAP */
+#define APPLOK   4   /* BUTTON in Baum ADOPENAP */
+#define APPLCNCL 5   /* BUTTON in Baum ADOPENAP */
+
+#define ADINSDIS 6   /* Formular/Dialog */
+#define DRID     2   /* FTEXT in Baum ADINSDIS */
+#define DRLABEL  3   /* FTEXT in Baum ADINSDIS */
+#define IDRIVE   6   /* BUTTON in Baum ADINSDIS */
+#define ITRASH   7   /* BUTTON in Baum ADINSDIS */
+#define IPRINTER 8   /* BUTTON in Baum ADINSDIS */
+#define IBOX     9   /* BOX in Baum ADINSDIS */
+#define IICON    10  /* ICON in Baum ADINSDIS */
+#define IUP      11  /* BOXCHAR in Baum ADINSDIS */
+#define IDOWN    13  /* BOXCHAR in Baum ADINSDIS */
+#define DROK     14  /* BUTTON in Baum ADINSDIS */
+#define DRCNCL   15  /* BUTTON in Baum ADINSDIS */
+#define DRQUIT   16  /* BUTTON in Baum ADINSDIS */
+
+#define ADMKDBOX 7   /* Formular/Dialog */
+#define MKNAME   1   /* FTEXT in Baum ADMKDBOX */
+#define MKOK     2   /* BUTTON in Baum ADMKDBOX */
+#define MKCNCL   4   /* BUTTON in Baum ADMKDBOX */
+
+#define ADFORMAT 8   /* Formular/Dialog */
+#define FCBOX4   1   /* BOX in Baum ADFORMAT */
+#define FCBOXC   2   /* BOX in Baum ADFORMAT */
+#define SRCDRA   4   /* BOXCHAR in Baum ADFORMAT */
+#define SRCDRB   5   /* BOXCHAR in Baum ADFORMAT */
+#define DESTDR   6   /* BOXCHAR in Baum ADFORMAT */
+#define FCCOPY   7   /* BUTTON in Baum ADFORMAT */
+#define LINEBOX  8   /* BOX in Baum ADFORMAT */
+#define FCBOXF   9   /* BOX in Baum ADFORMAT */
+#define DRIVE    10  /* STRING in Baum ADFORMAT */
+#define ADRIVE   11  /* BOXCHAR in Baum ADFORMAT */
+#define BDRIVE   12  /* BOXCHAR in Baum ADFORMAT */
+#define FCLABEL  13  /* FTEXT in Baum ADFORMAT */
+#define SIDEBOX  14  /* BOX in Baum ADFORMAT */
+#define FCDOUBLE 15  /* BUTTON in Baum ADFORMAT */
+#define FCSINGLE 16  /* BUTTON in Baum ADFORMAT */
+#define FCHIGH   17  /* BUTTON in Baum ADFORMAT */
+#define FCFORMAT 18  /* BUTTON in Baum ADFORMAT */
+#define BARA     20  /* BOX in Baum ADFORMAT */
+#define BARB     22  /* BOX in Baum ADFORMAT */
+#define FCOK     23  /* BUTTON in Baum ADFORMAT */
+#define FCCNCL   24  /* BUTTON in Baum ADFORMAT */
+#define FCBARA   25  /* BOX in Baum ADFORMAT */
+#define FCBARB   26  /* BOX in Baum ADFORMAT */
+
+#define ADICON   9   /* Formular/Dialog */
+#define ICON0    1   /* ICON in Baum ADICON */
+#define ICON1    2   /* ICON in Baum ADICON */
+#define ICON2    3   /* ICON in Baum ADICON */
+#define ICON3    4   /* ICON in Baum ADICON */
+#define ICON4    5   /* ICON in Baum ADICON */
+
+#define PRINTFIL 10  /* Formular/Dialog */
+#define PFILE    1   /* FTEXT in Baum PRINTFIL */
+
+#define BACKGROU 11  /* Formular/Dialog */
+
+#define SSCREEN  12  /* Formular/Dialog */
+#define STITLE   1   /* TEXT in Baum SSCREEN */
+#define DESKPREF 4   /* BUTTON in Baum SSCREEN */
+#define WINPREF  5   /* BUTTON in Baum SSCREEN */
+#define PAT0     9   /* BOX in Baum SSCREEN */
+#define PAT1     10  /* BOX in Baum SSCREEN */
+#define PAT2     11  /* BOX in Baum SSCREEN */
+#define PAT3     12  /* BOX in Baum SSCREEN */
+#define PAT4     13  /* BOX in Baum SSCREEN */
+#define PAT5     14  /* BOX in Baum SSCREEN */
+#define PAT6     15  /* BOX in Baum SSCREEN */
+#define PAT7     16  /* BOX in Baum SSCREEN */
+#define OUTBOX   17  /* BOX in Baum SSCREEN */
+#define PATTERN  18  /* BOX in Baum SSCREEN */
+#define COLOR0   20  /* BOX in Baum SSCREEN */
+#define COLOR1   21  /* BOX in Baum SSCREEN */
+#define COLOR2   22  /* BOX in Baum SSCREEN */
+#define COLOR3   23  /* BOX in Baum SSCREEN */
+#define COLOR4   24  /* BOX in Baum SSCREEN */
+#define COLOR5   25  /* BOX in Baum SSCREEN */
+#define COLOR6   26  /* BOX in Baum SSCREEN */
+#define COLOR7   27  /* BOX in Baum SSCREEN */
+#define COLOR8   28  /* BOX in Baum SSCREEN */
+#define COLOR9   29  /* BOX in Baum SSCREEN */
+#define COLOR10  30  /* BOX in Baum SSCREEN */
+#define COLOR11  31  /* BOX in Baum SSCREEN */
+#define COLOR12  32  /* BOX in Baum SSCREEN */
+#define COLOR13  33  /* BOX in Baum SSCREEN */
+#define COLOR14  34  /* BOX in Baum SSCREEN */
+#define COLOR15  35  /* BOX in Baum SSCREEN */
+#define SOK      36  /* BUTTON in Baum SSCREEN */
+#define SCANCEL  37  /* BUTTON in Baum SSCREEN */
+
+#define FILEOPTI 13  /* Formular/Dialog */
+#define OPTNAME  2   /* FTEXT in Baum FILEOPTI */
+#define OPTOK    3   /* BUTTON in Baum FILEOPTI */
+
+#define DLAUNCH  14  /* Formular/Dialog */
+#define RUNNAME  2   /* FTEXT in Baum DLAUNCH */
+#define LTOS     4   /* BUTTON in Baum DLAUNCH */
+#define LGRAPHIC 5   /* BUTTON in Baum DLAUNCH */
+#define LAUNCHOK 7   /* BUTTON in Baum DLAUNCH */
+#define LNCNCL   8   /* BUTTON in Baum DLAUNCH */
+
+#define TEXTLINE 15  /* Formular/Dialog */
+#define TSTYLE   1   /* TEXT in Baum TEXTLINE */
+
+#define SAMENAME 16  /* Formular/Dialog */
+#define SNAME    1   /* TEXT in Baum SAMENAME */
+#define FNAME    2   /* FTEXT in Baum SAMENAME */
+#define EDFNAME  3   /* FTEXT in Baum SAMENAME */
+#define COPY     4   /* BUTTON in Baum SAMENAME */
+#define SKIP     5   /* BUTTON in Baum SAMENAME */
+#define QUIT     6   /* BUTTON in Baum SAMENAME */
+
+#define CPBOX    17  /* Formular/Dialog */
+#define TITLE    1   /* TEXT in Baum CPBOX */
+#define NUMDIR   2   /* FTEXT in Baum CPBOX */
+#define NUMFILE  3   /* FTEXT in Baum CPBOX */
+#define CSDRIVE  4   /* FTEXT in Baum CPBOX */
+#define CDDRIVE  5   /* FTEXT in Baum CPBOX */
+#define HIDECBOX 6   /* BOX in Baum CPBOX */
+#define CPFILE   7   /* FTEXT in Baum CPBOX */
+#define CPDIR    8   /* FTEXT in Baum CPBOX */
+#define DATEBOX  9   /* BOX in Baum CPBOX */
+#define PYES     11  /* BUTTON in Baum CPBOX */
+#define CHBOX1   13  /* BOX in Baum CPBOX */
+#define OKCP     14  /* BUTTON in Baum CPBOX */
+#define CCANCEL  15  /* BUTTON in Baum CPBOX */
+
+#define INWICON  18  /* Formular/Dialog */
+#define IBOX1    2   /* BOX in Baum INWICON */
+#define WNAME    3   /* FTEXT in Baum INWICON */
+#define WBOX     5   /* BOX in Baum INWICON */
+#define WICON    6   /* ICON in Baum INWICON */
+#define WUP      7   /* BOXCHAR in Baum INWICON */
+#define WDOWN    8   /* BOXCHAR in Baum INWICON */
+#define WFOLDER  10  /* BUTTON in Baum INWICON */
+#define WNONE    11  /* BUTTON in Baum INWICON */
+#define WSKIP    12  /* BUTTON in Baum INWICON */
+#define WREMOVE  13  /* BUTTON in Baum INWICON */
+#define WOK      14  /* BUTTON in Baum INWICON */
+#define WQUIT    16  /* BUTTON in Baum INWICON */
+
+#define HELP1    19  /* Formular/Dialog */
+#define MOREHELP 14  /* BUTTON in Baum HELP1 */
+
+#define HELP2    20  /* Formular/Dialog */
+
+#define SEAFILE  21  /* Formular/Dialog */
+#define SFILE    2   /* FTEXT in Baum SEAFILE */
+#define SEAOK    3   /* BUTTON in Baum SEAFILE */
+#define SEACNCL  4   /* BUTTON in Baum SEAFILE */
+
+#define MNINSAPP 22  /* Formular/Dialog */
+#define MPFNAME  2   /* FTEXT in Baum MNINSAPP */
+#define MPARGS   3   /* FTEXT in Baum MNINSAPP */
+#define MPDTYPE  4   /* FTEXT in Baum MNINSAPP */
+#define MPITITLE 5   /* TEXT in Baum MNINSAPP */
+#define MPIBUTTN 6   /* BUTTON in Baum MNINSAPP */
+#define MPBTITLE 7   /* TEXT in Baum MNINSAPP */
+#define MPBBUTTN 8   /* BUTTON in Baum MNINSAPP */
+#define MPFTITLE 9   /* TEXT in Baum MNINSAPP */
+#define MPFBUTTN 10  /* BUTTON in Baum MNINSAPP */
+#define MPDTITLE 11  /* TEXT in Baum MNINSAPP */
+#define MPDBUTTN 12  /* BUTTON in Baum MNINSAPP */
+#define MPPTITLE 13  /* TEXT in Baum MNINSAPP */
+#define MPPBUTTN 14  /* BUTTON in Baum MNINSAPP */
+#define MPOK     15  /* BUTTON in Baum MNINSAPP */
+#define MPREMOVE 16  /* BUTTON in Baum MNINSAPP */
+#define MPCANCEL 17  /* BUTTON in Baum MNINSAPP */
+#define MPQUIT   18  /* BUTTON in Baum MNINSAPP */
+
+#define MNSETPRE 23  /* Formular/Dialog */
+#define SPDTITLE 3   /* TEXT in Baum MNSETPRE */
+#define SPDBUTTN 4   /* BUTTON in Baum MNSETPRE */
+#define SPCTITLE 5   /* TEXT in Baum MNSETPRE */
+#define SPCBUTTN 6   /* BUTTON in Baum MNSETPRE */
+#define SPOTITLE 7   /* TEXT in Baum MNSETPRE */
+#define SPOBUTTN 8   /* BUTTON in Baum MNSETPRE */
+#define MNSPOK   9   /* BUTTON in Baum MNSETPRE */
+#define MNSPCAN  10  /* BUTTON in Baum MNSETPRE */
+
+#define MNSETVID 24  /* Formular/Dialog */
+#define SVCTITLE 2   /* TEXT in Baum MNSETVID */
+#define SVCBUTTN 3   /* BUTTON in Baum MNSETVID */
+#define SVLTITLE 4   /* TEXT in Baum MNSETVID */
+#define SVLBUTTN 5   /* BUTTON in Baum MNSETVID */
+#define SVDTITLE 6   /* TEXT in Baum MNSETVID */
+#define SVDBUTTN 7   /* BUTTON in Baum MNSETVID */
+#define SVMODES  8   /* BUTTON in Baum MNSETVID */
+#define IBASE    9   /* IBOX in Baum MNSETVID */
+#define SVOK     10  /* BUTTON in Baum MNSETVID */
+#define SVCANCEL 11  /* BUTTON in Baum MNSETVID */
+
+#define MNVIDEO  25  /* Formular/Dialog */
+#define SVSTLOW  3   /* BUTTON in Baum MNVIDEO */
+#define SVSTMED  4   /* BUTTON in Baum MNVIDEO */
+#define SVSTHIGH 5   /* BUTTON in Baum MNVIDEO */
+#define TTMEDIUM 6   /* BUTTON in Baum MNVIDEO */
+#define TTHIGH   7   /* BUTTON in Baum MNVIDEO */
+#define TTLOW    8   /* BUTTON in Baum MNVIDEO */
+#define SVTTOK   9   /* BUTTON in Baum MNVIDEO */
+#define SVTTCAN  10  /* BUTTON in Baum MNVIDEO */
+
+#define MNMENU   26  /* Formular/Dialog */
+#define MPIBASE  1   /* BOX in Baum MNMENU */
+#define MPINONE  2   /* STRING in Baum MNMENU */
+#define MPIF1    3   /* STRING in Baum MNMENU */
+#define MPIF2    4   /* STRING in Baum MNMENU */
+#define MPIF3    5   /* STRING in Baum MNMENU */
+#define MPIF4    6   /* STRING in Baum MNMENU */
+#define MPIF5    7   /* STRING in Baum MNMENU */
+#define MPIF6    8   /* STRING in Baum MNMENU */
+#define MPIF7    9   /* STRING in Baum MNMENU */
+#define MPIF8    10  /* STRING in Baum MNMENU */
+#define MPIF9    11  /* STRING in Baum MNMENU */
+#define MPIF10   12  /* STRING in Baum MNMENU */
+#define MPFI11   13  /* STRING in Baum MNMENU */
+#define MPIF12   14  /* STRING in Baum MNMENU */
+#define MPIF13   15  /* STRING in Baum MNMENU */
+#define MPIF14   16  /* STRING in Baum MNMENU */
+#define MPIF15   17  /* STRING in Baum MNMENU */
+#define MPIF16   18  /* STRING in Baum MNMENU */
+#define MPIF17   19  /* STRING in Baum MNMENU */
+#define MPIF18   20  /* STRING in Baum MNMENU */
+#define MPIF19   21  /* STRING in Baum MNMENU */
+#define MPIF20   22  /* STRING in Baum MNMENU */
+#define MPFBASE  23  /* BOX in Baum MNMENU */
+#define MPFTOS   24  /* STRING in Baum MNMENU */
+#define MPFTTP   25  /* STRING in Baum MNMENU */
+#define MPFGEM   26  /* STRING in Baum MNMENU */
+#define MPFGMTTP 27  /* STRING in Baum MNMENU */
+#define SDBASE   28  /* BOX in Baum MNMENU */
+#define SDAPP    29  /* STRING in Baum MNMENU */
+#define SDTOP    30  /* STRING in Baum MNMENU */
+#define SIBASE   31  /* BOX in Baum MNMENU */
+#define SIFULL   32  /* STRING in Baum MNMENU */
+#define SIFILE   33  /* STRING in Baum MNMENU */
+#define MPBBASE  34  /* BOX in Baum MNMENU */
+#define MPBAUTO  35  /* STRING in Baum MNMENU */
+#define MPBNORML 36  /* STRING in Baum MNMENU */
+#define SPBASE   37  /* BOX in Baum MNMENU */
+#define SPYES    38  /* STRING in Baum MNMENU */
+#define SPNO     39  /* STRING in Baum MNMENU */
+#define VIDBASE  40  /* BOX in Baum MNMENU */
+#define VID2     41  /* STRING in Baum MNMENU */
+#define VID4     42  /* STRING in Baum MNMENU */
+#define VID16    43  /* STRING in Baum MNMENU */
+#define VID256   44  /* STRING in Baum MNMENU */
+#define VIDTRUE  45  /* STRING in Baum MNMENU */
+#define SVIBASE  46  /* BOX in Baum MNMENU */
+#define SVION    47  /* STRING in Baum MNMENU */
+#define SVIOFF   48  /* STRING in Baum MNMENU */
+#define SVLBASE  49  /* BOX in Baum MNMENU */
+#define SVL40    50  /* STRING in Baum MNMENU */
+#define SVL80    51  /* STRING in Baum MNMENU */
+
+#define MNSYSTEM 27  /* Formular/Dialog */
+#define SDTITLE  2   /* TEXT in Baum MNSYSTEM */
+#define SDBUTTON 3   /* BUTTON in Baum MNSYSTEM */
+#define SITITLE  4   /* TEXT in Baum MNSYSTEM */
+#define SIBUTTON 5   /* BUTTON in Baum MNSYSTEM */
+#define MFBASE   7   /* BOX in Baum MNSYSTEM */
+#define MFLEFT   8   /* BOXCHAR in Baum MNSYSTEM */
+#define MFFILE   9   /* FTEXT in Baum MNSYSTEM */
+#define MFRIGHT  10  /* BOXCHAR in Baum MNSYSTEM */
+#define MFKEY    11  /* FTEXT in Baum MNSYSTEM */
+#define MFUP     12  /* BOXCHAR in Baum MNSYSTEM */
+#define MFDOWN   13  /* BOXCHAR in Baum MNSYSTEM */
+#define MKITEM   17  /* BOXTEXT in Baum MNSYSTEM */
+#define MKUPS    18  /* BOXCHAR in Baum MNSYSTEM */
+#define MKDOWNS  19  /* BOXCHAR in Baum MNSYSTEM */
+#define MKKEYS   20  /* FTEXT in Baum MNSYSTEM */
+#define MKCLEAR  21  /* BUTTON in Baum MNSYSTEM */
+#define MKMEMORY 22  /* FTEXT in Baum MNSYSTEM */
+#define MOK      23  /* BUTTON in Baum MNSYSTEM */
+#define MCANCEL  24  /* BUTTON in Baum MNSYSTEM */
+
+#define MORE     0   /* Freier String */
+
+#define ENDFILE  1   /* Freier String */
+
+#define CART     2   /* Freier String */
+
+#define CPYSTR   3   /* Freier String */
+
+#define DELSTR   4   /* Freier String */
+
+#define FILEINFO 5   /* Freier String */
+
+#define FOLDINFO 6   /* Freier String */
+
+#define MOVESTR  7   /* Freier String */
+
+#define READERRO 8   /* Freier String */
+
+#define CANTOPEN 9   /* Freier String */
+
+#define NOMEM    10  /* Freier String */
+
+#define CACHETXT 11  /* Freier String */
+
+#define BLTTXT   12  /* Freier String */
+
+#define NCONFLIC 13  /* Freier String */
+
+#define RNAME    14  /* Freier String */
+
+#define CRENSTR  15  /* Freier String */
+
+#define MRENSTR  16  /* Freier String */
+
+#define ISTR     17  /* Freier String */
+
+#define ISELS    18  /* Freier String */
+
+#define ISEL     19  /* Freier String */
+
+#define ISTRS    20  /* Freier String */
+
+#define DEVICE   21  /* Freier String */
+
+#define SINF     22  /* Freier String */
+
+#define LITEM    23  /* Freier String */
+
+#define FSTOS    24  /* Freier String */
+
+#define FSTOSTTP 25  /* Freier String */
+
+#define FSGEM    26  /* Freier String */
+
+#define FSGEMTTP 27  /* Freier String */
+
+#define FSAPP    28  /* Freier String */
+
+#define FSTOP    29  /* Freier String */
+
+#define FSFULL   30  /* Freier String */
+
+#define FSFILE   31  /* Freier String */
+
+#define FS40     32  /* Freier String */
+
+#define FS80     33  /* Freier String */
+
+#define FSYES    34  /* Freier String */
+
+#define FSNO     35  /* Freier String */
+
+#define FS2C     36  /* Freier String */
+
+#define FS4C     37  /* Freier String */
+
+#define FS16C    38  /* Freier String */
+
+#define FS256C   39  /* Freier String */
+
+#define FSTRUEC  40  /* Freier String */
+
+#define FSAUTO   41  /* Freier String */
+
+#define FSNORMAL 42  /* Freier String */
+
+#define FSON     43  /* Freier String */
+
+#define FSOFF    44  /* Freier String */
+
+#define FSNONE   45  /* Freier String */
+
+#define FSF1     46  /* Freier String */
+
+#define FSF2     47  /* Freier String */
+
+#define FSF3     48  /* Freier String */
+
+#define FSF4     49  /* Freier String */
+
+#define FSF5     50  /* Freier String */
+
+#define FSF6     51  /* Freier String */
+
+#define FSF7     52  /* Freier String */
+
+#define FSF8     53  /* Freier String */
+
+#define FSF9     54  /* Freier String */
+
+#define FSF10    55  /* Freier String */
+
+#define FSF11    56  /* Freier String */
+
+#define FSF12    57  /* Freier String */
+
+#define FSF13    58  /* Freier String */
+
+#define FSF14    59  /* Freier String */
+
+#define FSF15    60  /* Freier String */
+
+#define FSF16    61  /* Freier String */
+
+#define FSF17    62  /* Freier String */
+
+#define FSF18    63  /* Freier String */
+
+#define FSF19    64  /* Freier String */
+
+#define FSF20    65  /* Freier String */
+
+#define DLTEXT   66  /* Freier String */
+
+#define ITEXT    67  /* Freier String */
+
+#define SAVEINF  68  /* Freier String */
+
+#define DESKNAME 69  /* Freier String */
+
+#define STNOAPPL 70  /* Alert String */
+
+#define STNOWIND 71  /* Alert String */
+
+#define STFOEXIS 72  /* Alert String */
+
+#define STDISKFU 73  /* Alert String */
+
+#define STFO8DEE 74  /* Alert String */
+
+#define STBADCOP 75  /* Alert String */
+
+#define TRSINFO  76  /* Alert String */
+
+#define FCNOMEM  77  /* Alert String */
+
+#define FCFAIL   78  /* Alert String */
+
+#define FCSIZE   79  /* Alert String */
+
+#define FCNOTYPE 80  /* Alert String */
+
+#define SAVETOP  81  /* Alert String */
+
+#define PRINTTOP 82  /* Alert String */
+
+#define ABORTCON 83  /* Alert String */
+
+#define NOICON   84  /* Alert String */
+
+#define NOAPP    85  /* Alert String */
+
+#define NODRIVE  86  /* Alert String */
+
+#define NOOUTPUT 87  /* Alert String */
+
+#define CNTOPEN  88  /* Alert String */
+
+#define CNTCRTDR 89  /* Alert String */
+
+#define WRERROR  90  /* Alert String */
+
+#define RDERROR  91  /* Alert String */
+
+#define CNTCRTFL 92  /* Alert String */
+
+#define CNTDELF  93  /* Alert String */
+
+#define CNTDELD  94  /* Alert String */
+
+#define PRINTINF 95  /* Alert String */
+
+#define RENAME   96  /* Alert String */
+
+#define NOBUF    97  /* Alert String */
+
+#define DELDISK  98  /* Alert String */
+
+#define NOTPRG   99  /* Alert String */
+
+#define NOSETDIR 100 /* Alert String */
+
+#define NOAUTO   101 /* Alert String */
+
+#define NOWINMEM 102 /* Alert String */
+
+#define NOTYPE   103 /* Alert String */
+
+#define ICONTYPE 104 /* Alert String */
+
+#define NODIRCOP 105 /* Alert String */
+
+#define NOINSTAL 106 /* Alert String */
+
+#define NOMORE   107 /* Alert String */
+
+#define NOID     108 /* Alert String */
+
+#define ILLMAT   109 /* Alert String */
+
+#define NOCART   110 /* Alert String */
+
+#define NOMATCH  111 /* Alert String */
+
+#define DELITEM  112 /* Alert String */
+
+#define MCFAIL   113 /* Alert String */
+
+#define FNOTFIND 114 /* Alert String */
+
+#define SNEXT    115 /* Alert String */
+
+#define NOHELP   116 /* Alert String */
+
+#define NOSEA    117 /* Alert String */
+
+#define KEYUSED  118 /* Alert String */
+
+#define CARTNOSH 119 /* Alert String */
+
+#define BADKEY   120 /* Alert String */
+
+#define XNFILE   121 /* Alert String */
+
+#define NORESCHG 122 /* Alert String */
+
+#define FTOLAUNC 123 /* Alert String */
+
+#define NODROP   124 /* Alert String */
+
+#define NOSHUT   125 /* Alert String */
+
+#define FCNOWRK  126 /* Alert String */

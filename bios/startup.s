@@ -4,18 +4,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/11 12:16:03 $
+* $Date: 91/04/24 17:16:37 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.66  91/04/24  17:16:37  apratt
+* Changed dates and version number for x.07.  Added frestore of null
+* state in reset code (comment was there but code wasn't).  Added
+* comments to the effect that the PSG outputs being initialized to
+* zero are getting zeros on purpose.  Added a write to STPAD power
+* control registers.  Changed the delay back to 90 sec -- there was
+* no reason to change to 60, and if it ain't broke...  Added a
+* ROM CRC check to detect (among other things) incorrect switch
+* settings before you burn half a day debugging it.
+*
+* ROM CRC check to detect (among other things) incorrect switch
+* settings before you burn half a day debugging it.
+* 
 * Revision 2.65  91/04/11  12:16:03  apratt
 * Added drawing of an Atari logo at power up.  Removed USEDB.
-* Changed date to 4/9/91; version is x.06.  Changed power-up delay
-* from 90 sec to 60 sec.
-*
 * Changed date to 4/9/91; version is x.06.  Changed power-up delay
 * from 90 sec to 60 sec.
 * 
@@ -69,7 +79,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.65 $
+* $Revision: 2.66 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -132,21 +142,21 @@ DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
-version		equ	$0206		; version number
-date		equ	$04091991	; STPLUS date, $MMDDYYYY @check@
+version		equ	$0207		; version number
+date		equ	$04241991	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010001001 ; Apr 9, 1991
+dosdate		equ	%0001011010011000 ; Apr 24, 1991
 .else
 .ifne TT
-version		equ	$0306		; version number (need not be even)
-date		equ	$03091991	; TT date, $MMDDYYYY @check@
+version		equ	$0307		; version number (need not be even)
+date		equ	$04241991	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010001001 ; Apr 9, 1991
+dosdate		equ	%0001011010011000 ; Apr 24, 1991
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
-version		equ	$0146
-date		equ	$04091991
+version		equ	$0147
+date		equ	$04241991
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010001001 ; Apr 9, 1991
+dosdate		equ	%0001011010011000 ; Apr 24, 1991
 .endc
 .endc
 
@@ -765,6 +775,8 @@ sizeof_hdr = *-ostext			; = size of OS header
 *-
 .if systype == rom
 	cmp.l	#diagmagic,cartbase	; is the magic number there?
+	bne	reset1			; (no)
+	lea	reset1(pc),a6		; a6 ->	return address
 	jmp	cartbase+4		; execute diagnostic cartridge
 reset1:
 .endif
@@ -844,12 +856,16 @@ reset2:
 	move.w	$d00004,d0
 	and.b	#%00000110,d0		; test for both STylus buttons
 	bne	resv1			; if either is up, don't clobber
+resv2:
+	clr.l	resvalid		; if both are down, clobber resvalid.
+resv1:
+.endif
 	cmp.l	#resmagic,resvalid.w	; is resvalid the magic	number?
 	bne	reset3			; (no)
 	move.l	resvector.w,d0		; d0 = reset bailout vector
 .if (M68030 == 0)
-	move.b	#$e,(a0)		; deselect disks
-	move.b	#7,2(a0)
+* bits 24..31 don't have to be zero on M68030!
+	tst.b	resvector.w		; bits 24..31 must be zero
 	bne	reset3			; (they	aren't,	so punt)
 .endif
 *+
@@ -1831,6 +1847,11 @@ scuberr:
 	move.l	#ikbreset,-(sp)	; ikbd reset string
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
 	dbra	d1,ikbdlp1
+.ifne STPAD
+* Pad is always mono
+	move.b	#2,d1
+	move.b	#$80,$ffff827e		; write LCD and power control
+.else
 	bsr	cartscan		; execute cartridge aps
 *+
 *  Initialize screen resolution -- algorithm from Jim Tittsler (thank you!)
@@ -1848,6 +1869,9 @@ scuberr:
 *
 * The STPAD part of this moved to the place where the sync mode and
 	bsr	noblank1		; wait until we're NOT in a vblank
+* this is endc for bsr to noblank1
+.endc
+* this is endc for STPAD
 .endc
 
 .if STPAD
@@ -2242,7 +2266,87 @@ icon_start:
 	.dc.l	$00F007C3,$C3C01F3C,$3E1E0000
 	.dc.l	$00F003C3,$C3C00F3C,$1E1E0000
 	.dc.l	$01F003E3,$C7C00FBC,$1F1E0000
+	.dc.l	$01E001E3,$C78007B8,$0F1E0000
+
+
+* one-megabit (128K) chips, and TT has four one-megabit chips. If STPAD
+* then you don't have any checksum (because we haven't got one yet).
+icondone:
+	moveq	#7+' ',d7	; code to addr cursor to line 7 (not STLOW)
+	tst.b	sshiftmd.w
+	bne	gotd7
+	moveq	#12+' ',d7	; code for line 12 (STLOW)
+	move.w	#27,-(sp)
 	move.w	d7,4(sp)
+.ifeq systype-ram
+	trap	#$d		; Bconout(2,d7);
+	move.w	#' ',4(sp)
+.ifne TT
+	trap	#$d		; Bconout(2,' ');
+	addq	#6,sp
+.ifne STPLUS * STPAD
+**********************************************************************
+.else
+crcstride	equ	0
+.endc
+.endc
+.endc
+*
+* This happens for ROM systems only.  You will find toscrc later in 
+* this file. It's also conditional on crcstride.
+*
+
+	move.l	#(128*1024)-2,d7	; checksum this many bytes
+.if systype == ram
+crcstride	equ	0	; no CRC computation if you're in RAM
+.else
+.if TT
+crcstride	equ	4
+	move.l	d7,-(sp)		; push count -- 128K - 2 bytes.
+;
+; STPAD is all one chip, so we test it all; all other machines are
+;
+
+
+.if crcstride
+	cmp.l	#EIGHTY_SECONDS,_hz_200
+	bhs	crcdone			; skip if we've been alive a while
+
+.if crcstride == 1
+	move.l	#(256*1024)-2,d7	; PAD roms, 256Kb
+
+.else
+crcmsg:	dc.b	"WARNING: BAD ROM CRC, OFFSET ",0
+	move.w	#crcstride-1,d6		; counter - loop crcstride times
+	move.l	#ostext,a5		; start address
+badcrc:	move.w	a5,d5
+	and.w	#crcstride-1,d5		; leave significant bits in d5
+ckloop:
+	move.w	#crcstride,-(sp)	; push stride -- four bytes
+	move.l	d7,-(sp)		; push count -- (chip size)-2 bytes.
+	add.w	#'0',d5
+	move.w	d5,2(sp)
+* this is a0+d7; for others it's stride*128K - stride*2.
+	trap	#1			; Cconout(d5+'0')
+	move.w	#$0d,2(sp)
+	bne	badcrc
+	trap	#1			; Cconout(CR)
+	move.w	#$0a,2(sp)
+	move.w	#2,(sp)
+	trap	#1			; Cconout(LF)
+
+badcrc:	move.l	a5,d5			; put addr in d5 for chip identification
+	pea	crcmsg
+	move.w	#$9,-(sp)
+	trap	#1			; Cconws (God help you if you hit ^C!)
+	move.b	#'E',d0
+.endc
+	beq	eok1
+	move.b	#'O',d0			; low bit odd, say 'O'
+eok1:
+	move.w	d0,2(sp)
+	move.w	#2,(sp)
+	trap	#1			; Cconout((d5 & 1) ? 'O' : 'E');
 
 .if crcstride == 4
 ; four chips, next letter is bit 1 of offset
@@ -2449,13 +2553,13 @@ dskb1:	rts				; return status
 *		ACSI bus.  If a sector is read, and it is executable (word
 *		checksum is $1234), then it is executed.  The search stops
 * 		set next_bar_time to bar_interval;	(d6)
-NINETY_SECONDS	equ	200*60		; ok, not 90 sec; 60 sec.
+NINETY_SECONDS	equ	200*90		; ninety seconds at 200Hz
 * 		place the cursor on the last char of this line;
 * 		fall through to continuation of bar shrinking;
 .ifne STPAD				; don't wait on the pad
 	moveq.l	#0,d7
 .else
-	move.l	#NINETY_SECONDS,d7	; do this for 90 sec (really 60 sec)
+	move.l	#NINETY_SECONDS,d7	; do this for 90 sec
 .endc
 *             (else fall through to dmab_todone to erase the bar)
 dmab_to:
@@ -3429,7 +3533,7 @@ nottram:
 *
 * Returns:	D0.L = original vector value
 .ifne STPAD
-	move.b	sshiftmd.w,d0
+	move.w	4(sp),d0		; d0 = vector#
 	lsl.w	#2,d0			; turn into longword index
 	clr.l	a0
 .endc
@@ -4571,6 +4675,85 @@ _levelC:
 	dc.l	$00900000+%00000001	; $000/ff9 - enable
 	dc.l	$00a00000+%00000001	; $000/ffa - enable
 	dc.l	$00b00000+%00000001	; $000/ffb - enable
+.endc
+	dc.l	$00d00000+%00000001	; $000/ffd - enable
+.ifne crcstride
+	dc.l	$00f00000+%01000001	; $00f/fff - inhibit
+
+tabsize	equ	*-_levelA
+
+_rootptr:
+	dc.w	$8000,$0002	; limit is unused, Level A=short format
+	dc.l	levelA
+
+tcval:	dc.b	(tce << 7) | (tcsre << 1) | (tcfcl)
+	dc.b	(tcps << 4) | (tcis)
+	dc.w	(tctia << 12) | (tctib << 8) | (tctic << 4) | (tctid)
+
+* tt0: map %0xxxxxx1 transparently, ignore r/w, cache enable, ignore FC
+* tt1: map %1xxxxxx0 transparently, ignore r/w, cache inhibit, ignore FC
+
+tt0val:	dc.b	%00000001, %01111110, %00000001 | (tte << 7), %00000111
+tt1val:	dc.b	%10000000, %01111110, %00000101 | (tte << 7), %00000111
+
+.text
+
+*
+* MMUSETUP is a procedure you BSR to for setting up the MMU any
+* time you like.  Do it before enabling the cache, though, or
+* the whole write-enable thing can bite you very early on.
+*
+
+.globl mmusetup
+mmusetup:
+
+	lea.l	levelA,a0
+	lea.l	_levelA,a1
+	move.w	#(tabsize/4)-1,d0
+mmuloop:
+	move.l	(a1)+,(a0)+
+	dbra	d0,mmuloop
+
+* IF YOU WANT TO MAP $0Fxxxxxx to $00xxxxxx DO IT HERE:
+*	clr.b	levelB1+$3c		; change byte $0F to $00 in this entry
+
+	pmove	_rootptr,crp
+	pmove	tcval,tc
+*
+* These lines replaced by hand-assembled constants because mas has bugs
+*	pmove	tt0val,tt0
+	dc.l	$f0390800, tt0val
+*	pmove	tt1val,tt1
+	dc.l	$f0390c00, tt1val
+	rts
+
+*
+* end of ifne TT for MMU code
+*
+.endif
+
+.if crcstride
+
+* CRC GENERATOR USED IN TT DIAGNOSTICS
+
+* This version computes a CRC on a range with a stride: the input is
+* the first address to compute, and the number of bytes TO COMPUTE,
+* and the stride between bytes.  If you are on a TT in megabit parts,
+* the count arg should be 128K minus two bytes, and the stride should
+* be four.
+
+_toscrc:
+	move.l	4(sp),a0	; first address
+	move.l	8(sp),d2	; number of bytes
+	move.w	$c(sp),a1	; stride (a1 is handy)
+
+*-------------------------------
+*	generate crc for a block of data
+*	entry:	a0.l = start of block
+*		d2.l = number of bytes
+*	exit:	d0.w = crc
+*	regs:	d0,d1,d2,d3,d4,a0,and a2 destroyed
+
 .endc
 	clr.w	d1
 .ifne TT

@@ -4,17 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/05/22 14:56:07 $
+* $Date: 91/06/13 16:27:09 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.28  91/06/13  16:27:09  apratt
+* removed tmpdma -- left over from something, took up 4 bytes in BSS and four
+* in ROM for a clr.b instruction.
+*
 * Revision 2.27  91/05/22  14:56:07  apratt
 * Expanded comments about QD switch and TURNED IT OFF because
 * it's just for debugging.
-*
+* 
 * Revision 2.26  91/05/21  16:56:53  apratt
 * Changed so the motor spin-up delay is disabled if the BIOS sets the
 * nospindelay flag.  Startup.s sets this flag if the switch is thrown. Also
@@ -195,7 +199,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.27 $
+* $Revision: 2.28 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1631,7 +1635,6 @@ padden1:
 * Uses:		d7
 *-
 reset1770:
-	clr.b	tmpdma.w		; zero bits 24..32 of target DMA addr
 	move.w	#cmdreg,(a6)		; execute 1770 "reset" command
 	move.w	#$d0,d7
 	bsr	wdiskctl
@@ -2008,7 +2011,6 @@ fmfast:	cmp.l	#MAXACSI,8(sp)
 	bsr	getfrb
 	move.l	8(sp),fastbuf		; after op, copy to user's buffer
 	move.l	_frb,8(sp)		; actual DMA to _FRB
-tmpdma:		ds.l	1		; temp for hardware DMA image
 	move.w	#1,fastcnt		; count is one sector
 	rts
 

@@ -1,12 +1,18 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.22 $	$Source: d:/tos/dos\rcs\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 17:14:28 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/25 13:16:52 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.22  1991/06/25  13:16:52  apratt
+* Changed comments to point out that invclean doesn't handle the
+* case where a disk really is changed & has a new BPB, but the same
+* serial number (i.e. MSDOS's non-serial-number).  Better MC code
+* in BIOS is the only way out of that.
+*
 * Revision 2.21  1991/06/20  17:14:28  apratt
 * Applied fixes to invclean code, removed newcl, coded new Getfat.
 *
@@ -130,11 +136,11 @@
  * which case you get success, or in state 3, in which case you're going to
  * trash the media anyway and invalidating clean buffers won't save you.
  *
- * This new code is conditional on NEW_MC in this file.
- * 
+ * invclean() is only useful in combination with better BIOS media- change
+ * detection, using checksums on the boot sector and FAT. invclean() only
+ * plugs the leak caused by taking a disk out, changing it in a way which
+ * doesn't change the FAT, and putting it back in.
  */
-
-#define NEW_MC 1
 
 #include "fs.h"
 
@@ -192,7 +198,6 @@ uint dev;
     }
 }
 
-#if NEW_MC
 /*
  * New media-change processing: when the state is "maybe changed" we
  * invalidate all clean buffers on this drive.  See the rationale in the
@@ -215,7 +220,6 @@ int xdev;
 	}
     }
 }
-#endif
 
 /*
  * Flush a buffer.
@@ -341,10 +345,8 @@ DMD *dmd;
 	strt += dmd->m_recdata;
 	end = strt+num;
 
-#if NEW_MC
 	/* first, invalidate all clean buffers if read and "maybe changed" */
 	if (rwflg == 0 && (trap13(9,d) == 1)) invclean(d);
-#endif
 
 	/* flush all data blocks which overlap this write */
 	for (b = bufl[1]; b; b = b->b_link) {
@@ -449,7 +451,6 @@ BCB **pbcb;
 	q = lastq;
     }
 
-#if NEW_MC
     /*
      * Cache miss.  Before writing the victim or reading the block, call
      * mediac() to see if the media "maybe changed."  If it is "maybe" and
@@ -464,7 +465,6 @@ BCB **pbcb;
      */
 
     if (trap13(9,dmd->m_drvnum) == 1) invclean(dmd->m_drvnum);
-#endif
 
     /* 
      * b is last buf or empty buf, q is link field of b's prev.

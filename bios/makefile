@@ -1,13 +1,16 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.14 $	$Source: e:/tos/bios\RCS\makefile.,v $
+#  $Revision: 2.15 $	$Source: d:/tos/bios\RCS\makefile.,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 1991/12/05 00:43:20 $     $Locker:  $
+#  $Author: apratt $	$Date: 1992/02/29 21:24:14 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.14  1991/12/05  00:43:20  apratt
-#  Added machine type 'w' for Sparrow.
+#  Revision 2.15  1992/02/29  21:24:14  apratt
+#  Added dependency on m68030.s
+#
+# Revision 2.14  1991/12/05  00:43:20  apratt
+# Added machine type 'w' for Sparrow.
 #
 # Revision 2.13  1991/09/25  19:35:36  apratt
 # Removed clear.o -- absorbed into startup.s or something.
@@ -171,11 +174,11 @@ memtest.o:	memtest.s
 
 # any switches.x?? will do, where x is machine
 
-flop.$(MACHINE): flop.s
+flop.$(MACHINE): flop.s m68030.s
 		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
-dmaread.$(MACHINE): dmaread.s
+dmaread.$(MACHINE): dmaread.s m68030.s
 		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
@@ -187,11 +190,11 @@ clock.$(MACHINE): clock.s
 
 # any switches.xy? will do, where x is machine and y is systype
 
-startup.$(MACHINE)a:	startup.s
+startup.$(MACHINE)a:	startup.s m68030.s
 		cp switches\switches.$(MACHINE)au switches.s
 		$(ASM)
 
-startup.$(MACHINE)o:	startup.s
+startup.$(MACHINE)o:	startup.s m68030.s
 		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
@@ -199,6 +202,6 @@ startup.$(MACHINE)o:	startup.s
 
 # any switches.x?y will do for BIOS (x is machine, y is country)
 
-bios.$(MACHINE)$(CCODE):	bios.s
+bios.$(MACHINE)$(CCODE):	bios.s m68030.s
 		cp switches\switches.$(MACHINE)o$(CCODE) switches.s
 		$(ASM)

@@ -4,34 +4,42 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/21 17:15:28 $
+* $Date: 90/10/15 12:04:40 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.59  90/10/15  12:04:40  apratt
+* Changed all version numbers, and changed all dates to Oct 12, 1990.
+*
+* Also removed PC-relative addressing because MAS has a bug: PC-relative
+* addressing to a label that's BEFORE the PC, with arithmetic, generates
+* incorrect code.  Example: "move.b label+1(PC),d0" when 'label' is before
+* the current PC generates "move.b label+3(PC),d0"
+*
+* incorrect code.  Example: "move.b label+1(PC),d0" when 'label' is before
+* the current PC generates "move.b label+3(PC),d0"
+* 
 * Revision 2.58  90/08/21  17:15:28  apratt
 * This version works in both STe and Mega STe, distinguishing between
 * them at runtime by checking for bus error when accessing ttscu1.
-*
+* 
 * Bconmap is no longer conditional.
-*
+* 
 * Probe for the SFP004 only if not TT.  Fix the FPU cookie, which was
 * broken before, but only on non-TT (whew!).
-*
+* 
 * This version is NOT country-dependent.  The only country dependency was
 * osconf, and that's now an EQU exported from BIOS (which is already
 * country dependent).
-*
-* Other log messages removed.
-*
 * 
 * Other log messages removed.
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.58 $
+* $Revision: 2.59 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -63,6 +71,8 @@
 * be more than $3e bytes away, for the same reason (bus error when
 * reading RAM address >3fffff).
 *
+* The software line in question is First Byte's Kid series.  They have
+* doesn't work for other reasons.
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
 *
@@ -93,21 +103,21 @@ DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
-version		equ	$0200		; version number *MUST BE EVEN*
-date		equ	$08201990	; STPLUS date, $MMDDYYYY @check@
+version		equ	$0202		; version number
+date		equ	$10121990	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010100010100 ; August 20, 1990
+dosdate		equ	%0001010101001100 ; October 12, 1990
 .else
 .ifne TT
-version		equ	$0300		; version number (need not be even)
-date		equ	$08011990	; TT date, $MMDDYYYY @check@
+version		equ	$0302		; version number (need not be even)
+date		equ	$10121990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010100000001 ; August 1, 1990
+dosdate		equ	%0001010101001100 ; October 12, 1990
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
-version		equ	$0142
-date		equ	$08011990
+version		equ	$0144
+date		equ	$10121990
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010100000001 ; August 1, 1990
+dosdate		equ	%0001010101001100 ; October 12, 1990
 .endc
 .endc
 
@@ -856,7 +866,8 @@ vtend:	move.w	(a0)+,d0
 * Note: The floppy side and selects are inverted, so writing 1 disables them.
 * Other outputs are initialized to zero here: *DTR, *RTS, STROBE,
 .ifeq TT
-	btst.b	#0,os_conf+1(pc)	; check bit: configured for 50hz?
+* In some cases this is the only place that initializes these values.
+*-
 	lea	giselect,a0		; a0 -> giselect, giwrite-2
 	move.b	#7,(a0)			; set porta & portb to output
 	move.b	#$c0,2(a0)
@@ -1289,7 +1300,8 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *
 *  Backing off by 256 bytes means the defualt low byte is zero, and the
 *  screen doesn't abut the end of memory, so this solves both problems.
-	lea	os_end-4(pc),a0		; no, use default numbers
+*-
+	move.l	phystop.w,a0		; video_base = phystop - 0x8000
 .if (TT == 0)
 	sub.l	#$8000,a0
 	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero

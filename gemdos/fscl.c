@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/09 17:40:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.19  1991/06/18  17:52:02  apratt
+* Updated to DB release 3 (new print)
+*
 * Revision 2.18  1991/05/09  17:40:38  apratt
 * General stuff.
 *
@@ -96,7 +99,7 @@ uint dev;
 {
     BCB *b;
 
-    DBCMD(2,"print fatdirty (wpeek (`a6 + 8));_c");
+    DBCMD(2,"print fatdirty -x (wpeek (`a6 + 8));_c");
     for (b = bufl[0]; b; b = b->b_link) {
 	if (b->b_bufdrv == dev && b->b_dirty) {
 	    flush(b);
@@ -142,9 +145,9 @@ BCB *b;
     	n = b->b_buftyp;	/* n gets THIS BUFFER's type */
 	b->b_bufdrv = B_INVALID; /* invalidate now in case of error */
 
-	/* this DBCMD contains &b so b isn't placed in a register */
-	DBCMD(0x200,(&b,"print -n Write:;bcb (lpeek (`a6 + 8));"
-		    "dw lpeek(lpeek(a6+8)+10)[200];_c"));
+	/* this DBCMD contains &b so b isn't placed in a register. */
+	/* Set bufdump to the amount of a buffer to dump */
+	DBCMD(0x200,(&b,"print -n Write:;bcb (lpeek (`a6 + 8)) `bufdump;_c"));
 
 	rwabs(1,b->b_bufr,1,b->b_bufrec,d);
 
@@ -220,9 +223,9 @@ DMD *dmd;
 	uint d;
 	uint end;
 
-	DBCMD(4,"print usrio rw: (wpeek (`a6 + 8)) count: (wpeek (`a6 + a)) "
-	      "start: (wpeek (`a6 + c)) ubuf: (lpeek (`a6 + e)) "
-	      "dmd: (lpeek (`a6 + 12));_c");
+	DBCMD(4,"print usrio rw: -x (wpeek (`a6 + 8)) count: -x (wpeek (`a6 + a)) "
+	      "start: -x (wpeek (`a6 + c)) ubuf: -x (lpeek (`a6 + e)) "
+	      "dmd: -x (lpeek (`a6 + 12));_c");
 
 	d = dmd->m_drvnum;
 	strt += dmd->m_recdata;
@@ -275,8 +278,8 @@ BCB **pbcb;
     int mcflag = 0;
     BCB *lastb, **lastq;
 
-    DBCMD(2,"print getrec recn: (wpeek (`a6 + 8)) dmd: (lpeek (`a6 + a)) "
-	  "flg: (wpeek (`a6 + e)) pbcb: (lpeek (`a6 + 10));_c");
+    DBCMD(2,"print getrec recn: -x (wpeek (`a6 + 8)) dmd: -x (lpeek (`a6 + a)) "
+	  "flg: -x (wpeek (`a6 + e)) pbcb: -x (lpeek (`a6 + 10));_c");
 
     if (wrtflg == 2) doread = 0, wrtflg = 1;
     else doread = 1;
@@ -359,9 +362,11 @@ doio:
     if (doread || mcflag == 1 || mediach(dmd->m_drvnum)) {
 	/* &b appears in this DBCMD so it doesn't go in a register. */
 	/* I only hope it goes in (- `a6 4) since it's the first auto. */
-	DBCMD(0x400,(&b,"print Read:;bcb (lpeek (`a6 - 4));_c"));
 	rwabs(0,b->b_bufr,1,recn,dmd->m_drvnum);
-	DBCMD(0x400,"dw (lpeek (lpeek (`a6 - 4)) + 10)[200];_c");
+	DBCMD(0x400,"print did read;bcb (lpeek (`a6 - 4)) `bufdump;_c");
+    }
+    else {
+    	DBCMD(2,"print 'did not read; dont really need to';_c");
     }
 
     /* read succeeded (or wasn't necessary) so validate the buffer */
@@ -505,7 +510,7 @@ DMD *dmd;
     char *fptr;		/* points to first byte of fatword */
     char *q;		/* points to buf[offset] once that's known */
 
-    DBCMD(4,"print clfix (wpeek (`a6 + 8)) becomes (wpeek (`a6 + a));_c");
+    DBCMD(4,"print clfix -x (wpeek (`a6 + 8)) becomes -x (wpeek (`a6 + a));_c");
 
     if (dmd->m_16) {
 	/* compute byte offset into FAT */
@@ -881,10 +886,10 @@ void (*bufxfr) _P((uint, void *, void *));
     ulong bytnum;
     uint curcl, currec, recoffs;
 
-    DBCMD(4,"print _xrw flg: (wpeek (`a6 + 8)) "
-	  "ofd: (lpeek (`a6 + a)) "
-	  "len: (lpeek (`a6 + e)) "
-	  "ubufr: (lpeek (`a6 + 12));_c");
+    DBCMD(4,"print _xrw flg: -x (wpeek (`a6 + 8)) "
+	  "ofd: -x (lpeek (`a6 + a)) "
+	  "len: -x (lpeek (`a6 + e)) "
+	  "ubufr: -x (lpeek (`a6 + 12));_c");
 
     dfd = ofd->o_dfd;
     dmd = &drvtbl[dfd->dfd_dev];

@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\mem.c,v $
+* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/09 17:42:04 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.19  1991/06/18  17:52:02  apratt
+* Updated to DB release 3 (new print)
+*
 * Revision 2.18  1991/05/09  17:42:04  apratt
 * Added a bunch of unsigned's.
 *
@@ -152,7 +155,7 @@ int type;
     REG MD *p;
     REG unsigned long maxval;
 
-    DBCMD(0x80,"print mbiggest mpb: (lpeek (`a6 + 8)) type: (wpeek (`a6 + c));_c");
+    DBCMD(0x80,"print mbiggest mpb: -x (lpeek (`a6 + 8)) type: -x (wpeek (`a6 + c));_c");
 
     maxval = 0;
 
@@ -182,8 +185,8 @@ int type;
     MD *p1;
     int fval;
 
-    DBCMD(0x80,"print ffit amt: (lpeek (`a6 + 8)) mpb: (lpeek (`a6 + c)) "
-	       "type: (wpeek (`a6 + c));_c");
+    DBCMD(0x80,"print ffit amt: -x (lpeek (`a6 + 8)) mpb: -x (lpeek (`a6 + c)) "
+	       "type: -x (wpeek (`a6 + c));_c");
 
     p = *(q = &mp->mp_mfl);		/* start at the beginning */
 
@@ -278,8 +281,8 @@ unsigned long len;
     MD *m;
     MD *p;
 
-    DBCMD(1,"print xmshrink {dummy} blk: (lpeek (`a6 + a)) "
-	    "size: (lpeek (`a6 + e));_c");
+    DBCMD(1,"print xmshrink (dummy) blk: -x (lpeek (`a6 + a)) "
+	    "size: -x (lpeek (`a6 + e));_c");
     /*
      * Traverse the list of memory descriptors looking for this block.
      */
@@ -344,7 +347,7 @@ MPB *mp;
     MD *p1;
     void *mtemp;
 
-    DBCMD(0x80,"print freeit (lpeek (`a6 + 8)) mpb: (lpeek (`a6 + c));_c");
+    DBCMD(0x80,"print freeit -x (lpeek (`a6 + 8)) mpb: -x (lpeek (`a6 + c));_c");
 
     p1 = 0;		/* this is p's prev */
 
@@ -420,7 +423,7 @@ int mode;
 {
     REG MD *ret;
 
-    DBCMD(1,"print xfmalloc amt: (lpeek (`a6 + 8)) mode: (wpeek (`a6 + c));_c");
+    DBCMD(1,"print xfmalloc amt: -x (lpeek (`a6 + 8)) mode: -x (wpeek (`a6 + c));_c");
 
     if (amount == 0xffffffffL) return mbiggest(&pmd,mode);
     else {
@@ -441,7 +444,7 @@ unsigned long
 xmalloc(amount)
 unsigned long amount;
 {
-    DBCMD(1,"print -n xmalloc amt: (lpeek (`a6 + 8)) >>;_c");
+    DBCMD(1,"print -n xmalloc amt: -x (lpeek (`a6 + 8)) >>;_c");
 
     if (run->p_hflags & P_RAMALLOC) return xfmalloc(amount,3);
     else return xfmalloc(amount,0);
@@ -458,7 +461,7 @@ void *addr;
     MD *p;
     MD **q;
 
-    DBCMD(0x01,"print xmfree (lpeek (`a6 + 8));_c");
+    DBCMD(0x01,"print xmfree -x (lpeek (`a6 + 8));_c");
 
     for (p = *(q = &pmd.mp_mal); p; p = *(q = &p->m_link)) {
 	if (addr == UNFLAG(p->m_start)) goto found;
@@ -488,7 +491,7 @@ PD *pid;
     REG MD *m;
     REG MD **q;
     
-    DBCMD(0x80,"print xmunhook pid: (lpeek (`a6 + 8));_c");
+    DBCMD(0x80,"print xmunhook pid: -x (lpeek (`a6 + 8));_c");
 
     for (m = *(q = &pmd.mp_mal); m; ) {
 	if (m->m_own == pid) {
@@ -513,7 +516,7 @@ PD *pid;
     REG MD *m;
     REG MD **q;
     
-    DBCMD(0x80,"print xmfreeall pid: (lpeek (`a6 + 8));_c");
+    DBCMD(0x80,"print xmfreeall pid: -x (lpeek (`a6 + 8));_c");
 
     for (m = *(q = &pmd.mp_mal); m; ) {
 	if (m->m_own == pid) {
@@ -542,7 +545,7 @@ PD *pid;
 {
     REG MD *m;
 
-    DBCMD(0x80,"print xmchown blk: (lpeek (`a6 + 8)) pid: (lpeek (`a6 + c));_c");
+    DBCMD(0x80,"print xmchown blk: -x (lpeek (`a6 + 8)) pid: -x (lpeek (`a6 + c));_c");
 
     for (m = pmd.mp_mal; m; m = m->m_link) {
 	if (UNFLAG(m->m_start) == blk) {
@@ -567,7 +570,7 @@ unsigned long siz;
     REG MD *m;
     REG unsigned long s;
 
-    DBCMD(1,"print xmaddalt blk: (lpeek (`a6 + 8)) siz: (lpeek (`a6 + c));_c");
+    DBCMD(1,"print xmaddalt blk: -x (lpeek (`a6 + 8)) siz: -x (lpeek (`a6 + c));_c");
 
     /* 
      * Make sure that the new block we get starts on a quantum boundary,

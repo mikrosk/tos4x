@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/09 17:35:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.18  1991/06/18  17:52:02  apratt
+* Updated to DB release 3 (new print)
+*
 * Revision 2.17  1991/05/09  17:35:48  apratt
 * Split out meanings of FN_DOTSOK and FN_TRAILOK, and fixed a bug
 * where FA_NORM was being used instead of FN_NORM.  Changed
@@ -149,7 +152,7 @@ xgetdir(buf,drv) /*+ return text of current dir into specified buffer */
 char *buf;
 int drv;
 {
-  DBCMD(0x01,"print xgetdir buf: (lpeek (`a6 + 8)) drv: (wpeek (`a6 + c));_c");
+  DBCMD(0x01,"print xgetdir buf: -x (lpeek (`a6 + 8)) drv: -x (wpeek (`a6 + c));_c");
   return xgetndir(buf,drv,0x7fffffffL);
 }
 
@@ -213,9 +216,9 @@ DMD *dmd;
     	return len;
     }
 
-    DBCMD(0x100,"print _getndir, pbuf (lpeek (`a6 + 8)) "
-		"< (lpeek (lpeek (`a6 + 8))) > "
-		"len (lpeek (`a6 + c)) dir (lpeek (`a6 + 10)) holds:;"
+    DBCMD(0x100,"print _getndir, pbuf -x (lpeek (`a6 + 8)) "
+		"-t '(' -x (lpeek (lpeek (`a6 + 8))) -T ')' "
+		"len -x (lpeek (`a6 + c)) dir -x (lpeek (`a6 + 10)) holds:;"
 		"dirf (lpeek (`a6 + 10));_c");
 
     /* set up dir2 as dir's parent */

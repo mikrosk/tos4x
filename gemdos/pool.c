@@ -1,12 +1,15 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\pool.c,v $
+* $Revision: 2.16 $	$Source: d:/tos/dos\rcs\pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
+* Revision 2.16  1991/06/18  17:52:02  apratt
+* Updated to DB release 3 (new print)
+*
 * Revision 2.15  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -102,8 +105,8 @@ long size;
 {
     struct block *bp = ptr;
 
-    DBCMD(16,"print Enter addheap ptr: (lpeek (`a6 + 8)) "
-	     "size: (lpeek (`a6 + c));_c");
+    DBCMD(16,"print Enter addheap ptr: -x (lpeek (`a6 + 8)) "
+	     "size: -x (lpeek (`a6 + c));_c");
 
     /* round size down to large block size */
     size = (size/LSIZE)*LSIZE;
@@ -261,7 +264,7 @@ struct block
 	return 0;
     }
 
-    DBCMD(16,"print newpool returns lpeek(._blockhe);_c");
+    DBCMD(16,"print newpool returns -x lpeek(._blockhe);_c");
 
     return blockhead;
 }
@@ -419,7 +422,7 @@ struct block
 
     if (dptr == sptr) {
 	if (!(dptr = sptr->b_next)) {
-	    DBCMD(16,"print and LAST! - (quit);_c");
+	    DBCMD(16,"print and LAST! (quit);_c");
 	    return 0;
 	}
 	DBCMD(16,"print first was best;_c");
@@ -455,11 +458,11 @@ struct block
 	    if ((long)md->m_own != 1) goto notdone;
 	    DBCMD(16,"print Was free;_c");
 	}
-	DBCMD(16,"print compact is done! {sindex fell off end};_c");
+	DBCMD(16,"print compact is done! (sindex fell off end);_c");
 	return sptr;				/* we're done */
 
 notdone:
-	DBCMD(16,"print Advanced sindex to `d6;_c");
+	DBCMD(16,"print Advanced sindex to -x `d6;_c");
     }
 }
 	
@@ -498,7 +501,7 @@ MD *target, *dest;
     REG MD **q;
     REG int i;
 
-    DBCMD(16,"print -n mdmove (lpeek (`a6 + 8)) into (lpeek (`a6 + c));_c");
+    DBCMD(16,"print -n mdmove -x (lpeek (`a6 + 8)) into -x (lpeek (`a6 + c));_c");
 
     /* outer loop steps qq through mfl and mal of both pmd's */
     /* inner loop goes through the list at qq */
@@ -584,7 +587,7 @@ void *ptmp;
 {
     REG struct block *ptr;
 
-    DBCMD(16,"print enter freebig (lpeek (`a6 + 8));_c");
+    DBCMD(16,"print enter freebig -x (lpeek (`a6 + 8));_c");
     ptr = (struct block *)(ptmp-HEADSIZE);
 
     if (Bisfree(ptr)) {
@@ -605,7 +608,7 @@ MD *ptr;
     REG MD *md;
     REG int i;
 
-    DBCMD(16,"print enter freesmall (lpeek (`a6 + 8));_c");
+    DBCMD(16,"print enter freesmall -x (lpeek (`a6 + 8));_c");
 
     for (p = blockhead; p; p = p->b_next) {
 	if ((char *)p < (char *)ptr && (char *)(p+1) > (char *)ptr) {

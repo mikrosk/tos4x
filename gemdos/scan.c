@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.13 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.14 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/30 16:06:06 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.14  1991/06/18  17:52:02  apratt
+* Updated to DB release 3 (new print)
+*
 * Revision 1.13  1991/05/30  16:06:06  apratt
 * Added kludge code to handle multiple backslashes in a row.
 *
@@ -216,7 +219,7 @@ int flags;
     earlyflag = (flags & FN_EARLY);
 
     DBCMD(0x20,"print fn2dir -s (lpeek (lpeek (`a6 + 8))) "
-		"flags -x (wpeek (`a6 + 10)) dir: (lpeek (`a6 + c));_c");
+		"flags -x (wpeek (`a6 + 10)) dir: -x (lpeek (`a6 + c));_c");
 
     if (!*name) return EBADRQ;
     if (*(name+1) == COLON) {
@@ -331,7 +334,7 @@ int flags;
 
 	if (err = dirfirst(dir,dmd)) return err;
 
-	DBCMD(0x20,"print scan new dir level. dir (lpeek (`a6 + c)) is:;"
+	DBCMD(0x20,"print scan new dir level. dir -x (lpeek (`a6 + c)) is:;"
 			"dirf (lpeek (`a6 + c));_c");
 
 	while (1) {
@@ -398,7 +401,7 @@ DIR *dir;
     fcb = getrec(dir->dir_recno,dmd,0,&dir->dir_bcb);
     dir->dir_fcb = (FCB *)(fcb + dir->dir_recoffs);
 
-    DBCMD(0x20,"print dir2dir returns, dir (lpeek (`a6 + 8)) is:;"
+    DBCMD(0x20,"print dir2dir returns, dir -x (lpeek (`a6 + 8)) is:;"
 		"dirf (lpeek (`a6 + 8));_c");
 
     return E_OK;
@@ -448,7 +451,7 @@ DMD *dmd;
     /* you only call this if you fell off the end of this record */
 
     DBCMD(0x20,
-	"print _dirnext, dir: (lpeek (`a6 + 8)) dmd: (lpeek (`a6 + c));"
+	"print _dirnext, dir: -x lpeek(a6 + 8) dmd: -x lpeek(a6 + c);"
 	"print -n (DIR) ; dirx lpeek(a6 + 8);"
 	"print -n (DMD) ; dmd lpeek(a6 + c);_c");
 

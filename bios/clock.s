@@ -4,16 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/22 12:23:28 $
+* $Date: 90/04/30 18:43:38 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.7  90/04/30  18:43:38  apratt
+* Added NVMaccess call: see comments for details.
+*
 * Revision 2.6  90/02/22  12:23:28  apratt
 * Removed ".w" from _time and _date.
-*
+* 
 * Revision 2.5  89/12/08  15:40:49  apratt
 * Changed TT clock code to use bitfield instructions.
 * Also fixes a bug: the minutes were set to half the correct value.
@@ -49,7 +52,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.6 $
+* $Revision: 2.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -433,9 +436,7 @@ read1:	.ds.b	READS
 read2:	.ds.b	READS
 	.even
 
-.endc
-
-.ifne TT
+.else
 
 *
 * Clock chip in the TT is the Motorola MC146818A
@@ -641,5 +642,143 @@ berr:	move.l	a0,sp		; restore SP after bus error
 	move.l	a1,$8		; restore bus error vector
 	or	#1,ccr		; set carry bit
 	rts			; and return
+
+**********************************************************************
+*
+* XBIOS call $2e: NVMaccess: read, write, or initialize the non-volatile 
+* memory in the RTC chip.
+* 
+* 	WORD NVMaccess(op,start,count,buffer)
+* 	WORD op, start, count;
+* 	BYTE *buffer;
+* 
+* Returns 0 for success, EBADRQ (-5) for range error on args, and 
+* EGENRL (-12) if the NVM checksum isn't consistent before a read
+* or write.  In the case of a read the data is transferred anyway.
+* 
+* If the checksum is consistent before a WRITE operation,  the call
+* writes the new data,  then recomputes the checksum and writes the
+* checksum and its inverse in the appropriate places.
+* 
+* 	OPCODE	MEANING
+* 	   0	READ: copy data from NVM to buffer.
+* 	   1	WRITE: copy data from buffer to NVM.
+* 	   2	INIT: zero the NVM and initialize the checksum.
+* 
+**********************************************************************
+
+.globl NVMaccess
+
+NVMaccess:
+	moveq	#-5,d0		; pre-load EBADRQ return code
+	move.w	4(sp),d1	; get opcode
+	beq	nvmread		; 0 is read
+	cmp.w	#2,d1
+	beq	nvminit		; 2 is init
+	bhi	nvmdone		; >2 is illegal
+
+; else opcode is 1, meaning write
+
+	bsr	nvmcheck	; (sets d1=start+e,d2=count,a1=RTCA)
+	tst.w	d0
+	bne	nvmdone		; bail out on errors
+	move.l	$a(sp),a0	; get buffer address
+	bra	nvmwe		; bra to end of dbra loop
+
+nvmwl:	move.b	d1,(a1)		; write register number
+	move.b	(a0)+,(a2)	; write data
+	addq	#1,d1		; incr register number
+nvmwe:	dbra	d2,nvmwl
+
+	bsr	nvmgetchk	; write succeeded; get & write checksum
+	move.b	#49+$e,(a1)
+	move.b	d0,(a2)
+	not.b	d0
+	move.b	#48+$e,(a1)
+	move.b	d0,(a2)
+	moveq	#0,d0		; return no error
+nvmdone:
+	rts
+
+nvmread:
+	bsr	nvmcheck	; (sets d1=start+e,d2=count,a1=RTCA,a2=RTCD)
+	cmp.w	#-5,d0		; if EBADRQ return now
+	beq	nvmdone
+
+	move.l	$a(sp),a0	; else proceed with read & return this d0
+	bra	nvmre
+
+nvmrl:	move.b	d1,(a1)
+	move.b	(a2),(a0)+
+	addq	#1,d1
+nvmre:	dbra	d2,nvmrl
+
+	rts
+
+nvminit:
+	lea.l	RTCA,a1
+	lea.l	RTCD,a2
+	moveq	#0,d0
+	moveq	#$e,d1
+	moveq	#50-1,d2
+nvmil:	move.b	d1,(a1)		; clear all 50 RAM locations
+	move.b	d0,(a2)
+	addq	#1,d1
+	dbra	d2,nvmil
+
+	move.b	#48+$e,(a1)	; write FF to location 48
+	move.b	#$ff,(a2)
+	rts			; return no error (d0 is still 0)
+
+*
+* nvmcheck: subroutine common to nvmread and nvmwrite.
+* Checks consistency of the NVM, returns EGENRL (-12) if bad.
+* Loads start & count off stack & checks range, returns EBADRQ (-5)
+* if bad. 
+*
+* Else leaves d1=start+$e, d2=count, a1=RTCA, a2=RTCD
+*
+
+nvmcheck:
+	bsr	nvmgetchk	; get RTCA to a0, checksum to d0
+	move.b	d0,d1
+	moveq	#-12,d0		; preload EGENRL return code
+	move.b	#49+$e,(a1)
+	cmp.b	(a2),d1		; match?
+	bne	nvmdone		; no - return EGENRL
+	not.b	d1
+	move.b	#48+$e,(a1)
+	cmp.b	(a2),d1		; inverse match?
+	bne	nvmdone		; no - return EGENRL
+
+; checksum matches, now check args
+
+	moveq	#-5,d0		; preload EBADRQ return code
+	move.w	$a(sp),d1	; get start reg number
+	cmp.w	#48,d1
+	bhs	nvmdone		; start >= 48: EBADRQ
+	move.w	$c(sp),d2	; get count
+	bmi	nvmdone		; count < 0: EBADRQ
+	add.w	d1,d2		; add start
+	cmp.w	#48,d2
+	bhi	nvmdone		; (start+count) > 48: EBADRQ
+	move.w	$c(sp),d2	; get count back
+	add.w	#$e,d1		; add $e to start for true reg num
+	moveq	#0,d0		; and return zero
+	rts
+
+nvmgetchk:
+	lea	RTCA,a1
+	lea	RTCD,a2
+	moveq	#0,d0		; pre-clear checksum
+	moveq	#$e,d1		; starting reg num is $e
+	moveq	#48-1,d2	; count is 48
+
+nvmcl:	move.b	d1,(a1)
+	add.b	(a2),d0
+	addq	#1,d1
+	dbra	d2,nvmcl
+	rts			; return checksum in d0
+
 .endc
 

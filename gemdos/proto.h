@@ -10,7 +10,7 @@ void *getrec _P((uint recn, DMD *dmd, int wrtflg, BCB **pbcb));
 char *getfat _P((unsigned int s, DMD *dmd, int wflag));
 voidfn clfix _P((uint cl, uint link, DMD *dmd));
 uint getcl _P((uint cl, DMD *dmd));
-uint nextcl _P((uint cl, DMD *dmd, int extflag, int *extended));
+uint nextcl _P((uint cl, DMD *dmd, int extflag));
 uint fastcl _P((DMD *dmd, int freeflag));
 long xrw _P((int wrtflg, OFD *ofd, ulong len, void *ubufr, void (*bufxfr )_P ((uint, void *, void *))));
 long ckdrv _P((uint d));
@@ -92,17 +92,17 @@ volatile void panic1 _P((char *s));
 
 /* mem.c */
 void xminit _P((void));
-long mbiggest _P((MPB *mp, int type));
-MD *ffit _P((long amount, MPB *mp, int type));
-long xmshrink _P((int n, void *blk, long len));
+unsigned long mbiggest _P((MPB *mp, int type));
+MD *ffit _P((unsigned long amount, MPB *mp, int type));
+long xmshrink _P((int n, void *blk, unsigned long len));
 void freeit _P((MD *m, MPB *mp));
-long xfmalloc _P((long amount, int mode));
-long xmalloc _P((long amount));
+unsigned long xfmalloc _P((unsigned long amount, int mode));
+unsigned long xmalloc _P((unsigned long amount));
 long xmfree _P((void *addr));
 void xmunhook _P((PD *pid));
 void xmfreeall _P((PD *pid));
 void xmchown _P((void *blk, PD *pid));
-long xaddalt _P((void *blk, long siz));
+long xaddalt _P((void *blk, unsigned long siz));
 
 /* pool.c */
 voidfn poolinit _P((void));

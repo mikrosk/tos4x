@@ -1,12 +1,18 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/09 17:35:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.17  1991/05/09  17:35:48  apratt
+* Split out meanings of FN_DOTSOK and FN_TRAILOK, and fixed a bug
+* where FA_NORM was being used instead of FN_NORM.  Changed
+* dirnext's end-of-dir return from ENMFIL to EFILNF.
+* Removed the extended flag from nextcl call.
+*
 * Revision 2.16  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -108,7 +114,7 @@ char *p;
 	return E_OK;
     }
 
-    if (err = fn2dir(&p,&dir,FN_DOTSOK)) {
+    if (err = fn2dir(&p,&dir,FN_DOTSOK | FN_TRAILOK)) {
     	if (err == EROOT) {
     	    run->p_curdir[drv] = 0;
     	    return E_OK;
@@ -296,7 +302,7 @@ char *s;
     /* first, call fn2dir so we know where this *will* go. */
     /* Fail on anything but EFILNF. */
 
-    if ((err = fn2dir(&s,&dir,FA_NORM)) != EFILNF) {
+    if ((err = fn2dir(&s,&dir,FN_NORM)) != EFILNF) {
 	if (!err) return EACCDN;
 	else return err;
     }
@@ -316,7 +322,7 @@ char *s;
     /* allocate a new cluster */
 
     newcl = TRUE;
-    if (!(cl = nextcl(0,dmd,TRUE,NULL))) return ERROR;
+    if (!(cl = nextcl(0,dmd,TRUE))) return ERROR;
     newcl = TRUE;
     rec = realcl2rec(cl,dmd);
 
@@ -476,7 +482,7 @@ char *p;
 	if (c != ERASED) return EACCDN;
     }
 
-    if (err && err != ENMFIL) return err;
+    if (err && err != EFILNF) return err;
 
     /*
      * Check to see if anybody has cl as his current dir on that drive. If
@@ -538,8 +544,8 @@ DTA *dta;
 	 !err && dir.dir_fcb->f_name[0] && !(m = wmatch(&fcb,dir.dir_fcb));
 	 err = dirnext(&dir,dmd)) /* empty loop */ ;
 
-    if (err == ENMFIL || !m) return EFILNF;
     if (err) return err;
+    if (!m) return EFILNF;
 
     /* fill in the invariants of the search in the DTA */
 
@@ -595,7 +601,10 @@ xsnext() /*+ search next, return into dta */
 
     while (1) {
 	err = dirnext(&dir,dmd);
-	if (err) return err;	    /* includes ENMFIL */
+	if (err) {
+	    if (err == EFILNF) return ENMFIL;
+	    else return err;
+	}
 	pfcb = dir.dir_fcb;
 	c = pfcb->f_name[0];
 	if (c == 0) return ENMFIL;

@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/06 14:50:56 $
+* $Date: 1991/09/12 19:41:34 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.13  1991/09/12  19:41:34  apratt
+* Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+* So we use (TT == 0) instead.  Sigh.
+*
 * Revision 2.12  1991/09/06  14:50:56  apratt
 * Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
 *
@@ -78,7 +82,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.12 $
+* $Revision: 2.13 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\clock.s,v $
@@ -111,7 +115,7 @@
 	.globl	_getclock	; getclock() BIOS call
 	.globl	_date,_time	; GEMDOS date and time variables
 
-.if !TT
+.if (TT == 0)
 
 *
 * STPAD doesn't really probe for the clock chip: there is always one. The

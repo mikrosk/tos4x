@@ -4,13 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/06 12:14:10 $
+* $Date: 1991/09/12 19:41:34 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.81  1991/09/12  19:41:34  apratt
+* Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+* So we use (TT == 0) instead.  Sigh.
+*
+* Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+* So we use (TT == 0) instead.  Sigh.
+*
 * Revision 2.80  1991/09/06  12:14:10  apratt
 * Changed .ifne to just .if, .ifeq to .if !, and .endc to .endif.
 * Changed noblank1 so it uses some old code: it waits for 240 ticks
@@ -18,9 +25,6 @@
 * instruction loop) with no ticks.  This works on STe and the old
 * method (wait for any tick on timer B, which tells you you're not
 * in VBLANK) doesn't.
-*
-* This is 2.06k / 3.06k, send to Texas for analysis of the monochrome
-* video problem which the new noblank solves.
 *
 * This is 2.06k / 3.06k, send to Texas for analysis of the monochrome
 * video problem which the new noblank solves.
@@ -190,7 +194,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.80 $
+* $Revision: 2.81 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\startup.s,v $
@@ -240,37 +244,23 @@
 
 * SPARROW and TT are both M68030.
 
-* set DMASND to 1 if you want to enable DMA sound: this assumes that
-* the chip actually exists (so clearing the control register will
-* not cause a bus error) and that MONOMON is XORed with the sound chip's
-* IRQ line.
+*M68030		equ	(SPARROW | TT)	; normallly, but see below:
+.include "m68030.s"
 
-.if TT | STPLUS
-.if !STPAD
-DMASND		equ	1
-.else
-DMASND		equ	0
-.endif
-.else
-DMASND		equ	0
-.endif
+* ONLY_LONGFRAME gets set when you're on machine that can never
 * have a short-frame processor (68000).  Currently that's only TT.
 
 ONLY_LONGFRAME	equ	TT
-.if STPLUS
-vershi		equ	$02
-.else
 
 * DMASND used to be a compile-time constant, but now it's not. It's a
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
-vershi		equ	$01
-.endif
+* the DMA sound IRQ line.  This is independent of of whether you have the
 * analog hardware outside the sound shifter to actually make sound.
 
 * set the high byte of the version number based on the machine type
 verslo		equ	$06
 .if TT
-* The date is now in another file, which is updated automatically 
+vershi		equ	$03
 .else
 vershi		equ	$02
 .endif
@@ -298,6 +288,7 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 *									*
 *************************************************************************
 
+*------------------------------------------------------------------------
 *									:
 *	System Initialization for 520, 1040, MEGA STs			:
 *	Copyright 1984, 1985, 1986, 1987, 1988, 1989, 1990  Atari Corp.	:
@@ -509,19 +500,16 @@ SPAR_VMC	equ	$ffff82c0	; video master control
 syncmode	equ	$ffff820a	; video	sync mode
 dbasel		equ	$ffff8203	; display base low
 dbaseh		equ	$ffff8201	; display base high
-.if STPLUS | TT
-*--- ST PLUS shifter
+color0		equ	$ffff8240	; color	palette	#0
 shiftmd		=	$ffff8260	; video	shift mode (resolution)
 
 .if TT
 ttcolor0	equ	$ffff8400	; TT background color reg
+shiftmd		=	$ffff8262	; TT shift mode (overrides above equ)
 .endif
-.endif
-*--- configuration switches
-.if STPLUS | TT
+
 *--- Video base address low byte (not on ST)
 * This register can be accessed as byte or word, and D.RENN assures me
-.endif
 * that the low bit of this register will always read as zero on STe,
 * and the low three bits as zero on TT.
 dbasell		equ	$ffff820d	; addr of low byte of this reg
@@ -593,14 +581,12 @@ ttucr	equ	ttmfp+$29		; USART control reg
 ttrsr	equ	ttmfp+$2b		; receiver status
 tttsr	equ	ttmfp+$2d		; transmit status
 ttudr	equ	ttmfp+$2f		; USART data
-.if DMASND
-*--- DMA SOUND REGISTERS (only one interesting one)
+
 *--- 6850 registers:
 keyctl	equ	$fffffc00		; keyboard ACIA control
 keybd	equ	keyctl+2		; keyboard data
-.endif
 midictl	equ	$fffffc06		; MIDI ACIA control
-.if TT | STPLUS
+midi	equ	midictl+2		; MIDI data
 
 
 *--- DMA SOUND AND MicroWire REGISTERS
@@ -608,12 +594,9 @@ dmasndc	equ	$ffff8900
 mwdata	equ	$ffff8922
 mwmask	equ	$ffff8924
 
-.endif
 *--- SCU REGISTERS: interrupt mask, interrupt state, and two gp regs
-.if TT
-* write here to set refresh rate for fast RAM
+ttvmeimsk	equ	$ffff8e0d	; "vme" int mask in SCU
 ttsysimsk	equ	$ffff8e01	; "sys" int mask in SCU	
-.endif
 ttvmeistate	equ	$ffff8e0f	; "vme" int state in SCU
 ttsysistate	equ	$ffff8e03	; "sys" int state in SCU
 
@@ -658,7 +641,7 @@ resvector:	ds.l	1	; (42a)	 [RESET] bailout vector
 phystop:	ds.l	1	; (42e)	 physical top of RAM
 _membot:	ds.l	1	; (432)	 bottom of available memory;
 _memtop:	ds.l	1	; (436)	 top of available memory;
-sshiftmd:	ds.w	1	; (44c)	 shadow for 'shiftmd' register
+memval2:	ds.l	1	; (43a)	 validates 'memcntlr' and 'memconf'
 flock:		ds.w	1	; (43e)  floppy disk/FIFO lock variable
 seekrate:	ds.w	1	; (440)  default floppy seek rate
 _timr_ms:	ds.w	1	; (442)  system timer calibration (in ms)
@@ -751,7 +734,7 @@ kcl_hook:	ds.l	1	; (5b0)  handler for keyclick
 *	This space reserved for		:
 *	future RAM-loaded fixes		:
 *	to the operating system.	:
-		.globl	fix_it_up
+*					:
 *
 * ROMs for 68030's use $700-$800 for the PMMU page tables: this has the
 * advantage of making them protected from user-mode access.
@@ -787,6 +770,10 @@ fix_it_up:	ds.b	$800-$5b4
 *----------------------------------------
 		.globl	user_vars
 user_vars:	ds.b	64		; 64 bytes for carts and things
+
+
+*----------------------------------------
+*					:
 *	BSS beyond this point		:
 *	will change in future		:
 *	revs of the OS.			:
@@ -804,15 +791,13 @@ padstuff:	ds.l	10*4		; other pad variables (total 40 bytes)
 
 the_env:	ds.b	20		; space for a small enviroment string
 savarea:	ds.w	savsiz*nlevels	; register save area
-
+savend:					; end of register sav area
+		ds.b	6		; enough for JMP <abs> before hdrcopy
+hdrcopy:	ds.b	$40		; copy of OS header ["big enough"]
 defcookies:	ds.l	DEFCSIZE*2	; initial cookie jar
 _upref:		ds.w	1		; boot pref for _dmaboot
 .if TT
 ttmd:		ds.l	4		; the TT MD for fast RAM (see getmpb)
-
-
-
-
 .endif
 _hasdmasnd:	ds.b	1		; flag: MONOMON is XORed with IRQ
 _iamanst:	ds.b	1		; flag: I am an ST - mainly ST video.
@@ -993,7 +978,7 @@ resvchk:
 
 * if STPAD, read the switches register to learn the state of top closed &
 * power on.  Clobber resvalid if they are BOTH down, which is a state that
-.if !TT
+* should never happen -- this is required to get you home again if you
 * install a reset vector to never-never land; you can't just turn off the
 * power and wait for RAM to decay.  Note that other things (modem wake,
 * alarm wake, extern wake) can bring the power bit down besides the button;
@@ -1024,41 +1009,10 @@ resv1:
 	tst.b	resvector.w		; bits 24..31 must be zero
 	bne	reset3			; (they	aren't,	so punt)
 .endif
-*+
-*  If we're on a machine with DMA sound, clobber it
-*  and program the volume/tone chip for max vol, etc.
-*-
-
-.if DMASND
-	clr.w	dmasndc		; reset sound chip
-
-* program the volume/tone controller for a sane volume & tone, and
-* mix the GI sound in with the DMA sound so it comes out the speaker.
-
-	lea.l	vtpgm(pc),a0
-	move.w	(a0)+,mwmask
-	bra	vtend
-
-* data for the MicroWire interface...  The low high bit is set for
-* each of these so we can tell when it's shifted completely out.
-
-*		  addr  cmd  data   lobit
-vtpgm:	dc.w	($0600+$01ff)*2		; mask for all cmds
-	dc.w	($0400+$00c0+$28)*2+1	; max master volume
-	dc.w	($0400+$0140+$14)*2+1	; max left channel volume
-	dc.w	($0400+$0100+$14)*2+1	; max right channel volume
-	dc.w	($0400+$0080+$06)*2+1	; flat treble
-	dc.w	($0400+$0040+$06)*2+1	; flat bass
-	dc.w	($0400+$0000+$01)*2+1	; mix GI sound with DMA sound
-	dc.w	$0			; end of this list
-
-vtloop:	move.w	d0,mwdata		; write data
-vtwait:	tst.w	mwdata			; wait for data == 0
-	bne	vtwait
-vtend:	move.w	(a0)+,d0
-	bne	vtloop
-
-.endif
+	btst	#0,d0			; the vector must be even
+	bne	reset3			; (it isn't, so	punt)
+	move.l	d0,a0			; a0 ->	reset handler
+	lea	resvchk(pc),a6		; a6 -> WRONG RETURN ADDRESS! See note
 	jmp	(a0)			; execute reset	bailout
 reset3:
 .endif
@@ -1071,7 +1025,7 @@ reset3:
 *
 * Note: The floppy side and selects are inverted, so writing 1 disables them.
 * Other outputs are initialized to zero here: *DTR, *RTS, STROBE,
-.if !TT
+* and for TT: *SPKR_DIS, *LAN; for STPAD: *IDERESET, FDD_HIDEN.
 * In some cases this is the only place that initializes these values.
 *-
 	lea	giselect,a0		; a0 -> giselect, giwrite-2
@@ -1131,9 +1085,7 @@ notpal:
 * from the STylus touch-screen hardware.  This is as good a place to
 * put that as any...
 *
-.if STPLUS | TT
-	clr.b	dbasell		; set lo byte ptr
-.endif
+	move.b	#2,shiftmd		; write "mono" to shifter mode reg.
 	move.b	#$80,$ffff827f		; write LCD and power control
 	tst.w	$d00000			; clear "conversion done" int.
 .endif
@@ -1149,16 +1101,33 @@ sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 	dbra	d0,sysic1		; (loop for more colors)
 
 
+.if systype == rom
+*+
+*  [ROM only]
+*  Put the screen (temporarily)
+*         (get memory controller conf. from RAM; if valid, goto reset4)
+*	  if STPAD
+*	    (write memconf, d6, d5; fall through)
+* On STe and TT, low byte is cleared automatically when others are written.
+*	    (size memory for ST/STe, write memconf, fall through)
+*         endif
+*  but shamelessly modified for the hell of it.
+*
+*  The bottom 1K of memory is only touched on the first RESET,
+*  to size memory and setup the memory controller.  The first 1K
+*  is never cleared.
+*	    (goto mem_sized)
 * controller, and tells other things besides: the byte at 8006 (or the high
-.if !TT
+* byte of the word there) yields:
 	bne	sp_cold			; no - this is a cold boot
+	cmp.l	#memmag3,memval3.w	; check again
+	beq	reset4			; ok - warm boot.
 
 * On Sparrow, detected cold boot.  So determine memory size.
 * Take mmb as a number; phystop is 512KB << mmb clamped to 14MB maximum.
 sp_cold:
 	move.w	SPAR_CONF,d0	; read again just for fun
 	lsr.w	#8,d0		; get switches in low word: d0=vvmmrrbf
-* This is the ifne in "ifeq TT ... (ifne STPAD ... else ... endif) else ... endif"
 	lsr.b	#1,d0		; d0=0vvmmrrb
 * STPAD is always 1MB, memory controller config value $a.
 * (This means "two 2MB banks, of which only the first actually exists,
@@ -1168,8 +1137,6 @@ sp_cold:
 	or.b	d0,d1		; d1=00000mmb
 	move.l	#$100000,d5
 	move.b	memcntlr.w,d6		; d6 = memory controller configuration
-* first else of "ifeq TT ... (ifne STPAD ... else ... endif) else ... endif"
-
 	move.l	phystop.w,d5		; d5 ->	(possible) top of physical mem
 	lea	ret_2(pc),a6		; load return address
 	bra	val_memval		; get memory controller validation
@@ -1187,7 +1154,7 @@ ret_2:	beq	reset4			; already sized -- don't size or test
 	move.l	#$06161964,d0
 	move.l	#$03251987,d1
 	move.l	d0,$00300010		; write a magic number to 3rd MB
-* from test-pattern signatures:
+	move.l	d1,$00300014		; and another one
 	cmp.l	$00300010,d0		; still there?
 	bne	pad_small		; nope, you're small
 	cmp.l	$00300014,d1		; also still there?
@@ -1195,20 +1162,44 @@ ret_2:	beq	reset4			; already sized -- don't size or test
 pad_small:
 	move.l	#$100000,d5		; we have 1MB
 pad_big:
-* If neither shadow appears, but the pattern took in the first place,
-.if !STPLUS
-shadow	equ	$200			; look for first shadow at 512 bytes
+
+* STPAD sizing done, size is in d5
+
 .else
-shadow	equ	$40000			; look for first shadow at 128K
-.endif
+*--- write test-pattern to both banks:
+	move.b	#$fe,dbasell		; see if dbasell and dstride are RAM
+	move.b	#$00,dstride		; write fe, then 00
+fmem1:	move.w	d0,(a0)+		; write	to bank 0
+					; would put $FE on the bus.
+	cmp.b	#$fe,d0			; NOW cmp.b
+	cmp.l	#$200,a0		; filled $200 bytes?
+	tst.b	dstride
+* from test-pattern signatures.
+	move.b	#$00,dbasell
+	move.b	#$fe,dstride
+	tst.b	dbasell
+	bne	memST
+	move.b	dstride,d0
+	cmp.b	#$fe,d0
+	bne	memST
+	clr.b	dstride			; set stride back to reset state
+* If a shadow appears at the first shadow place, you know you have small
+* parts.  If one appears at the second place, you have medium parts.
+* If neither shadow appears, but the pattern took in the first place,
+* you have big parts.
 *
+* Starting with 9/91 ROMs, ST and STPLUS are the same thing, so
+	
 * to be an assembly-time constant, now it's in d7.
 *
-	move.l	#shadow+8,a0		; pattern matches at first shadow loc?
+* We detect ST-vs-STe by seeing if the high 7 bits of dbasell are RAM.
+* If so then we're an STe.
 *
 
 	move.b	#$5a,dbasell		; see if dbasell is RAM
-	move.l	#shadow*2+8,a0		; pattern matches at second shadow loc?
+	tst.b	dbasel			; read another register to destroy
+					; capacitance effects; dbasel is 00.
+	move.b	dbasell,d0		; read; don't say cmp.b because that
 					; would put $5a on the bus.
 	cmp.b	#$5a,d0			; NOW cmp.b
 	bne	memST
@@ -1220,11 +1211,9 @@ shadow	equ	$40000			; look for first shadow at 128K
 
 ; OK, dbasell holds its value: you're an STe.
 
-cold3:	move.b	d6,memconf		; setup	memory controller
+	move.l	#$40000,d7		; set shadow to $40000 for STe
 	bra	gotshadow
-* first endif of "ifeq TT ... (ifne STPAD ... else ... endif) else ... endif"
 memST:	move.l	#$200,d7		; set shadow to $200 for ST
-* second else of "ifeq TT ... (ifne STPAD ... else ... endif) else ... endif"
 
 	move.l	#bank1,d1		; d1 = bank offset (start with bank 1)
 mem1:	lsr.w	#2,d6			; (shift bank1's size into position)
@@ -1289,14 +1278,13 @@ mem4:	sub.l	#bank1,d1		; decrement bank number
 * the value to put in memconf and memcntlr.
 *
 
-* last endif of "ifeq TT ... (ifne STPAD ... else ... endif) else ... endif"
 	btst.b	#0,ttscu1		; bit is clear for cold boot
 	beq	mt_cold			; definitely a cold boot
 
 	move.b	memcntlr.w,d6		; might be warm boot...
 	move.l	phystop.w,d5
-*  bus error (for an non-existant controller) or the pattern we write won't
-*  read back correctly (non-existant bank on a controller that works).
+	lea.l	ret_2(pc),a6
+	bra	val_memval
 ret_2:	beq	reset4			; already sized; don't size or test.
 
 mt_cold:
@@ -1305,7 +1293,7 @@ mt_cold:
 	moveq	#0,d0
 	move.l	d0,$1008		; clear space first so pattern
 	move.l	d0,$100c		; doesn't "happen" to be there
-.if !STPAD
+	move.l	#$06161964,d0
 	move.l	d0,$8			; write pattern
 	cmp.l	$1008,d0		; shadowed here?
 	bne	mt_big			; no, definitely big parts
@@ -1463,6 +1451,81 @@ mt_pr:
 
 * not TT: set the fast-RAM system variables to indicate "no fast RAM"
 .endif
+* if some system variable is garbage in an otherwise-warmbooting
+* machine.  The hope is that the cold boot will wipe out the offending
+* here instead of anywhere earlier: you need goot RAM for catching the bus
+* for ST BOOK, where you can't just turn off the power.
+*
+
+reset4:
+	move.l	#_supstk+supsiz,sp	; setup SSP now
+	move.l	#coldboot,$8		; bus error during boot -> coldboot
+	move.l	#coldboot,$c		; addr error - same thing
+* Transfer the sparrow config value to the corresponding bits in VMC (video
+* master control): VVmmrrBf goes into BhvcesVV in VMC.
+* Also, touch ST color palette because that puts us in ST video mode.
+*
+	move.b	SPAR_CONF,d0	; d0=vvmmrrbf
+	move.b	d0,d1		; d1=vvmmrrbf
+	lsl.b	#6,d1		; d1=bf000000
+	and.b	#$80,d1		; d1=b0000000
+	lsr.b	#6,d0		; d0=000000vv
+	or.b	d0,d1		; d1=b00000vv
+	move.w	d1,SPAR_VMC	; write to VMC.
+	tst.w	color0
+	move.w	(a0)+,mwmask
+* Zap the DMA sound controller, if you have DMA sound in this machine.  You
+* can't tell that without probing for it, though, which is why we do it
+* here instead of anywhere earlier: you need good RAM for catching the bus
+* error.
+*
+* The _hasdmasnd flag actually means "MONOMON on GPIP bit 7 is XORed with
+* the DMASND IRQ signal, and you have to worry about this when you futz
+* with MONOMON in VBLANK."  STPAD will DTACK (i.e. no bus error) at the
+* controller address, but it doesn't really have DMA sound, so that part
+* is an assembly-time conditional.
+*
+* The monomon stuff is irrelevant to SPARROW, but the volume/tone
+* initialization isn't.
+*
+
+* program the volume/tone controller for a sane volume & tone, and
+* mix the GI sound in with the DMA sound so it comes out the speaker.
+
+	lea.l	vtpgm(pc),a0
+	move.w	(a0)+,d1	; get into a reg for sparrow
+	move.w	d1,mwmask
+	bra	vtend
+
+* each of these so we can tell when it's shifted completely out.
+
+*		  addr  cmd  data   lobit
+* the ST/STe case, check to see if the low byte video address register and
+* the stride register are there.
+	dc.w	($0400+$0100+$14)*2+1	; max right channel volume
+	dc.w	($0400+$0080+$06)*2+1	; flat treble
+	dc.w	($0400+$0040+$06)*2+1	; flat bass
+	dc.w	($0400+$0000+$01)*2+1	; mix GI sound with DMA sound
+	move.b	#$fe,dbasell		; see if dbasell and dstride are RAM
+	move.b	#$00,dstride		; write fe, then 00
+* the data is a rotate register, not a shift register.  Thus you wait
+					; would put $FE on the bus.
+	cmp.b	#$fe,d0			; NOW cmp.b
+* because we're doing this at boot time at IPL 7; this code is not
+	tst.b	dstride
+	bne	iset
+	move.b	#$00,dbasell
+	move.b	#$fe,dstride
+	tst.b	dbasell
+	bne	iset
+	move.b	dstride,d0
+	cmp.b	#$fe,d0
+iset:
+	sne	_iamanst
+	clr.b	dstride			; set stride back to reset state
+	clr.b	dbasell			; and dbasell too
+	bne	vtwait
+vtend:	move.w	(a0)+,d0
 	bne	vtloop
 
 nodmasnd:
@@ -1520,7 +1583,7 @@ iset:	sne	_iamanst		; if NE, you're an ST.
 clrm_1:	move.w	d0,(a0)+		; clobber a word
 	cmp.l	a0,a1			; at end?
 	bne	clrm_1			; (no -- loop for more words)
-.if !TT
+
 .if M68030
 *+
 *  [M68030 only]
@@ -1530,9 +1593,9 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *  This has to run after clearing BSS memory.
 *-
 
-.if STPLUS | TT
-	move.b	_v_bas_ad+3.w,dbasell	; load lo byte addr
+	bsr	mmusetup
 .endif
+
 *+
 *  Setup display base,
 *  clear display memory.
@@ -1598,15 +1661,24 @@ usem:	move.l	4(a0),end_os.w		; init end-of-OS pointer
 	move.l	#_auxostat,prv_auxo.w
 	move.l	#_auxout,prv_aux.w
 
-* Initialize the cookie jar
+*--- Randoms:
+	move.l	#_scrdmp,scr_dump.w	; screen-dump vector
+	move.l	_v_bas_ad.w,_memtop.w 	; _memtop = _v_bas_ad
+	move.l	end_os.w,_membot.w	; set bottom of memory (for DOS)
+	move.w	#dnvbls,nvbls.w		; default number of vbl queue entries
+	st	_fverify.w		; enable write-verify
+	move.w	#df_seek,seekrate.w	; set default seek-rate
+	move.l	#_diskbuf,_dskbufp.w	; setup pointer to disk buffer
 	move.w	#-1,_prtcnt.w		; initialize print-count
+	move.l	#ostext,_sysbase.w	; -> base of OS
+	move.l	#savend,savptr.w	; register-save pointer for traps 13&14
 	move.l	#_rts,swv_vec.w		; ignore monitor changes for now
 	clr.l	_drvbits.w		; clobber "drive-alive" bits
 *		00010000 	STe (.if STPLUS)
 	clr.w	_bootdev.w		; clear bootdev
 *		    0008	STe/AT (.if STPLUS and IDE bus exists)
 *		    0010	Mega STe (.if STPLUS and SCU exists)
-*		00020000	TT (ifne TT)
+* like bootable RAMdisks.  The no-change lobby wins this time.
 *
 .if systype == rom
 	bsr	copy_header		; kludge OS ROM header
@@ -1645,30 +1717,38 @@ usem:	move.l	4(a0),end_os.w		; init end-of-OS pointer
 	move.l	a0,_p_cookie.w
 
 *
-.if !(TT | STPLUS)
+* The 68020 user's manual says "unimplemented bits are read as zeroes"
 * for the movec instruction, so I use the freeze bit of the data cache
-	clr.l	(a0)+			; ST video
+* to probe for the difference between 68020 (which doesn't have a
 * data cache) and a 68030 (which does).
-	clr.l	(a0)+			; ST machine
-.endif
+*
 
+	move.l	#"_CPU",(a0)+	; probe for CPU type
 	moveq.l	#0,d1		; set cpu type == 68000
-* else decide what kind of STPLUS we are: STe, Mega STe, and STe-PLUS.
 	move.w	#$10,a2		; vector being used is now illegal-instruction
-.if STPAD
 	move.l	(a2),a3		; save old illegal instruction vector
 	move.l	a7,a1		; save ssp
 	move.l	#ill_1,(a2)	; game's over after first exception
 	move	ccr,d0		; illegal on 68000
 	moveq.l	#10,d1		; no exception; 68010 at least
-.if STPLUS
+	bclr	#9,d0		; test and clear - bit still set?
+	beq	cpunot30	; no - it's a 20
+	moveq.l	#30,d1		; was still set - it's a 30
 	movec	d0,cacr		; (un-freeze data cache)
-	move.l	#$00010000+STPAD,(a0)+	; STE video w/stpad as minor rev
+
+cpunot30:
+ill_1:	move.l	a1,a7		; restore old ssp
+	move.l	a3,(a2)		; restore old exception vector
+	move.l	d1,(a0)+	; write CPU type in cookie jar
+	sne	_longframe+1.w	; and, incidentally, set longframe, too.
+
+.if TT
+	move.l	#"_VDO",(a0)+
 	move.l	#$00020000,(a0)+
 	move.l	#"_MCH",(a0)+
 	move.l	#$00020000,(a0)+
 .else
-	move.l	#$00010000+STPAD,d0	; load d0 for normal STe (plus STPAD)
+.if STPAD
 * STPAD is one kind of STPLUS -- if we're that kind, use those values,
 
 	move.l	#"_VDO",(a0)+
@@ -1691,113 +1771,66 @@ usem:	move.l	4(a0),end_os.w		; init end-of-OS pointer
 	clr.l	(a0)+
 	bra	cdone1
 
+pickste:
 * OK, not an ST; definitely STe video then.
 	move.l	#"_VDO",(a0)+
 
-.if TT
-	move.l	#"_VDO",(a0)+
-	move.l	#$00020000,(a0)+	; TT video
-	move.l	#"_MCH",(a0)+
-	move.l	#$00020000,(a0)+	; TT machine
-.endif
+* distinguish STPLUS from Mega STe by using ttscu1: if bus error,
+* it's STPLUS, else it's Mega STe.
+
 	move.l	#$00010000,d0		; load d0 for normal STe
-.if TT | STPLUS
-* TT and STPLUS have configuration switches.  Set that cookie here.
-	tst.b	ttscu1
-	move.w	#$0010,d0		; no bus error: set Mega STe lo word
-
-
-*
-* This is a little tricky: the configuration bits can be in two different
-* places: one for STPLUS and new TTs, one for old TTs.  The 
-* equate to conf_switches is set above for STPLUS and the "other" TTs,
-* and ttd_conf_switches is the other one.  If we're on STPLUS, we just
-* read the bits.  If we're on TT, we read conf_switches first, guarding
-* against bus error.  Bus error means the bits are found at memconf-1
-* (memconf is the odd byte). In either case, the bits are in the high byte
-* of a word where we don't care about the low byte.
-* Furthermore, the "1" state should be the default, since some STEs and TTs
-* are/were manufactured with all switches open (or missing!).
-*
-* Note: at the end of this code, d0 has the switches in it, or $FF if there
-* aren't any.  That's used later to set the _SND and _FDC cookies.
-*
-
-.if STPLUS
-* Get here on bus error touching ttscu1 -- we're not a Mega STe.
-.endif
-.if TT
-
-* must find configuration bits in either of two places: one for TTD,
-* one for all others.  Each address gives bus error on the other machine.
-
 	move.l	$8,a1
 	move.l	sp,a2
-	move.l	#conf_berr,$8
-	move.w	conf_switches,d0	; get conf bits from normal place
-	bra	gotem			; hey! no exception
-conf_berr:
-	move.w	ttd_conf_switches,d0
-gotem:	move.l	a1,$8
-	move.l	a2,sp
-.endif
-	lsr.w	#8,d0			; get conf switches in low byte
+	move.l	#nomste,$8
+	tst.b	ttscu1
+	move.w	#$0010,d0		; no bus error: set Mega STe lo word
+	bra	gotmch
 
+* Get here on bus error touching ttscu1 -- we're not a Mega STe.
+* Probe for the IDE bus; if there, we're STe-PLUS, else STe.
 
-.else
-	moveq.l	#$ffffffff,d0		; no switches, use FF for other things
-.endif
+nomste:
 	clr.w	d0			; set d0 back to "normal STe"
-* end of TT | STPLUS configuration switches setting.
 	move.l	a2,sp			; restore pre-bus-error stack pointer
 	move.l	#gotmch,$8		; and set a new vector
-	tst.b	$FFF00039		; read ATASR
-.if !DMASND
-	move.l	#$1,(a0)+		; GI sound only
-.else
-	move.l	#"_MCH",(a0)+
-* d0.b holds the configuration switches as computed above.
-* The conditional assembly has gotten a little hairy: TT | STPLUS is,
-* at the moment, the same as DMASND, but it might not always be that way.
 
-	moveq.l	#1,d1			; GI sound always present
-	btst.l	#$7,d0			; test high-order bit
-	sne	d2			; 1 means DMASND output present
-	and.b	#$2,d2			; mask off all but the %10 bit
-	or.b	d2,d1			; or in a 1 for present, 0 for missing
-	move.l	d1,(a0)+		; set _SND value
-.endif
+	tst.b	$FFF00039		; read ATASR
+	move.w	#$0008,d0		; no bus error - we're STe-PLUS
+
+gotmch:	move.l	a1,$8
+	move.l	a2,sp
+	move.l	#"_MCH",(a0)+
+	move.l	d0,(a0)+
 cdone1:
 .endif
 .endif
-* switches, when zero, means you have high-density capability.  This
-* is defined as "Flopfmt of 18 sectors gives you high-density at 18
-* sectors" and "Protobt type 4 gives you 80 tracks / double sided /
-* 18 spt" and Floprd/Flopwr/Flopver work on high-density disks (and
-* auto-detect them)."  One day we'll have a switch which tells us to
-* install the quad-density version of this cookie, meaning all of the
-* above at 36 spt, plus "Protobt type 5 gives 36 spt."
-*
-* The high byte of the value of the _FDC cookie holds a value
-* indicating the kinds of drives available: 00 means 720K only, 01
-* means 1.44MB, and other values are undefined, but will eventually
-* mean stuff like 2.88MB.  The low three bytes of the cookie is to be
-* used by vendors who want to identify their products; they should
-* register their desires with somebody (as of 4/25/91 it's Bill
-* Rehbock).  "ATC" means Atari's 1772-clone that runs reliably at
-* the higher denisty.
-*
-* We're being cagey about this because we don't want to preannounce
-* the high-density floppy capability, and besides, we don't want people
-* looking at the switches directly if we can help it.  So, like DMASND,
-* you get a cookie based on a switch.
-*
-* In addition, if the switch is thrown, we set nospindelay so the
-* floppy BIOS knows you're using an Epson SMD-340 or something like
-* it.  See comments in flop.s for the rationale.
+.endif
+
+* OK, the CPU, VDO, and MCH cookies are set.  TT and STPLUS have
+* configuration switches.  Set that cookie and use the high bit to set _SND
+* and _FDC cookies.
+
+	move.b	#%01111111,d0		; preload "no DMA sound, no hi den"
+	tst.b	_iamanst
+	bne	noswi
+
+	move.l	#"_SWI",(a0)+
+
+	moveq.l	#0,d0			; pre-load the conf bits
+	move.w	conf_switches,d0	; get configuration bits (as word!)
+	lsr.w	#8,d0			; shift switches into low byte
+	move.l	d0,(a0)+
+noswi:
+
+* Switch values are in d0: this fact is used to set _SND below.
+
+	moveq.l	#3,d1			; pre-load "dma and normal sound"
+	move.l	#"_SND",(a0)+
+	btst	#7,d0			; test the (possibly fake) sound SWI
+	bne	gotsnd
 	bclr	#1,d1			; nope, no DMA sound
 gotsnd:	move.l	d1,(a0)+		; write sound cookie value
-	btst.l	#$6,d0			; second switch thrown (read as 0)?
+
 * d0.b still holds the configuration switches as computed above.
 
 *
@@ -1854,16 +1887,15 @@ nofdc:
 * If not found, the cookie is installed with value 0000 0000,
 * meaning no FPU.  This is to make it easy for software FPU emulators
 * to register themselves (see below).
-* All other bits and values are reserved.  It may be that other bits
-* will describe the presence of coprocessors with other CPID's.
 *
-* The low word of the _FPU cookie's value describes software floating
-* point which is installed.  Since there isn't any yet, this is
-* somewhat nebulous.  However, a zero means there is no software
-* support for line-F instructions, and the high bit of the low word
-* means whatever you've got is aware of having a 68040, so it will
-* use line-F instructions for those functions which are present in
-* that processor.
+* The full definition of this cookie (as of now, 5/90) is as follows:
+*
+* The high word of the _FPU cookie value contains a description of the
+* hardware FP support present in the machine.  
+
+* The low bit of the high word is set if and only if there is an SFP004-
+* equivalent floating-point peripheral installed.
+*
 * In addition, the next three bits (at least) describe the presence of
 * a 6888x coprocessor: a value of %001 means either 68881 or 68882,
 * %010 means 68881 explicitly, %011 means 68882 explicitly, and
@@ -1871,29 +1903,31 @@ nofdc:
 *
 * The reason for this scheme is that you may actually have both an
 * SFP004-equivalent peripheral installed AND a 6888x coprocessor,
-* Usually, the low word is zero when you have a 68881, because there's
-* no need for S/W emulation.  However, when you have the SFP004, you
-* might also have software that turns line-F instructions into the
-* corresponding SFP004 commands, and with a 68040, you might have
-* software that deals with the missing FP instructions.
+* if (for example) you have upgraded a Mega STe with a 68020 + 68881.
+*
+*	HIGH WORD
+* 
+* 	0000 = no hardware FPU
 *	0001 = SFP004
-* This code always installs SOME cookie so software emulators can just
-* find the cookie & change it, rather than installing their own.
+* 	0002 = 68881 or 68882, unsure which
+*	0003 = 68881 or 68882, unsure which, plus SFP004
 * 	0004 = 68881
 *	0005 = 68881 + SFP004
 *	0006 = 68882
 *	0007 = 68882 + SFP004
-* probe for FPU: line-F exception means there is none.
-* Coprocessor violation does, too, but should "never happen."
-* However, it did in some machines, so here it is.  I think it
-* actually means there's something wrong on the data bus...
+*	0008 = 68040
+*	0009 = 68040 + SFP004 (unlikely)
+*
+* All other bits and values are reserved.  It may be that other bits will
+* describe the presence of coprocessors with other CPID's.
 *
 * The low word of the _FPU cookie's value describes software floating point
 * which is installed.  Since there isn't any yet, this is somewhat
+* nebulous.  However, a zero means there is no software support for line-F
 * instructions, and the high bit of the low word means whatever you've got
 * is aware of having a 68040, so it will use line-F instructions for those
 * functions which are present in that processor.
-	move.l	#$00020000,(a0)+	; found 6888x: set %10 bit
+*
 * 	LOW WORD
 * 
 * 	0000 = no software FPU emulation
@@ -1903,9 +1937,7 @@ nofdc:
 * Usually, the low word is zero when you have a 68881, because there's no
 * need for S/W emulation.  However, when you have the SFP004, you might
 * also have software that turns line-F instructions into the corresponding
-
-.if !TT
-* We only probe for SFP004 if you're not on a TT.
+* SFP004 commands, and with a 68040, you might have software that deals
 * with the missing FP instructions.
 *
 * This code always installs SOME cookie so software emulators can just find
@@ -1918,13 +1950,11 @@ nofdc:
 * violation does, too, but should "never happen." However, it did in some
 * machines, so here it is.  I think it actually means there's something
 * wrong on the data bus...
-.endif
 
+	move.l	$2c,a1
+	move.l	$34,a2
+	move.l	sp,a3
 
-* If there's fast RAM, put the _FRB cookie in the cookie jar.
-* It points to 64K of space available for anybody to do copies
-* when attempting a Rwabs between TT RAM and an ACSI device.
-* Don't change this size: RAM-loaded drivers use the same buffer.
 	move.l	#nofpu,$2c
 	move.l	#nofpu,$34
 	fmove.l	fp0,d0			; test a simple FPU inst.
@@ -1979,7 +2009,7 @@ xfpudone:
 *	beq	sei2			; (it's there -- leave vectors alone)
 .endif
 *--- setup 62 vectors:
-.if !TT
+.if (TT == 0)
 	lea	_term(pc),a1		; a1 -> "terminate process" handler
 	add.l	#$02000000,a1		; a1 += vector number (high byte)
 	lea	8,a0			; a0 -> interrupt RAM
@@ -1998,15 +2028,13 @@ sei1:	move.l	a1,(a0)+
 .endif
 *
 *  Exception vectors are pointed to the system critical error handler
-.if STPAD
-* on STPAD, vector NMI to RTE; it's possible to get NMI when the
+* Vector NMI to RTE; it's possible to get NMI on STPAD when the
 *  the exception number.  If TT, the exception number comes off the stack
 *  in the frame word.
 *
 *  Trap 2, Divide-by-zero, and NMI are pointed at an RTE.
 *
 *  The HBLANK, VBLANK, line 1010, [someday: line 1111], trap 13, trap 14,
-.endif
 *  and "extended" trap vectors are initialized appropriately.
 *
 * New code: we set all these exceptions to vector to 'coldboot' on the
@@ -2056,15 +2084,11 @@ sei3:	move.l	#_rte,(a1)+		; point interrupt at RTE
 	move.l	a4,etv_timer.w		; default timer-tick vector -> rts
 	move.l	#_critich,etv_critic.w 	; default critical error handler
 	move.l	a4,etv_term.w		; default terminate vector -> rts
-*  "The other half" of the BIOS handles character I/O;
-*  call its initialization hook.
-*  (It can "never fail".  This will get interesting
-*   if we ever do a detachable keyboard ....)
+
+*+
+*  Setup the vblank deferred vector list.
 *
-*
-.if TT | STPLUS
-* TT: have to enable interrupts in SCU also
-* STPLUS: ignore bus errors
+*-
 	lea	_vbl_list.w,a0		; a0 -> default list of vbl locs
 	move.l	a0,_vblqueue.w		; install ptr to them
 	move.w	#dnvbls-1,d0		; clear vbl vectors
@@ -2073,7 +2097,13 @@ sei3:	move.l	#_rte,(a1)+		; point interrupt at RTE
 *  vectors have been moved into RAM to make it possible
 *  to efficiently intercept them later on.
 *
-.endif
+*  This only happens in TOS 1.2 and later.  On TT with Bconmap,
+*  the vectors for device 1 (the mappable one) get (re-)written
+*  by mapinit, which is called by initmfp.
+*-
+
+	lea	CHRDEVTAB,a0		; a0 -> routines
+	move.w	#xconstat,a1		; a1 -> RAM vectors
 
 	moveq	#(4*8)-1,d0		; = #vectors to install
 chdev1:	move.l	(a0)+,(a1)+
@@ -2137,7 +2167,7 @@ ikbdlp1:
 *  Fire up %%2 cartridges
 *
 *-
-.if !TT
+	moveq	#2,d0			; bit# = 2
 	bsr	cartscan		; execute cartridge aps
 .if STPAD
 	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
@@ -2145,7 +2175,7 @@ ikbdlp1:
 
 *+
 *  Initialize screen resolution -- algorithm from Jim Tittsler (thank you!)
-.if !TT
+*  Init console subsystem.
 *  If in medium resolution, make color 3 black (color 15 ==> color 3).
 *
 * This used to read the current rez out of the hardware & set the software
@@ -2153,7 +2183,7 @@ ikbdlp1:
 * should reset the rez, too.  So... We set low rez, unless there's
 * a mono monitor, in which case we set high rez (read "ST LOW" at "TT HIGH"
 * when on a TT).
-.if !TT
+*
 * As of 5/14/91, TT's with color monitors boot in TT MED, which makes it
 * look less like a toy machine with only 40 columns.
 *
@@ -2578,7 +2608,7 @@ icon_start:
 	.dc.l	$00000000,$00000000,$00000000
 	.dc.l	$00000000,$00000000,$00000000
 	.dc.l	$00000000,$00000000,$00000000
-	tst.w	sshiftmd.w
+	.dc.l	$0000C07F,$FE030007,$C01E0700
 	.dc.l	$0001E07F,$FE07801F,$F81E18C0
 	.dc.l	$0003E07F,$FE0F803F,$FC1E1740
 	.dc.l	$0003F07F,$FE0FC03F,$FE1E2520
@@ -2621,13 +2651,13 @@ icondone:
 	trap	#$d		; Bconout(2,' ');
 	addq	#6,sp
 
-; only possible combinations of STPLUS and STPAD are 0,0, 1,0 and 1,1;
-; thus, this clause is only true if STPLUS and not STPAD (1,0).
+
+*
 * end of icon code
-.if (STPLUS & (!STPAD))
+*
 **********************************************************************
-.else
-crcstride	equ	0
+
+**********************************************************************
 *
 * Begin code which checks the ROM CRC's for consistency.  STPLUS has two
 * one-megabit (128K) chips, and TT has four one-megabit chips.
@@ -2635,18 +2665,31 @@ crcstride	equ	0
 * This happens for ROM systems only.  You will find toscrc later in 
 * this file. It's also conditional on crcstride.
 *
-	move.l	#(128*1024)-2,d7	; checksum this many bytes
+* Changed 11/5/91 to check only if _hz_200 < EIGHTY_SECONDS
+*   because otherwise warm boots take too long.  But not on TT because
+*   otherwise there's no chance to use ALT to go to ST LOW rez.
+*   Besides, it's not annoyingly slow on TT, as it is on ST/STe.
+*
+
 .if systype == ram
 crcstride	equ	0	; no CRC computation if you're in RAM
 .else
 .if TT
 crcstride	equ	4
-	move.l	d7,-(sp)		; push count -- 128K - 2 bytes.
+.else
 ;
 ; STPAD is all one chip, so we test it all; all other machines are
 ; two chips.  It is now officially obsolete to have 6 chips for TOS.
 ;
+.if STPAD
+crcstride	equ	1
+.else
+crcstride	equ	2
+.endif
+.endif
+.endif
 
+* the if's above determine whether this code appears, and the stride used.
 
 .if crcstride
 	cmp.l	#EIGHTY_SECONDS,_hz_200
@@ -2673,7 +2716,7 @@ ckloop:
 * this is a0+d7; for others it's stride*128K - stride*2.
 
 .if crcstride == 1
-.if TT
+	add.l	d7,a0
 .else
 	add.l	#((crcstride*(128*1024)) - (crcstride*2)),a0
 .endif
@@ -2719,7 +2762,7 @@ eok2:
 	trap	#1			; Cconws(".\r\n");
 
 	addq	#6,sp			; clean stack
-	cmp.w	#$6,sshiftmd.w		; TT HIGH monitor?
+	addq.l	#1,a5			; incr start addr for next time
 	dbra	d6,ckloop		; go back and check others
 
 crcdone:
@@ -2992,6 +3035,11 @@ dskb1:	rts				; return status
 *
 *     endtime = 80 seconds;
 *     if (now >= endtime) goto all_done;	    (skip everything)
+*     memtest_done = FALSE;		    (a5 holds this flag)
+* 
+* main_loop (label dmab_to):
+* 	if (!memtest_done) {
+* 	    memtest_done = memtest_next();
 * 	    if (!memtest_done) goto done_with_mt_and_bar;
 * 	    else {
 * 		(memtest just finished)
@@ -3004,9 +3052,6 @@ dskb1:	rts				; return status
 * 	}
 * 	(continuation of bar shrinking here; label nomt)
 * 	if (now >= next_bar_time) {
-.if !STPAD
-* This whole timeout business only applies if you are not STPAD.
-
 * 	    kill-to-end-of-line (erase the next dot)
 * 	    send backspace (move to previous dot)
 * 	    next_bar_time += bar_interval;
@@ -3035,7 +3080,7 @@ dskb1:	rts				; return status
 * all_done:
 * 	all done
 * 
-	tst.w	sshiftmd		; test (shadow) resolution register
+* The idea is that for each loop, you either do the "next" memory test or
 * shrink the line (if it's time), and in any case you check the keyboard and
 * clean up if the guy hit a key.  Something subtle here is that the line will
 * shrink one dot per loop until it has shrunk down to its correct remaining
@@ -3151,28 +3196,6 @@ nomt:
 dmab_ns:
 
 * this is the end of the memory-test/shrinking bar sequence.  We check
-* this else is the end of the timeout code, which is gone if you are STPAD.
-* If you are STPAD you do get the memory test, and you can interrupt it.
-.else
-dmab_mt:
-	bsr	mem_test_next		; test next block of memory
-	bne	dmab_mtdone		; memory test done
-	move.l	#$00010002,-(sp)
-	trap	#$d
-	addq.l	#4,sp
-	tst.l	d0
-	beq	dmab_mt			; no key; loop.
-
-	move.l	#$00020002,-(sp)
-	trap	#$d			; Bconin(2) -- get the char.
-	addq.l	#4,sp
-
-	bsr	mem_abort		; aborted memory test
-
-dmab_mtdone:
-	move.l	#EIGHTY_SECONDS,_hz_200	; so we don't test RAM again
-.endif
-
 * to see if we're actually done (gasp!) and also for user interruption.
 
 * Begin scanning DMA devices for a bootable one.  The place in the
@@ -3183,11 +3206,7 @@ dmab_notime:
 * Check the keyboard for a user aborting the timeout
 	moveq.l	#8,d4			; start with SCSI device 0
 .else
-.if STPLUS
 	moveq.l	#16,d4			; start with IDE device 0
-.else
-	moveq.l	#0,d4			; start with ACSI device 0
-.endif
 
 .if STPAD
 * from there as a floating bus.
@@ -3258,6 +3277,9 @@ dmab_skip:
 	add.w	#$a,sp
 	tst.w	d0
 	beq	gotpref
+	clr.w	_upref.w	; NVM was invalid: zero the preference.
+gotpref:
+
 * The sequencing is taken care of by adding one to the device number, then
 * aborting if it's 8, and setting it to zero if it ends in 8 or 0.  If the
 * TT ever gets an IDE bus this'll have to change.
@@ -3476,9 +3498,12 @@ hbl:	move.w	d0,-(sp)		; save d0
 	move.w	2(sp),d0		; get pushed SR
 	and.w	#$0700,d0		; strip crufty bits
 hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
-.if !STPAD
+.if (STPAD == 0)
 
-.if DMASND
+
+*+
+* vbl -	vertical blank interrupt handler
+*
 *-
 vbl:
 	addq.l	#1,_frclock		; bump frame clock
@@ -3498,17 +3523,13 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	beq	vbl11
 	movem.l	d7/a0,-(sp)		; save registers
 	jsr	(a1)			; call routine
-	beq	v_read2
+	movem.l	(sp)+,d7/a0		; restore registers
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
-v_read2:
-.else
-*** non-DMASND equivalent: just get the input from gpip
-	move.b	gpip,d1			; get "High Rez" input
-.endif
 
+*------ Video monitor fail-safe anti-burnout check:
 *** When DMASND is TRUE:
 *** If DMA sound is active, the MONOMON line is inverted (that is,
-.if !TT
+*** they XOR).  Therefore, the sequence is as follows:
 ***	READ sound status (to d0)
 ***	READ gpip (to d1)
 ***	IF gpip != d1 then try again
@@ -3531,7 +3552,7 @@ v_read2:
 .if (STPAD == 0) & (SPARROW == 0)
 
 	move.b	gpip,d1			; get "High Rez" input
-.if !TT
+	tst.b	_hasdmasnd		; test the "I have DMA sound" flag
 	beq	v_readdone		; don't have it; d1 is right.
 
 	move.w	sr,-(sp)
@@ -3542,7 +3563,7 @@ v_read1:
 	btst	#7,d1
 	sne	d1
 	move.b	gpip,d2			; still the same?
-.if !TT
+	btst	#7,d2
 	sne	d2
 	cmp.b	d1,d2
 	bne	v_read1			; no - start over
@@ -3581,11 +3602,15 @@ v_readdone:
 * not needed in TT, but why take chances?)
 
 	bsr	noblank1		; returns when NOT in vblank
-.if STPLUS | TT
-	move.b	_v_bas_ad+3.w,dbasell	; for STPLUS use these 8 bits
-.endif
+
+.if (TT == 0)
+	move.b	#2,d0			; set mode 2 (high rez)
+.else
+	move.b	#6,d0			; set mode 6 (high rez)
 .endif
 	bra	swmon2
+
+*--- high rez: switch to low (hopefully defshiftmd) if gpip%%7 == 1
 swmon1:	btst.l	#7,d1			; bit is 1 when no mono
 	beq	swmon3			; no change (still highrez)
 	move.b	defshiftmd.w,d0		; get preferred rez
@@ -3694,7 +3719,7 @@ _critic:
 *
 *-
 _critich:
-.if !ONLY_LONGFRAME
+	moveq	#-1,d0			; default return value = ERROR
 	rts				; return to trap invoker
 
 
@@ -3713,7 +3738,7 @@ _critich:
 *	2(sp) ret			2(ssp) ret
 *	 (sp) SR			 (ssp) SR
 *
-.if !TT
+* Returns:	anything in D0
 *		If the function number is invalid, RETURNS IT IN D0.
 *		This is to ensure that you can tell old ROMs from new ones:
 *		For the interrogative calls, the fn number must be used
@@ -3736,7 +3761,7 @@ _critich:
 * 
 *-
 trp14h:	lea	trp14tab(pc),a0		; a0 -> trap14 jump table
-.if !ONLY_LONGFRAME
+	bra	traph
 trp13h:	lea	trp13tab(pc),a0		; a0 -> trap13 jump table
 
 * save registers, twiddle stack:
@@ -3750,7 +3775,7 @@ traph:	move.l	savptr,a1		; a1 -> register save area
 	beq	trap_1			; nope.
 .endif
 	tst.w	(sp)+			; drop the frame word off the stack
-.if !TT
+trap_1:
 	movem.l	d3-d7/a3-a7,-(a1)	; save C registers + super stack
 	move.l	a1,savptr		; update save-area pointer
 
@@ -3776,7 +3801,7 @@ b_supr:	move.w	(sp)+,d0		; get function#
 	move.l	(a0),a0			; indirect through RAM...
 *
 * BIOS functions are called with a5=0, and I won't back that part out
-.if !TT
+* even though we have a good assembler now.
 *
 b_1:	clr.l	a5			; a5 -> zero page
 	jsr	(a0)			; call BIOS function
@@ -4136,10 +4161,10 @@ _get_mpb:
 	bls	nottram
 
 	lea.l	ttmd.w,a2
-.if	STPLUS | TT
- 	move.b	dbasell,d0		; load low byte for STPLUS
-.endif
-
+	tst.w	_iamanst		; see if we're an ST
+	clr.l	(a2)			; ttmd.m_link = 0;
+	move.l	#$01000001,4(a2)	; ttmd.m_start = start of fast RAM +1
+	move.l	_ramtop,d0
 	sub.l	#$01000000,d0
 	move.l	d0,8(a2)		; ttmd.m_length = (length)
 	clr.l	$c(a2)			; ttmd.m_rover (not used any more)
@@ -4164,7 +4189,7 @@ nottram:
 	clr.l	a0
 	lea	(a0,d0.w),a0		; a0 -> vector
 	move.l	(a0),d0			; d0 = current vector address
-.if !TT
+	move.l	6(sp),d1		; d1 = what_to_change_it_to
 	bmi	setex1			; punt if (d1 < 0)
 	move.l	d1,(a0)			; set vector address
 setex1:	rts
@@ -4191,16 +4216,15 @@ _physbase:
 	move.b	dbasel,d0		; load and shift bits 8..15
 	lsl.l	#8,d0
 	tst.b	_iamanst		; see if we're an ST
-.if STPLUS | TT
 	bne	phydone
-.endif
+ 	move.b	dbasell,d0		; load low byte when non-ST
 phydone:
 	rts				; return pointer in d0
 
 
 *+
 * _logbase - get logical display base
-.if !TT
+*
 *-
 _logbase:
 	move.l	_v_bas_ad.w,d0	; set software shadow
@@ -4241,12 +4265,12 @@ _setscreen:
 *--- set logical location:
 	tst.l	4(sp)			; if(logloc < 0) then ignore it
 	bmi	f5a
-.if !(STPLUS | TT)
+	move.l	4(sp),_v_bas_ad.w	; set software pointer from logloc
+
 *--- set physical location:
-.else
-	and.w	#$0fff,d0		; STPLUS/TT have other dirty bits
-.endif
-	tst.w	6(sp)			; if new color is <0, don't set it
+f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
+	bmi	f5b
+	move.b	9(sp),dbaseh		; set bits 16..23 of hardware pointer
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
  	move.b	$b(sp),dbasell		; STPLUS set low 8 bits, too
 					; (harmless on ST)
@@ -4280,7 +4304,7 @@ _setpalette:
 	rts				; (updated by vbl handler)
 
 
-.if !TT
+*+
 * _setcolor - set single color, return old color
 *	_setcolor(WORD colorNum, WORD colorValue)
 *
@@ -4349,9 +4373,10 @@ _term:
 savp_2:	move.l	(sp)+,proc_pc.w		; save bogus PC + exception number
 	movem.l	d0-d7/a0-a7,proc_regs.w ; common registers
 .else
-.if STPLUS | TT
-	move.b	dbasell,d0
-.endif
+	tst.w	_iamanst		; are we an ST?
+* for M68030, we determine exception number differently: the frame word
+* on the stack contains the vector offset.
+
 	movem.l	d0-d7/a0-a7,proc_regs
 	move.l	2(sp),proc_pc.w		; save the PC
 	move.w	6(sp),d0		; get addr of bsr instruction
@@ -4712,9 +4737,10 @@ ptype:
 	dc.b	1			; atari color dot
 	dc.b	-1			; [atari color daisy???]
 	dc.b	3			; epson mono dot
-*  Uses:	d0
+	dc.b	-1			; [epson mono daisy]
 	dc.b	-1			; [epson color dot]
-* Noblank1 is the same thing, but returns via RTS.
+	dc.b	-1			; [epson color daisy]
+	.even
 
 *--- parameter storage for printScreen:
 	.bss
@@ -4751,12 +4777,12 @@ p_masks:	ds.l	1		; -> halftone masks
 *-
 
 *
-*	clr.b	tbcr			; halt the timer
-*	clr.b	tbdr			; load a zero there
-*	move.b	#$08,tbcr		; start timer B in event-count mode
-*tb_1:	tst.b	tbdr			; changed yet?
-*	beq	tb_1			; (not yet)
-*	jmp	(a6)			; return
+* Sigh... Saving the iera is probably only half the battle; now I save the
+* timer's control register, too.  You STILL can't count hblanks across the
+* rez change, but maybe this will help.  I didn't actually see something
+* break because of this, but it can't hurt, right?  (5/2/91; in TOS 3.06)
+*
+* Background first: Timer B ticks based on the falling edge of DE,
 * around VBLANK.  THEORY 3 most clearly states "it's safe just after
 * get DE's, because if you get (a rising edge of) DE then you know you're
 *
@@ -4776,9 +4802,14 @@ p_masks:	ds.l	1		; -> halftone masks
 * noblank: use THEORY 3, it's safe any time you get no ticks on Timer B
 * begin test code with a different meaning of "when is it safe."
 	jmp	(a6)
-	move.b	#$10,tbcr		; reset timer B
+	movem.l	d1/d3/d4,-(sp)
+	move.b	iera,d1			; save old Timer B interrupt enable
+	and.b	#1,d1
+	bclr	#0,iera			; disable Timer B interrupt
+	swap	d1
+	move.b	tbcr,d1			; save old Timer B control reg
 	moveq	#1,d4			; d4 = number we want
-	move.b	#$00,tbcr		; pause timer B
+	clr.b	tbcr			; reset timer B
 	move.b	#240,tbdr		; number of lines to wait for
 	move.b	#$08,tbcr		; startup timer B, in event-count mode
 tb_1:	move.b	tbdr,d0			; get contents of data reg
@@ -4790,6 +4821,10 @@ tb_3:	cmp.b	tbdr,d4			; has timer changed?
 	bne	tb_2			; (yes, not a vbl)
 	dbra	d3,tb_3			; wait for 2ms w/o change
 	move.b	#$10,tbcr		; reset timer B
+	move.b	d1,tbcr			; restore the old control value
+	swap	d1
+	or.b	d1,iera			; restore the old interrupt enable
+	movem.l	(sp)+,d1/d3/d4
 	rts
 
 * End of test code
@@ -5531,7 +5566,7 @@ crctab:
 	dc.w	$5af5,$4ad4,$7ab7,$6a96,$1a71,$0a50,$3a33,$2a12
 	dc.w	$dbfd,$cbdc,$fbbf,$eb9e,$9b79,$8b58,$bb3b,$ab1a
 	dc.w	$6ca6,$7c87,$4ce4,$5cc5,$2c22,$3c03,$0c60,$1c41
-	move.b	shiftmd,d0		; d0 <- curr rez
+	dc.w	$edae,$fd8f,$cdec,$ddcd,$ad2a,$bd0b,$8d68,$9d49
 	dc.w	$7e97,$6eb6,$5ed5,$4ef4,$3e13,$2e32,$1e51,$0e70
 	dc.w	$ff9f,$efbe,$dfdd,$cffc,$bf1b,$af3a,$9f59,$8f78
 	dc.w	$9188,$81a9,$b1ca,$a1eb,$d10c,$c12d,$f14e,$e16f

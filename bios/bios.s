@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/06 14:50:56 $
+* $Date: 1991/09/12 19:41:34 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.37  1991/09/12  19:41:34  apratt
+* Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+* So we use (TT == 0) instead.  Sigh.
+*
 * Revision 2.36  1991/09/06  14:50:56  apratt
 * Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
 *
@@ -87,7 +91,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.36 $
+* $Revision: 2.37 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\bios.s,v $
@@ -185,6 +189,7 @@ osconf		equ	%10111
 .if country == denmark
 osconf		equ	%11001
 .endif
+
 *+ (lmd)
 * Imports:
 *
@@ -1395,7 +1400,7 @@ ikbdwc:
 	move.w	6(sp),d1
 ikbdput:
 	lea	keyboard,a1	;point to ikbd register base
-.if !TT
+ikput1:
 * wait 5ms using a trick: assume that Timer C is still programmed as
 * we set it up.  Read the Timer C countdown register, then wait for
 * a new read which is GREATER than that one.  That means (at least)
@@ -1590,14 +1595,15 @@ initmfp:
 	move.l	#$00880105,d0
 	movep.l	d0,scr(a0)
 
-.if TT | STPLUS
+	move.b	#c9600,ttmfp+tcdcr	; clobbers TTMFP Timer C...
+	move.b	#d9600,ttmfp+tddr
 	move.b	#1,(brate+ttribufptr).w	; save in ttmfp's iorec
 .endif
 
 	tst.b	_iamanst		; if you're an ST don't do this
 	bne	noscc
 	bsr	_setupscc		; initialize the SCC controller
-	bsr	rtson	
+noscc:
 
 *	initialize the default rs-232 control line settings
 
@@ -2448,20 +2454,14 @@ bumxit:	rts
 * For TT, if the argument is 0 (for RS232), we read the current mapping
 * from the variable mapiorec, which is maintained by Bconmap.
 *
-.if TT | STPLUS
 
-.endif
 	.globl	iorec
 
 iorec:
 	move.w	4(sp),d1
-.if TT | STPLUS
-.globl mapiorec
-
 	beq	auxiorec
 	asl.l	#2,d1			;x4=index into devtab space
 	move.l	devtab(pc,d1.w),d0	;get device bufrec pointer
-.endif
 	rts
 
 auxiorec:
@@ -2807,7 +2807,7 @@ imapvecs:
 	dc.l	bistat,bin,bostat,bout,brsconf,chbibufptr
 	dc.l	ttistat,ttin,_ttostat,_ttout,ttrsconf,ttribufptr
 	dc.l	aistat,ain,aostat,aout,arsconf,chaibufptr
-.if STPLUS
+
 deftabsize	equ	4	; number of lines in imapvecs
 defmap		equ	0	; index into imapvecs of ROM-default map
 
@@ -2815,15 +2815,6 @@ defmap		equ	0	; index into imapvecs of ROM-default map
 * These are all used for STe; ST uses only the first row.
 imapvecs:
 	dc.l	auxistat,auxin,_auxostat,_auxout,auxrsconf,ribufptr
-.else
-imapvecs:
-	dc.l	auxistat,auxin,_auxostat,_auxout,auxrsconf,ribufptr
-
-deftabsize	equ	1
-defmap		equ	0
-; end if STPLUS
-.endif
-; end if TT
 	dc.l	bistat,bin,bostat,bout,brsconf,chbibufptr
 	dc.l	aistat,ain,aostat,aout,arsconf,chaibufptr
 
@@ -2902,8 +2893,8 @@ mapend:	rts
 * This (re-)initializes xconstat etc. for device 1 (the mappable one).
 *
 
-.if STPLUS
-* We have to check now: if you're really an STPLUS, not a Mega STe,
+mapinit:
+	lea.l	defmaptab.w,a0
 	move.l	a0,maptab.w
 	move.w	#deftabsize,maptabsize.w
 
@@ -3120,15 +3111,13 @@ ttrirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 ttrisendnow:	ds.b	1
 ttbrate:	ds.b	1		* saved baud rate for Rsconf(-2)
 ttmask:		ds.b	1		; not used
-.if TT | STPLUS
-
 
 .even
 .text
-* the Bconmap structure.  It should also be enabled for STe		*
-* when it gets 8530's.							*
+.endif
+
 *************************************************************************
-* It's short-circuited if we're actually on an STPLUS, not Mega STe,	*
+*									*
 * This section contains the code to hook the TT SCC ports into		*
 * the Bconmap structure.  It should also be enabled because of STe's	*
 * 8530's.  You'd better not call this when you're on ST.		*
@@ -4015,11 +4004,14 @@ chbirxoff:	ds.b	1
 chbitxoff:	ds.b	1
 chbirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 *					* Bit 1 = Handshake (0=Disabled)
-.endif
+chbisendnow:	ds.b	1
+chbbrate:	ds.b	1		* saved baud rate for Rsconf(-2)
+chbmask:	ds.b	1		* mask for incoming chars
+
 .text
 
-*	revised 05/01/86	Mike Schmal
-*	Worked in spanish key board
+* End of SCC code.  It's in all ROMs now because ST, STe, and Mega STe
+* all use the same ROM, and TT has it too.  It could be taken out
 * of STPAD.
 
 *************************************************************************

@@ -9,6 +9,8 @@
  *		made tables char-sized.
  */
 
+#define oldway 0	/* 1 = VsetMode does dev_init, 0 = not; 0 is preferred */
+
 /* Imports
  *=======================================================================
  */
@@ -1027,8 +1029,13 @@ VsetMode( WORD mcode )
 	dovtg(modecode);
 	set_regs(modecode);
 
+#ifdef oldway
+/* this has been moved to setscreen(), because VsetMode isn't
+ * supposed to muck with line A at all
+ */
 	mode2sdef(modecode, &sdef);
 	dev_init(&sdef);
+#endif
     }
     return curmode;
 }
@@ -1470,6 +1477,15 @@ vmode:		newmode = ValidMode(newmode);
     if (rez >= 0) *sshiftmd = rez;
 
     newmode = VsetMode(newmode);
+#ifndef oldway
+/* moved here from VsetMode */
+    if (rez >= 0)
+    {
+        mode2sdef(modecode, &sdef);
+	dev_init(&sdef);
+    }
+#endif
+
     if (newmode == 88)
     {
     /* If !Sparrow, set hardware shiftmd and reinit VDI */

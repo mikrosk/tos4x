@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.22 $	$Source: d:/tos/dos\rcs\fscl.c,v $
+* $Revision: 2.23 $	$Source: d:/tos/dos\rcs\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/25 13:16:52 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.23  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.22  1991/06/25  13:16:52  apratt
 * Changed comments to point out that invclean doesn't handle the
 * case where a disk really is changed & has a new BPB, but the same
@@ -346,7 +349,7 @@ DMD *dmd;
 	end = strt+num;
 
 	/* first, invalidate all clean buffers if read and "maybe changed" */
-	if (rwflg == 0 && (trap13(9,d) == 1)) invclean(d);
+	if (rwflg == 0 && (trapD(9,d) == 1)) invclean(d);
 
 	/* flush all data blocks which overlap this write */
 	for (b = bufl[1]; b; b = b->b_link) {
@@ -464,7 +467,7 @@ BCB **pbcb;
      * invalidating clean buffers.
      */
 
-    if (trap13(9,dmd->m_drvnum) == 1) invclean(dmd->m_drvnum);
+    if (trapD(9,dmd->m_drvnum) == 1) invclean(dmd->m_drvnum);
 
     /* 
      * b is last buf or empty buf, q is link field of b's prev.
@@ -1083,7 +1086,7 @@ void (*bufxfr) _P((uint, void *, void *));
 	DBCMD(4,"print do head;_c");
 	bufp = getrec(currec+dmd->m_recdata,dmd,wrtflg,NULL);
 	(*bufxfr)(lenhead,bufp+recoffs,ubufr);
-	ubufr += lenhead;
+	(uchar *)ubufr += lenhead;
 	bytnum += lenhead;
 	len -= lenhead;
 
@@ -1122,7 +1125,7 @@ void (*bufxfr) _P((uint, void *, void *));
 		    DBCMD(4,"print discontiguous record: do the run;_c");
 		    usrio(wrtflg,run_len,run_start,ubufr,dmd);
 		    runlen = ((ulong)run_len) << dmd->m_rblog;
-		    ubufr += runlen;
+		    (uchar *)ubufr += runlen;
 		    bytnum += runlen;
 		    /* set up next run */
 		    run_start = currec;
@@ -1135,7 +1138,7 @@ void (*bufxfr) _P((uint, void *, void *));
 	DBCMD(4,"print out of middle loop: do the last run;_c");
 	usrio(wrtflg,run_len,run_start,ubufr,dmd);
 	runlen = ((ulong)run_len) << dmd->m_rblog;
-	ubufr += runlen;
+	(uchar *)ubufr += runlen;
 	bytnum += runlen;
 
 	/* incr currec even if no more to do, as a signal for next time */

@@ -1,12 +1,15 @@
 /*
 ***************************    FSDECL.H    ******************************
 *
-* $Revision: 2.12 $	$Source: d:/tos/dos\rcs\fsdecl.h,v $
+* $Revision: 2.13 $	$Source: d:/tos/dos\rcs\fsdecl.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 17:14:06 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdecl.h,v $
+* Revision 2.13  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.12  1991/06/20  17:14:06  apratt
 * changes for new newcl/Getfat code
 *
@@ -39,33 +42,36 @@
  *
  */
 
-extern long _dblev;	/* debugger level mask */
+extern long _dblev;	/* (rwa) debugger level mask */
 
-extern uint logmsk[];
+extern uint logmsk[];	/* (sup) */
 
-extern PD *run;
+extern PD *run;		/* (sup) */
 
-extern uint drvsel;	/* mask of drives selected since power up */
-extern long rwerr;	/* hard error number currently in progress */
-extern uint errdrv;	/* drive on which error occurred */
+extern uint drvsel;	/* (sup) mask of drives selected since power up */
+extern long rwerr;	/* (sup) hard error number currently in progress */
+extern uint errdrv;	/* (sup) drive on which error occurred */
 
-extern uint realtime;
-extern uint realdate;
-extern BCB *bufl[];
-extern uint bootdev;
-extern char diruse[];
-extern DMD drvtbl[16];
+/* BIOS uses these names */
+#define realtime time
+#define realdate date
+extern uint realtime;	/* (sup) */
+extern uint realdate;	/* (sup) */
+extern BCB *bufl[];	/* BIOS */
+extern uint bootdev;	/* BIOS */
+extern char diruse[];	/* unused? */
+extern DMD drvtbl[16];	/* (sup) */
 
-extern char diskbuf[];
-extern MPB pmd;
-extern char nday[];
+extern char diskbuf[];	/* (sys\ld_dos) */
+extern MPB pmd;		/* (mem) */
+extern char nday[];	/* (sup) */
 
-extern PD rootpd;
-extern OFD *rootuft[];
-extern PD *pdtab[];
-extern char biosdev[];
+extern PD rootpd;	/* (sup) */
+extern OFD *rootuft[];	/* (sup) */
+extern PD *pdtab[];	/* (sup) */
+extern char biosdev[];	/* (fshand) */
 
-DFD *dfd_head;
-OFD *ofd_head;
+DFD *dfd_head;		/* (sup) */
+OFD *ofd_head;		/* (sup) */
 
-extern jmp_buf errbuf;
+extern jmp_buf errbuf;	/* (sup) */

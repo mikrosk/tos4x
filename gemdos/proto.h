@@ -3,6 +3,7 @@
 uint log2 _P((uint n));
 voidfn dirdirty _P((DIR *dir));
 voidfn fatdirty _P((uint dev));
+voidfn invclean _P((int xdev));
 voidfn flush _P((BCB *b));
 voidfn flushall _P((void));
 voidfn usrio _P((uint rwflg, uint num, uint strt, void *ubuf, DMD *dmd));
@@ -103,6 +104,7 @@ void xmunhook _P((PD *pid));
 void xmfreeall _P((PD *pid));
 void xmchown _P((void *blk, PD *pid));
 long xaddalt _P((void *blk, unsigned long siz));
+void *xsrealloc _P((signed long ss));
 
 /* pool.c */
 voidfn poolinit _P((void));
@@ -118,7 +120,7 @@ void freesmall _P((MD *ptr));
 
 /* sup.c */
 long xmediach _P((int drv));
-long osif _P((int *pw));
+long osif _P((volatile int *pw));
 
 /* con.c */
 void coninit _P((void));

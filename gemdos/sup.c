@@ -1,12 +1,15 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.17 $	$Source: d:/tos/dos\rcs\sup.c,v $
+* $Revision: 2.18 $	$Source: d:/tos/dos\rcs\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 17:14:06 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.18  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.17  1991/06/20  17:14:06  apratt
 * changes for new newcl/Getfat code
 *
@@ -111,6 +114,9 @@ volatile void __assert(const char *exp, const char *file, long line)
 	panic1(assertbuf);  /* never returns */
 }
 
+static long endmediach _P((int drv, long rc));
+static long domediach _P((int drv, long rc));
+
 /****************************************************************************/
 
 static long
@@ -209,7 +215,7 @@ static long (*funcs[])() = {
 
 	/* 0x10 */
 	&xconos,	&xprnos,	&xauxis,	&xauxos,
-	&xaddalt,	&ni,		&ni, 		&ni,
+	&xaddalt,	&xsrealloc,	&ni, 		&ni,
 	&ni,		&xgetdrv,	&xsetdta, 	&ni,
 	&ni,		&ni,		&ni,		&ni,
 
@@ -242,7 +248,7 @@ static long (*funcs[])() = {
 
 unsigned char funcwords[NFUNCS] = {
     0, 0, 1, 0, 1, 1, 1, 0, 0, 2, 2, 0, 0, 0, 1, 0,
-    0, 0, 0, 0, 4, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
+    0, 0, 0, 0, 4, 2, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0,
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 0, 1, 0, 0,
     0, 3, 0, 0, 0, 0, 3, 0, 0, 2, 2, 2, 3, 3, 1, 5,
     5, 2, 4, 4, 3, 1, 2, 3, 2, 2, 5, 7, 1, 0, 3, 0,
@@ -257,9 +263,9 @@ unsigned char funcwords[NFUNCS] = {
  */
 long
 osif(pw)
-int *pw;
+volatile int *pw;
 {
-    uint fn;
+volatile uint fn;
     long rc;
     BCB *bx;
     uint i;
@@ -268,7 +274,7 @@ int *pw;
     clsave = (clbcb = bufl[0])->b_bufr;
 
 restrt:
-    &fn, &pw;		/* take addr so these are not put in regs */
+/*    &fn, &pw;*/	/* take addr so these are not put in regs */
     fn = pw[0];
 
     if (fn >= NFUNCS)
@@ -300,7 +306,7 @@ restrt:
 
     /* end of setjmp/longjmp handling; put pw in a register */
 
-    ppw = pw;
+    ppw = (int *)pw;
 
     /*
      * I used to copy the max number of args from the stack, but this is
@@ -330,12 +336,26 @@ restrt:
  * Code to initialize GEMDOS; called from rwa.s
  */
 
-#define NBUFS 4		/* MUST BE AT LEAST FOUR! See FSCL for why. */
-#define DEFBUFSIZ 8192	/* outrageously large sectors by default */
+#define NBUFS 4		/* MUST BE AT LEAST FOUR! See FSCL code for why. */
+
+/*
+ * BIGBUFF can be defined for making a RAM-loaded GEMDOS which
+ * may load after the hard disk driver.  Actually, the buffer setup
+ * code in osi() should check if the bufl's have been initialized,
+ * and leave them alone if they have.  (erm, do they get cleared
+ * on warmboot?  hmm.)  For now, this can be recompiled.
+ */
+
+#ifdef BIGBUFF
+#define DEFBUFSIZ 8192
+#else
+#define DEFBUFSIZ 512
+#endif
+
 char secbuf[NBUFS][DEFBUFSIZ];			/* sector buffers */
 BCB bcbx[NBUFS];				/* bcb for each buffer */
 
-extern void tikhnd(), (*otime)(), ntrap2(), (*obdos)(), enter();
+extern __far void tikhnd(), (*otime)(), ntrap2(), (*obdos)(), enter();
 
 /*
  * Initialize GEMDOS
@@ -378,13 +398,12 @@ osi()
 	 * Initialize OS, login boot device:
 	 */
 
-#if !UNREAL
+	/* Link into the tick handler,  take trap 1 & 2 */
 	otime = setexc(0x100,-1);
 	(void)setexc(0x100,tikhnd);
 
 	obdos = setexc(0x22,ntrap2);
 	(void)setexc(0x21,enter);
-#endif
 
 	/* set rootpd and fill it with important stuff */
 	run = &rootpd;
@@ -413,6 +432,10 @@ osi()
 	poolinit();
 	xminit();
 	coninit();
+#ifdef STUB
+/* init the debug stub */
+	sinit(run);
+#endif
 }
 
 

@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.18 $	$Source: d:/tos/dos\rcs\fshand.c,v $
+* $Revision: 2.19 $	$Source: d:/tos/dos\rcs\fshand.c,v $
 * =======================================================================
-* $Author: unknown $ 	$Date: 1991/12/11 20:16:44 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.19  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.18  1991/12/11  20:16:44  unknown
 * Changed FN_NORM to SCAN_NORM in one place
 *
@@ -966,7 +969,7 @@ uint drv;
 	DBCMD(1,"print xsetdrv -x (wpeek (`a6 + 8));_c");
 	if (drv > MAXDEVS) return EDRIVE;
 	run->p_curdrv = drv;
-	return( trap13(0x0A) );	/* return Drvmap() */
+	return( trapD(0x0A) );	/* return Drvmap() */
 }
 
 

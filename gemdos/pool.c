@@ -1,12 +1,15 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.16 $	$Source: d:/tos/dos\rcs\pool.c,v $
+* $Revision: 2.17 $	$Source: d:/tos/dos\rcs\pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
+* Revision 2.17  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.16  1991/06/18  17:52:02  apratt
 * Updated to DB release 3 (new print)
 *
@@ -588,7 +591,7 @@ void *ptmp;
     REG struct block *ptr;
 
     DBCMD(16,"print enter freebig -x (lpeek (`a6 + 8));_c");
-    ptr = (struct block *)(ptmp-HEADSIZE);
+    ptr = (struct block *)((char *)ptmp-HEADSIZE);
 
     if (Bisfree(ptr)) {
 	/* panic! block is free */ 

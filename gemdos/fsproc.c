@@ -1,12 +1,15 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.23 $	$Source: d:/tos/dos\rcs\fsproc.c,v $
+* $Revision: 2.24 $	$Source: d:/tos/dos\rcs\fsproc.c,v $
 * =======================================================================
-* $Author: unknown $ 	$Date: 1992/05/20 00:28:58 $    $Locker:  $
+* $Author: kbad $ 	$Date: 1992/07/27 20:09:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.24  1992/07/27  20:09:24  kbad
+* Lattice compiled Sparrow GEMDOS
+*
 * Revision 2.23  1992/05/20  00:28:58  unknown
 * This checkin represents falling back to 2.20, pre-memprot.
 *
@@ -44,7 +47,7 @@
 /* this is the power of 2 that the TPAsize field represents -- 17 for 128K */
 #define FASTCLICK 17
 
-PD *run;
+/*PD *run; - in sup.c */
 
 /*
  * Common supervisor stack
@@ -90,7 +93,7 @@ unsigned int rc;
 
     DBCMD(1,"print xterm rc: -x (wpeek (`a6 + 8));_c");
 
-    dojmp(trap13(5,0x102,-1L));		/* call terminate vector */
+    dojmp(trapD(5,0x102,-1L));		/* call terminate vector */
 
     clksync();				/* sync with BIOS clock */
     r = run;
@@ -502,8 +505,8 @@ PRG *prg;
 int h;
 PD *lp;				/* -> basepage */
 {
-  REG unsigned char *r;	    /* no sign extension here! */
-  REG unsigned char *bssadr;
+  REG uchar *r;	    /* no sign extension here! */
+  REG uchar *bssadr;
   REG uint n;
   REG ulong *cp;
   REG ulong i;
@@ -519,7 +522,7 @@ PD *lp;				/* -> basepage */
   tpasiz = ((long)lp->p_hitpa - (long)lp->p_lowtpa) - 0x100;
 
   codbas = (char *)(lp+1);
-  bssadr = (char *)(codbas + flen);
+  bssadr = (uchar *)(codbas + flen);
   bsslen = tpasiz - flen;
   
   /*
@@ -556,8 +559,8 @@ PD *lp;				/* -> basepage */
    *  if it's out of range (of text and data) then return an error;
    *  do the first fixup.
    */
-  cp = (long *)(codbas + relst);
-  if (((char *)cp < codbas) || ((char *)cp >= bssadr)) {
+  cp = (ulong *)(codbas + relst);
+  if (((char *)cp < codbas) || ((uchar *)cp >= bssadr)) {
     DBCMD(0x40,"print xpgmld: first fixup offset is out of range;_c");
     return(EPLFMT);
   }
@@ -603,7 +606,7 @@ PD *lp;				/* -> basepage */
 	      ((char *)cp) += n;	/* bump cp and do fixup */
 
 	      /* If out of range, indicate an error */
-	      if (((char *)cp < codbas) || ((char *)cp >= bssadr)) 
+	      if (((char *)cp < codbas) || ((uchar *)cp >= bssadr)) 
 		    return(EPLFMT);
 
 	      /* do the fixup */

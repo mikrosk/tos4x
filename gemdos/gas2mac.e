@@ -2,7 +2,6 @@
 ; replace \15 with \r, \12 with \n, etc.
 ; replace {# with { and :# with : (bitfield)
 ; replace :[wl]:[248] with .[wl]*[248] (020 addressing mode)
-; replace "tst.l a0" with "cmp.w #0,a0" (mas doesn't know it's legal)
 ; replace :b with .b, etc.
 ; replace :4 with *4, etc. (scale in d0.size*scale)
 ; replace 0x with $
@@ -19,6 +18,7 @@
 ; .skip 99 -> dcb.b 99,0
 ; postincrement a3@+ -> (a3)+
 ; predecrement a3@- -> -(a3)
+; "tst.l a0" -> "cmp.w #0,a0" (mas doesn't know it's legal)
 ; indirect: a3@ -> (a3)
 ; ind1: a4@(a2.w) -> (a4,a2.w)
 ; ind2: a4@(99,a2.w) -> 99(a4,a2.w)
@@ -36,15 +36,15 @@ store-procedure gas2mac
   beginning-of-file
   !force replace-string "\~"" "~"~""
   beginning-of-file
-  !force replace-string "\15" "\r"
+  !force replace-string "\15" "~",$0d,~""
   beginning-of-file
-  !force replace-string "\12" "\n"
+  !force replace-string "\12" "~",$0a,~""
   beginning-of-file
-  !force replace-string "\10" "\b"
+  !force replace-string "\10" "~",$08,~""
   beginning-of-file
-  !force replace-string "\11" "\t"
+  !force replace-string "\11" "~",$09,~""
   beginning-of-file
-  !force replace-string "\33" "\e"
+  !force replace-string "\33" "~",$1b,~""
   beginning-of-file
   !force replace-string {# {
   beginning-of-file
@@ -61,8 +61,6 @@ store-procedure gas2mac
   !force replace-string ":w:4" ".w*4"
   beginning-of-file
   !force replace-string ":w:2" ".w*2"
-  beginning-of-file
-  !force replace-string "tstl a" "cmpw #0,a"
   beginning-of-file
   !force replace-string :b .b
   beginning-of-file
@@ -123,6 +121,8 @@ store-procedure gas2mac
   add-mode magic
 
   beginning-of-file
+  run fix-tstla0
+  beginning-of-file
   run fix-postinc
   beginning-of-file
   print fix-predec
@@ -167,6 +167,19 @@ store-procedure gas2mac
   kill-to-end-of-line
   print done
   set $status 1
+!endm
+
+store-procedure fix-tstla0
+*loop
+  !force search-forward "tstl a[0-7]$"
+  !if $status
+    2 backward-character
+    set-mark
+    beginning-of-line
+    kill-region
+    insert-string "~tcmp.w #0,"
+    !goto loop
+  !endif
 !endm
 
 store-procedure del-app

@@ -1,12 +1,12 @@
-
-set eightbit 0
-bind "echo \e8s\r" 1d ; # ^] bury window, Mint/MGR style
-load c:\apratt\rdb.rc
+#set eightbit 0
+#bind "echo \e8s\r" 1d ; # ^] bury window, Mint/MGR style
+load c:\kbad\db.rc
 load fs.db
 
 alias a "dw`sp[f]"
 alias xskip "b #f lpeek(`sp);g"
 getsym dos.sys `stubbp+11c
+#getsym ..\build\tos.sym
 load bios.db
 alias dobios 'b#8 ._trap13 ; alias br8 "_db13 `sp+4;_13enter";b#9 ._trap14-2; \
 	alias br9 "if `bios_ret print BIOS returns `d0;_13leave"'

@@ -4,21 +4,32 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/21 17:18:59 $
+* $Date: 90/10/15 12:08:02 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.26  90/10/15  12:08:02  apratt
+* Fixed keyboard tables so they're right: the arrow keys for some countries
+* did NOT give ASCII codes of digits when shifted, as the VDI spec says
+* they should.  Also, shifted numeric keypad keys gave punctuation
+* in some countries, which was wrong.
+*
+* Also removed PC-relative addressing because MAS has a bug: PC-relative
+* addressing to a label that's BEFORE the PC, with arithmetic, generates
+* incorrect code.  Example: "move.b label+1(PC),d0" when 'label' is before
+* the current PC generates "move.b label+3(PC),d0"
+*
 * Revision 2.25  90/08/21  17:18:59  apratt
 * Mega STe support added.
-*
+* 
 * Bconmap is no longer conditional.
-*
+* 
 * Osconf is now an EQU exported from here to startup.s, so that file
 * isn't country-dependent any more.
-*
+* 
 * Revision 2.24  90/08/03  15:18:09  apratt
 * Fixed an oops in Norway's keyboard table: REAL TTOS FINAL RELEASE!
 * 
@@ -27,7 +38,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.25 $
+* $Revision: 2.26 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2861,7 +2872,7 @@ mapierr:
 	lea.l	imapvecs(PC),a1
 
 	move.w	#(6*deftabsize)-1,d0	; number of longs to move - 1
-	lea.l	(imapvecs+(defmap*$18))(PC),a1
+iloop:	move.l	(a1)+,(a0)+
 	dbra	d0,iloop
 
 	move.w	#(defmap+6),curmap.w
@@ -5725,10 +5736,10 @@ keyshif:
 	dc.b	$83,'/','(',')','=','_',$08,$09
 	dc.b	'F','G',$a9,'I','O','D','R','N'
 	dc.b	'H','P','Q','W',$0D,$00,'U',$9d
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
-	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
-	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
 	dc.b	'E','A',$9a,'T','K','M','L','Y'
+	dc.b	$a6,$60,$00,'?','J',$99,'V','C'
+	dc.b	$80,'Z','S','B',':',';',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
 
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
 	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
@@ -5999,8 +6010,8 @@ keycl:
 	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
 
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 	dc.b	'<',$00,$00,'(',')','/','*','7'
 	dc.b	'8','9','4','5','6','1','2','3'
@@ -6031,8 +6042,8 @@ keyshif:
 
 keycl:
 	.dc.b	0,esc,"1234567890+",$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
+	.dc.b	"ASDFGHJKL",$99,$8e,"'",0,$5c,'ZXCVBNM,.-',0,0,0,space,0
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
 	.dc.b	'<',0,0,'()/*7894561230.',cr
@@ -6067,8 +6078,8 @@ keycl:
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
 	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
-	dc.b	0,0,0,del,0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'<',0,0,'()/*7894561230.',cr
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 
 .endif
 
@@ -6100,9 +6111,9 @@ keycl:
 	dc.b	0,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
 	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$8a,'+', cr,0,'A','S'
 	dc.b	'D','F','G','H','J','K','L',$95,$85,$97,0,'\','Z','X','C','V'
-        dc.b    '78',0,'~4',0,'6#',0,'2',0,'0',del
+	dc.b	'B','N','M',',','.','-',0,0,0,' ',0,0,0,0,0,0
 	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
-        dc.b    '>',0,0,'[]\@{}|4561230.',cr
+	dc.b	0,0,0,del,0,0,0,0,0,0,0,0,0,0,0,0
 	dc.b	'<',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
 	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
 
@@ -6132,9 +6143,9 @@ keyshif:
 keycl:
         dc.b   0,esc,'1234567890',"'",'^',bs,tab,'QWERTZUIOP',$9a,$B9,cr,0
         dc.b    'ASDFGHJKL',$99,$8E,$DD,0,'$YXCVBNM,.-',0,0,0,space,0
-        dc.b    '78',0,'~4',0,'6#',0,'2',0,'0',del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
         dc.b    '-',0,0,0,'+',0,0,0,0,del
-        dc.b    '>',0,0,'[]\@{}|4561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
         dc.b    '<',0,0,'()/*7894561230.',cr
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
 
@@ -6162,8 +6173,8 @@ keyshif:
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
 
 keycl:
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+        dc.b   0,esc,'1234567890',"'",'^',bs,tab,'QWERTZUIOP',$8a,$B9,cr,0
+        dc.b    'ASDFGHJKL',$82,$85,$DD,0,'$YXCVBNM,.-',0,0,0,space,0
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
         dc.b    '-',0,0,0,'+',0,0,0,0,del
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0

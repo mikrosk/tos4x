@@ -4,24 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/10/15 12:08:02 $
+* $Date: 91/01/31 13:50:17 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.27  91/01/31  13:50:17  apratt
+* Fixed some bugs in serial port handling for SCC.
+*
 * Revision 2.26  90/10/15  12:08:02  apratt
 * Fixed keyboard tables so they're right: the arrow keys for some countries
 * did NOT give ASCII codes of digits when shifted, as the VDI spec says
 * they should.  Also, shifted numeric keypad keys gave punctuation
 * in some countries, which was wrong.
-*
+* 
 * Also removed PC-relative addressing because MAS has a bug: PC-relative
 * addressing to a label that's BEFORE the PC, with arithmetic, generates
 * incorrect code.  Example: "move.b label+1(PC),d0" when 'label' is before
 * the current PC generates "move.b label+3(PC),d0"
-*
+* 
 * Revision 2.25  90/08/21  17:18:59  apratt
 * Mega STe support added.
 * 
@@ -38,7 +41,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.26 $
+* $Revision: 2.27 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -470,6 +473,7 @@ bufhigh	equ	12	;amount of space used in buffer that trigger's
 *			;the sending of a "xoff" signal to the host
 status	equ	28	;copy of midi acia status
 rxoff	equ	30	* "xoff" Sent Flag
+txoff	equ	31	* "xoff" Received Flag
 rsmode	equ	32	* bit 0 = Xon/Xoff Flow Control Enabled
 *			* bit 1 = RTS/CTS Flow Control Enabled
 sendnow	equ	33	* Buffer Bypass Flag/Data
@@ -514,7 +518,8 @@ robuflow:	ds.w	1
 robufhigh:	ds.w	1
 
 rsrbyte:	ds.b	1		* Other Associated Variables
-auxbrate:	ds.w	1		* saved brate value for Rsconf(-2)
+tsrbyte:	ds.b	1
+rirxoff:	ds.b	1
 ritxoff:	ds.b	1
 rirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 risendnow:	ds.b	1		* flag/char to send NOW
@@ -1510,7 +1515,7 @@ ttmfp	equ	$fffffa81
 	bsr	initint
 
 *	init the "d" timer
-	move.w	#$1,(brate+ribufptr).w	;9600 is baud rate number 1
+
 	moveq	#dtimer,d0	;select the d timer
 	moveq	#c9600,d1	;init for /4 for 9600 baud
 	moveq	#d9600,d2	;init for 9600 baud
@@ -1536,7 +1541,7 @@ ttmfp	equ	$fffffa81
 
 .if TT
 	lea.l	ttmfp,a0
-	move.w	#1,(brate+ttribufptr).w	; save in ttmfp's iorec
+	move.l	#$00880105,d0
 .endc
 
 .ifne TT+STPLUS
@@ -1718,6 +1723,8 @@ rs232init:
 	dc.w	rbufsize*3/4	;obufhigh
 
 	dc.b	0		* sendnow
+	dc.b	1		* brate: 9600 baud
+	dc.b	$ff		* mask: keep all bits
 	dc.b	0		;txoff
 	dc.b	1		;rsmode -- Flow Control ON
 	dc.b	0		;sendnow
@@ -2487,7 +2494,7 @@ auxrsconf:
 * EXPECTS: a0=iorec, a2=mfp.
 * RETURNS: see above for rsconf return values
 *
-	move.w	brate(a0),d0
+
 rscommon:
 	moveq.l	#0,d0		;pre-clear hi word of return value
 	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
@@ -2553,7 +2560,7 @@ auxc1:
 	bmi.b	auxc2
 *
 *	next, we disable the receiver and transmitter enable bits
-	move.w	d1,brate(a0)	;shadow baud rate value now
+*
 	bclr.b	#0,rsr(a2)	;disable the receiver
 	bclr.b	#0,tsr(a2)	;disable the transmitter
 
@@ -3054,7 +3061,8 @@ ttrobufhigh:	ds.w	1
 
 ttrsrbyte:	ds.b	1		* Other Associated Variables
 tttsrbyte:	ds.b	1
-ttbrate:	ds.w	1		* saved baud rate for Rsconf(-2)
+ttrirxoff:	ds.b	1
+ttritxoff:	ds.b	1
 ttrirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 *					* Bit 1 = Handshake (0=Disabled)
 ttrisendnow:	ds.b	1
@@ -3148,6 +3156,7 @@ sccidone:
 * inittab: this table initializes the channel as a normal serial port
 * at 9600 baud with rx, tx, and ext interrupts.  See brtab for
 * derivation of the baud rate countdown value.
+*
 
 .text
 inittab:
@@ -3169,7 +3178,7 @@ inittab:
 	dc.b	$3,%11000001	; enable receiver (copy plus %1)
 	dc.b	$5,%11101010	; enable transmitter (copy plus %1000)
 *				; this number should also be the default wr5
-	dc.b	$1,%00010011	; int enables (tx,ext (like CTS))
+
 * interrupts
 	dc.b	$f,%00100000	; CTS IE
 	dc.b	$0,$10		; reset ext/status
@@ -3306,6 +3315,12 @@ intbex:
 
 intbrx:
 	movem.l	d0-d1/a0-a2,-(sp)
+	lea.l	sccbc,a2	; channel ptr
+	lea.l	chbibufptr.w,a0	; iorec ptr
+	bra	sccrxfull	; jump to common handler
+
+intbxx:
+	movem.l	d0-d1/a0-a2,-(sp)
 	lea.l	sccbc,a2
 	lea.l	chbibufptr,a0
 	bra	sccrxerr
@@ -3324,6 +3339,12 @@ intaex:
 
 intarx:
 	movem.l	d0-d1/a0-a2,-(sp)
+	lea.l	sccac,a2	; channel ptr
+	lea.l	chaibufptr.w,a0	; iorec ptr
+	bra	sccrxfull	; jump to common handler
+
+intaxx:
+	movem.l	d0-d1/a0-a2,-(sp)
 	lea.l	sccac,a2
 	lea.l	chaibufptr,a0
 	bra	sccrxerr
@@ -3331,6 +3352,7 @@ intarx:
 **********************************************************************
 *
 * Common interrupt handlers begin here.
+*
 
 sccrxfull:
 	LOG	"_RX_"
@@ -3391,6 +3413,13 @@ rxkick:	SCCr	#0,d0		; get status
 
 * all receive interrupt handling ends up here
 rxdone:
+	SCCw	#0,#%00111000	; reset highest IUS
+	LOG	"_rx_"
+	movem.l	(sp)+,d0-d1/a0-a2
+	rte
+
+sccrxerr:
+	LOG	"_RE_"
 	SCCr	#1,d0		; read status (don't care what it is)
 	SCCr	#8,d0		; read char (don't care what it is)
 	SCCw	#0,#%00110000	; error reset
@@ -3645,7 +3674,7 @@ brsconf:
 	lea	chbibufptr.w,a0
 	lea	sccbc,a2
 *	bra	sccrsconf	; bra (to next insn)
-	move.w	brate(a0),d0
+
 sccrsconf:
 	moveq.l	#0,d0		;pre-clear hi word of return value
 	cmp.w	#-2,4(sp)
@@ -3693,7 +3722,7 @@ rs0a:
 	move.w	(sp)+,d0
 rs0b:
 	move.b	d0,rsmode(a0)
-	move.w	d0,brate(a0)
+
 * set baud rate
 rs1:	move.w	4(sp),d0
 	cmp.w	#$f,d0
@@ -3712,8 +3741,22 @@ rs2:	move.w	8(sp),d0
 	bmi	rs3		; negative is no change
 
 * save incoming ucr value in our iorec so we can return it later
-	move.b	d0,d1
+* We have 0,1,2 or 3 in bits 6-7 of d1.  These represent 8, 7, 6, and 5
+	move.b	d0,ucr_shadow(a0)
+
+* decode word-length bits 6-5
+
 * We have 0,1,2 or 3 in bits 6-5 of d1.  These represent 8, 7, 6, and 5
+* data bits, and, coincidentally, the number of 0's we need at the top
+* of the mask.
+
+	move.b	d0,d1		; get UCR argument
+	and.b	#%01100000,d1	; get word-length bits
+	lsr.b	#5,d1		; shift; now d2 is number of zeros we want
+	moveq.l	#-1,d2		; preload $FF into d2.b
+	lsr.b	d1,d2		; lsr.b shifts zeros in the top
+	move.b	d2,mask(a0)	; save the mask
+
 * mask is done; now mangle these bits from 68901 format to 8530 format
 * (00->11, 01->01, 10->10, 11->00).
 
@@ -3878,7 +3921,8 @@ chaobufhigh:	ds.w	1
 
 charsrbyte:	ds.b	1		* Other Associated Variables
 chawr5:		ds.b	1		* shadow of WR5
-chabrate:	ds.w	1		* saved baud rate for Rsconf(-2)
+chairxoff:	ds.b	1
+chaitxoff:	ds.b	1
 chairsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 *					* Bit 1 = Handshake (0=Disabled)
 chaisendnow:	ds.b	1
@@ -3914,7 +3958,8 @@ chbobufhigh:	ds.w	1
 
 chbrsrbyte:	ds.b	1		* Other Associated Variables
 chbwr5:		ds.b	1		* shadow of WR5
-chbbrate:	ds.w	1		* saved baud rate for Rsconf(-2)
+chbirxoff:	ds.b	1
+chbitxoff:	ds.b	1
 chbirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 *					* Bit 1 = Handshake (0=Disabled)
 .endc

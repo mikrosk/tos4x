@@ -4,16 +4,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/02 17:45:44 $
+* $Date: 90/03/19 16:00:50 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.45  90/03/19  16:00:50  apratt
+* Changed TT to TT+STPLUS w.r.t. SCU: catch & ignore bus errors in the
+* init code for SCU so it runs on either STe or Mega STe.
+*
+* Fixed the out-of-range check for Bcon* functions: was (devno > maxdev)
+* but is now (devno >= maxdev).
+*
 * Revision 2.44  90/03/02  17:45:44  apratt
 * This rev is the source for the 3/1/90 ROM.
-*
+* 
 * Revision 2.43  90/03/02  10:39:08  apratt
 * Added a comment to the effect that anybody who programs Timer B
 * to a value of 1 (that is, interrupt every time) will defeat
@@ -425,7 +432,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.44 $
+* $Revision: 2.45 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1041,7 +1048,7 @@ keyctl	equ	$fffffc00		; keyboard ACIA control
 keybd	equ	keyctl+2		; keyboard data
 .endc
 midictl	equ	$fffffc06		; MIDI ACIA control
-.ifne TT
+.ifne TT+STPLUS
 ttvmeintmsk	equ	$ffff8e0d	; "vme" int mask in SCU
 ttsysintmsk	equ	$ffff8e01	; "st" int mask in SCU	
 ttscu1		equ	$ffff8e09	; general-purpose register 1
@@ -2162,10 +2169,17 @@ sei3:	move.l	#_rte,(a1)+		; point interrupt at RTE
 *   if we ever do a detachable keyboard ....)
 *
 *
-.ifne TT
+.ifne TT+STPLUS
 * TT: have to enable interrupts in SCU also
+* STPLUS: ignore bus errors
+	lea	_vbl_list.w,a0		; a0 -> default list of vbl locs
+	move.l	a0,_vblqueue.w		; install ptr to them
+	move.w	#dnvbls-1,d0		; clear vbl vectors
 	move.b	#$40,ttvmeintmsk	; enable int priority 6
 	move.b	#$14,ttsysintmsk	; enable int priorities 2, 4
+*  vectors have been moved into RAM to make it possible
+*  to efficiently intercept them later on.
+*
 .endc
 
 	moveq	#(4*8)-1,d0		; = #vectors to install
@@ -3440,7 +3454,7 @@ trp14tab:
 * This is a lose, but necessary for old drivers which don't know from caches.
 *-
 m030_rw:
-	bhi	badmap
+	btst.b	#0,1(sp)		; test bit 0 of r/w function code
 	bne	m030_write		; not read, don't change return PC
 	move.l	#m030_rw1,(sp)		; read: cause return to m030_rw1
 m030_write:
@@ -4961,7 +4975,6 @@ eget_ok:
 
 eget_loop:
 .endc
-
 
 eget_dec:
 	dbra	d1,eget_loop		; do untill count = -1

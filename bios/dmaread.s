@@ -1,16 +1,19 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: unknown $
 * =======================================================================
 *
-* $Date: 1992/02/28 08:25:22 $
+* $Date: 1992/05/18 23:07:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.30  1992/05/18  23:07:56  unknown
+* Sparrow and TT are M68030 - no longer read from a file
+*
 * Revision 1.29  1992/02/28  08:25:22  apratt
 * Changed cache handling to be .if M68030 rather than .if SCSI.  This lets
 * us make ROMs for Sparrow.
@@ -136,7 +139,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.29 $
+* $Revision: 1.30 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\dmaread.s,v $
@@ -160,8 +163,7 @@
 
 * SPARROW and TT are both M68030.
 
-*M68030		equ	(SPARROW | TT)	; normallly, but see below:
-.include "m68030.s"
+M68030		equ	(SPARROW | TT)
 
 SCSI		=	TT
 IDE_AT		=	1	; Always! (AKP 9/91)

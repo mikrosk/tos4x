@@ -4,23 +4,26 @@
 * $Author: minna $
 * =======================================================================
 *
-* $Date: 91/07/29 12:37:45 $
+* $Date: 91/08/02 15:07:10 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.14  91/08/02  15:07:10  minna
+* Added handling of final interrupt after data transfer
+*
 * Revision 1.13  91/07/29  12:37:45  minna
 * _atread() and _atwrite modified to not use the
 * ATSC (sector count register) to count down on
 * multiple sectors read or write.  Some vendors
 * decrement the register too early.
-*
+* 
 * To test if the IDE interface exists, instead of
 * reading from bAT (the data register), read from
 * ATASR (the alternate status register.)
-*
+* 
 * Revision 1.12  91/03/27  12:36:36  apratt
 * Base address of IDE has moved to $F00000.  This code assumes that the base
 * address is on a longword boundary.  Added guards against missing IDE bus,
@@ -72,7 +75,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.13 $
+* $Revision: 1.14 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -139,6 +142,9 @@ IDE_AT		=	STPAD
 ;			To check if the IDE bus is there, read from
 ;			the alternate status register instead of the
 ;			data register.
+; Aug-02-91	ml.	Added handling of final interrupt from the
+;			IDE drive after data transfer. (Routines that 
+;			call readbuf() and wrtbuf() are modified).
 ;-
 
 .globl	_dmaread
@@ -1102,12 +1108,13 @@ _atread:
 atr0:	bsr	w4int		; wait for interrupt
 	tst.w	d0		; successful?
 	bmi.b	atr1		; if timed-out, return
+
 	btst	#3,d0		; DRQ?
 	beq.b	atr1		; if not, return
 
 	bsr	readbuf		; fill sector buffer
 	dbra	d1,atr0		; more to read?
-	moveq	#0,d0		; everything's fine
+	bra	w4int
 atr1:	rts
 
 
@@ -1148,7 +1155,7 @@ atw1:	bsr	wrtbuf		; fill sector buffer
 	btst	#3,d0		; DRQ?
 	beq.b	atw2		; if not, return
 	dbra	d1,atw1		; else go transfer data
-	moveq	#0,d0		; everything's fine
+	bra	w4int
 atw2:	rts
 
 
@@ -1235,7 +1242,8 @@ _identify:
 	beq.b	id0		; if not, return with error
 
 	bsr	readbuf		; read data
-	moveq	#0,d0		; return successful
+	bra	w4int
+
 id0:	rts 
 
 

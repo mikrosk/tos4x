@@ -1,21 +1,34 @@
+****
+* PAD NOTE: inexplicably, you get a bus error writing to 8604 in
+* the prototype PADs we've got on 2/28/91, even when you DO have
+* an ACSI DMA chip.  So we catch that case, too, even though it
+* "shouldn't happen."
+****
+
 .super
 ******************* Revision Control System *****************************
 *
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/11/20 18:20:27 $
+* $Date: 91/03/27 12:36:54 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.22  91/03/27  12:36:54  apratt
+* Added a check for the dma chip and the 1772 if STPAD.  The missing-ACSI-chip
+* test is only necessary for prototype PADs, and may go away soon.
+*
+* Made fast-ram handling (actually non-ACSI-ram) happen for any machine.
+*
 * Revision 2.21  90/11/20  18:20:27  apratt
 * Removed the one place that reads the denselect register: it's
 * WRITE ONLY in Mega STE.  It's shadowed anyway in the DSB, so
 * this is no hardship.
-*
+* 
 * Revision 2.20  90/11/19  19:35:27  apratt
 * Fixed a bug which has been here since day 1: on single-drive systems,
 * Flopfmt and Flopwr to the boot sector set the state of disk A to "has
@@ -160,7 +173,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.21 $
+* $Revision: 2.22 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -286,10 +299,11 @@ tcdr		equ	$fffffa00+$23
 .ifne TT
 	.globl	seekrate		; default floppy seek rate
 	.globl	_diskmode		; disk change mode
-	.globl	_p_cookie
 .endc
 	.globl	_iamanst		; byte: true if we're on an ST
+.if M68030
 	.globl	clrcache		; clear i & d caches on TT
+.endif
 .if TT
 	.globl	ttwait
 .endif
@@ -304,6 +318,7 @@ m_unsure	equ	1		; "UNSURE" about media change
 
 *------ Error returns
 e_error		equ	-1		; general catchall
+e_nready	equ	-2		; drive-not-ready
 e_crc		equ	-4		; CRC error
 e_seek		equ	-6		; seek error
 e_rnf		equ	-8		; record (sector) not found
@@ -376,8 +391,6 @@ gpip	equ	mfp+1			; general purpose I/O
 *
 * Parameter types (in general):
 *	LONG dsb, buf;
-
-
 *	WORD devno, sectno, trackno, count;
 *	WORD spt, interlv, virgin;
 *	LONG magicno;
@@ -388,8 +401,40 @@ gpip	equ	mfp+1			; general purpose I/O
 *+
 * flopini - initialize floppies
 * Passed (on the stack):
+*	 $c(sp) devno
+*	 $8(sp) ->DSB
+*	 $4(sp)	->buffer (unused)
 *	 $0(sp)	return address
 *
+.ifne STPAD
+	move.l	a6,-(sp)
+*
+* This call didn't save any regs before! Now it saves the Alcyon C regs.
+* (Feb '91)
+*-
+_flopini:
+	clr.l	_frb			; zero this out until needed
+	lea	dsb0,a1			; get ptr to correct DSB
+	tst.w	$c(sp)
+	beq	fi_1
+	lea	dsb1,a1
+
+fi_1:	move.w	seekrate,dseekrt(a1)	; setup default seek rate
+	moveq	#e_error,d0		; (default error)
+	clr.w	dcurtrack(a1)		; fake clean drive
+	clr.w	fastcnt			; this has to go here somewhere!
+
+	move.w	#trkreg,(a6)
+	moveq.l	#-1,d7
+	bsr	wdiskctl		; write FF to trkreg
+	move.w	#trkreg,(a6)
+	bsr	rdiskctl		; read it back
+	cmp.b	#$ff,d0
+	bne	noflop
+	move.l	a1,sp			; restore - no bus errors
+	move.l	a0,$8
+	move.l	(sp)+,a6
+.endc
 	bsr	select			; select drive and side
 
 	bsr	restore			; attempt restore
@@ -402,9 +447,7 @@ fi_ok:	beq	flopok			; return OK (on win)
 .endc
 
 .if STPAD
-.ifne TT
 
-.endc
 *
 * init_noflops: this is where we go when we detect that there really are no
 * floppies attached to an STBOOK at init time.  Rwabs.c calls init twice,
@@ -418,8 +461,21 @@ init_noflops:
 	move.w	#$0202,_diskmode.w	; make both appear "changed."
 	moveq.l	#0,d0			; return "success" to rwabs.c,
 	tst.w	_nflops.w		; if this is the first time through
+	beq	i1
+	moveq.l	#e_undev,d0		; else return failure.
+i1:	rts
 	
+*
+* entry point for read, write, format, and verify to call when there are
+* NO floppies.  This is before regs were saved or anything else.
+	move.l	(sp)+,a6	; restore saved a6
 
+noflop1:
+	moveq	#e_nready,d0
+	rts
+
+*
+* Probe for a floppy disk controller.  We no longer probe to see if there's
 * a DMA chip -- we assume it's there, or at any rate that it won't bus
 * error.
 *
@@ -436,11 +492,12 @@ fdcprobe:
 	moveq.l	#0,d7
 	bsr	wdiskctl		; write a zero to trkreg
 	move.w	#secreg,(a6)
+	moveq.l	#-1,d7
+	bsr	wdiskctl		; write $FF to secreg
+	move.w	#trkreg,(a6)
 	bsr	rdiskctl		; read it back
 	move.b	d0,d1			; save it for a little bit
-.ifne TT
 	bne	noflop			; nope - no floppies
-.endc
 	move.w	#secreg,(a6)
 	bsr	rdiskctl		; read secreg back
 	subq.w	#1,flock.w		; un-lock the bus
@@ -559,11 +616,12 @@ frd5:	subq.w	#1,retrycnt.w		; drop retry count
 * err_bits - set "curr_err" according to 1770 error status
 * Passed:	d0 = 1770 status
 *
+* Returns:	curr_err, containing current error number
+*
+* Uses:		d1
 *-
 err_bits:
-.ifne TT
 	moveq	#e_wp,d1		; write protect?
-.endc
 	btst	#6,d0
 	bne	eb1
 
@@ -672,11 +730,12 @@ fwr4:	move.w	#$180,(a6)		; get 1770 status
 	move.w	#retries,retrycnt.w	; setup retry count
 	addq.w	#1,csect.w		; bump sector number
 	add.l	#$200,cdma.w		; and DMA pointer for next sector
+	subq.w	#1,ccount.w		; if(!--count) return OK;
+	beq	flopok
+	bsr	select1			; setup sector#, DMA pointer
 	bra	fwr1a			; write next (no seek)
 
-.ifne TT
 fwre:	cmp.w	#midretry,retrycnt.w	; re-seek head in "middle" retry
-.endc
 	bne	fwr5			; (not middle retry)
 fwre1:	bsr	reseek			; home head and	seek
 fwr5:	subq.w	#1,retrycnt.w		; decrement retry count
@@ -915,11 +974,11 @@ oterr:	moveq	#1,d7			; return NE (error status)
 	rts
 
 *--- use skew table passed in to us
+use_skewtbl:
+	cmp.w	spt.w,d3		; are we through all tracks
 	beq	end_track		; this way out
 
-.ifne TT
 	move.w	d3,d6
-.endc
 	add.w	d6,d6			; work index
 	move.w	(a3,d6.w),d4		; d4 = a skew table entry
 	addq.w	#1,d3			; inc skew table index in this case
@@ -1035,7 +1094,8 @@ tvr1:	move.b	cdma+3.w,dmalow		; load dma pointer
 	bsr	wdiskctl
 	move.l	_hz_200.w,d7
 	add.l	#timeout,d7		; d7 = _hz_200 value to die at
-	clr.l	a5			; a5 -> zeropage base
+
+*--- wait for command completion
 tvr2:	btst.b	#5,gpip			; test for 1770	done
 	beq	tvr4			; (yes,	it completed)
 	cmp.l	_hz_200.w,d7
@@ -1107,7 +1167,6 @@ fvbl2:	addq.b	#1,d0			; turn into drive-select bits
 	bsr	setporta		; (uses d1!)
 
 fvbl1:	move.w	_wpstatus.w,d0		; or _wpstatus into _wplatch
-	clr.l	a5			; a5 -> zeropage base
 	or.w	d0,_wplatch.w		; (catch any WP transitions)
 
 
@@ -1189,9 +1248,7 @@ flopfail:
 	moveq	#m_unsure,d0		; disk change mode = UNSURE
 	bsr	setdmode		; set media change mode
 	move.w	curr_err.w,d0		; get current error number
-.ifne TT
 	ext.l	d0			; extend to long
-.endc
 	bra	unlok1			; clobber floppy lock & return
 
 *+
@@ -1670,8 +1727,6 @@ clrspinup:
 getspinup:
 .if HI_DEN
 	tst.b	dspinflag(a1)		; return 0 or -1, not the flag itself.
-.ifne TT
-
 	sne	d0
 	ext.w	d0
 	ext.l	d0
@@ -1712,9 +1767,11 @@ getspinup:
 *	move.w	_wpstatus.w,d0
 *	or.w	d0,_wplatch.w	; (catch WP transitions)
 *	move.b	(a0),d0		; reload the WP status as return value.
+.ifne TT
 *	ext.l	d0
 *	rts
 
+.endc
 *
 * code to handle fast vs slow ram:
 *
@@ -1786,13 +1843,11 @@ rdfast:	cmp.l	#MAXACSI,8(sp)
 	bcs	undone			; never mind
 	bsr	getfrb
 	move.l	8(sp),fastbuf		; after op, copy to user's buffer
-	moveq.l	#e_error,d0		; return general failure
+	move.l	_frb,8(sp)		; actual DMA to _FRB
 	move.w	$18(sp),fastcnt		; count
-.endc
 	rts
 
 * wrfast - the buffer address is at 8(sp), count at $18(sp)
-_frb:		ds.l	1		; frb address to use (zero until set)
 * Change the pointer and do the copy.
 
 wrfast:	cmp.l	#MAXACSI,8(sp)
@@ -1824,10 +1879,9 @@ tmpdma:		ds.l	1		; temp for hardware DMA image
 	tst.l	_frb			; already done this?
 .endc
 	move.l	_p_cookie,a0		; no; get base of cookie jar
-.ifne TT
+	cmp.w	#0,a0			; no cookie jar?
 	beq	getf2			; yow! no cookie jar! bail out.
 getf1:	tst.l	(a0)			; end of cookie jar?
-.endc
 	beq	getf2			; yes, die horribly
 	cmp.l	#"_FRB",(a0)+		; no; match our cookie?
 	beq	getfdone		; yes, copy ptr & return

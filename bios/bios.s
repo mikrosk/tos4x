@@ -4,18 +4,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/01 15:33:46 $
+* $Date: 90/03/02 10:47:58 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.14  90/03/02  10:47:58  apratt
+* Added initialization of ST MFP Timer B to something other than 1.
+* See startup.s, at the label noblank, for why this is necessary
+* and not sufficient (!).
+*
 * Revision 2.13  90/03/01  15:33:46  apratt
 * Made dowait global; changed delay in ikput to use STMFP Timer C rather
 * than instructions.  Made bus error during SCC init just return.
 * Changed some ttwait calls to dowait.
-*
+* 
 * Revision 2.11  90/02/16  16:43:07  apratt
 * Added SCC serial-port code to the bconmap section.  All works.
 * 
@@ -169,7 +174,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.13 $
+* $Revision: 2.14 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -1569,6 +1574,13 @@ ttmfp	equ	$fffffa81
 	lea	ttmfp,a0	; init TT mfp
 	moveq.l	#0,d0
 .endc
+	movep.l	d0,ierb(a0)	; clear TT_ierb thru TT_isrb
+	movep.l	d0,isrb(a0)	; clear isrb thru vr
+
+	move.b	#$58,vr(a0)	; set vector base to $140 and s-bit
+.endif
+
+*	init the "b" timer
 * This must be initialized with a value other than one, so noblank
 * and noblank1 don't wait forever.  God help you if you program the
 * timer to a one, then call something which calls noblank!

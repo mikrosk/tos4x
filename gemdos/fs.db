@@ -1,6 +1,6 @@
 # link ........ bufdrv . buftyp . bufrec .... dirty . dmd ........ bufr ........
 
-procedure bcb a
+procedure bcb a count
   print -n link lpeek(`a);(a += 4)
   print -n bufdrv wpeek(`a);(a += 2)
   print -n buftyp wpeek(`a);(a += 2)
@@ -10,21 +10,31 @@ procedure bcb a
   print bufr lpeek(`a);(a += 4)
 .
 
-procedure allbcbs
+# the 'count' argument is how many buffers in each list to show; without it, 
+# you get 10; with it, you get that many.  -1 is unreasonably large and will
+# show all the buffers (unsigned compare).
+
+procedure allbcbs count
   local buf
+  local lcount
+  if (argc == 0) (count = 0a)
   (buf = lpeek(.bufl))
   print LIST 0: `buf
+  (lcount = count)
 #:loop0
     bcb `buf
     (buf = lpeek(`buf))
-  if buf goto loop0
+    (lcount -= 1)
+  if (buf && lcount) goto loop0
   echo
   (buf = lpeek(.bufl + 4))
   print LIST 1: `buf
+  (lcount = count)
 #:loop1
     bcb `buf
     (buf = lpeek(`buf))
-  if `buf goto loop1
+    (lcount -= 1)
+  if (buf && lcount) goto loop1
 .
 
 procedure mostbcbs
@@ -79,8 +89,8 @@ procedure dfd a
   print -n strtcl wpeek(`a);(a += 2)
   print fileln lpeek(`a);(a += 4)
 
-  print -n attrib (peek `a);x a (`a+1)
-  print -n dirty (peek `a);x a (`a+1)
+  print -n attrib (peek(`a));x a (`a+1)
+  print -n dirty (peek(`a));x a (`a+1)
   print -n dev wpeek(`a);(a += 2)
   print -n dircl wpeek(`a);(a += 2)
   print -n dirrec wpeek(`a);(a += 2)
@@ -140,13 +150,13 @@ procedure dmd a
 
 procedure dta a
   print -n dta_sname -sb `a;x a (`a+b)
-  print -n dta_attr (peek `a);x a (`a+1)
+  print -n dta_attr (peek(`a));x a (`a+1)
   print -n dta_clust wpeek(`a);(a += 2)
   print dta_curcl wpeek(`a);(a += 2)
   print -n dta_recno wpeek(`a);(a += 2)
   print -n dta_recoffs wpeek(`a);(a += 2)
-  print dta_dev (peek `a);x a (`a+1)
-  print -n fattrib (peek `a);x a (`a+1)
+  print dta_dev (peek(`a));x a (`a+1)
+  print -n fattrib (peek(`a));x a (`a+1)
   print -n ftime wpeek(`a);(a += 2)
   print -n fdate wpeek(`a);(a += 2)
   print -n flength lpeek(`a);(a += 4)
@@ -158,7 +168,7 @@ procedure dta a
 
 procedure fcb a
   print -n name -sb `a;(a += b)
-  print -n attrib (peek `a);(a += 1)
+  print -n attrib (peek(`a));(a += 1)
   (a += 0a)
   print -n time wpeek(`a);(a += 2)
   print -n date wpeek(`a);(a += 2)
@@ -289,7 +299,7 @@ procedure uft a
   if (ofd && !(ofd & 1)) do_ofd `ofd
   if (ofd & 1) print tty (`ofd >> 1)
   (uft += 4)
-  (count += 4)
+  (count += 1)
   if (`count < `size) goto loop
 .
 
@@ -308,7 +318,7 @@ procedure do_ofd ofd
     print > OFD `ofd
     ofd `ofd
     print >> DFD lpeek(`ofd + 8)
-    dfd lpeek(`ofd + 8))
+    dfd lpeek(`ofd + 8)
 .
 
 # flag is "optional" -- if zero, show all blocks, but if 1, suppress free.
@@ -318,7 +328,7 @@ procedure block a flag
   print -n b_next lpeek(`a);(a += 4)
   set type peek(`a)
   print -n b_type `type;(a += 1)
-  print -n b_callno (peek `a);(a += 1)
+  print -n b_callno (peek(`a));(a += 1)
   print -n b_data is `a
   if (`type == 0) print free
   if (`type == 1) "print cut: ; docut `a"
@@ -328,16 +338,16 @@ procedure block a flag
 
 procedure docut a
   print -n -x8 slot 0: link: lpeek(`a) start: lpeek(`a + 4)
-  print -x8 length: (lpeek (+ `a 8)) own: lpeek(`a + c)
+  print -x8 length: lpeek(`a + 8) own: lpeek(`a + c)
   (a += 10)
   print -n -x8 slot 0: link: lpeek(`a) start: lpeek(`a + 4)
-  print -x8 length: (lpeek (+ `a 8)) own: lpeek(`a + c)
+  print -x8 length: lpeek(`a + 8) own: lpeek(`a + c)
   (a += 10)
   print -n -x8 slot 0: link: lpeek(`a) start: lpeek(`a + 4)
-  print -x8 length: (lpeek (+ `a 8)) own: lpeek(`a + c)
+  print -x8 length: lpeek(`a + 8) own: lpeek(`a + c)
   (a += 10)
   print -n -x8 slot 0: link: lpeek(`a) start: lpeek(`a + 4)
-  print -x8 length: (lpeek (+ `a 8)) own: lpeek(`a + c)
+  print -x8 length: lpeek(`a + 8) own: lpeek(`a + c)
 .
 
 alias allblocks "(t0 = lpeek(.blockhead));_blocks"
@@ -346,7 +356,7 @@ alias _blocks "if `t0 'block `t0 1;(t0 = lpeek(`t0));_blocks'"
 procedure pdtab
   local pd ppd ppdend
   (ppd = .pdtab)
-  (ppdend = .pdtab + 20 4)		; # this assumes NUMPDS is 0x20
+  (ppdend = .pdtab + 20 * 4)		; # this assumes NUMPDS is 0x20
 
 #:loop
     (pd = lpeek(`ppd))
@@ -359,10 +369,10 @@ procedure alldmds
     local dmd dmdend mask
     (mask = 1)
     (dmd = .drvtbl)
-    (dmdend = .drvtbl + @30*@16)
+    (dmdend = .drvtbl + #30*#16)
 #:loop
       if (wpeek(.drvsel) & `mask) "dmd `dmd;print"
-      (dmd += @30)
+      (dmd += #30)
       (mask <<= 1)
       if (`dmd < `dmdend) goto loop
 .
@@ -398,7 +408,7 @@ procedure showtail tail
 
 procedure _dopexec mode arg1 arg2 arg3
   print -n Pexec `mode
-  if (mode == 0 || mode == 3) "print -n -s name= `arg1 tail=;showtail (+ `arg2 1);print env= -x `arg3"
+  if (mode == 0 || mode == 3) "print -n -s name= `arg1 tail=;showtail arg2+1;print env= -x `arg3"
   if (mode == 4 || mode == 6) print basepage= `arg2
-  if (mode == 5 || mode == 7) "print -n arg1= `arg1 tail=;showtail (+ `arg2 1);print env= `arg3"
+  if (mode == 5 || mode == 7) "print -n arg1= `arg1 tail=;showtail arg2+1;print env= `arg3"
 .

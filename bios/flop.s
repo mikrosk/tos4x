@@ -3,24 +3,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/03/25 11:49:50 $
+* $Date: 88/03/28 11:45:48 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.3  88/03/28  11:45:48  apratt
+* Added check-floppy-state Xbios call.  Can cause "insert other floppy"
+* message, so use this only when you would cause a swap anyway.
+*
 * Revision 1.2  88/03/25  11:49:50  apratt
 * This version has more index information per Intel controller spec
 * in the format-track code.  THIS IS UNTESTED AND MIGHT NOT WORK.
-*
+* 
 * Revision 1.1  87/11/20  14:23:48  lozben
 * Initial revision
 * 
 *
 * =======================================================================
 *
-* $Revision: 1.2 $
+* $Revision: 1.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -96,6 +100,7 @@ tcdr		equ	$fffffa00+$23
 
 *------ Exports:
 	.globl _flopini			; init floppy			func
+	.globl _flopwp			; check wp state of floppy	func
 	.globl _flopvbl			; vertical blank monitor	func
 	.globl _flopwr			; write sector			func
 	.globl _flopfmt			; format drive/track		func
@@ -1140,6 +1145,43 @@ rwd2:	cmp.b	tcdr,d1
 	move.b	(sp)+,(a0,d0.w)		; set drive's mode
 * Returns:	both media "might have changed" condition
 *		and "grace" timers expired.
+*
+*
+*-
+
+_floprate:
+	lea.l	dsb0,a1			; get dsb0 first
+	tst.w	4(sp)			; was that right?
+	beq	rate1			; yes.
+	lea.l	dsb1,a1			; no - use dsb1
+rate1:	move.w	dseekrt(a1),d0		; get the old rate
+	move.w	6(sp),d1		; get the desired rate
+	cmp.w	#-1,d1			; no change?
+
+flopwp:
+	sub.w	#$c,sp		; "push" 3 dummy longs
+	bsr	change		; get right disk in drive
+	beq	clrspinup
+	add.w	#$c,sp		; clean up stack
+	move.w	$4(sp),d0	; get (possibly new) dev number
+	and.w	#$1,d0		; keep only bit 0
+	lea	_wpstatus(a5),a0
+	add.w	d0,a0		; a0 -> WP status table entry
+
+	addq.b	#1,d0		; turn into drive-select bits
+	lsl.b	#1,d0		; (magic shift left)
+	eor.b	#7,d0
+	bsr	setporta	; (d2 = old bits)
+	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
+	btst	#6,d0
+	sne.b	d0		; d0 = $00 or $ff
+	move.b	d0,(a0)		; wpstatus = $00 or $ff
+	move.b	d2,d0		; d0 = old bits
+	bsr	setporta	; restore old select bits
+
+	move.w	_wpstatus(a5),d0
+	or.w	d0,_wplatch(a5)	; (catch WP transitions)
+	rts
 	tst.b	dspinflag(a1)		; return 0 or -1, not the flag itself.
 
 * wrfast - the buffer address is at 8(sp), count at $18(sp)

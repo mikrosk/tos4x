@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/05 17:49:47 $
+* $Date: 89/09/07 16:29:00 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.29  89/09/07  16:29:00  apratt
+* Changed date & dosdate and added 'check' to date lines.
+*
 * Revision 2.28  89/09/05  17:49:47  apratt
 * Fixed dumb bug in setpalette code for TT.  Works now.
-*
+* 
 * Revision 2.27  89/08/30  16:02:43  apratt
 * Added def_frb variable, set to the value that the _FRB cookie gets.
 * Zero if no fast RAM.  Added moving end_os up by 64K as well as _membot.
@@ -315,7 +318,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.28 $
+* $Revision: 2.29 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -405,23 +408,23 @@ STPLUS		=	0	; @check@
 
 LONGFRAME	=	1	; @check@
 
-systype		=	ram	; 'rom' or 'ram' @check@
+systype		=	rom	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
 
 .ifeq TT
 version		equ	$0106		; version number *MUST BE EVEN*
-date		equ	$03301989	; date, $MMDDYYYY
+date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .endc
 
 .ifne TT
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$08281989	; date, $MMDDYYYY
+date		equ	$09071989	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001100011100 ; Aug 28, 1989
+dosdate		equ	%0001001100100111 ; Sep 7, 1989
 .endc
 
 ****

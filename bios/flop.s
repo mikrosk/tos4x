@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/21 19:03:30 $
+* $Date: 1991/11/06 21:27:32 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.36  1991/11/06  21:27:32  apratt
+* New code to check _iamanst and avoid hitting denselect if you are.
+* This only works if writing denselect on (non-Mega) STe doesn't buserr.
+*
 * Revision 2.35  1991/10/21  19:03:30  apratt
 * Fixed a comment: flopwr to sector 0 sets MC mode to "changed" not
 * "unsure."  It always has, but this was commented and documented
@@ -116,7 +120,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.35 $
+* $Revision: 2.36 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $
@@ -192,6 +196,7 @@ QD	equ	0
 * get in trouble: you can't see a sector ID before the drive is up	*
 * to speed.								*
 *									*
+*************************************************************************
 
 HI_DEN		equ	1		; always enable this code
 
@@ -226,6 +231,7 @@ tcdr		equ	$fffffa00+$23
 	.globl	flock			; floppy/FIFO lock variable
 	.globl	_frclock		; vbl-frame-counter
 	.globl	_nflops			; number of floppy drives attached
+	.globl	_curflop		; currently inserted floppy
 	.globl	_critic			; critical error handler
 	.globl	seekrate		; default floppy seek rate
 	.globl	_diskmode		; disk change mode
@@ -723,8 +729,15 @@ _flopfmt:
 * parameter written to the controller.
 
 	moveq	#$3,d0			; assume hi den first
+	cmp.w	#13,spt.w
+	bhs	denok
+	moveq	#$0,d0			; no, is low
+denok:
+.if STPAD
 	bsr	do_hiden
+.else	
 .if (TT | SPARROW)
+	move.w	d0,denselect
 .else
 	tst.b	_iamanst
 	bne	noden1
@@ -1354,7 +1367,14 @@ go2retry:
 * NOTE: density register is WRITE ONLY: don't read it!
 *
 go2bad:
-	move.w	d0,denselect		; write back new value
+	move.w	ddenflags(a1),d0	; get the current density
+	and.w	#3,d0			; mask off unused bits
+	eor.w	#3,d0			; flip wanted bits
+	move.w	d0,ddenflags(a1)	; to control register and to dsb
+.if STPAD
+	bsr	do_hiden
+.else
+.if (TT | SPARROW)
 	move.w	d0,denselect
 .else
 	tst.b	_iamanst
@@ -1440,7 +1460,13 @@ nomap:
 *
 *-
 flopcmd:
+
+.if HI_DEN
+; set density based on the DSB pointer in a1
+.if STPAD
+	move.w	ddenflags(a1),d0
 	bsr	do_hiden
+.else
 .if (TT | SPARROW)
 	move.w	ddenflags(a1),denselect
 .else

@@ -3,16 +3,19 @@
 * $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/02/27 18:09:50 $
+* $Date: 89/02/27 18:13:55 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.1  89/02/27  18:13:55  kbad
+* *** TOS 1.4  FINAL RELEASE VERSION ***
+*
 * Revision 1.22  89/02/27  18:09:50  kbad
 * Added ITALY keyboard code for new Italian keyboard
-*
+* 
 * Revision 1.21  89/02/13  12:03:37  apratt
 * Check for reboot used to include ASCII part of the key code, so if you
 * redefined the keyboard it wouldn't reboot.  Now just the
@@ -101,7 +104,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.22 $
+* $Revision: 2.1 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $

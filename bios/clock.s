@@ -3,17 +3,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/18 14:28:59 $
+* $Date: 89/08/29 15:13:19 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.3  89/08/29  15:13:19  apratt
+* Fixed TT clock code (I hope).
+*
 * Revision 2.2  89/08/18  14:28:59  apratt
 * Added TT clock code. Not extensively tested. Includes switch for TT,
 * set to zero for not TT.
-*
+* 
 * Revision 2.1  89/02/27  12:36:29  apratt
 * *** TOS 1.4  FINAL RELEASE VERSION ***
 * 
@@ -33,7 +36,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.2 $
+* $Revision: 2.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -536,6 +539,7 @@ gwait:	move.b	#REGA,RTCA(a2)
 	moveq.l	#0,d1
 	move.b	#YEAR,RTCA(a2)
 	move.b	RTCD(a2),d1
+	sub.w	#$a,d1		; subtract 10 for years since 1980
 	asl.w	#8,d1
 	asl.w	#1,d1
 	or.w	d1,d0		; d0 is now complete GEMDOS date
@@ -588,7 +592,7 @@ _setclock:
 	and.w	#%1111,d1
 	move.b	d1,1(sp)	; write month
 	lsr.w	#4,d0
-	sub.w	#10,d0		; subtract 10 to get year since 1970
+	add.w	#10,d0		; add 10 to get year since 1970
 	move.b	d0,(sp)		; write year
 
 	move.b	#REGB,RTCA(a2)

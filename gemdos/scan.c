@@ -1,12 +1,16 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.14 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.15 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 17:18:56 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.15  1991/06/20  17:18:56  apratt
+* Fixed a bug: ANDing recno with clrm is only valid when recno
+* is relative to the start of a cluster (e.g. cluster 2).
+*
 * Revision 1.14  1991/06/18  17:52:02  apratt
 * Updated to DB release 3 (new print)
 *

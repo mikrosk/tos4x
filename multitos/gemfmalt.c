@@ -1,0 +1,631 @@
+/*	GEMFMALT.C		09/01/84 - 01/07/85	Lee Lorenzen	*/
+/*	CHANGED			02/19/85 - 02/23/85	Derek Mui	*/
+/*	Reg Opt			03/08/85		Derek Mui	*/
+/*	1.1			03/21/85 - 05/11/85	Lowell Webster	*/
+/*	Modify fm_build to handle 6 resolutions	2/6/86	Derek Mui	*/
+/*	Change the mouse logic at fm_alert	3/5/86	Derek Mui	*/
+/*	Fix at fm_strbrk	3/16/87	- 3/17/87	Derek Mui	*/
+/*	Fix at fm_strbrk to allow 31 characters  4/8/87	Derek Mui	*/
+/*	Fix at fm_alert		4/9/87			Derek Mui	*/
+/*	Add more defines	11/23/87		D.Mui		*/
+/*	New rsc update		12/9/87			D.Mui		*/
+/*	Change fm_alert to make alert box moves	11/6/90	D.Mui		*/
+/*	Changed fm_build and fm_alert to build 3d buttons 7/16/92 D.Mui	*/
+
+/*	-----------------------------------------------------------
+*	AES Version 4.0	MultiTOS version is written by Derek M. Mui
+*	Copyright (C) 1992 
+*	Atari (U.S.) Corp
+*	All Rights Reserved
+*	-----------------------------------------------------------
+*/	
+
+/*
+*	-------------------------------------------------------------
+*	GEM Application Environment Services		  Version 1.1
+*	Serial No.  XXXX-0000-654321		  All Rights Reserved
+*	Copyright (C) 1985			Digital Research Inc.
+*	-------------------------------------------------------------
+*/
+
+#include <compiler.h>
+#include <machine.h>
+#include <pdstruct.h>
+#include <obdefs.h>
+#include <objaddr.h>
+#include <gemlib.h>
+#include <rslib.h>
+#include <aesmint.h>
+#include <gemusa.h>
+
+#define MAX_MSGS     5
+#define MAX_BTNS     3
+#define MSG_OFF      2
+#define BUT_OFF      7
+#define NUM_ALOBJS   10
+#define NUM_ALSTRS   8
+#define MAX_MSGLEN   30	/* changed	*/
+#define INTER_WSPACE 2
+#define INTER_HSPACE 0
+
+						/* in GSXIF.C		*/
+EXTERN	VOID	bb_restore();
+EXTERN	VOID	bb_save();
+EXTERN	WORD	ob_add();
+EXTERN	VOID	ob_draw();
+EXTERN	VOID	ob_actxywh();
+EXTERN 	VOID	rs_obfix();
+EXTERN	WORD	fm_show();
+
+EXTERN	WS	gl_ws;
+EXTERN	UWORD	gl_alrtcol;
+EXTERN	PD	*errpd;
+EXTERN	FDB	gl_tmp;
+EXTERN	FDB	gl_crit;
+EXTERN 	GRECT	gl_rcenter;
+EXTERN  WORD	gl_mouse;
+EXTERN	LONG	ad_sysglo;
+EXTERN 	LONG	ad_armice;
+EXTERN	WORD	gl_hbox;
+EXTERN	WORD	gl_hchar;
+EXTERN	WORD	gl_wchar;
+EXTERN	WORD	gl_width;
+EXTERN	WORD	gl_ncols;
+EXTERN	WORD	gl_moff;		/* CHANGED 5/10 LKW	*/
+EXTERN	GRECT	gl_rscreen;
+EXTERN	PD	*currpd;
+EXTERN	WORD	gl_xrat;
+EXTERN	WORD	gl_yrat;
+EXTERN	WORD	gl_button;
+
+OBJECT	*critobj[MAXERR];		/* critical error objects	*/
+
+GLOBAL 	BYTE	gl_nils[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
+GLOBAL	WORD	ml_alrt[] = 
+		{ALRT00CRT,ALRT01CRT,ALRT02CRT,ALRT03CRT,ALRT04CRT,
+			ALRT05CRT, ALRTDSWAP};
+MLOCAL	WORD	ml_pwlv[] = 
+		{0x0102,0x0102,0x0102,0x0101,0x0002,0x0001,0x0101};
+
+MLOCAL	WORD	ml_ted[] = { A00,A01,A02,A03,-1,-1,A06 };
+
+GLOBAL	WORD	tmpmoff;
+GLOBAL	WORD	tmpmon;
+
+GRECT	al_grect;		/* for form alert	*/
+WORD	al_center;
+
+
+/*
+*	Routine to break a string into smaller strings.  Breaks occur
+*	whenever an | or a ] is encountered.
+*/
+	WORD
+fm_strbrk(tree, palstr, stroff, pcurr_id, pnitem, pmaxlen)
+	LONG		tree;
+	LONG		palstr;
+	WORD		stroff;
+	WORD		*pcurr_id;
+	WORD		*pnitem;
+	WORD		*pmaxlen;
+{
+	REG WORD		nitem, curr_id;
+	REG WORD		len, maxlen;
+	REG BYTE		tmp;
+	LONG			pstr;
+	WORD			nxttmp;
+
+	nitem = maxlen = 0; 
+	curr_id = *pcurr_id;
+	tmp = NULL;
+
+	while( tmp != ']')
+	{
+	  pstr = LLGET(OB_SPEC(stroff + nitem));
+	  len = 0;
+
+	  do
+	  {
+	    tmp = LBGET(palstr + curr_id);
+
+	    if ( len >= 31 )
+	    {
+	       LBSET(pstr + len, NULL);
+	       tmp = NULL;
+	       while( TRUE )
+	       {
+	         tmp = LBGET(palstr + curr_id);
+ 	         if ( ( tmp != ']' ) && ( tmp != '|' ) )
+		 {
+		   curr_id++;	
+		   continue;
+		 }
+		 else
+		   break;
+	       }
+	     }			    
+
+	    curr_id++;
+            nxttmp = LBGET(palstr + curr_id);
+
+	    if ( (tmp == ']') || (tmp == '|') )
+	    {
+	      if (tmp == nxttmp)
+	      {
+		if ( len < 31 )
+		  curr_id++;
+		else
+		  tmp = NULL;
+	      }
+	      else
+	      {
+		nxttmp = tmp;
+		tmp = NULL;
+	      }
+	    }
+
+	    LBSET(pstr + len, tmp);
+	    len++;
+	  } while( tmp != NULL );
+
+	  tmp = nxttmp;	
+	  maxlen = max(len - 1, maxlen);
+	  nitem++;
+	}
+	*pcurr_id = curr_id;
+	*pnitem = nitem;
+	*pmaxlen = maxlen;
+}
+
+
+/*
+*	Routine to parse a string into an icon #, multiple message
+*	strings, and multiple button strings.  For example,
+*
+*		[0][This is some text|for the screen.][Ok|Cancel]
+*		0123456
+*
+*	becomes:
+*		icon# = 0;
+*		1st msg line = This is some text
+*		2nd msg line = for the screen.
+*		1st button = Ok
+*		2nd button = Cancel
+*/
+
+	VOID
+fm_parse(tree, palstr, picnum, pnummsg, plenmsg, pnumbut, plenbut)
+	LONG		tree;
+	REG LONG	palstr;
+	WORD		*picnum;
+	WORD		*pnummsg, *plenmsg;
+	WORD		*pnumbut, *plenbut;
+{
+	WORD		curr_id;
+
+	*picnum = LBGET(palstr + 1) - '0';
+	curr_id = 4;
+	fm_strbrk(tree, palstr, MSG_OFF, &curr_id, pnummsg, plenmsg);
+	curr_id++;
+	fm_strbrk(tree, palstr, BUT_OFF, &curr_id, pnumbut, plenbut);
+	*plenbut += 1;
+}
+
+
+	VOID
+fm_build(tree, haveicon, nummsg, mlenmsg, numbut, mlenbut)
+	REG LONG	tree;
+	WORD		haveicon;
+	WORD		nummsg, mlenmsg;
+	WORD		numbut, mlenbut;
+{
+	REG WORD	i,j;
+	GRECT		al, ic;
+	GRECT		bt, ms;
+	WORD		icw,ich;
+
+	icw = 4;
+	ich = 4;
+	/* 	define the icw and ich at here please	*/
+	
+	i = (mlenbut * numbut) + ( (numbut-1) * 2 );
+	i = max( i, mlenmsg );   	/* find the max char length	*/
+				 	/* find the max char height	*/
+	j = max( nummsg, 1 );
+	r_set(&al, 0x0L, i+2, j);	/* this is the alert box 	*/
+					/* this is the message object   */
+	r_set(&ms, 2, 0x0300, mlenmsg, 1);
+
+	if (haveicon)
+	{
+	  r_set(&ic, 1, 1, icw, ich);
+	  al.g_w += icw + 1;
+	  al.g_h = max( al.g_h, 1 + ich );		
+	  ms.g_x += icw;
+	}
+
+	al.g_h += 3;		
+
+	/* center the buttons */
+
+	i = (al.g_w -  ( (numbut - 1) * 2 ) - (mlenbut * numbut)) / 2;
+
+	/* set the button	*/
+
+	r_set( &bt, i, al.g_h - 2, mlenbut, 1 ); 
+
+	/* now make the al.g_h smaller	*/
+
+/*	al.g_h -= 1;
+	al.g_h += ( (gl_hchar/2) << 8 );
+*/
+
+	ob_setxywh(tree, ROOT, &al);
+
+	for(i=0; i<NUM_ALOBJS; i++)
+	  LBCOPY(OB_NEXT(i), &gl_nils[0], 6);
+
+						/* add icon object	*/
+	if (haveicon)
+	{
+	  ob_setxywh(tree, 1, &ic);
+	  ob_add(tree, ROOT, 1);
+	}
+						/* add msg objects	*/
+	for(i=0; i<nummsg; i++)
+	{
+	  ob_setxywh(tree, MSG_OFF+i, &ms);
+	  ms.g_y += 1;
+	  ob_add(tree, ROOT, MSG_OFF+i);
+	}
+					
+	/* add button objects	*/
+
+	for(i=0; i<numbut; i++)
+	{
+	  LWSET(OB_FLAGS(BUT_OFF+i), SELECTABLE | EXIT | IS3DOBJ | IS3DACT );
+	  LWSET(OB_STATE(BUT_OFF+i), NORMAL);
+	  ob_setxywh(tree, BUT_OFF+i, &bt);
+	  bt.g_x += mlenbut + 2 ;
+	  ob_add(tree, ROOT, BUT_OFF+i);
+	}
+						/* set last object flag	*/
+	LWSET(OB_FLAGS(BUT_OFF+numbut-1),
+		SELECTABLE | EXIT | LASTOB | IS3DOBJ | IS3DACT);
+}
+
+
+/*	Form alert	*/
+
+	WORD
+fm_alert( defbut, palstr )
+	WORD		defbut;
+	LONG		palstr;
+{
+	REG WORD	i;
+	REG LONG	tree;
+	WORD		inm, nummsg, mlenmsg; 
+	WORD		numbut, mlenbut;
+	WORD		x,y,moved,state,bheight;	
+	OBJECT		*addr;
+	LONG		plong;
+	LONG		*ptr;
+	GRECT		t,f,m;
+	WORD		x1,y1,w,h;
+	UWORD		color;
+	LONG		spec;
+
+	Debug1( currpd->p_name );
+	Debug1( "calls Fm_alert\r\n" );
+	wm_update( 3 );
+						/* init tree pointer	*/
+	rs_gaddr(ad_sysglo, R_TREE, ALERT, &addr);
+	tree = addr;
+
+	spec = LLGET( OB_SPEC(ROOT) );
+	spec &= 0xFFFFFF80L;
+	spec |= 0x70L;		/* was 0x40 (dithered) */ 
+
+	if ( gl_alrtcol >= gl_ws.ws_ncolors )
+	  color = WHITE;
+	else
+	  color = gl_alrtcol;
+ 
+	spec |= ( color & 0x000F );
+ 	LLSET( OB_SPEC(ROOT), spec ); 
+
+	bheight = LWGET( OB_HEIGHT(BUT_OFF) );
+
+	LWSET( OB_FLAGS( 0 ), TOUCHEXIT | IS3DACT);	/* 8/28/90	*/
+	LWSET( OB_TYPE( 1 ), G_IMAGE );
+	rs_gaddr( ad_sysglo, R_BIPDATA, NOTEBB, &plong );
+	LLSET( OB_SPEC( 1 ), plong );	
+	LWSET( OB_FLAGS( 1 ), TOUCHEXIT );
+
+	LWSET(OB_STATE(ROOT), OUTLINED);
+	fm_parse(tree, palstr, &inm, &nummsg, &mlenmsg, &numbut, &mlenbut);
+	fm_build(tree, (inm != 0), nummsg, mlenmsg, numbut, mlenbut);
+
+	if (defbut)
+	{
+	  plong = OB_FLAGS(BUT_OFF + defbut - 1);
+	  LWSET(plong, LWGET(plong) | DEFAULT);
+	}
+
+	if (inm != 0)
+	{
+	  rs_gaddr(ad_sysglo, R_FRIMG, 0, &ptr);
+	  LLSET(OB_SPEC(1), ptr[inm-1] );
+	}
+						/* convert to pixels	*/
+	for(i=0; i<NUM_ALOBJS; i++)
+	  rs_obfix(tree, i);
+
+	/* LWSET(OB_WIDTH(1), 32);	*/
+	/* LWSET(OB_HEIGHT(1), 32);	*/
+
+	LLSET( OB_WIDTH(1), 0x00200020L );
+
+	/* fixed 7/16/92	*/
+
+	for( i=0; i<3; i++ )
+	  LWSET( OB_HEIGHT(BUT_OFF+i), bheight );
+
+	if ( !defbut )
+	  defbut = 1;
+
+	ob_gclip( tree, BUT_OFF + defbut - 1, &x1, &y1, &x, &y, &w, &h );
+	y = y - LWGET( OB_Y(0) );
+	y += h + 2;
+	LWSET(OB_HEIGHT(ROOT), y );
+						/* center tree on screen*/
+
+	r_set(&f, 0, gl_hbox, gl_rscreen.g_w, gl_rscreen.g_h-gl_hbox );
+	
+	ob_center(tree, &m);
+
+	if ( !al_center )			/* not center alert	*/
+	{
+	  m.g_x = al_grect.g_x;
+	  m.g_y = al_grect.g_y;
+	  rc_constrain( &f, &m );
+	  addr->ob_x = m.g_x + 3;
+	  addr->ob_y = m.g_y + 3;
+	}
+						/* save screen under-	*/
+						/*   neath the alert	*/
+/*	wm_update( 1 );	*/
+
+
+
+	gsx_gclip( &t );			/* save the old clip	*/
+
+	gsx_moff();
+	bb_save( &m );
+	gsx_mon();
+					/* draw the alert	*/
+	gsx_sclip(&m);	
+	ob_draw(tree, ROOT, MAX_DEPTH);
+
+	
+						/* let user pick button	*/
+
+	moved = FALSE;
+
+	state = currpd->p_state;
+
+	ctlmouse( 1 );				/* turn on the mouse	*/
+
+        for(;;)
+	{
+	  i = fm_do( tree, 0 ) & 0x7fff;
+	  if (i != 0 && i != 1) break;
+	  gr_dragbox( m.g_w, m.g_h, m.g_x, m.g_y, &f, &x, &y );
+
+	  if ( ( m.g_x == x ) && ( m.g_y == y ) )
+	    continue;
+
+	  moved = TRUE;
+	  bb_restore( &m );
+	  m.g_x = x;
+	  m.g_y = y;
+	  LWSET( OB_X(0), x+3 );
+	  LWSET( OB_Y(0), y+3 );	  
+	  bb_save( &m );
+	  ob_draw(tree, ROOT, MAX_DEPTH);	
+	}
+
+
+
+	currpd->p_state = state;
+
+	gsx_sclip( &m );
+	gsx_moff();
+	bb_restore( &m );			/* restore saved screen	*/
+	gsx_mon();
+	gsx_sclip( &t );			/* restore clip rect	*/
+
+	ctlmouse ( 0 );				/* back to the way it was */	
+
+/*	wm_update( 0 );	*/
+
+	if ( moved )
+	{
+	  al_center = FALSE;
+	  al_grect.g_x = m.g_x;
+	  al_grect.g_y = m.g_y;
+	}
+
+
+	wm_update( 2 );
+
+	return( i - BUT_OFF + 1 );		/* return selection	*/
+}
+
+
+/*	AES Critical error handler	*/
+
+	WORD
+eralert( n, d )	
+	WORD		n;		/* n = alert #, 0-5 	*/	
+	WORD		d;		/* d = drive code, 0=A	*/
+{
+	WORD		*pdrive_let;
+	WORD		drive_let;
+	WORD		ret;
+	GRECT		t,m;
+	OBJECT		*obj;
+	FDB		tmp;
+	PD		*p;
+
+	p = currpd;
+	currpd = errpd;
+	ctlmouse( 1 );	
+
+	pdrive_let = &drive_let;
+	drive_let = ( d + 'A' ) << 8;	/* make it a 2 char string!	*/
+
+	gsx_gclip( &t );
+	obj = critobj[n];
+
+	if ( ml_ted[n] != -1 )		/* set the drive name */
+	  inf_sset( obj, ml_ted[n], pdrive_let );
+
+	ob_center( obj, &m );
+		
+	tmp = gl_tmp;	/* save old blt buffer */
+	gl_tmp = gl_crit;	
+	bb_save( &m ); 
+
+	gsx_sclip( &m );
+	ob_draw( obj, ROOT, MAX_DEPTH );
+	
+	do
+	{	
+	  if ( gl_button & 0x01 )
+	  {
+ 	    ret = ob_find( obj, 0, MAX_DEPTH, gl_xrat, gl_yrat );
+	    if ( ret != -1 )
+	    {
+	      if ( obj[ret].ob_flags & EXIT )
+	      {
+	        ret = ( obj[ret].ob_flags & DEFAULT ) ? 1 : 0;
+	        break;
+	      }
+	    }
+	  }
+	  else
+	  {
+	    if ( trap13( 1, 2 ) == -1 )
+	    {
+	      if ( ( trap13( 2, 2 ) & 0x00ff ) == 0x0D )
+	      {
+	        ret = 1;
+		break;
+	      }
+	    }
+	  }
+	    	
+	}while( 1 );
+
+	bb_restore( &m );
+	gl_tmp = tmp;
+	gsx_sclip( &t );
+	ctlmouse(0);
+	currpd = p;
+	return( ret );		/* 1 retry 0 cancel */
+}
+
+
+
+	WORD
+fm_error(n)
+	WORD		 n;	/* n = dos error number */
+{
+	REG WORD	string;
+	WORD		ret;
+	
+	ret = FALSE; 
+
+	if ( n > 63 )			/* nothing for xtal errors */
+	  return( ret );
+
+	switch (n)
+	{
+	  case 2:			/* file not found	*/
+	  case 18:			/* no more files	*/
+	  case 3:			/* path not found	*/
+		string = ALRT18ERR;
+		break;
+	  case 4:			/* too many open files	*/
+		string = ALRT04ERR;
+		break;
+	  case 5:			/* access denied	*/
+		string = ALRT05ERR;
+		break;
+	  case 8:			/* insufficient memory	*/
+	  case 10:			/* invalid environmeny	*/
+	  case 11:			/* invalid format	*/
+		string = ALRT08ERR;
+		break;
+	  case 15:			/* invalid drive	*/
+		string = ALRT15ERR;
+		break;
+	  default:
+		string = ALRTXXERR;
+	}
+
+	ret = fm_show(string, (string == ALRTXXERR) ? &n : NULLPTR, 1 );
+
+	return( ret != 1 );
+}
+
+/*	
+ *	New routine to force arrow mouse and show 
+ *	mouse when it is over an alert box
+ *	6/12/92
+*/
+	
+	VOID
+ctlmouse( mon )
+	WORD	mon;
+{
+	if ( mon )
+	{
+	  gr_mouse( M_ARROW|0xC000, (BYTE*)0 );
+	  tmpmon = gl_mouse;		/* save the mouse on flag	*/
+	  tmpmoff = gl_moff;
+#if 0
+	  if ( !gl_mouse )	/* if the mouse is currently off	*/
+	  {			/* then turn it on			*/	
+	    gsx_1code( SHOW_CUR, 0 );	/* set the flag			*/	
+	    gl_mouse = TRUE;
+	  }
+#else
+
+	  while( gl_moff )
+	   gsx_mon();
+	  	
+/*	  gsx_1code( SHOW_CUR, 0 );	*/	/* force the mouse on		*/
+/*	  gl_mouse = TRUE;		*/
+/*	  gl_moff = 0;			*/	/* reset the flag to make bbset work	*/
+#endif
+	}
+	else
+	{
+#if 0
+	  gsx_1code( SHOW_CUR, 0 );	/* force the mouse on		*/
+
+	  gsx_ncode( HIDE_CUR, 0x0L );	/* turn off the mouse anyway	*/
+#endif
+	  while( tmpmoff-- )
+	    gsx_moff();
+#if 0	
+	  if ( !tmpmon )		/* the mouse was off so turn off	*/
+	    gsx_ncode( HIDE_CUR, 0x0L );
+#endif
+/*	  gl_mouse = tmpmon; 	*/
+/*	  gl_moff = tmpmoff;	*/
+/*	  gr_mouse( M_RESTORE, (BYTE*)0 );	*/
+	}
+}

@@ -1,0 +1,3 @@
+-u -u -q -k _iscrmgr -k _mn_hdo -k _mn_popup -k _mn_attach -k _mn_istart -k _mn_settings
+-k _mn_free -k _mn_new -k _mn_init -k _ArrowScroll -k _PushArrowTe -o ab.o gemctrl 
+ctrlbind mn_event mn_mbar mn_popup mn_tools mn_index mn_menu mn_submn

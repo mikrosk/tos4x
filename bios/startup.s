@@ -1,19 +1,23 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 88/09/21 15:08:19 $
+* $Date: 88/10/03 15:01:09 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.15  88/10/03  15:01:09  kbad
+* Incorporated changes for new build method (several things were made
+* obsolete -- look for the keyword "newbuild" to find these changes).
+*
 * Revision 1.14  88/09/21  15:08:19  apratt
 * Whoops.. dmaread claimed to try twice, but really tried once.
 * Now it tries twice.
-*
+* 
 * Revision 1.13  88/09/06  11:39:52  kbad
 * Added osconf word for denmark.
 * 
@@ -71,7 +75,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.14 $
+* $Revision: 1.15 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -131,26 +135,36 @@ denmark		=      13 ***DON'T  CHANGE***
 * reading RAM address >3fffff).
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
-systype		=	rom		; 'rom' or 'ram'
+systype		=	ram		; 'rom' or 'ram'
 country		=	usa      	; 'usa', etc....
 version		=	$0104		; version number *MUST BE EVEN*
-date		=	$08261988	; date, $MMDDYYYY
+date		=	$10011988	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		=	%0001000100011010 ; Aug 8, 1988
-
-*--- for RAM:
- ifeq systype-ram
-endos		equ	$2140c		; end of OS memory usage
-the_magic	equ	endos-$c	; -> magic stuff (at the top of the OS)
- endc
-
-*--- for ROM:
- ifeq systype-rom
-endos		equ	$ad00		; end of OS memory usage
-the_magic	equ	$fefff4		; -> magic stuff (top of the ROM)
- endc
+dosdate		=	%0001000101000001 ; Oct 1, 1988
 
 
+****
+*
+* The lines below are an anachronism from the old build process.
+* The new build process gets numbers like these from the other
+* object modules in the link stage.  Other places affected by this
+* are marked with the key word "newbuild."
+*
+* endos is the address where the BIOS/GEMDOS/VDI memory usage ends.
+*
+**--- for RAM:
+* ifeq systype-ram
+*endos		equ	$2140c		; end of OS memory usage
+*the_magic	equ	endos-$c	; -> magic stuff (at the top of the OS)
+* endc
+*
+**--- for ROM:
+* ifeq systype-rom
+*endos		equ	$ad00		; end of OS memory usage
+*the_magic	equ	$fefff4		; -> magic stuff (top of the ROM)
+* endc
+*
+****
 
 *******************************************************************************
 *+
@@ -800,9 +814,15 @@ ostext:		bra.s	reseth		;($0)  branch to reset handler
 * In ROM, these are found at $FC0000.
 * In any event, they are found at *(_st_begos).
 *
-os_end:		dc.l	endos		;($c)  -> end of OS memory usage
+****
+* newbuild changes os_end and os_magic, commented lines are obsolete.
+* See comments below on endaesbss; the_magic isn't used any more.
+*
+* os_end:	dc.l	endos		;($c)  -> end of OS memory usage
+os_end:		dc.l	endaesbss	;($c)  -> end of OS memory usage
 * RAM to make the hard disk driver happy.
-os_magic:	dc.l	the_magic	;($14) -> GEM magic (or NULL)
+* os_magic:	dc.l	the_magic	;($14) -> GEM magic (or NULL)
+os_magic:	dc.l	0		;($14) -> GEM magic (or NULL)
 *-
 ostext:		bra	reseth		;($0)  branch to reset handler
 		dc.w	version		;($2)  OS version number
@@ -1177,12 +1197,29 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *  use the Setscreen call, which writes all three.  They think they
 *  need to align their screens on 256-byte boundaries, so the low byte
 *  of the address is zero.  
-	move.l	os_magic(pc),a0		; get pointer to magic
-	cmp.l	#$87654321,(a0)		; is the magic there?
-	beq	usem			; yes -- use numbers there
-	lea	os_end-4(pc),a0		; no, use default numbers
-usem:	move.l	4(a0),end_os		; init end-of-OS pointer
-	move.l	8(a0),exec_os		; init default-shell pointer
+*
+* newbuild -- this stuff is obsoleted by what follows it.
+*
+*	move.l	os_magic(pc),a0		; get pointer to magic
+*	cmp.l	#$87654321,(a0)		; is the magic there?
+*	beq	usem			; yes -- use numbers there
+*	lea	os_end-4(pc),a0		; no, use default numbers
+*usem:	move.l	4(a0),end_os		; init end-of-OS pointer
+*	move.l	8(a0),exec_os		; init default-shell pointer
+****
+*
+* endaesbss is a symbol whose value is the highest RAM usage by the
+* OS.  In a ROM system, this is the end of the AES BSS.  In a RAM
+* system, this is the end of the AES text/data/resource (whatever
+* is last).
+*
+	.globl	endaesbss
+	.globl	gemstart
+	move.l	#endaesbss,end_os
+	move.l	#gemstart,exec_os
+*
+* end of newbuild changes
+****
 	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero
 .else
 	move.l	#_dskinit,hdv_init(a5)	; initialization

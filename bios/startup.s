@@ -3,19 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/30 16:02:43 $
+* $Date: 89/09/05 17:49:47 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.28  89/09/05  17:49:47  apratt
+* Fixed dumb bug in setpalette code for TT.  Works now.
+*
 * Revision 2.27  89/08/30  16:02:43  apratt
 * Added def_frb variable, set to the value that the _FRB cookie gets.
 * Zero if no fast RAM.  Added moving end_os up by 64K as well as _membot.
 * Added code to match the boot spec: scan of bootable devices stops
 * when hdv_rw changes.  Cut bomb-handler delay from 1 sec to 0.5 sec.
-*
+* 
 * Revision 2.26  89/08/30  15:18:42  lozben
 * Fixed a bug in _EsetShift().
 * 
@@ -312,7 +315,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.27 $
+* $Revision: 2.28 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2900,7 +2903,7 @@ swmon2:	move.b	d0,sshiftmd(a5)
 .ifne TT
 	lea	ttcolor0(a5),a1		; a1 -> hardware palette base
 .endc
-	move.w	#16-1,d0		; d0 = count
+	move.w	#16-1,d1		; d1 = count
 .ifeq TT
 vbl2:	move.w	(a0)+,(a1)+		; load a palette
 .endc
@@ -2909,7 +2912,7 @@ vbl2:	move.w	(a0)+,d0
 	bsr	sw2hw
 	move.w	d0,(a1)+
 .endc
-	dbra	d0,vbl2			; ...and repeat
+* rez was low, but now there's a mono monitor! Go to high rez & bail out.
 	clr.l	colorptr(a5)		; zap colorptr
 * This code calls noblank1 to wait until vblank is over before changing
 * mode.  Otherwise the monochrome shifter can be 16 bits off. (Maybe

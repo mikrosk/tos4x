@@ -1,16 +1,19 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: unknown $
 * =======================================================================
 *
-* $Date: 1992/02/28 01:21:56 $
+* $Date: 1992/05/18 23:07:48 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.21  1992/05/18  23:07:48  unknown
+* SPARROW now uses motorola clock chip; added stub waketime
+*
 * Revision 2.20  1992/02/28  01:21:56  apratt
 * Oops. When STPAD boots we *do* want to disable off the alarm.
 *
@@ -119,7 +122,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.20 $
+* $Revision: 2.21 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\clock.s,v $
@@ -146,13 +149,21 @@
 
 .include "switches.s"
 
+*
+* This file switches on the symbols RICOH and MOTO; here is the formula for
+* what machines have what parts:
+*
+
+RICOH	equ	((TT + SPARROW) == 0)
+MOTO	equ	(TT + SPARROW)
+
 	.globl	clktest		; test for clock chip (returns CC/CS)
 	.globl	_iclock		; clock setup
 	.globl	_setclock	; setclock() BIOS call
 	.globl	_getclock	; getclock() BIOS call
 	.globl	_date,_time	; GEMDOS date and time variables
 
-.if (TT == 0)
+.if RICOH
 
 *
 * STPAD doesn't really probe for the clock chip: there is always one. The
@@ -869,12 +880,13 @@ badnews:
 	moveq.l	#-1,d0			; Return -1: you tried to set alarm
 	rts				; for "this minute" and I won't.
 
-.else
+.endif
 
+.if MOTO
 *
-* This is the TT branch of the main "if" in this file.
-*
-* Clock chip in the TT is the Motorola MC146818A
+* This code is for the TT and Sparrow; the clock chip in the TT is the
+* Motorola MC146818A; in Sparrow it's a "compatible" Dallas Semiconductor
+* DS1287 (not 1287A).
 *
 
 RTCA	equ	$ffff8961
@@ -1082,6 +1094,37 @@ berr:	move.l	a0,sp		; restore SP after bus error
 	move.l	a1,$8		; restore bus error vector
 	or	#1,ccr		; set carry bit
 	rts			; and return
+
+*
+* stub out waketime
+*
+
+.globl _waketime
+_waketime:
+	move.l	4(sp),d0
+	beq	wake_clr
+	addq.l	#1,d0
+	beq	wake_get
+	subq.l	#2,d0
+	beq	wake_set
+	addq.l	#1,d0
+wake_clr:
+	move.l	d0,waketime
+	moveq.l	#0,d0
+	rts
+
+wake_get:
+	move.l	waketime,d0
+	rts
+
+wake_set:
+	move.l	d0,waketime
+	moveq.l	#0,d0
+	rts
+
+.bss
+waketime: ds.l	1
+.text
 
 **********************************************************************
 *

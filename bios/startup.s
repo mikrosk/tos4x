@@ -4,18 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/12/06 14:03:49 $
+* $Date: 89/12/08 15:45:14 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.36  89/12/08  15:45:14  apratt
+* Fixed Lozben's fatfinger in _setscreen concerning wvbl.
+* Also changed TT background color to blue: it's nonwhite, so you
+* know this is not the final ROM (per LT), but it's not black,
+* so you can tell your TT is doing something.
+*
 * Revision 2.35  89/12/06  14:03:49  apratt
 * In the reset-bailout vector test, there are some sanity checks.
 * One of them checks to be sure that the high byte of the vector is 00.
 * This is OK on ST and STE, but not TT, so I made it conditional.
-*
+* 
 * Revision 2.34  89/10/23  18:37:17  lozben
 * Set the rez shadow register when setting the shifter on the TT.
 * 
@@ -351,7 +357,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.35 $
+* $Revision: 2.36 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -443,9 +449,9 @@ dosdate		equ	%0001001001111110 ; Mar 30, 1989
 
 .ifne TT
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$09121989	; TT date, $MMDDYYYY @check@
+date		equ	$03011990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001100101100 ; Sep 12, 1989
+dosdate		equ	%0001010001100001 ; Mar 1, 1990
 .endc
 
 ****
@@ -2715,7 +2721,7 @@ ca_r:	rts
 colors:	dc.w	$777			; 0 white
 .endc
 .ifne TT
-colors:	dc.w	$000			; 0 black (TT shifter's busted)
+colors:	dc.w	$077			; 0 blue (says "this is not final")
 .endc
 	dc.w	$700			; 1 red
 	dc.w	$070			; 2 green
@@ -2731,12 +2737,7 @@ colors:	dc.w	$000			; 0 black (TT shifter's busted)
 	dc.w	$337			; 12 light blue
 	dc.w	$737			; 13 light magenta
 	dc.w	$377			; 14 light cyan
-.ifeq TT
 	dc.w	$000			; 15 black
-.endc
-.ifne TT
-	dc.w	$777			; 15 white (TT shifter's busted)
-.endc
 .endc
 
 .ifne STPLUS
@@ -3493,8 +3494,7 @@ _tickcal:
 _physbase:
 	moveq	#0,d0			; cleanup pointer-to-be
 	move.b	dbaseh,d0		; load and shift bits 16..23
-f5a:	bsr	wvbl			; wait for start of vertical-blank
-	tst.l	8(sp)			; if(physloc < 0) then ignore it
+	lsl.w	#8,d0
 	move.b	dbasel,d0		; load and shift bits 8..15
 	lsl.l	#8,d0
 	tst.b	_iamanst		; see if we're an ST
@@ -3505,6 +3505,7 @@ phydone:
 	rts				; return pointer in d0
 
 
+	bsr	wvbl			; wait for start of vertical-blank
 * _logbase - get logical display base
 .ifeq TT
 *-

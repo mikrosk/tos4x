@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/27 12:35:02 $
+* $Date: 89/02/27 12:36:29 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.1  89/02/27  12:36:29  apratt
+* *** TOS 1.4  FINAL RELEASE VERSION ***
+*
 * Revision 1.4  89/02/27  12:35:02  apratt
 * Blasted fatfinger again, in the no-bus-error case in clktest. Fixed.
-*
+* 
 * Revision 1.3  89/02/17  11:55:46  apratt
 * Fixed my fat fingers in clktest.  Also shortened by a few bytes.
 * 
@@ -26,7 +29,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.4 $
+* $Revision: 2.1 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $

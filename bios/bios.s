@@ -1,16 +1,21 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: unknown $
 * =======================================================================
 *
-* $Date: 1992/02/28 08:31:20 $
+* $Date: 1992/05/18 23:07:12 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.48  1992/05/18  23:07:12  unknown
+* Set M68030 if (SPARROW | TT) -- all Sparrow is 68030
+*
+* The cold boot code for STPAD and SPARROW now clear 1MB as documented.
+*
 * Revision 2.47  1992/02/28  08:31:20  apratt
 * Changed coldboot so it works for Sparrow.
 *
@@ -137,7 +142,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.47 $
+* $Revision: 2.48 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\RCS\bios.s,v $
@@ -167,8 +172,7 @@
 
 * SPARROW and TT are both M68030.
 
-*M68030		equ	(SPARROW | TT)	; normallly, but see below:
-.include "m68030.s"
+M68030		equ	(SPARROW | TT)
 
 *******************************************************************************
 *+
@@ -2948,6 +2952,15 @@ mapend:	rts
 *
 * This (re-)initializes xconstat etc. for device 1 (the mappable one).
 *
+* SPARROW: Sometime soon, Sparrows will arrive with SCC channel B as their
+* one and only serial port.  For compatibility, I think we're going to use
+* Bconmap to fake stuff out: it will look like a Mega STe, with STMFP, SCC
+* B, and SCC A as your options, but SCC B is the only option you'll be
+* allowed to choose.  I am most sorry about the impact this will have on
+* users: to some extent, I don't care how hard programmers have to work.
+* Currently (5/15/92) all Sparrows have STMFP as the serial port, so this
+* code falls out correctly (but just barely).
+*
 
 mapinit:
 	lea.l	defmaptab.w,a0
@@ -3311,6 +3324,9 @@ nolan:
 * but you'd better not try to use the SCC ports for anything!
 * This also short-circuits if you're on an STPLUS, not Mega STe.
 *
+* SPARROW has SCC but no SCU, meaning no ttvmeintmsk register.
+* Sigh.
+*
 
 .globl _setupscc
 
@@ -3370,7 +3386,13 @@ vloop:	move.l	(a1)+,(a0)+
 	lea.l	inittab(PC),a1
 	bsr	sccinit		; initialize channel B
 
+*
+* Sparrow has SCC but no ttvmeintmsk; otherwise all machines that have
+* scc have this register.
+*
+.if (SPARROW == 0)
 	bset.b	#5,ttvmeintmsk	; enable level 5 interrupts (SCC)
+.endif
 	rts
 
 *
@@ -5143,10 +5165,13 @@ mauskey1:
 * STPAD doesn't give a bus error at the end of memory: we have to
 * compile in the limit of 1MB and clear it from ROM.
 *
-* Yes, you can really only clear 1MB.  If you clear 4MB on a 1MB machine
-* you will clear out the (shadow of the) bus error vector itself. This is
-* also true of SPARROW, which is another machine where if there is one
-* megabyte it shadows.
+* Yes, you really have to clear from ROM.  If you cleared 4MB on a 1MB
+* machine you would clear out the (shadow of the) bus error vector itself.
+* This is also true of SPARROW, which is another machine where if there is
+* one megabyte it shadows.
+*
+* We could check the memory-size bits in Sparrow and see how much there
+* is, but we don't. Like STPAD, we clear 1MB regardless.
 *
 *************************************************************************
 
@@ -5171,10 +5196,13 @@ tdis:	dc.l	0
 	move.l	$4,$8			; set bus error to reset vector
 	move.l	#$c,a0			; start clearing at $c
 	moveq.l	#0,d0
-	move.l	#$00040000-1,d1		; clear 1MB or to bus error
+	move.w	#$fffe,d1		; clear the first megabyte or so
 cploop:	move.l	d0,(a0)+
+	move.l	d0,(a0)+
+	move.l	d0,(a0)+
+	move.l	d0,(a0)+
 	dbra	d1,cploop
-	move.l	$4,a0
+	move.l	$4,a0			; get reset vector from ROM
 	jmp	(a0)
 .else
 .if M68030

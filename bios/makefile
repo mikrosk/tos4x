@@ -1,13 +1,18 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.15 $	$Source: d:/tos/bios\RCS\makefile.,v $
+#  $Revision: 2.16 $	$Source: d:/tos/bios\RCS\makefile.,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 1992/02/29 21:24:14 $     $Locker:  $
+#  $Author: unknown $	$Date: 1992/05/18 23:08:24 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.15  1992/02/29  21:24:14  apratt
-#  Added dependency on m68030.s
+#  Revision 2.16  1992/05/18  23:08:24  unknown
+#  Made rwabs.c machine-dependent, because of disk change.
+#  Took "optimize" out because it doesn't work under MiNT.
+#  Took out m68030.s - it was a temporary hack while Sparrows had both CPUs.
+#
+# Revision 2.15  1992/02/29  21:24:14  apratt
+# Added dependency on m68030.s
 #
 # Revision 2.14  1991/12/05  00:43:20  apratt
 # Added machine type 'w' for Sparrow.
@@ -83,6 +88,7 @@
 #
 # flop, dmaread and clock are affected the machine switch only.
 #
+# rwabs.c is affected by machine, too: for SPARROW it gets USE_DISK_CHANGE.
 # startup is affected by machine and systype.
 #
 # Set these switches with no spaces.  MACHINE is s, e, p, or t.
@@ -103,8 +109,15 @@
 # 	n	norway
 # 	d	denmark
 # 
-# letters used: abcd fg i k  n    stu w
-# letters free:     e  h j lm opqr   v xyz0123456789
+# ccode letters used: abcd fg i k  n    stu w
+# ccode letters free:     e  h j lm opqr   v xyz0123456789
+#
+# Machine letters:
+#	e	ST/STe/Mega STe
+#	t	TT
+#	w	Sparrow
+#	p	STPad (STBOOK)
+#
 
 CCODE=u
 MACHINE=w
@@ -119,12 +132,13 @@ TMPDIR	=	m:
 ASM = mas -3 -8 -S $*.s -O=$@
 
 # You can add "-s c:\alcyon\lib\oas68sym.dat" or whatever to the as68 line.
+# You can also add "optimize $*.s" before oas68, except that it doesn't
+# work with memory protection on.
 
 .c.o:
 	ocp68 $(CFLAGS) $*.c $*.i
 	oc068 $*.i $*.1 $*.2 $*.3 -f
 	oc168 $*.1 $*.2 $*.s
-	optimize $*.s
 	oas68 -l -u -s c:\alcyon\lib\oas68sym.dat $*.s
 	rm $*.i $*.1 $*.2 $*.s
 
@@ -138,12 +152,12 @@ SFILES	=	xinout.o memtest.o
 # CFILES are those which come from .c sources, also not affected
 # by country or machine switches.
 
-CFILES	=	prtblk.o rwabs.o
+CFILES	=	prtblk.o 
 
 allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o \
 			dmaread.$(MACHINE) clock.$(MACHINE) \
 			bios.$(MACHINE)$(CCODE) flop.$(MACHINE) \
-			$(CFILES) $(SFILES)
+			rwabs.$(MACHINE) $(CFILES) $(SFILES)
 		biosvers version.s
 		mac version.s
 		aln -u -u -p -w -l -o $@ $< version.o
@@ -153,7 +167,7 @@ allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o \
 allbios.$(MACHINE)a$(CCODE):	startup.$(MACHINE)a \
 			dmaread.$(MACHINE) clock.$(MACHINE) \
 			bios.$(MACHINE)$(CCODE) flop.$(MACHINE) \
-			$(CFILES) $(SFILES)
+			rwabs.$(MACHINE) $(CFILES) $(SFILES)
 		biosvers version.s
 		mac version.s
 		aln -u -u -p -w -l -o $@ $< version.o
@@ -161,8 +175,6 @@ allbios.$(MACHINE)a$(CCODE):	startup.$(MACHINE)a \
 		@echo $@ linked.
 
 prtblk.o:	prtblkc.h prtblk.c
-
-rwabs.o:	portab.h rwabs.c
 
 xinout.o:	xinout.s
 		$(ASM)
@@ -174,11 +186,11 @@ memtest.o:	memtest.s
 
 # any switches.x?? will do, where x is machine
 
-flop.$(MACHINE): flop.s m68030.s
+flop.$(MACHINE): flop.s
 		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
-dmaread.$(MACHINE): dmaread.s m68030.s
+dmaread.$(MACHINE): dmaread.s
 		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
@@ -187,14 +199,52 @@ clock.$(MACHINE): clock.s
 		$(ASM)
 
 ############
+#
+# rwabs is produced with -DUSE_DISK_CHANGE=1 for sparrow and falcon,
+# and =0 for all others.
+#
+
+rwabs.w:	portab.h rwabs.c
+		ocp68 $(CFLAGS) -DUSE_DISK_CHANGE=1 rwabs.c rwabs.i
+		oc068 rwabs.i rwabs.1 rwabs.2 rwabs.3 -f
+		oc168 rwabs.1 rwabs.2 rwabs.s
+		oas68 -l -u -s c:\alcyon\lib\oas68sym.dat rwabs.s
+		rm rwabs.i rwabs.1 rwabs.2 rwabs.s
+		mv rwabs.o rwabs.w
+
+rwabs.p:	portab.h rwabs.c
+		ocp68 $(CFLAGS) -DUSE_DISK_CHANGE=0 rwabs.c rwabs.i
+		oc068 rwabs.i rwabs.1 rwabs.2 rwabs.3 -f
+		oc168 rwabs.1 rwabs.2 rwabs.s
+		oas68 -l -u -s c:\alcyon\lib\oas68sym.dat rwabs.s
+		rm rwabs.i rwabs.1 rwabs.2 rwabs.s
+		mv rwabs.o rwabs.p
+
+rwabs.t:	portab.h rwabs.c
+		ocp68 $(CFLAGS) -DUSE_DISK_CHANGE=0 rwabs.c rwabs.i
+		oc068 rwabs.i rwabs.1 rwabs.2 rwabs.3 -f
+		oc168 rwabs.1 rwabs.2 rwabs.s
+		oas68 -l -u -s c:\alcyon\lib\oas68sym.dat rwabs.s
+		rm rwabs.i rwabs.1 rwabs.2 rwabs.s
+		mv rwabs.o rwabs.t
+
+rwabs.e:	portab.h rwabs.c
+		ocp68 $(CFLAGS) -DUSE_DISK_CHANGE=0 rwabs.c rwabs.i
+		oc068 rwabs.i rwabs.1 rwabs.2 rwabs.3 -f
+		oc168 rwabs.1 rwabs.2 rwabs.s
+		oas68 -l -u -s c:\alcyon\lib\oas68sym.dat rwabs.s
+		rm rwabs.i rwabs.1 rwabs.2 rwabs.s
+		mv rwabs.o rwabs.e
+
+############
 
 # any switches.xy? will do, where x is machine and y is systype
 
-startup.$(MACHINE)a:	startup.s m68030.s
+startup.$(MACHINE)a:	startup.s
 		cp switches\switches.$(MACHINE)au switches.s
 		$(ASM)
 
-startup.$(MACHINE)o:	startup.s m68030.s
+startup.$(MACHINE)o:	startup.s
 		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
@@ -202,6 +252,6 @@ startup.$(MACHINE)o:	startup.s m68030.s
 
 # any switches.x?y will do for BIOS (x is machine, y is country)
 
-bios.$(MACHINE)$(CCODE):	bios.s m68030.s
+bios.$(MACHINE)$(CCODE):	bios.s
 		cp switches\switches.$(MACHINE)o$(CCODE) switches.s
 		$(ASM)

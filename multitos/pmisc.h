@@ -84,6 +84,7 @@ WORD 	objc_change( LONG tree, WORD drawob, WORD depth, WORD xc, WORD yc,
 			WORD wc, WORD hc, WORD newstate, WORD redraw);
 WORD 	objc_delete(LONG tree, WORD delob);
 WORD 	objc_find(OBJECT *tree, WORD startob, WORD depth, WORD mx, WORD my);
+WORD 	objc_xfind(OBJECT *tree, WORD startob, WORD depth, WORD mx, WORD my);
 WORD 	objc_offset(OBJECT *tree, WORD obj, WORD *poffx, WORD *poffy);
 WORD 	objc_draw(LONG tree, WORD drawob, WORD depth, WORD xc, WORD yc,
 			WORD wc, WORD hc);

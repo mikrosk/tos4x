@@ -1,41 +1,11 @@
 /*	VDIDEFS.H		4/22/91			D.Mui		*/
 
-/*
-*************************************************************************
-*			Revision Control System
-* =======================================================================
-*  $Revision: 1.6 $	$Source: f:\multitos/RCS/vdidefs.h,v $
-* =======================================================================
-*  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
-* =======================================================================
-*  $Log: vdidefs.h,v $
-*  Revision 1.6  1993/04/27  23:00:14  ersmith
-*  Merged Cary's and Hans-Martin's changes
-*
- * Revision 1.4  1993/03/12  19:51:12  ersmith
- * Merged HMK's loadable resource stuff
- *
- * Revision 1.3  1993/03/10  20:12:42  ersmith
- * Lattice port
- *
-* Revision 2.2  89/04/26  18:20:13  mui
-* TT
-* 
-* Revision 2.1  89/02/22  05:23:57  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.1  88/06/02  12:30:33  lozben
-* Initial revision
-* 
-*************************************************************************
-*/
-
 #ifndef _VDIDEFS_H_
 #define _VDIDEFS_H_
 
 #include "portab.h"
 
-typedef struct wsstr		/* work stationn structure	*/
+typedef struct wsstr		/* work station structure	*/
 {
 	WORD		ws_xres;
 	WORD		ws_yres;

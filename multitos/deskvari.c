@@ -18,9 +18,9 @@
  *	replacement Desktop. Clear it for making GEM.SYS
  *      DESKPRG must also be set/cleared in
  *	      DESKSTAR.S, DESKTOP.C, DESKROM.C
- *	See the Defines in the makegem/makedesk files.
+ *	See the Defines in the softload.h file.
  */
-
+#include "softload.h"
 
 BYTE	dr[32];		/* drives flag			*/	
 WORD	p_timedate;	/* preserve time and date	*/

@@ -23,7 +23,8 @@
 /*	Converted to Lattice C 5.51	Cary Gee       02/12/93 */
 /*	Force the use of prototypes	Cary Gee       02/22/93 */
 /*								*/
-
+/*	Add iconfy features to wmset/wmget H.M.Krober  05/04/93 */ 
+/*								*/
 /*	MultiTOS window library is written by Minna Lai		
 *	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -451,9 +452,12 @@ wm_create( kind, rect )
     wp->kind = kind;			/* save kind of window */
 
     /* initialize window object colors */
+    /* also, set all objects to not display, initially */
     for (i = 0; i < MAXOBJ; i++) {
 	wp->tcolor[i] = wtcolor[i];
 	wp->bcolor[i]= wbcolor[i];
+	wp->obj[i].ob_type = G_IBOX;
+	wp->obj[i].ob_flags = HIDETREE;
     }
 
     /* initialize window coordinates and size */
@@ -504,7 +508,7 @@ wm_create( kind, rect )
 	}
 
 	if (kind & SMALLER) {
-	    w_bld(wp, W_SMALLER, G_BOXCHAR, W_TITLE, 0x2e010000, IS3D);
+	    w_bld(wp, W_SMALLER, G_BOXCHAR, W_TITLE, 0x7f010000, IS3D);
 	}
     }
 
@@ -570,6 +574,9 @@ wm_create( kind, rect )
 	    w_bld(wp, W_HELEV, G_BOX, W_HSLIDE, GBOX_OBS, IS3D);
 	}
     }
+    wp->iconflag = FALSE;
+    w_rect(&(wp->icon), 0, 0, 0, 0);
+    wp->savekind = 0;
 
     storewp(wp);	/* store window structure into database */
     w_adjust( wp, rect);
@@ -674,7 +681,7 @@ wmclose( handle )
 	Ndebug5( (LONG)handle );
 
 	closetop = FALSE;		/* assume not closing the top win */
-					    
+
 	wp->prev = wp->curr;		/* save previous coords */
 
 	w_rect(&(wp->curr), 0, 0, 0, 0);  /* reset current coords and work area coords */
@@ -1109,7 +1116,15 @@ wg_1:
 	case WF_REDRAW:
 	    *((LONG*)&ow[0]) = ( LONG )wp->drawaddr;
 	    break;
-	
+	case WF_ICONIFY:	  /* return iconified state */
+	    ow[0] = wp->iconflag; /* window status: TRUE==ICON, FALSE==NORMAL */
+	    ow[1] = WINICON_W;	  /* std. width of an icon */
+	    ow[2] = WINICON_H;	  /* std. height of an icon */
+	    break;
+	case WF_UNICONIFY:
+	    r = (GRECT *)ow;	/* window's size when not iconified */
+	    *r = wp->icon;
+	    break;
 	case WF_RESVD:
 	default:
 	    ret = FALSE;
@@ -1132,6 +1147,10 @@ wmset(handle, field, iw)
 	REG WINDOW	*wp;	    /* pointer to window structure */
 	WORD		ret, obj, drawit;
 	GRECT		rect, rect1;
+	WORD		which;
+	WORD		oldbcolor, oldtcolor;
+	WORD		i;
+	PD		*p;
 
 	if ((wp = srchwp(handle)) == ( WINDOW *)NULLPTR)
 	  return FALSE;	
@@ -1169,8 +1188,37 @@ wmset(handle, field, iw)
 		w_clipdraw( wp, W_INFO, ( GRECT *)NULLPTR);
 	    }
 	    break;
+	  case WF_UNICONIFYXYWH: /* set size which will be send when */
+	    rect = *(GRECT *)iw; /* a WM_UNICONIFY message occurs    */
+	    w_adjust(wp, &rect);
+	    rc_copy(&rect, &wp->icon);
+	    break;
+
+	  case WF_UNICONIFY:
+	    wp->ttxt.te_font = IBM; 	/* normal font */
+	    wp->kind = wp->savekind;	/* get parts back */
+	    wp->savekind = 0;
+	    wp->iconflag = FALSE;	/* not an icon window anymore */
+	    w_showparts(wp);		/* show window parts again */
+
+	    goto currxywh;		/* set to previous window size */
+
+	  case WF_ICONIFY:
+	    wp->ttxt.te_font = SMALL;	/* small font */
+	    w_hideparts(wp);		/* hide window parts */
+	    wp->savekind = wp->kind;	/* remember window parts */
+	    wp->kind = 0;
+	    wp->iconflag = TRUE;	/* we are now an iconified window */
+	    if (wp->savekind & NAME) 
+		    wp->kind |= NAME;
+	    if (wp->savekind & MOVER) 
+		    wp->kind |= MOVER;
+	    rc_copy(&wp->curr, &wp->icon); /* store current coords */
+			
+	    /* now set it to icon window sizes ... */
 
 	  case WF_CURRXYWH:
+currxywh:
 	    if ( iw[1] < gl_hbox )
 	      iw[1] = gl_hbox;
 
@@ -1330,28 +1378,62 @@ ws_2:
 	    break;
 
 	case WF_COLOR:
+	    which = iw[0];
+wfagain:
 	    if (iw[1] != -1)
-		wp->tcolor[iw[0]] = iw[1];
+		wp->tcolor[which] = iw[1];
 	    if (iw[2] != -1)
-		wp->bcolor[iw[0]] = iw[2];
+		wp->bcolor[which] = iw[2];
 
 	    if (wp->handle == gl_topw)
-		setcol(wp, iw[0], TRUE);
+		setcol(wp, which, TRUE);
 	    else
-		setcol(wp, iw[0], FALSE);
+		setcol(wp, which, FALSE);
 
 	    /* if window is already opened, redraw it */
 
 	    if (wp->status.opened)
-		w_clipdraw( wp, iw[0], ( GRECT *)NULLPTR);
+		w_clipdraw( wp, which, ( GRECT *)NULLPTR);
 
+/* kludge: take the colors for the fuller and use them for the
+ * iconifier
+ */
+	    if (which == W_FULLER) {
+		which = W_SMALLER;
+		goto wfagain;
+	    }
 	    break;
 
 	case WF_DCOLOR:
+	    which = iw[0];
+wfdagain:
+	    oldtcolor = wtcolor[which];
+	    oldbcolor = wbcolor[which];
 	    if (iw[1] != -1)
-		wtcolor[iw[0]] = iw[1];
+		wtcolor[which] = iw[1];
 	    if (iw[2] != -1)
-		wbcolor[iw[0]] = iw[2];
+		wbcolor[which] = iw[2];
+/* Now update any existing windows to use the new colors */
+	    for (i = 0; i < NUMWIN; i++) {
+		for(wp = hashtbl[i]; wp; wp = wp->wnext) {
+		    if (wp->handle == deskwind || wp->handle == phanwind)
+			continue;
+	/* only update the window if it is using the default color */
+		    if (oldtcolor == wp->tcolor[which])
+			wp->tcolor[which] = wtcolor[which];
+		    if (oldbcolor == wp->bcolor[which])
+			wp->bcolor[which] = wbcolor[which];
+
+		    setcol( wp, which, (wp->handle == gl_topw) ); 
+
+		    if (wp->status.opened)
+		        w_clipdraw( wp, which, (GRECT *)NULLPTR );
+		}
+	    }
+	    if (which == W_FULLER) {
+	     	which = W_SMALLER;
+		goto wfdagain;
+	    }
 	    break;
 
 	case WF_BEVENT:
@@ -1360,13 +1442,29 @@ ws_2:
 	    break;
 
 	case WF_BOTTOM:			/* Feb 26 1992 ml. */
+	    i = (gl_topw == handle);	/* do some stuff if top window is changed */
 	    ret = tobot(handle);
+	    if (ret && i) {
+		wp = srchwp( gl_topw );
+		if (!wp) break;
+		p = wp->owner;
+	        if ( ( p->p_state != PS_DEAD ) && ( p->p_state != PS_ZOMBIE ) )
+	        {
+	            if ( ( p->p_type & AESAPP ) )
+	            {				/* In case mn_bar is 0 */
+			ap_sendmsg( WM_ONTOP, p->p_pid, gl_topw, 0, 0, 0, 0 );
+			gl_kbid = p->p_pid;
+			setmenu( (phanwind == gl_topw) ? wp->cowner : wp->owner );
+		    }
+		}
+	    }
 	    break;
 	
 	case WF_REDRAW:	     /* set the redraw address of a particular win */
 	    wp->drawaddr = ( BYTE *)( *((LONG*)&iw[0] ));
 	    break;
 
+	    break;
 	case WF_RESVD:	    /* old WMLIB has code, but doc says RESERVED */
 	default:
 	    ret = FALSE;
@@ -1931,11 +2029,11 @@ WORD	handle;		/* handle of window to be topped */
 
 	/* change border of newly bottomed window */
 	activate(nbwp, NO);
-	w_clipdraw(nbwp, W_NAME, ( GRECT *)NULLPTR); /* changed 6/16/92	*/
+	w_clipdraw(nbwp, W_BOX, ( GRECT *)NULLPTR);
 
 	/* draw border of the newly topped window */
 	activate(unnbwp, YES);
-	w_clipdraw(unnbwp, W_NAME, ( GRECT *)NULLPTR); /* changed 6/16/92	*/
+	w_clipdraw(unnbwp, W_BOX, ( GRECT *)NULLPTR);
 
 	ap_sendmsg( WM_ONTOP, unnbwp->owner->p_pid, gl_topw, 0, 0, 0, 0);
 
@@ -2265,7 +2363,7 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
     {
 	blen = rect->g_w - lrx;
 	lly = iny;
-	w_obrect(wp, W_HBAR, 0, (rect->g_h-h3dbox), blen, gl_hbox);
+	w_obrect(wp, W_HBAR, 0, (rect->g_h-h3dbox), blen, h3dbox);
 
 	if (wp->kind & LFARROW) {
 	    w_obrect(wp, W_LFARROW, ADJ3DPIX, ADJ3DPIX, gl_wbox, gl_hbox);
@@ -2335,6 +2433,9 @@ w_clipdraw(wp, obj, pc)
     GRECT	rclip;
     RLIST	*rlist;
 		
+    if (wp->obj[obj].ob_flags & HIDETREE)
+	return;
+
     gsx_moff();
 
     rlist = genrlist(wp->handle, WF_CURRXYWH);
@@ -2473,6 +2574,153 @@ w_bld(wp, ob, type, parent, spec, is3d)
 }
 
 
+/*
+ *	Hide window parts for iconifying window.
+ *	Only the title bar is present when a window gets icnonified.
+ */
+
+VOID
+w_hideparts(wp)
+WINDOW	*wp;
+{
+	REG OBJECT  	*obaddr;
+	WORD		hparts, vparts;
+	WORD		kind;
+
+	/* initialize object */
+    	obaddr = wp->obj;
+	kind = wp->kind;
+
+	hparts = kind & HPARTS;	/* mask for vertical slider elements */
+        vparts = kind & VPARTS;	/* mask for horizontal slider elements */
+
+	if (kind & CLOSER)
+		ob_delete(obaddr, W_CLOSER);
+	if (kind & FULLER)
+		ob_delete(obaddr, W_FULLER);
+	if (kind & SMALLER)
+		ob_delete(obaddr, W_SMALLER);
+	if (kind & INFO)
+		ob_delete(obaddr, W_INFO);
+	if (kind & SIZER) {
+		ob_delete(obaddr, W_SIZER);
+
+		if (!hparts && !vparts) {
+			ob_delete(obaddr, W_VBAR);
+		}
+    	} else if (hparts && vparts) {
+		ob_delete(obaddr, W_SIZER);
+    	}
+
+	if (vparts) {
+		ob_delete(obaddr, W_VBAR);
+
+		if (kind & UPARROW) {
+			ob_delete(obaddr, W_UPARROW);
+		}
+
+		if (kind & DNARROW) {
+			ob_delete(obaddr, W_DNARROW);
+		}
+
+		if (kind & VSLIDE) {
+			ob_delete(obaddr, W_VSLIDE);
+			ob_delete(obaddr, W_VELEV);
+		}
+    	}
+
+	if (hparts) {
+		ob_delete(obaddr, W_HBAR);
+
+		if (kind & LFARROW) {
+			ob_delete(obaddr, W_LFARROW);
+		}
+
+		if (kind & RTARROW) {
+			ob_delete(obaddr, W_RTARROW);
+		}
+
+		if (kind & HSLIDE) {
+			ob_delete(obaddr, W_HSLIDE);
+			ob_delete(obaddr, W_HELEV);
+		}
+    	}
+
+}
+/*
+ *	Show window parts for uniconified window.
+ */
+
+VOID w_showparts(wp)
+WINDOW	*wp;
+{
+	REG OBJECT  	*obaddr;
+	WORD		hparts, vparts;
+	WORD		kind;
+	/* initialize object */
+    	obaddr = wp->obj;
+	kind = wp->kind;
+
+	hparts = kind & HPARTS;	/* mask for vertical slider elements */
+        vparts = kind & VPARTS;	/* mask for horizontal slider elements */
+
+	if (kind & CLOSER)
+		ob_add(obaddr, W_TITLE, W_CLOSER);
+	if (kind & FULLER)
+		ob_add(obaddr, W_TITLE, W_FULLER);
+	if (kind & SMALLER)
+		ob_add(obaddr, W_TITLE, W_SMALLER);
+	if (kind & INFO)
+		ob_add(obaddr, W_BOX, W_INFO);
+	if (kind & SIZER) {
+		ob_add(obaddr, W_BOX, W_SIZER);
+
+		if (!hparts && !vparts) {
+			ob_add(obaddr, W_BOX, W_VBAR);
+		}
+    	} else if (hparts && vparts) {
+		ob_add(obaddr, W_BOX, W_SIZER);
+    	}
+
+	if (vparts) {
+		ob_add(obaddr, W_BOX, W_VBAR);
+
+		if (kind & UPARROW) {
+			ob_add(obaddr, W_VBAR, W_UPARROW);
+		}
+
+		if (kind & DNARROW) {
+			ob_add(obaddr, W_VBAR, W_DNARROW);
+		}
+
+		if (kind & VSLIDE) {
+			ob_add(obaddr, W_VBAR, W_VSLIDE);
+			ob_add(obaddr, W_VSLIDE, W_VELEV);
+		}
+    	}
+
+	if (hparts) {
+		ob_add(obaddr, W_BOX, W_HBAR);
+
+		if (kind & LFARROW) {
+			ob_add(obaddr, W_HBAR, W_LFARROW);
+		}
+
+		if (kind & RTARROW) {
+			ob_add(obaddr, W_HBAR, W_RTARROW);
+		}
+
+		if (kind & HSLIDE) {
+			ob_add(obaddr, W_HBAR, W_HSLIDE);
+			ob_add(obaddr, W_HSLIDE, W_HELEV);
+		}
+    	}
+
+	if (wp->handle != gl_topw)
+		activate(wp, NO);
+	else
+		activate(wp, YES);
+}
 	VOID
 w_obrect(wp, ob, obx, oby, obw, obh)
 	WINDOW	*wp;

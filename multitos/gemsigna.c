@@ -18,6 +18,7 @@
 *
 *	02/12/93	cjg	Convert to Lattice C 5.51
 *	02/22/93	cjg	Force the use of prototypes
+*	05/04/93	hmk	ch_mowner now recognizes iconified windows
 */
 #include "pgem.h"
 #include "pmisc.h"
@@ -106,6 +107,7 @@ GLOBAL	WORD	gl_button;	/* current button state as reported by 	*/
 	REG WORD	mx,my;
 	GRECT		t;
 	GRECT		temp;
+	WINDOW		*wp;
 
 	m = idtopd( gl_smid );
 
@@ -124,9 +126,13 @@ GLOBAL	WORD	gl_button;	/* current button state as reported by 	*/
 			
 	      if ( inside( mx, my, &t ) )	/* inside the work area	*/
 	      {
-		if ( ( srchwp( wh )->type & 0x01 ) || 
-	             ( !wh ) || ( wh == gl_topw ) || ( button != 0x01 ) )
-	          m = srchwp( wh )->owner;
+		if ( ( ((wp = srchwp( wh ))->type & 0x01 ) || 
+	               ( !wh ) || ( wh == gl_topw ) || ( button != 0x01 )
+		     ) 
+		     && ( !wp->iconflag )  /* +++ 05/04/93 HMK */
+		   ) /* if window is iconified, don't send event to appl. */
+					   
+	        	m = srchwp( wh )->owner;
 	      }
 	    }
 	  }
@@ -178,10 +184,15 @@ mchange( mx, my )
 	/* give mouse to screen handler when not button down and	*/
 	/* there is an active menu and it will satisfy his event	*/
 						/* CHANGED LKW		*/
-	if ( ( !cu_button ) && ( gl_mntree ) && 
+	/* 04/28/93: Now also checking for gl_smid! If gl_smid != 0 then*/
+	/* someone did a wm_update(BEG_MCTRL) and requires total mouse  */
+	/* control. So we can NOT take away mouse control from him,     */
+	/* even if we are over the menu bar. 				*/
+	if ( ( !cu_button ) && ( gl_mntree ) && (!gl_smid) &&
 	     ( gl_ctwait.m_out != inside( cu_xrat, cu_yrat, ( GRECT *)&gl_ctwait.m_x ) ) )
 	{
 	  gl_mowner = scr_pd;
+	  Debug7("mchange: screen now owns mouse!!!\r\n");
 	}
 
 	post_mouse( gl_mowner, cu_xrat, cu_yrat );

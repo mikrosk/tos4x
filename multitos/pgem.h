@@ -25,8 +25,9 @@ VOID	ldaccs( VOID );
 
 VOID	free_accs( VOID );
 
+VOID	all_run( VOID );
 
-
+VOID	accwait( VOID );
 
 
 
@@ -46,7 +47,7 @@ VOID	ct_msgup( WORD message, WORD owner, WORD wh,
 VOID	ct_wmsgup( WORD message, WORD owner, WORD wh,
 		   WORD m1, WORD m2, WORD m3, WORD m4 );
 
-VOID	hctl_window( WORD mx, WORD my, WORD kshift );
+VOID	hctl_window( WORD mx, WORD my, WORD kshift, WORD clicks );
 
 VOID	swap_prg( PD *p );
 
@@ -449,8 +450,6 @@ WORD	pred_dinf( VOID );
 VOID	bailout( BYTE *ptr );
 
 
-
-
 /* FILE: GEMMNLIB.C
  * --------------------------------------------------------------------
  */
@@ -540,6 +539,12 @@ VOID	ob_draw( REG LONG tree, WORD obj, WORD depth );
 WORD	ob_find( REG LONG tree, REG WORD currobj, 
 		 REG WORD depth, WORD mx, WORD my );
 
+WORD	ob_xfind( REG LONG tree, REG WORD currobj, 
+		 REG WORD depth, WORD mx, WORD my );
+
+WORD	doobfind( REG LONG tree, REG WORD currobj, 
+		 REG WORD depth, WORD mx, WORD my, WORD just_inside );
+
 VOID	ob_add( REG LONG tree, REG WORD parent, REG WORD child );
 
 VOID	ob_delete( REG LONG tree, REG WORD obj );
@@ -624,7 +629,7 @@ PD 	*xget_pd( BYTE *name, WORD type );
 
 PD	*get_pd( BYTE *name, WORD type );
 
-PD	*pstart( REG PD *px, WORD (*pcode)(), BYTE *ldaddr );
+PD	*pstart( REG PD *px, WORD (*pcode)( ), BYTE *ldaddr );
 
 
 
@@ -939,6 +944,8 @@ VOID	dk_newdraw( GRECT *px );
 
 VOID	dk_redraw( OBJECT *obj, WORD root, GRECT *px );
 
+VOID	w_showparts(WINDOW *wp);
+VOID	w_hideparts(WINDOW *wp);
 
 
 

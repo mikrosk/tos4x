@@ -11,9 +11,8 @@
 /*
  *	Set the DESKPRG flag to compile this file for a
  *	replacement Desktop. Clear it for making GEM.SYS
- *      DESKPRG must also be set/cleared in
- *	      DESKSTAR.S, DESKVARI.C, DESKROM.C
- *	See the Defines in makedesk/makegem files.
+ *
+ *	See the Defines in SOFTLOAD.H
  */
 
 
@@ -21,6 +20,7 @@
 #include "pmisc.h"
 #include "gemdos.h"
 #include "machine.h"
+#include "softload.h"
 
 EXTERN	LONG	trap();
 

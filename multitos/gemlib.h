@@ -100,7 +100,9 @@
 
 #define WF_BEVENT	24
 #define WF_BOTTOM	25
-
+#define WF_ICONIFY	26
+#define WF_UNICONIFY	27
+#define WF_UNICONIFYXYWH 28
 						/* update flags		*/
 #define	END_UPDATE 0
 #define	BEG_UPDATE 1
@@ -126,6 +128,17 @@
 #define AI_STEXT	1
 #define AI_E1		2
 #define AI_LANG		3
+#define AI_E2		4
+#define AI_E3		5
+#define AI_E4		6
+#define AI_RES1		7
+#define AI_MOUSE	8
+#define AI_MENU		9
+#define AI_SHW1		10
+#define AI_WIND		11
+#define AI_MSG		12
+#define AI_OBJ		13
+#define AI_FORM		14
 
 #define	SHADOW	2		/* thickness of drop shadow in pixels */
 
@@ -204,7 +217,12 @@ typedef struct rstree
 #define RIGHT	0x0004
 #define BOTTOM	0x0008
 
+#ifdef MNBAR
 #define	MAXOBJ	21		/* maximum number of objects in a window */
+#else
+#define	MAXOBJ	20		/* maximum number of objects in a window */
+#endif
+
 #define	NUMRECT	80		/* # RLISTs per block of memory allocated */
 #define	NUMWIN	8		/* # window structures per block of memory */
 #define	HASHSIZ	8		/* size of hash table */
@@ -241,6 +259,8 @@ typedef	struct	window {
 				/* from time to time for use in phantom window */
     UWORD   handle;		/* window handle */
     UWORD   kind;		/* flag for components of window */
+    UWORD   savekind;		/* saved flags for iconified windows */
+    UWORD   iconflag;		/* if TRUE, window is iconified */
     OBJECT  *aesobj;		/* for use in AES */
     OBJECT  obj[MAXOBJ];	/* definition of each object */
     WORD    tcolor[MAXOBJ];	/* object colors if window is topped */
@@ -253,6 +273,7 @@ typedef	struct	window {
     GRECT   full;		/* coords and size when full */
     GRECT   prev;		/* previous coords and size */
     GRECT   curr;		/* current coords and size */
+    GRECT   icon;		/* coords before iconified */
     RLIST   *fxywh;		/* first rect in rectangle list */
     RLIST   *nxywh;		/* next rect in rectangle list */
 				/* slider positions and sizes are in 1-1000

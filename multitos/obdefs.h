@@ -1,32 +1,3 @@
-/*
-*************************************************************************
-*			Revision Control System
-* =======================================================================
-*  $Revision: 1.6 $	$Source: f:\multitos/RCS/obdefs.h,v $
-* =======================================================================
-*  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
-* =======================================================================
-*  $Log: obdefs.h,v $
-*  Revision 1.6  1993/04/27  23:00:14  ersmith
-*  Merged Cary's and Hans-Martin's changes
-*
- * Revision 1.4  1993/03/12  19:51:12  ersmith
- * Merged HMK's loadable resource stuff
- *
- * Revision 1.3  1993/03/10  20:12:42  ersmith
- * Lattice port
- *
-* Revision 2.2  89/04/26  18:29:21  mui
-* TT
-* 
-* Revision 2.1  89/02/22  05:31:23  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.1  88/06/02  12:35:57  lozben
-* Initial revision
-* 
-*************************************************************************
-*/
 /*	OBDEFS.H	03/15/84 - 02/08/85	Gregg Morris		*/
 /*	Add 3D definitons		7/7/92	D.Mui			*/
 

@@ -44,3 +44,10 @@
  */
 #define LOADKBT		0
 
+/*
+ * The DESKPRG variable controls whether we are compiling a stand alone desktop
+ * or not
+ */
+#ifndef DESKPRG
+#define DESKPRG		0
+#endif

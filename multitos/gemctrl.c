@@ -14,7 +14,7 @@
 /*	Fixed at hctl_window to check if button is pressed 6/6/92	*/
 /*	Convert to Lattice C 5.51		2/17/93		C.Gee	*/
 /*	Force the use of prototypes		2/24/93		C.Gee	*/
-
+/*	Iconify feature added to screen manager 5/04/93		H.Krober*/
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
 *	Copyright (C) 1992 
@@ -213,8 +213,8 @@ ct_wmsgup(message, owner, wh, m1, m2, m3, m4)
 /*	Handle the window click action and send message	*/
 
 	VOID
-hctl_window( mx, my, kshift )
-	WORD		mx, my, kshift;
+hctl_window( mx, my, kshift, clicks )
+	WORD		mx, my, kshift, clicks; /* click added 5/4/93 hmk */
 {
 	GRECT		f, real;
 	WORD		set, w_handle, x, y, w, h, buttonset;
@@ -228,7 +228,6 @@ hctl_window( mx, my, kshift )
 
 	if ( ( w_handle = wind_find( mx, my ) ) == NIL )
 	  return;
-
 	graf_mouse( M_ARROW|0xC000, 0L );
 
 	waitforaes();
@@ -239,7 +238,8 @@ hctl_window( mx, my, kshift )
 	/* if window is top window, handle control points */
 	  		/* changed ROOT to W_BOX 072691 - ml. */
 	obj = pwin->obj;
-	cpt = objc_find( obj, W_BOX, MAX_DEPTH, mx, my );
+	cpt = objc_xfind( obj, W_BOX, MAX_DEPTH, mx, my );
+
 /*	t = pwin->curr;	*/
 /*	rc_intersect( &gl_rfull, &t );	*/
 	r_get( ( WORD *)&pwin->curr, &x, &y, &w, &h );
@@ -249,8 +249,10 @@ hctl_window( mx, my, kshift )
 
 	switch( cpt )
 	{
-	    case W_SMALLER:
-		message = (kshift & 3) ? WM_CLOSE : WM_FULLED;
+	    case W_SMALLER:		/* +++ 04/93 Iconify Feature */
+		message = WM_ICONIFIED;	
+		w = WINICON_W; h = WINICON_H;
+		y = gl_rfull.g_y + gl_rfull.g_h - h - 1;
 		goto do_cpt;
 
 	    case W_CLOSER:
@@ -262,7 +264,7 @@ do_cpt:
 		while( TRUE )
 		{
 		  graf_mkstate( &mx, &my, &mstate, &kind );
-		  wm = objc_find( obj, W_BOX, MAX_DEPTH, mx, my );
+		  wm = objc_xfind( obj, W_BOX, MAX_DEPTH, mx, my );
 		  if ( mstate & 0x01 )
 		  {
 		    if ( wm == cpt )
@@ -292,7 +294,6 @@ do_cpt:
 		c_clipdraw( pwin, cpt, NULLPTR );
 		if ( wm != cpt )
 		  message = 0; 
-
 		break;
 
 	    case W_NAME:
@@ -367,6 +368,20 @@ do_cpt:
 		break;
 
 	    default:
+		/* +++ 04/05/93 HMK
+		 * If window is iconoified and a double click is
+		 * hapening on the window's work area, uniconify the
+		 * window
+		 */
+	      if (pwin->iconflag && (clicks == 2)) {
+		message = WM_UNICONIFIED;
+		x = pwin->icon.g_x;	/* coords before window was 	*/ 
+		y = pwin->icon.g_y;	/* iconified.			*/
+		w = pwin->icon.g_w;
+		h = pwin->icon.g_h;
+		break;
+	      }
+
 h_2:	      if ( w_handle != gl_topw )
 	      {
 		if ( w_handle )		/* Not the top window	*/
@@ -474,16 +489,17 @@ swap_prg( p )
 	item = c_w_tophandle( p );
 
 	if ( item != -1 )	/* Yes, it has a window */
-	  ct_wmsgup( WM_TOPPED, p->p_pid, item, item, item, item, item );
-	else
 	{
-	  waitforaes();
-	  openphanwind( p );
-	  releaes();
-	  msgbuff[0] = 0;		/* force a background redraw	*/
-	  msgbuff[1] = p->p_pid;
-	  hctl_mesag( msgbuff );
+	  ct_wmsgup( WM_TOPPED, p->p_pid, item, item, item, item, item );
 	}
+
+	waitforaes();
+	openphanwind( p );
+	releaes();
+
+	msgbuff[0] = 0;		/* force a background redraw	*/
+	msgbuff[1] = p->p_pid;
+	hctl_mesag( msgbuff );
 }
 
 
@@ -501,9 +517,13 @@ hctl_rect( mx, my )
 	LONG		*ptree;
 	WORD		temp1, temp2;
 
+
+	Debug7("hctl_rect() called, menu bar handling\r\n");
+
 	if ( ( gl_mntree != 0x0L ) && ( inside( mx, my, &gl_rmnactv ) ) )
 	{
 	  obj = mn_addr;
+	  Debug7("hctl_rect() inside menu bar\r\n");
 
 #if 0
 	  /* clean up all the check mark in the menu */
@@ -801,9 +821,12 @@ screenmgvr( VOID )
 	do
 	{
 				/* wait for something to happen		*/
-
+				/* +++ 05/04/93 HMK			*/
+				/* Now also waiting for double clicks.	*/
+				/* This is needed for uniconifying a	*/
+				/* window.				*/
 	  ev_which = evnt_multi( MU_MESAG|MU_KEYBD|MU_M1|MU_BUTTON|MU_TIMER,
-				 1, 1, 1,
+				 2, 1, 1,	
 				 gl_ctwait.m_out,
 				 gl_ctwait.m_x,
 				 gl_ctwait.m_y,
@@ -830,8 +853,10 @@ screenmgvr( VOID )
 	  if ( ev_which & MU_MESAG )
 	    cont = hctl_mesag( msgbuff );
 
-	  if ( ev_which & MU_BUTTON )
-	    hctl_window( rets[0], rets[1], rets[3] );
+	  if ( ev_which & MU_BUTTON ) /* # clicks added -+ 5/4/93 hmk */
+          {			      /*                 V            */
+	    hctl_window( rets[0], rets[1], rets[3], rets[5] );
+	   }
 						/* mouse over menu bar	*/
 	  if (ev_which & MU_M1)
 	    hctl_rect( rets[0], rets[1] );
@@ -1018,7 +1043,7 @@ l_1:
 	    case 5:
 		menu_bar( (OBJECT*)0, TRUE|0x0200 );
 	      break;
-					/* someone did a menu register	*/
+ 					/* someone did a menu register	*/
 					/* update the menu, please	*/
 	
 	    case 6:			/* reschange process exit */
@@ -1031,13 +1056,20 @@ l_1:
 
 	    case 8:			/* update the menu bar */
 	      Debug1("hctl_msg(): Update menu bar\r\n");
+	      /**
+		Next two lines added 04/29/93 HMK.
+		If PD's menu addr is NULL the process either has no menu
+		bar or called menu_bar(tree, 0) to erase it. So we will
+		display the shell's (desktop's) menu bar instead.
+	      **/	
+	      if (p->p_mnaddr == NULL)
+		p = shellpd;		/* use desktop's menu bar */
 	      menu_bar( ( OBJECT *)p, TRUE|0x0100 );
 	      break;
 
 	    case 9:			/* swap out the menu bar */
 	      menu_bar( ( OBJECT *)p, 0x0200 );
 	      break;
-	      	
 	    default:
 	      break;
 	}

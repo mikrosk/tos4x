@@ -1017,7 +1017,11 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 	    break;
 
 	  case 3:	/* launch accessory */
-	    if ( mn_addr->ob_tail < mn_maxitem )
+	    if ( !gl_multi && !(currpd->p_type & (AESSYSTEM|AESSHELL)) )
+	    {
+	      Debug1("Single tasking ACC launch not permitted\r\n");
+	    }
+	    else if ( mn_addr->ob_tail < mn_maxitem )
 	    {
 	      if ( p = sndcli( ad_shcmd, ad_shtail, envrn, FALSE ) )
 	      {

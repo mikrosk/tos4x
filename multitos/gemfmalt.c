@@ -214,10 +214,14 @@ fm_build(tree, haveicon, nummsg, mlenmsg, numbut, mlenbut)
 	GRECT		bt, ms;
 	WORD		icw,ich;
 
+	/* 	define the icw and ich at here please	*/
+#if 0
 	icw = 4;
 	ich = 4;
-	/* 	define the icw and ich at here please	*/
-	
+#else
+	icw = (31+gl_wchar)/gl_wchar;
+	ich = (31+gl_hchar)/gl_hchar;
+#endif
 	i = (mlenbut * numbut) + ( (numbut-1) * 2 );
 	i = max( i, mlenmsg );   	/* find the max char length	*/
 				 	/* find the max char height	*/
@@ -304,6 +308,7 @@ fm_alert( defbut, palstr )
 	WORD		x1,y1,w,h;
 	UWORD		color;
 	LONG		spec;
+	OBJECT		*cicons;
 
 	Debug1( currpd->p_name );
 	Debug1( "calls Fm_alert\r\n" );
@@ -327,9 +332,9 @@ fm_alert( defbut, palstr )
 	bheight = LWGET( OB_HEIGHT(BUT_OFF) );
 
 	LWSET( OB_FLAGS( 0 ), TOUCHEXIT | IS3DACT);
-	LWSET( OB_TYPE( 1 ), G_IMAGE );
-	rs_gaddr( ad_sysglo, R_BIPDATA, NOTEBB, &plong );
-	LLSET( OB_SPEC( 1 ), plong );	
+	LWSET( OB_TYPE( 1 ), G_CICON );
+	rs_gaddr( ad_sysglo, R_TREE, CICONS, (LONG *)&cicons );
+	LLSET( OB_SPEC( 1 ), cicons[NOTECC].ob_spec );	
 
 	LWSET(OB_STATE(ROOT), OUTLINED);
 	fm_parse(tree, palstr, &inm, &nummsg, &mlenmsg, &numbut, &mlenbut);
@@ -343,8 +348,7 @@ fm_alert( defbut, palstr )
 
 	if (inm != 0)
 	{
-	  rs_gaddr(ad_sysglo, R_FRIMG, 0, ( LONG *)&ptr);
-	  LLSET(OB_SPEC(1), ptr[inm-1] );
+	  LLSET(OB_SPEC(1), cicons[inm].ob_spec );
 	}
 						/* convert to pixels	*/
 	for(i=0; i<NUM_ALOBJS; i++)
@@ -574,6 +578,9 @@ fm_error(n)
 		break;
 	  case 15:			/* invalid drive	*/
 		string = ALRT15ER;
+		break;
+	  case 35:			/* bad executable	*/
+		string = ALRT35ER;
 		break;
 	  default:
 		string = ALRTXXER;

@@ -3,18 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/28 16:06:39 $
+* $Date: 88/06/28 16:27:21 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.8  88/06/28  16:27:21  apratt
+* Removed extra index information because it made 10-sector
+* formatting not work.  Better to be compatible with our own
+* programs than to try to be compatible with crummy PC drives.
+*
 * Revision 1.7  88/04/28  16:06:39  apratt
 * Backed out Flopwp XBIOS call... Turned out to be a flop.
 * (I didn't want the Desktop to use this one Flop call, because it's possible
 * that somebody installed an Rwabs-level driver for drives A and B.)
-*
+* 
 * Revision 1.6  88/04/27  13:36:26  apratt
 * Added code to set last-access time of both drives to "long ago"
 * when you change logical disks in a physical drive, so the next call
@@ -43,7 +48,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.7 $
+* $Revision: 1.8 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -500,22 +505,23 @@ _flopfmt:
 	move.l	skewtbl(a5),a3		; a3 -> skewtbl (if nesssary!)
 	tst.b	_iamanst
 	bne	noden1
-	
-	move.w	#80-1,d1		; 80 x $4e as GAP 4a
-	move.w	#$4e,d0
-	bsr	wmult
+	move.w	d0,denselect
+noden1:
+.endif
+.endif
+	move.w	d0,ddenflags(a1)
+.endif
 
-	move.w	#12-1,d1		; 12 x $00 as sync
-	clr.w	d0
-	bsr	wmult
+*--- seek to track (hard seek):
+	bsr	hseek			; hard seek to 'ctrack'
+	bne	flopfail		; (return error on seek failure)
+	move.w	ctrack.w,dcurtrack(a1)	; record current track#
 
-	move.b	#$f6,d0			; 3 x $C2 as IAM preamble
-	move.b	d0,(a2)+
-	move.b	d0,(a2)+
-	move.b	d0,(a2)+
-
-	move.b	#$fc,(a2)+		; 1 x $fc as IAM
-
+*--- format track, then verify it:
+	move.w	#e_error,curr_err.w	; vanilla error mode
+	bsr	fmtrack			; format track
+	bne	flopfail		; (return error on seek failure)
+	move.w	spt.w,ccount.w		; set number of sectors to verify
 	move.w	#1,csect.w		; starting sector# = 1
 	bsr	verify1			; verify sectors
 	move.w	#60-1,d1		; 60 x $4e (track leadin)
@@ -1148,7 +1154,7 @@ rdiskctl:				; read diskctl into d0
 
 rwdelay:
 .if TT
-	; code added 4/27/88 AKP
+	move.w	d0,-(sp)		; save counter register
 	move.w	#$0119,d0		; 25 * 1.6us > 32us
 	bsr	ttwait
 	move.w	(sp)+,d0		; restore register

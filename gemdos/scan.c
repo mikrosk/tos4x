@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.8 $	$Source: e:/tos/gd2\rcs\scan.c,v $
+* $Revision: 1.9 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.9  1991/04/05  18:38:22  apratt
+* Misc fixes making it work
+*
 * Revision 1.8  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -70,7 +73,8 @@ name.  Also a component like "..abc" or other unparsable.
 
 Call with flags == FN_DOTSOK to enable finding . and .. in the last
 component; call with FN_EARLY to return E_OK before searching in the last
-dir for the last component.
+dir for the last component.  FN_DOTSOK is used only in Dsetpath
+to enable Dsetpath("..").
 
 If the file doesn't exist, but you got all the way to the last directory,
 then EFILNF is returned and that directory's dev and cluster are valid.
@@ -82,6 +86,11 @@ On successful return from fn2dir() (return code zero), dir is fresh.
 
 QUIET CHANGE FROM ORIGINAL GEMDOS: Fopen("a:\*.*",0) used to open the first
 file on A: but this code returns EBADRQ.
+
+ROOT DIRECTORY SPECIAL CASES: ".\foo" when you're in the root is special
+cased because root doesn't truly have a "dot" directory.  "..\foo" in
+the root directory is special cased, too, so you can't get in trouble
+that way.  ".." in root is root.
 
 long
 dir2dir(dir)
@@ -158,7 +167,12 @@ x is space).
 
 */
 
-#define isdots(s) (*s == '.' && (!*(s+1) || (*(s+1) == '.') && (!*(s+2))))
+/* isend means "is the end of a component" -- either end of string or SLASH */
+#define isend(s) (!*(s) || *(s) == SLASH)
+
+/* isdots means "this component is either dot or dot-dot followed by isend" */
+#define isdots(s) (*(s) == '.' && \
+			(isend((s)+1) || ((*((s)+1) == '.') && isend((s)+2))))
 
 long
 fn2dir(pname, dir, flags)
@@ -172,11 +186,14 @@ int flags;
     uint cl;
     char c;
     int haswild = 0;
-
-    int dotflag = (flags == FN_DOTSOK);
-    int earlyflag = (flags == FN_EARLY);
+    uint attr;
     long err;
     FCB fcb, *pfcb;
+    int dotsok;
+    int earlyflag;
+
+    dotsok = (flags == FN_DOTSOK);
+    earlyflag = (flags == FN_EARLY);
 
     DBCMD(0x20,"print fn2dir -s (lpeek (lpeek (+ `a6 8))) "
 		"flags -x (wpeek (+ `a6 10)) dir: (lpeek (+ `a6 c));_c");
@@ -211,17 +228,35 @@ int flags;
 	 * don't actually bail out here because it might be the last
 	 * component and earlyflag might be set.
 	 */
-	for (end = name; *end && *end != SLASH; ++end) {
+	for (end = name; !isend(end); ++end) {
 	    if (*end == '?' || *end == '*')
 		haswild = 1;
 	}
 
-	/* empty component? */
-	if (end == name) return EBADRQ;
+	/*
+	 * Empty component? Return file not found (!) for compatibility.
+	 * I'd rather return EBADRQ because it will never succeed.
+	 *
+	 * Compatibility time: the Desktop has a bug.  The cause media
+	 * change routine you get when you hit Escape sets up the pointers,
+	 * then calls Fopen("A:\\X",0).  This double-slash is rejected by
+	 * old GEMDOS, but still causes a hit on the disk.  If you reject
+	 * empty components too soon then you don't hit the disk and don't
+	 * see the media change.  So we have to hit the disk on purpose
+	 * here.  How?  I don't know.  Freshen dir, I guess.
+	 */
+
+	if (end == name) {
+	    dirfirst(dir,dmd);
+	    return EFILNF;
+	}
 
 	/*
-	 * if name is last component, bail out here if earlyflag is set or
-	 * if name is "." or ".." and they are not allowed, or haswild.
+	 * if name is last component...
+	 *     if earlyflag, bail out now.
+	 *     if isdots(),
+	 *	   if dotsok, return EROOT (can only happen from Dsetpath).
+	 *	   else return EBADRQ.
 	 */
 
 	if (!*end) {
@@ -233,19 +268,41 @@ int flags;
 				"dirx (lpeek (+ `a6 c));_c");
 		return E_OK;
 	    }
-	    if ((!dotflag && isdots(name)) || haswild) return EBADRQ;
+	    if (isdots(name)) {
+		if (dotsok) {
+		    /* end of name; return EROOT */
+		    DBCMD(0x20,"print dot or dot-dot in root dir: EROOT;_c");
+		    return EROOT;
+		}
+		else return EBADRQ;
+	    }
 	}
+
+	/*
+	 * If we're in the root and the name is "." or ".." then we fake a
+	 * match.  dir is unchanged because it's already root. attr is set
+	 * to FA_SUBDIR so we don't think we've found a file in the middle
+	 * of a pathname where only directories can go.
+	 */
+
+	if (cl == 0 && isdots(name)) {
+	    DBCMD(0x20,"print dot or dot-dot in root dir: dotmatch;_c");
+	    attr = FA_SUBDIR;   /* fake attrib of matched "file" */
+	    goto dotmatch;
+	}
+
+        if (haswild) return EBADRQ;	/* no wildcards at this point */
 
 	/* build an FCB from the name */
 	if (err = name2fcb(name,end,&fcb)) return err;
 	fcb.f_attrib = FA_ALL;
 
-	/* do the scan (believe me, this loop is better than the old one!) */
+	/* do the scan */
 
 	if (err = dirfirst(dir,dmd)) return err;
 
 	DBCMD(0x20,"print scan new dir level. dir (lpeek (+ `a6 c)) is:;"
-			"dirx (lpeek (+ `a6 c));_c");
+			"dirf (lpeek (+ `a6 c));_c");
 
 	while (1) {
 	    pfcb = dir->dir_fcb;
@@ -269,23 +326,25 @@ nomatch:
 didmatch:
 	/* got a match */
 
+	/* set up cl of start of next search, down one level */
+        cl = pfcb->f_clust;
+        swp68(cl);
+	attr = pfcb->f_attrib;
+
+dotmatch:
 	oname = name;
 	name = end;
 	if (*name == SLASH) {
 	    /* fail if found a file but not at end of path */
-	    if (!(pfcb->f_attrib & FA_SUBDIR)) return EPTHNF;
+	    if (!(attr & FA_SUBDIR)) return EPTHNF;
 	    name++;
         }
-
-	/* set up cl of start of next search, down one level */
-        cl = pfcb->f_clust;
-        swp68(cl);
     } while (*name);
 
     /* end still points to end of last component; check for trailing SLASH */
     if (*end == SLASH) return EBADRQ;
 
-    DBCMD(0x20,"print fn2dir returns, dir:;dirx (lpeek (+ `a6 c));_c");
+    DBCMD(0x20,"print fn2dir returns, dir:;dirf (lpeek (+ `a6 c));_c");
     *pname = oname;
     return E_OK;
 }
@@ -301,7 +360,7 @@ DIR *dir;
     dir->dir_fcb = (FCB *)(fcb + dir->dir_recoffs);
 
     DBCMD(0x20,"print dir2dir returns, dir (lpeek (+ `a6 8)) is:;"
-		"dirx (lpeek (+ `a6 8));_c");
+		"dirf (lpeek (+ `a6 8));_c");
 
     return E_OK;
 }
@@ -385,7 +444,7 @@ DMD *dmd;
 		return ERROR;
 	    }
 	    dir->dir_curcl = xcl;
-    DBCMD(0x20,"print _dirnext returns, dir:;dirx (lpeek (+ `a6 8));_c");
+    DBCMD(0x20,"print _dirnext returns, dir:;dirf (lpeek (+ `a6 8));_c");
 	}
 	/* (else recno is fine; it's the next rec of this clust) */
     }
@@ -402,7 +461,7 @@ DMD *dmd;
 dirslot(dir)
 DIR *dir;
 {
-    DBCMD(0x20,"print dirslot: dir after dirfirst:;dirx (lpeek (+ `a6 8));_c");
+    DBCMD(0x20,"print dirslot: dir after dirfirst:;dirf (lpeek (+ `a6 8));_c");
     BCB *bcb;
     long err;
     DMD *dmd = &drvtbl[dir->dir_dev];

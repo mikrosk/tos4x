@@ -1,11 +1,14 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.16 $	$Source: e:/tos/gd2\rcs\makefile.,v $
+# $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $     $Locker:  $
+# $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.17  1991/04/05  18:38:22  apratt
+# Misc fixes making it work
+#
 # Revision 2.16  1991/03/28  17:39:36  apratt
 # THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 #
@@ -30,7 +33,7 @@
 #########################################################################
 
 TMPDIR	=	m:
-.SUFFIXES: .o .c .s .mac .gas
+.SUFFIXES: .o .oo .c .s .mac .gas
 
 # un-comment this whole section to compile with GCC
 CC=gcc
@@ -44,7 +47,13 @@ CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
 	$(CC) $(CFLAGS) -S $*.c
 	emacs @gas2mac.rc $*.s 
 	mas -u $*.s
-	-grep ___ $*.s >>under
+	rm $*.s
+
+.c.oo:
+	$(CC) $(CFLAGS) -S -DUNREAL $*.c
+	emacs @gas2mac.rc $*.s 
+	mas -u $*.s
+	mv $*.o $*.oo
 	rm $*.s
 
 .mac.o:
@@ -53,10 +62,7 @@ CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
 .gas.o:
 	gcc-as -o $*.o $*.gas
 
-#CC=cc
-#CFLAGS=
-
-all: gtest.prg # dos.sys
+all: gtest.prg dos.sys
 
 # set these to .mac or .gas as appropriate
 
@@ -71,16 +77,12 @@ CFILES =	fscl.c fscomm.c fsdir.c fsfs.c fshand.c scan.c \
 		fsproc.c
 
 OFILES =	fscl.o fscomm.o fsdir.o fsfs.o fshand.o scan.o \
-		setup.o time.o panic.o mem.o pool.o sup.o con.o \
+		time.o panic.o pool.o sup.o con.o \
 		fsproc.o
 
-gtest.prg: ftest.o fcmds.o docall.o traps.o unreal.o $(OFILES) 
+gtest.prg: ftest.o fcmds.o docall.o traps.o unreal.oo setup.oo mem.oo $(OFILES) 
 		cc -o $@ $< -l syserr.o
-#		$(CC) $(CFLAGS) -o $@ $< -lsyserr.o 
 		prgflags 7 7 $@
-
-frag.prg: testbed.o traps.o unreal.o $(OFILES) 
-		$(CC) $(CFLAGS) -o $@ $<
 
 DS=dossys
 LDOBJS	=	$(DS)\self.o $(DS)\ld_dos.o $(DS)\clear.o $(DS)\clock.o \
@@ -91,14 +93,14 @@ dos.sys:	gemdos.o
 		aln -l -o dos.sys $(LDOBJS) gemdos.o
 
 
-gemdos.o:	rwa.o $(OFILES) 
+gemdos.o:	rwa.o setup.o mem.o $(OFILES) 
 		aln -u -p -l -o $@ $<
 
 #$(OFILES):	fs.h
 
 fs.h:		fsdecl.h gemerror.h
 
-proto.h:	$(CFILES) unreal.c ftest.c
+proto.h:	$(CFILES)
 		mkptypes -z $< >proto.h
 
 # Compile these things with your "native" compiler, rather than using GCC

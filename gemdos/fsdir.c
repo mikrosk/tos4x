@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.15  1991/04/05  18:38:22  apratt
+* Misc fixes making it work
+*
 * Revision 2.14  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -68,6 +71,11 @@
  * only changes d's current directory.  (Hmm, should it?)
  * Part of the reason is that the current directory for each drive is now
  * represented by the cluster number only, not a reference to a struct.
+ *
+ * Note: this is the only function which calls name2fcb with dotsok, and
+ * the only function which can get EROOT back from name2fcb (or anywhere
+ * else).  EROOT means the path ended with "." or ".." in the root
+ * directory, and we handle that appropriately.
  */
 
 long
@@ -98,7 +106,11 @@ char *p;
     }
 
     if (err = fn2dir(&p,&dir,FN_DOTSOK)) {
-	if (err == EFILNF) return EPTHNF;
+    	if (err == EROOT) {
+    	    run->p_curdir[drv] = 0;
+    	    return E_OK;
+    	}
+	else if (err == EFILNF) return EPTHNF;
 	else return err;
     }
     if (!(dir.dir_fcb->f_attrib & FA_SUBDIR)) return EACCDN;
@@ -114,7 +126,7 @@ char *p;
  * xgetdir(buf,drv): return the text of the current dir on 'drv' into buf.
  *
  * This call is bad because it doesn't take the SIZE of the buffer as an arg.
- * We fixed this by adding a new call: Dgetnpath(buf,n,drv) where n is the
+ * We fixed this by adding a new call: Dgetnpath(buf,drv,n) where n is the
  * size of the buffer.  xgetdir calls xgetndir with a LARGE length arg.
  *
  * This code is recursive, and its depth is the depth of your current 
@@ -129,14 +141,14 @@ char *buf;
 int drv;
 {
   DBCMD(0x01,"print xgetdir buf: (lpeek (+ `a6 8)) drv: (wpeek (+ `a6 c));_c");
-  return xgetndir(buf,0x7fffffffL,drv);
+  return xgetndir(buf,drv,0x7fffffffL);
 }
 
 long
-xgetndir(buf,len,drv)
+xgetndir(buf,drv,len)
 char *buf;
-ulong len;
 uint drv;
+ulong len;
 {
     DIR dir;
     long err;
@@ -187,7 +199,15 @@ DMD *dmd;
     FCB *fcb;
 
     /* return now without doing anything if root dir */
-    if (!dir->dir_clust) return len;
+    if (!dir->dir_clust) {
+	DBCMD(0x100,"print _getndir at root, return;_c");
+    	return len;
+    }
+
+    DBCMD(0x100,"print _getndir, pbuf (lpeek (+ `a6 8)) "
+		"< (lpeek (lpeek (+ `a6 8))) > "
+		"len (lpeek (+ `a6 c)) dir (lpeek (+ `a6 10)) holds:;"
+		"dirf (lpeek (+ `a6 10));_c");
 
     /* set up dir2 as dir's parent */
     dir2.dir_dev = dir->dir_dev;
@@ -203,23 +223,30 @@ DMD *dmd;
     swapped_cl = dir->dir_clust;
     swp68(swapped_cl);
 
-    for (err = dirfirst(&dir2,dmd), fcb = dir2.dir_fcb;
-	 (!err && 
-	  fcb->f_name[0] != 0 && 
-	  fcb->f_name[0] != ERASED &&
-	  fcb->f_clust != swapped_cl);
-	err = dirnext(&dir2,dmd), fcb = dir2.dir_fcb) /* empty */ ;
-
-    if (fcb->f_name[0] == 0 || err == ENMFIL) {
-	/* return ERROR if you fell off without finding the dir! */
-	/* it's not really an EINTRN since it's external */
-	return ERROR;
+    err = dirfirst(&dir2,dmd);
+    fcb = dir2.dir_fcb;
+    while (!err) {
+	if (fcb->f_name[0] != 0 &&
+	    fcb->f_name[0] != ERASED &&
+	    fcb->f_clust == swapped_cl) goto found;
+	err = dirnext(&dir2,dmd);
+	fcb = dir2.dir_fcb;
     }
+
+    /* return ERROR if you fell off without finding the dir! */
+    /* it's not really an EINTRN since it's external */
     if (err) return err;
+    else return ERROR;
+
+found:
+    DBCMD(0x100,"print found our match.;_c");
 
     buf = *pbuf;
     *buf++ = SLASH;
     len--;
+
+    /* FCB name to 8.3 string code copied from filldta, below */
+
     src = fcb->f_name;
 
     count = (len < 8 ? len : 8);
@@ -230,7 +257,11 @@ DMD *dmd;
 	count = (len < 3 ? len : 3);
 	while (((*buf++ = *src++) != ' ') && (len--, count--)) /* empty */ ;
     }
-    *(buf-1) = '\0';
+    *(--buf) = '\0';
+    DBCMD(0x100,"print _getndir returns;_c");
+
+    *pbuf = buf;
+
     return len;
 }
 
@@ -319,7 +350,7 @@ char *s;
 
     /* zero out the rest of this record */
     fcb++;
-    clear(fcb,((char *)fcb)+dmd->m_recsiz);
+    clear(fcb,((char *)fcb)+dmd->m_recsiz-(2*sizeof(*fcb)));
 
     /* zero out the rest of the cluster */
     for (i=dmd->m_clsiz-1; i; --i) {
@@ -379,7 +410,9 @@ char *s;
  * NOTE: check to see if it's somebody's current directory by going through
  * all basepages from 'run' up; later, when there are more processes, this
  * will have to change.  Presumes that exec doesn't "inherit" directories
- * until "go" time, not at "load" time.
+ * until "go" time, not at "load" time.  The consequence of deleting
+ * somebody's current directory is to make his current directory the parent
+ * of the one being deleted.
  *
  * There are some systems now which change 'run' to implement some limited
  * multi-tasking. These make it possible to remove a directory which is
@@ -395,7 +428,7 @@ char *p;
     DIR dir, dir2;
     PD **ppd, *pd;
     long err;
-    uint cl;
+    uint cl, clparent;
     DMD *dmd;
     uint dev;
     char c;
@@ -413,11 +446,6 @@ char *p;
     cl = dir.dir_fcb->f_clust;
     swp68(cl);
 
-    /* check to see that nobody has cl as his current dir */
-    for (ppd = &pdtab[0], pd = *ppd; ppd < &pdtab[NUMPDS]; pd = *(++ppd)) {
-	if (pd && pd->p_curdir[dev] == cl) return EACCDN;
-    }
-
     dmd = &drvtbl[dev];
 
     /* make 'dir2' refer to the start of the dir to remove */
@@ -427,6 +455,10 @@ char *p;
 
     /* advance to .. entry before starting loop */
     if (err = dirnext(&dir2,dmd)) return err;
+
+    /* save away clparent so we can check for current directories */
+    clparent = dir2.dir_fcb->f_clust;
+    swp68(clparent);
 
     /*
      * see if there are any files in this dir (except . and ..) (this loop
@@ -442,6 +474,18 @@ char *p;
     }
 
     if (err && err != ENMFIL) return err;
+
+    /*
+     * Check to see if anybody has cl as his current dir on that drive. If
+     * they do, bump them up to cl's parent.  cl still holds the clust of
+     * the dir we're deleting, and clparent holds the clust of its parent.
+     */
+
+    for (ppd = &pdtab[0], pd = *ppd; ppd < &pdtab[NUMPDS]; pd = *(++ppd)) {
+	if (pd && pd->p_curdir[dev] == cl) {
+	    pd->p_curdir[dev] = clparent;
+	}
+    }
 
     /* ok, dir is empty: freshen the parent and call ixdel */
     dir2dir(&dir);
@@ -464,7 +508,7 @@ char *name;
 int att;
 {
     DBCMD(0x01,"print xsfirst -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c));_c");
-    att |= FA_RO | FA_ARCHIVE;
+    if (att != FA_LABEL) att |= FA_RO | FA_ARCHIVE;
     return(ixsfirst(name,att,(DTA *)run->p_xdta));
 }
 

@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
+* $Revision: 2.12 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.12  1991/04/05  18:38:22  apratt
+* Misc fixes making it work
+*
 * Revision 2.11  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -364,6 +367,7 @@ uint dev;
 			    freebig(ofd);
 			}
 		}
+		uft++;
 	    }
 	}
     }
@@ -637,7 +641,7 @@ uint mod;
     OFD *ofd;
 
     DBCMD(8,"print ixopen dir: (lpeek (+ `a6 8)) mode (wpeek (+ `a6 c));"
-	    "dirx (lpeek (+ `a6 8));fcb (lpeek (+ (lpeek (+ `a6 8)) e));_c");
+	    "dirf (lpeek (+ `a6 8));_c");
 
     /* fail if opening for mode other than zero and file is RO */
     if (mod && (dir->dir_fcb->f_attrib & FA_RO)) return EACCDN;

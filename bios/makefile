@@ -1,14 +1,17 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.9 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.10 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 91/03/27 14:00:26 $     $Locker:  $
+#  $Author: apratt $	$Date: 91/04/11 12:13:43 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.9  91/03/27  14:00:26  apratt
-#  Changed so switches files are in a subdirectory.
+#  Revision 2.10  91/04/11  12:13:43  apratt
+#  Removed pushd and popd -- they're not reliable.
 #
+# Revision 2.9  91/03/27  14:00:26  apratt
+# Changed so switches files are in a subdirectory.
+# 
 # Revision 2.8  91/03/27  12:37:31  apratt
 # Changed to add the "pad" machine.  Took out TSXMACHINE; dmaread and clock
 # are the only files for which multiple machines are really the same binary,
@@ -85,7 +88,7 @@
 # letters free:     e  h j lm opqr   v xyz0123456789
 
 CCODE=u
-MACHINE=p
+MACHINE=e
 
 # that's all you need to set for different machines or countries.
 ############
@@ -97,16 +100,13 @@ ASM = mas -3 -8 -S $*.s -O=$@
 # You can add "-s c:\alcyon\lib\oas68sym.dat" or whatever to the as68 line.
 
 .c.o:
-	cp $*.c $(TMPDIR)
-	pushd $(TMPDIR)
 	ocp68 $*.c $*.i
 	oc068 $*.i $*.1 $*.2 $*.3 -f
 	oc168 $*.1 $*.2 $*.s
 	optimize $*.s
 	oas68 -l -u -s c:\alcyon\lib\oas68sym.dat $*.s
-	popd
-	mv $(TMPDIR)\$*.o .
-	rm $(TMPDIR)\$*.[c|i|1|2|3|s]
+	rm $*.[ci123s]
+
 #
 ################################################################
 

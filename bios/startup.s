@@ -4,20 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/07/25 14:24:45 $
+* $Date: 90/07/27 15:08:15 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.55  90/07/27  15:08:15  apratt
+* Removed obsolete (and long-commented-out) dmaboot code.
+*
+* Added "boot preference" code: first ttscu1 bits 7-3, then the first
+* word of NVM are used as boot preference.  If NVM is invalid it's zero.
+*
 * Revision 2.54  90/07/25  14:24:45  apratt
 * Re-added clear of bootdev at reset time when you're a RAM TOS so the
 * floppy's AUTO folder gets executed, not the hard disk's.
-*
+* 
 * Improved privilege violation handler (again and for the last time!)
 * to handle D registers as dest of move.
-*
+* 
 * Revision 2.53  90/07/19  18:52:11  apratt
 * Changed date to 7/19 and color to slightly yellow, pulsing from
 * full yellow to full white.  Added pulsing for non-TT, too.
@@ -509,7 +515,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.54 $
+* $Revision: 2.55 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -598,13 +604,13 @@ date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .else
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$07191990	; TT date, $MMDDYYYY @check@
+date		equ	$07261990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010011110011 ; Jul 19, 1990
+dosdate		equ	%0001010011111010 ; Jul 26, 1990
 .endc
 
 .ifne TT
-bootcolor	equ	$ff9		; change this each release
+bootcolor	equ	$0fc		; change this each release
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
 bootcolor	equ	$fff		; white for production ROMs
 .endc
@@ -1223,8 +1229,9 @@ _frclock:	ds.l	1	; (466)	 count	of every vblank
 hdv_init:	ds.l	1	; (46a)	 hard disk initialization
 swv_vec:	ds.l	1	; (46e)	 video change-resolution bailout
 hdv_bpb:	ds.l	1	; (472)	 disk "get BPB"
-trp14ret:	ds.l	1	; (486)	 saved return addr for _trap14
-criticret:	ds.l	1	; (48a)	 saved return addr for _critic
+hdv_rw:		ds.l	1	; (476)	 disk read/write
+hdv_boot:	ds.l	1	; (47a)	 disk "get boot sector"
+hdv_mediach:	ds.l	1	; (47e)	 disk media change detect
 
 _cmdload:	ds.w	1	; (482)	 nonzero: load COMMAND.COM from boot
 conterm:	ds.b	1	; (484)  console/vt52 bitSwitches (%%0..%%2)
@@ -1235,7 +1242,7 @@ conterm:	ds.b	1	; (484)  console/vt52 bitSwitches (%%0..%%2)
 		ds.w	1	; (48c)  [unused, reserved]
 themd:		ds.l	4	; (48e)	 memory descriptor (MD)
 _____md:	ds.w	2	; (49e)  (more MD)
-		ds.l	1	; (4be)  reserved for future use
+savptr:		ds.l	1	; (4a2)	 pointer to register save area
 
 _nflops:	ds.w	1	; (4a6)	 number of disks attached (0, 1+)
 con_state:	ds.l	1	; (4a8)  state of conout() parser
@@ -1340,6 +1347,7 @@ padmagic:	ds.l	1		; $01241960 for STPAD touch driver
 padstuff:	ds.l	10*4		; other pad variables (total 40 bytes)
 .ifne TT
 the_env:	ds.b	20		; space for a small enviroment string
+_upref:		ds.w	1		; used in _dmaboot
 .endc
 
 _upref:		ds.w	1		; boot pref for _dmaboot
@@ -2831,176 +2839,7 @@ sizeikbd	equ	*-ikbreset-1
 *		The register set-up when jmp'ing to the root sector
 *		is deliberate and should not change.
 
-* Begin old code
-**
-** 7/89: expanded to provide a long timeout for the ack of the first command
-** byte, and an even longer one for the data following a fully-acked command.
-** The times are 10 sec for the ack of the first command byte (too long?)
-** and 40 sec for the data.
-** 	These times are global, in that we wait up to 10/40 sec from the
-** time we first started looking for DMA devices.  We still wait
-** a minimum of time appropriate to the shortest reasonable timeout, 
-** even if we've been looking for more that 10/40 sec.
-**-
 *+
-*dmaboot:
-*	moveq	#0,d7		; start with dev #0
-*	move.l	_hz_200,-(sp)	; remember when we started looking
-*dmb_1:	clr.l	a4		; quick zeropage (inside loop!)
-*	bsr	dmaread		; attempt to read boot sector
-*	bne	dmb_2		; (failed -- try next dev)
-*	move.l	_dskbufp(a4),a0	; a0 -> disk buffer
-*	move.w	#$00ff,d1	; checksum $100 words
-*	moveq	#0,d0		; checksum = 0
-*dmb_3:	add.w	(a0)+,d0	; add (next) word
-*	dbra	d1,dmb_3
-*	cmp.w	#bootmagic,d0	; is the sector executable?
-*	bne	dmb_2		; (nope)
-*	move.l	_dskbufp(a4),a0	; a0 -> disk buffer
-*	jsr	(a0)
-*dmb_2:	add.b	#$20,d7		; next devno
-*	bne	dmb_1		; (do all eight devs)
-*	addq.l	#4,sp		; pop the memory of when we started
-*	rts
-*
-*
-**+
-**  dmaread - attempt to read boot sector from DMA bus device
-**    Passed:	d7.b = ddd00000
-**		('ddd' is the ACSI device number, 0..7)
-**		a4.l = 0 for low-RAM and I/O space access
-**
-**    Returns:	NE: read failed;
-**		EQ: successful read,
-**		    sector data in (*_dskbufp)[];
-**
-**    Preserves:	d7.w
-**
-**    Uses:	everything else
-**
-**
-** Changed 5/88 by Allan Pratt: always retry the operation on a read error.
-** This is because some removable media signal media change this way.
-** This code does NOT retry on a timeout from the DMA or drive controller.
-** (Should it? TBD.) (This code uses a4 as quick zeropage, not a5.)
-**
-** At 4(sp) when we get here is a long which is the _hz_200 time when
-** this whole thing began.  Timeout for acking command bytes is at least
-** 10 sec later than this, and timeout for data is at least 40 sec later.
-**-
-*dmaread:
-*	moveq	#1,d5		; set for two iterations (dbra at end)
-*
-*dmaagain:
-*	lea	fifo(a4),a6	; a6 -> DMA control register
-*	lea	diskctl(a4),a5	; a5 -> DMA data register
-*	st	flock(a4)	; lock up DMA against vblank
-*
-*	move.l	_dskbufp(a4),-(sp)	; setup DMA pointer
-*	move.b	3(sp),dmalow(a4)
-*	move.b	2(sp),dmamid(a4)
-*	move.b	1(sp),dmahigh(a4)
-*	addq	#4,sp
-*
-*	move.w	#$098,(a6)	; toggle R/W, leave in Read state
-*	move.w	#$198,(a6)
-*	move.w	#$098,(a6)
-*	move.w	#1,(a5)		; write sector count register (= 1)
-*
-*	move.w	#$088,(a6)	; select dma bus (not SCR)
-*
-*	move.b	d7,d0		; setup d0.L with devno+command
-*	or.b	#$08,d0		; d0.b = devno<<5 .OR. "READ" command bits
-*	swap	d0
-*	move.w	#$08a,d0
-** timeout for the command bytes to ack is max(2000 - _hz_200,10)
-*	move.l	#2000,d1
-*	sub.l	_hz_200,d1	; d1 = (2000 - _hz_200)
-*	moveq.l	#10,d2
-*	cmp.l	d2,d1
-*	bgt	dmr_wc
-*	move.l	d2,d1
-*dmr_wc:	move.l	d1,d2		; save in d2 for use later on
-** timeout computation done, value in d1 (and d2)
-*
-*	bsr	wcbyte		; d0.L = xxxxxxxxDDD01000xxxxxxx010001010
-*	bne	dmr_q		; (punt on timeout)
-*
-*	moveq	#3,d6		; (count = 4)
-*	lea	dmr_st(pc),a0	; a0 -> bytestream for commands
-*dmr_lp:	move.l	(a0)+,d0	; get next command byte
-*	move.l	d2,d1		; get timeout value again
-*	bsr	wcbyte		; write it
-*	bne	dmr_q		; (punt on timeout)
-*	dbra	d6,dmr_lp	; (loop for more bytes)
-*
-*	move.l	#$0000000a,(a5)	; write byte 5 (controlByte = $00)
-** timeout for the read to complete is max(8000 - _hz_200,400)
-*	move.l	#8000,d1
-*	sub.l	_hz_200,d1	; d1 = 8000 - _hz_200
-*	move.l	#400,d2
-*	cmp.l	d2,d1
-*	bgt	dmr_w		; if d1 > 400 use d1 (signed compare!)
-*	move.l	d2,d1		; else use 400
-*dmr_w:
-** timeout computation done, value in d1
-*	bsr	wwait		; wait for completion
-*	bne	dmr_q		; (punt on timeout)
-*
-*	move.w	#$08a,(a6)	; select status reg
-*	move.w	(a5),d0		; get return code from DMA device
-*	and.w	#$00ff,d0	; strip crufty bits
-*	beq	dmr_r		; zero, so it's good.
-*
-*	dbra	d5,dmaagain	; bad read - retry (once)
-*
-** Fall through if we've already tried twice: give up (return -1).
-*
-**--- reset DMA, return NE
-*dmr_q:
-*	moveq	#-1,d0		; return -1 (error)
-*dmr_r:	move.w	#$080,(a6)	; cleanup DMA chip for floppy driver
-*	tst.b	d0		; (test for NE on return)
-*	sf	flock(a4)	; unlock DMA chip
-*	rts			; return
-*
-*
-**--- bytes in the command packet:
-*dmr_st:	dc.l	$0000008a	; byte 1 (devno = 0, blockno = 0)
-*	dc.l	$0000008a	; byte 2 (blockno = 0)
-*	dc.l	$0000008a	; byte 3 (blockno = 0)
-*	dc.l	$0001008a	; byte 4 (count = 1)
-*
-*
-**+
-**  wcbyte - write ACSI command byte, wait for IRQ
-**    Passed:	D0.L = command byte and FIFO control
-**			bits 16..23 = command byte,
-**			bits 0..7 = FIFO control bits
-**		d1.l = time to wait in 200Hz ticks before failing
-**		a5 -> $ff8604
-**		a4 =  $0 (for low-ram access)
-**
-**
-**    Returns:	NE on failure (timeout)
-**		EQ on successful ACK
-**
-**    Uses:	d1
-**
-**-
-*wcbyte:
-*	move.l	d0,(a5)		; write WDC, WDL [due to jwt]
-*wwait:	add.l	_hz_200(a4),d1	; d1 = time to quit at...
-*ww_1:	btst.b	#5,gpip(a4)	; disk done?
-*	beq	ww_w		; (yes, return)
-*	cmp.l	_hz_200(a4),d1	; timeout?
-*	bhi	ww_1		; (not yet -- wait some more...)
-*	moveq	#-1,d1		; ensure NE (timeout error) return
-*ww_w:	rts
-* endc
-** end old code
-
-*
 * new DMA BOOT code: use _dmaread (in another file) to scan
 * devices 8-15, then 0-7 (that is, SCSI, then ACSI).
 * First device which has an executable root sector stops the
@@ -3024,6 +2863,19 @@ dskb1:	rts				; return status
 * but writes "90 seconds" into 200Hz so a quick warm boot won't
 * wait again.
 *
+*+
+*  dmaboot - attempt to boot from a device on the DMA bus
+*    Passed:	nothing
+*
+*    Returns:	maybe-never (although it depends ...)
+*
+*    Uses:	everything
+*
+*    Discussion:
+*
+*		Attempts to read boot sectors from eight devices connected
+*		to the SCSI DMA bus, and eight devices connected to the
+*		ACSI bus.  If a sector is read, and it is executable (word
 *		checksum is $1234), then it is executed.  The search stops
 * 		set next_bar_time to bar_interval;	(d6)
 NINETY_SECONDS	equ	200*90
@@ -3066,11 +2918,7 @@ nomt:
 	move.l	d7,_hz_200		; you broke out: write 90 sec
 * if (mt_done && _hz_200 >= d6)
 	trap	#$d
-.ifne TT
-	move.w	#bootcolor,ttcolor0
-.else
 	move.w	#bootcolor,color0
-.endc
 * this is the end of the memory-test/shrinking bar sequence.  We check
 .ifne TT
 * Check the keyboard for a user aborting the timeout
@@ -3079,12 +2927,38 @@ nomt:
 	moveq.l	#0,d4			; start with ACSI device 0
 .endc
 .if STPAD
+.ifne TT
+
+
+	move.w	$d00004,d0
+	not.w	d0			; make the value one-is-down
+	and.w	#%00001100,d0		; check both button bits
+	bne	dmab_abort		; yes, at least one's down: abort
+.endif
+
+	move.l	#$00010002,-(sp)
+	trap	#$d			; poll for char: Bconstat(2)
+	addq.l	#4,sp
+	tst.l	d0
+	beq	dmab_to			; keep waiting for timeout
+	move.l	#$00020002,-(sp)	; get the char: Bconin(2)
+	trap	#$d
+	addq.l	#4,sp
+
+dmab_abort:
+	cmpa.w	#0,a5			; was memory test done?
+	bne	dmab_todone		; yes - don't have to abort it.
+	bsr	mem_abort		; clean up after aborting mem test
+	move.l	d7,_hz_200		; write eighty seconds so we 
+					; don't do this again
+.endc
+
 dmab_todone:
 	move.l	d7,_hz_200		; you broke out: write 80 sec
 	move.w	#13,-(sp)
 	move.l	#$00030002,-(sp)
 	move.w	d4,-(sp)		; device number
-	move.l	_dskbufp,-(sp)		; buffer
+	move.l	_dskbufp.w,-(sp)	; buffer
 	move.w	#1,-(sp)		; count of one
 	clr.l	-(sp)			; sector zero
 	jsr	_dmaread
@@ -3100,7 +2974,7 @@ dmab_skip:
 .if TT
 	jsr	_resetscsi		; reset the SCSI bus
 .endif
-dmaok:	move.l	_dskbufp,a0
+
 	clr.w	the_env			; zero our device sequencer
 
 .if TT
@@ -3129,17 +3003,17 @@ dmaloop:
 * TOS.  If it didn't change, we try the next device.
 	cmp.w	#bootmagic,d1
 	beq	dmafound		; success!
-	move.l	_dskbufp,a0
+
 *
 * dmarfail:  DMAread failed or sector isn't bootable ($1234) or didn't
 * change hdv_rw; try the next device.
-	moveq.l	#0,d5			; zero user-preference value
+*
 	move.l	d4,-(sp)		; save d4
 * The device sequence (in hex) is:
 *  STPLUS:	10-17, 0-7	(IDE first, then ACSI)
 *  TT:		8-f, 0-7	(SCSI first, then ACSI)
 	move.l	(sp)+,d4		; restore d4
-	cmp.l	hdv_rw,d0		; hdv_rw still the same?
+*  SPARROW:	10-17, 8-F	(IDE, then SCSI; sigh)
 *
 * STPAD and STe-PLUS have IDE busses.  On other STPLUSes (Mega STe and
 .endc

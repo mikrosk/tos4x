@@ -1,12 +1,17 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/09 17:40:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/28 15:10:00 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.15  1991/05/28  15:10:00  apratt
+* Fixed again - the special case where currec points past curcl
+* can have happened before a call to ixlseek, so you have to
+* deal with it at the front end as well as the back end.
+*
 * Revision 2.14  1991/05/09  17:40:38  apratt
 * General stuff.
 *
@@ -771,6 +776,7 @@ int flg;
     dmd = &drvtbl[dfd->dfd_dev];
 
     /* set OFD r/w pointer fields to the right values */
+    /* the first "if" takes care of zero-length files. */
     if (!n) ofd->o_curcl = 0;	/* flag meaning beginning of file */
     else {
 	new = n >> dmd->m_clblog;
@@ -784,9 +790,26 @@ int flg;
 	    /* (new >= old) */
 	    curcl = ofd->o_curcl;
 	    if (!curcl) {
-		curcl = ofd->o_dfd->dfd_strtcl;
+		curcl = dfd->dfd_strtcl;
 		swp68(curcl);
 	    }
+	    else if (((ofd->o_currec & dmd->m_clrm) == 0) &&
+		     (ofd->o_bytnum < dfd->dfd_fileln) &&
+		     (ofd->o_currec >= (cl2rec(curcl,dmd) + dmd->m_clsiz))) {
+		/*
+		 * last read/write ended at a cluster boundary which was
+		 * not end of file.  Update curcl to the true values: the
+		 * first record of the next cluster after what curcl is
+		 * now.
+		 */
+		if ((curcl = nextcl(curcl,dmd,0)) == 0) {
+		    /* nextcl returns zero on EOF and bad cluster and error */
+		    return ERROR;
+		}
+	    }
+
+	    /* curcl is now the right number */
+
 	    if (n == dfd->dfd_fileln && (n & (dmd->m_clsizb-1)) == 0) {
 		/*
 		 * seek to end of file which is end of cluster: This is
@@ -808,15 +831,12 @@ int flg;
 	}
 
 	/*
-	 * Inside the loop, the if will return on two kinds of error. First
-	 * error: FAT entry too large, including bad sector or premature
-	 * EOF (0xfffx). Second error: a bad FAT which has a free cluster
-	 * in a file (0x0000).
+	 * Inside the loop, you return ERROR when nextcl returns EOF
+	 * or errors like bad cluster.
 	 */
 
 	while (clcount--) {
-	    if ((curcl > dmd->m_numcl) ||
-		(!(curcl = getcl(curcl,dmd)))) return ERROR;
+	    if (!(curcl = nextcl(curcl,dmd,0))) return ERROR;
 	}
 
 	/*

@@ -3,16 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/04/17 14:43:48 $
+* $Date: 89/05/10 14:00:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.9  89/05/10  14:00:24  apratt
+* Added MOVEVBL switch to make vblqueue happen early in vblank.
+* Moved memory clearing around so the screen clears early on as before.
+* (Previous rev had a substantial delay between power-on and clear screen.)
+*
 * Revision 2.8  89/04/17  14:43:48  apratt
 * Added mwdata and mwmask equates... Oops.
-*
+* 
 * Revision 2.7  89/04/17  13:26:22  apratt
 * Added the new system variable _sysflags, definition TBD ($5a0)
 * 
@@ -220,7 +225,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.8 $
+* $Revision: 2.9 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -284,21 +289,29 @@ denmark		=      13 ***DON'T  CHANGE***
 * code is stopgap, such as programming the memory controller for 2Meg
 * and short-circuiting the RTC.  Caveat programmer.
 * The switches TT, STPLUS, systype, and country
-TT		=	0	; @check@
+TT		=	1	; @check@
 * of one of the canned switch settings files.
+
+* set MOVEVBL to 1 to make vblqueue processing first in the vblank
+* processing, rather than (almost) last as it always has been.
+* This gives the VDI more time to draw the mouse before the
+* beam starts drawing.  May not turn out to be necessary, and
+* may turn out to be dangerous (I'm not sure how...).
+
+MOVEVBL		=	1	; @check@
 
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
 * the chip actually exists (so clearing the control register will
 * not cause a bus error) and that MONOMON is XORed with the sound chip's
 * IRQ line.
 
-DMASND		=	0	; @check@
+DMASND		=	1	; @check@
 * have a short-frame processor (68000).  Currently that's only TT.
 * set DMAINV to 1 if the machine you're building ROMs for inverts
 * monomon when DMA sound chip is idle.  Older STPLUS and TT machine
 * do this, newer ones have the idle state noninverting.
 
-DMAINV		=	0	; @check@
+DMAINV		=	1	; @check@
 
 * set STPLUSVIDEO to 1 if you have ST PLUS video, with four bits per
 * gun instead of three in the palette.
@@ -309,7 +322,7 @@ STPLUSVIDEO	=	0	; @check@
 * Even if this is zero, the new system variable _longframe at $59e
 * is initialized.
 
-LONGFRAME	=	0	; @check@
+LONGFRAME	=	1	; @check@
 
 systype		=	rom	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
@@ -1265,8 +1278,8 @@ memr2:	beq	mem3			; yes -- 512K
 mem3:	addq.w	#4,d6			; adjust config	byte for 512K
 ; OK, dbasell holds its value: you're an STe.
 
-cold3:	move.b	d6,memconf		; setup	memory controller
-	clr.l	a5
+cold3:	clr.l	a5
+	move.b	d6,memconf(a5)		; setup	memory controller
 .endc
 	bra	gotshadow
 .ifne TT
@@ -1307,7 +1320,7 @@ mem4:	sub.l	#bank1,d1		; decrement bank number
 	move.l	phystop(a5),d5
 * concept to the one used in the ST series, but different in details.
 *
-ret_2:	beq	reset4			; already sized; don't size of test.
+* The TT master MCU can be configured to use either 256K or 1M deep
 * parts.  To figure out which are actually installed on your board, you
 * 	1) consult a calendar  (1Mx4 DRAMs are not expected in
 	move.b	#$a,memconf(a5)		; but mem cntlr for big
@@ -1372,12 +1385,30 @@ mt_done:
 *-
 	lea	$8000,sp		; initialize SP just this once
 	move.l	a0,8			; to catch non-existant controllers
+*  [ROM based system]
+*  Clear memory from $400 to 'd5' (phystop).
+*  Used to put screen at phystop - screen size and clear from top down.
+*  Now leaves screen where it is (at 64K) and clears from bottom up,
+*  so screen still clears early on.
+*  Must preserve d5 = phystop and d6 = mem controller program byte.
+	move.w	d0,d2			; d2 = copy of random #
+	moveq	#42,d1			; d1 = # words to stuff
+	add.w	d3,d2			; generate new random #
+	dbra	d1,mt_2			; (stuff more words)
+
+	move.l	a0,a1			; a1 -> end of RAM (as we knew it)
+	moveq	#42,d1			; d1 = # words to check
+mt_3:	cmp.w	-(a1),d0		; compare word in RAM with ours
+	bne	mt_q			; no match: bad bank (we quit)
+	clr.w	(a1)			; be tidy, clear out cruft
+	add.w	d3,d0			; generate next random #
+	dbra	d1,mt_3			; (check more words)
+
 *  Indicate that memory has successfully
 *  been sized and tested.  Set the variables
 *  to magic values ...
 *
 	move.l	a0,d5			; d5 -> end of RAM (as we know it)
-	clr.l	a5			; cheap zeropage
 	move.b	d6,memcntlr(a5)		; save configuration byte
 	move.l	d5,phystop(a5)		; save physical top-of-memory
 	move.l	#memmagic,memvalid(a5)	; indicate memory was configured
@@ -1460,40 +1491,7 @@ mt_p2:	move.w	d2,-(a1)		; stuff a word (or get a BUS ERROR)
 .endc
 mt_pq:	sub.l	d7,a0			; drop down to last successful probe
 
-*+
-*  [ROM based system]
-*  Put screen at phystop - screen size
-*  Clear memory from $400 to 'd5' (phystop).
 	cmp.l	#$01000000,a0		; was there any RAM at all?
-*-
-	clr.l	a5
-	move.l	phystop(a5),d0		; d0 = (phystop) - (screen size)
-.ifeq TT
-	sub.l	#$8000,d0		; ST needs this much screen RAM
-.endc
-.ifne TT
-	sub.l	#$25800,d0		; TT needs lots of screen RAM
-.endc
-.ifne STPLUSVIDEO+TT
-	move.b	d0,dbasell(a5)
-.endc
-	lsr.w	#8,d0
-	move.b	d0,dbasel(a5)		; dbasel = d0 >> 8
-	swap	d0
-	move.b	d0,dbaseh(a5)		; dbaseh = d0 >> 16
-	move.l	d5,a0			; start at the end
-	move.l	#$400,d4		; where to end
-	moveq	#0,d0			; d0-d3 = zeros
-	moveq	#0,d1
-	moveq	#0,d2
-	moveq	#0,d3
-clm_1:	movem.l	d0-d3,-(a0)		; ... work our way back
-	movem.l	d0-d3,-(a0)		;  by clobbering 64 bytes at a time
-	movem.l	d0-d3,-(a0)
-	movem.l	d0-d3,-(a0)
-	cmp.l	d4,a0			; done?
-	bne	clm_1			; (loop for more bytes)
-*
 * end of .ifeq systype-rom for memory sizing
 	clr.l	a0			; no - set ramtop to zero.
 mt_pr:
@@ -2401,6 +2399,23 @@ val_mr:	jmp	(a6)			; return EQ/NE
 *-
 
 colors:
+	dc.w	bootcolor		; 0 - boot color (white in production)
+.ifne MOVEVBL
+*------	Call deferred interrupt	vectors:
+	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
+	beq	vbl12			; (punt	if no vectors)
+	subq.l	#1,d7			; turn into DBRA count
+	move.l	_vblqueue,a0		; a0 ->	vectors
+vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
+	cmp.l	#0,a1			; if(a1	== NULL) continue;
+	beq	vbl11
+	movem.l	d7/a0,-(sp)		; save registers
+	jsr	(a1)			; call routine
+	movem.l	(sp)+,d7/a0		; restore registers
+vbl11:	dbra	d7,vbl10		; loop for more	vectors
+
+.endc
+
 	clr.l	a5			; a5 -> zero page
 	dc.w	$f3f			; 13 light magenta
 	dc.w	$3ff			; 14 light cyan
@@ -2545,6 +2560,7 @@ swmon1:	btst.l	#7,d1			; bit is 1 when no mono
 	beq	swmon3			; no change (still highrez)
 	move.b	defshiftmd.w,d0		; get preferred rez
 .if (TT == 0)
+.ifeq MOVEVBL
 *------	Call deferred interrupt	vectors:
 	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
 	beq	vbl12			; (punt	if no vectors)
@@ -2557,6 +2573,8 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	jsr	(a1)			; call routine
 	movem.l	(sp)+,d7/a0		; restore registers
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
+
+.endc
 
 	cmp.b	#2,d0			; if high-rez, then force low rez
 vbl12:	clr.l	a5			; quick zeropage

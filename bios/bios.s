@@ -4,16 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/02 12:34:47 $
+* $Date: 91/04/11 12:13:54 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.30  91/04/11  12:13:54  apratt
+* Removed PAL condition from spain -- now it's always PAL.
+*
 * Revision 2.29  91/04/02  12:34:47  apratt
 * Folded in some more things from SERPTCH. This is the version for 3.06.
-*
+* 
 * Revision 2.28  91/03/27  12:33:58  apratt
 * Turned on Bconmap for TT+STPLUS rather than just TT. It should really be on
 * for ANYTHING.  Also, a bug fix in RSCONF for MFP's: was writing rsmode in
@@ -52,7 +55,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.29 $
+* $Revision: 2.30 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -111,7 +114,7 @@
 .endc
 .endif
  ifeq country-spain
-osconf		equ	%01000 + PAL
+.if country == uk
 .endc
 .endif
  ifeq country-italy

@@ -4,16 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/03 13:21:39 $
+* $Date: 91/08/05 15:13:11 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.10  91/08/05  15:13:11  apratt
+* Added support for STPAD: took out the test (the Ricoh chip is ALWAYS
+* there), disabled the 1Hz and 16Hz wave outputs, and changed other code to
+* avoid clobbering alarm registers.
+*
 * Revision 2.9  90/08/03  13:21:39  apratt
 * TTOS FINAL RELEASE
-*
+* 
 * Revision 2.8  90/08/01  13:10:44  apratt
 * Fixed a bug: check didn't leave regs right when checksum was wrong,
 * even though the read operation expected to be able to do the read
@@ -60,7 +65,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.9 $
+* $Revision: 2.10 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -94,6 +99,14 @@
 	.globl	_date,_time	; GEMDOS date and time variables
 
 .ifeq TT
+
+*
+* STPAD doesn't really probe for the clock chip: there is always one. The
+* test clobbers the alarm registers, and this is A Bad Thing.  Also, there
+* are bits in both the reset register and the mode register which need
+* better handling than was here: 1Hz and 16Hz must be disabled, the alarm
+* reset bit must never be set, and the alarm enable bit must be preserved.
+* Sigh.
 
 RTCBASE	equ	$fffffc20	; base address of RTC chip
 
@@ -151,6 +164,7 @@ RD10YR	equ	$0
 *    o  if invalid date/time, return CS;
 *    o  set GEMDOS date/time, return CC.
 *
+
 _iclock:
 	bsr	clktest			; test for clock chip
 	bcs	iclfai			; (not around)
@@ -190,14 +204,19 @@ iclfai:	moveq	#-1,d0			; return -1L (error)
 * was added 2/6/89 by AKP.  Don't know why the above comment
 * refers to bus errors but doesn't implement them.
 *
+
 clktest:
-	clr.l	a1
+.ifne STPAD
+	move.w	#RTCBASE,a0		; fulfill return requirement
+	moveq.l	#0,d0			; clear the carry bit - clock exists.
+	rts
+.else
 	move.w	#RTCBASE,a0		; a0 -> base of clock chip
-	move.l	8(a1),d2		; save bus error vector
+	move.l	$8.w,d2			; save bus error vector
 	move.l	sp,a2			; save stack pointer for cleaning up
-	move.l	#clkerr,8(a1)		; write bus error vector
+	move.l	#clkerr,$8.w		; write bus error vector
 	move.b	#%1001,RTMODE(a0)	; set "alarm" bank
-	move.l	d2,8(a1)		; no bus error - restore vector
+	move.l	d2,8.w			; no bus error - restore vector
 	move.w	#$0a05,d0		; d0 = test pattern
 	movep.w	d0,RT01MIN(a0)		; write two registers
 	movep.w	RT01MIN(a0),d1		;   and read them back
@@ -210,10 +229,10 @@ clktest:
 	rts				; return OK
 
 clkerr:	move.l	a2,sp			; clean off the stack
-	move.l	d2,8(a1)		; restore the bus error vector
+	move.l	d2,$8.w			; restore the bus error vector
 clkfai:	or	#1,ccr			; set carry
 	rts				; return "failure"
-
+.endif
 
 
 
@@ -417,11 +436,12 @@ _setclock:
 *    o  write new clock data.
 *
 	clr.b	RDDOW(a1)		; clobber day-of-week in buffer
-	move.b	#%0010,RTRES(a0)	; clobber 15-stage divider
-	move.b	#%1001,RTMODE(a0)	; set "alarm" bank
+	move.b	#%1110,RTRES(a0)	; clobber 15-stage divider and 1Hz/16Hz
+					; (but don't touch alarm reset)
+	bset.b	#0,RTMODE(a0)		; set "alarm" bank (leave EN's alone)
 	move.b	#%0001,RT10MON(a0)	; set 24-hour mode
 	move.b	d2,RT01YR(a0)		; write leap-year count
-	move.b	#%1000,RTMODE(a0)	; set "normal" bank
+	bclr.b	#0,RTMODE(a0)		; set "normal" bank (leave EN's alone)
 
 	moveq	#READS-1,d0		; d0 = count
 	moveq	#RT01SEC,d1		; d1 = index to hardware registers

@@ -1,20 +1,27 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: minna $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/02 16:21:23 $
+* $Date: 91/08/15 16:18:07 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.16  91/08/15  16:18:07  apratt
+* Added code for IDE to wait until ATASR shows READY before
+* doing anything else.  Also changed so IDE_AT is assembled for
+* all STPLUS versions; the bus error detection will take care
+* of failing out quick on those machines that don't really have
+* an IDE bus.
+*
 * Revision 1.15  91/08/02  16:21:23  minna
 * Added delay between identify() and initparm(),
 * and reversed changes made earlier today.
-*
+* 
 * Revision 1.14  91/08/02  15:07:10  minna
 * Added handling of final interrupt after data transfer
 * on IDE drive.
@@ -80,7 +87,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.15 $
+* $Revision: 1.16 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -92,11 +99,15 @@
 
 .include "switches.s"
 
-* The code you get in assembling this file depends on the switches SCSI
-* and IDE_AT.  For now (2/91), only TT has SCSI and only STPAD has IDE.
+* The code you get in assembling this file depends on the switches SCSI and
+* IDE_AT.  For now (2/91), only TT has SCSI and all STPLUSes have IDE.
+*
+* Those STPLUS machines which use these ROMs but don't actually have an IDE
+* bus will still get the IDE code, but using it will fail right away
+* because it always probes for the IDE bus and returns if it doesn't exist.
 
 SCSI		=	TT
-IDE_AT		=	STPAD
+IDE_AT		=	STPLUS
 
 ;+
 ; DMAREAD(), DMAWRITE() - 
@@ -155,6 +166,11 @@ IDE_AT		=	STPAD
 ; Aug-02-91	ml.	Change again!  Conner now says there is no
 ;			final interrupt after data transfer, but need
 ;			a delay between the identify() and initparm().
+;
+; Aug-15-91	ml.	Added a check to see if IDE drive is ready before
+;			sending it the identify() command, by testing the
+;			DRDY (driver ready) bit in the Alternate Status
+;			Register.
 ;-
 
 .globl	_dmaread
@@ -296,6 +312,9 @@ at:	move.l	$8,a0
 	tst.b	ATASR			; read a register to probe for IDE bus
 	move.l	a1,sp			; hey! no bus error!
 	move.l	a0,$8			; restore vector & sp and continue.
+
+at3:	btst.b	#6,ATASR		; is drive ready yet?
+	beq.b	at3			; if not, wait longer
 
 	pea	sbuf			; scratch buffer for drive parameters
 	move.w	$12(sp),-(sp)		; AT unit#

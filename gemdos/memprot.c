@@ -127,6 +127,9 @@ typedef struct {
     uint tid:4;
 } tc_reg;
 
+void set_pmmu(tc_reg tc, crp_reg crp);
+void flush_pmmu(void);
+
 /*
  * init_tables: pass a pointer into here which is a 16-byte-aligned
  * block of memory big enough to hold all the page tables for one context.
@@ -191,7 +194,7 @@ MPB *pmd;
     g_ci_page.ci = 1;
 
     s_page = g_page;
-    s_page.s = 1;
+    s_page.s = 0;		/** leave s bit off for now **/
 
     invalid_page = g_page;
     invalid_page.dt = 0;
@@ -270,7 +273,7 @@ MPB *pmd;
 		tptr[j].tbl_address = (long_desc *)q;
 	    }
 	    else if (q < memtop) {
-		tptr[j].page_type = s_page;		/* TPA (sigh) */
+		tptr[j].page_type = s_page;	/* TPA (sigh) */
 		tptr[j].tbl_address = (long_desc *)(q | 1);
 	    }
 	    else {
@@ -337,35 +340,18 @@ MPB *pmd;
 /*
  * init_t2 -- second phase of initialization.
  *
- * The first phase builds all the tables.  It marks TPA tables as super-only
- * and sets the low bit of the page address of each entry.  This call
- * sets those all to invalid.  This call is made when the system is finished
- * booting.  Before that, there are things like memory tests and package
- * boots to deal with.
- * 
- * It is possible for things to call Malloc to get pages legitimately.
- * These pages are owned by the root process, and for this reason, Malloc
- * (really mark_region) will clear the low bit of the pages in question
- * so they aren't marked invalid here.
+ * The first phase builds all the tables.  It marks TPA tables as global.
+ * This call goes through the MPB and marks free pages as invalid.  The
+ * non-free pages [will] become super-only.
  */
 
 void
 init_t2()
 {
-    long_desc *tc, *td;
-    int i, j;
+    MD *p;
 
-    for (i = 0, tc = tbl_c00; i < 16; i++, tc++) {
-	if (tc->page_type.dt == 3) {
-	    for (j = 0, td = tc->tbl_address; j < 128; j++, td++) {
-		if ((long)td->tbl_address & 1) {
-		    /* make this page invalid */
-		    td->page_type.dt = 0;
-		}
-		/* else it's not TPA */
-	    }
-	}
-	/* else there's no table */
+    for (p = pmd.mp_mfl; p; p = p->m_link) {
+	mark_region(p,0);
     }
 }
 
@@ -429,15 +415,19 @@ int valid;
     ulong length = md->m_length;
     ulong i;
     long_desc *base_tbl, *tbl;
-    int limit_val;
     int dt_val;
+    extern int mem_initted;
+
+    if (!mem_initted) return;
 
     if (valid) {
-	limit_val = 0x7fff;
-	dt_val = 3;
+	DBCMD(0x80,"print -n mark_region valid. md: ;"
+	       "md lpeek(a6+8);_c");
+	dt_val = 1;
     }
     else {
-	limit_val = 0;
+	DBCMD(0x80,"print -n mark_region invalid. md:;"
+	       "md lpeek(a6+8);_c");
 	dt_val = 0;
     }
 
@@ -465,10 +455,7 @@ int valid;
 	    /* already where we're setting it! */
 	    DBCMD(-1,"print -i ERROR: page already in desired state!");
 	}
-	tbl[i].page_type.limit = limit_val;
 	tbl[i].page_type.dt = dt_val;
-	/* clear the low bit so init_t2 won't invalidate it. */
-	*(long *)&tbl[i].tbl_address &= ~1;
 	length -= EIGHT_K;
 	start += EIGHT_K;
     }

@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\mem.c,v $
+* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/09 17:42:04 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.18  1991/05/09  17:42:04  apratt
+* Added a bunch of unsigned's.
+*
 * Revision 2.17  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -92,9 +95,9 @@ This code gets rid of the dumb "rover" idea.  What a dog!
 
  ************************************************************************/
 
-#define FLAG(val) (((long)(val)) & 1)
-#define UNFLAG(val) ((MD *)(((long)(val)) & (~1)))
-#define PUTFLAG(val,flag) ((char *)(((long)val) | flag))
+#define FLAG(val) (((unsigned long)(val)) & 1)
+#define UNFLAG(val) ((MD *)(((unsigned long)(val)) & (~1)))
+#define PUTFLAG(val,flag) ((char *)(((unsigned long)val) | flag))
 
 /*
  * If you define QUANTUM to anything other than 2, you will change the
@@ -117,8 +120,8 @@ void
 xminit()
 {
     MD *p;
-    long s;
-    long adjust;
+    unsigned long s;
+    unsigned long adjust;
 
     (void)getmpb(&pmd);
 
@@ -131,7 +134,7 @@ xminit()
      */
 
     for (p = pmd.mp_mfl; p; p = p->m_link) {
-	if (s = (((long)(UNFLAG(p->m_start))) & (QUANTUM-1))) {
+	if (s = (((unsigned long)(UNFLAG(p->m_start))) & (QUANTUM-1))) {
 	    adjust = QUANTUM - s;
 	    p->m_start += adjust;
 	    p->m_length -= adjust;
@@ -141,13 +144,13 @@ xminit()
     }
 }
 
-long 
+unsigned long 
 mbiggest(mp,type)
 MPB *mp;
 int type;
 {
     REG MD *p;
-    REG long maxval;
+    REG unsigned long maxval;
 
     DBCMD(0x80,"print mbiggest mpb: (lpeek (`a6 + 8)) type: (wpeek (`a6 + c));_c");
 
@@ -171,7 +174,7 @@ int type;
 MD
 *ffit(amount,mp,type)
 MPB *mp;
-long amount;
+unsigned long amount;
 int type;
 {
     MD *p;
@@ -270,7 +273,7 @@ long
 xmshrink(n,blk,len)
 int n;
 void *blk;
-long len;
+unsigned long len;
 {
     MD *m;
     MD *p;
@@ -410,16 +413,16 @@ MPB *mp;
  * when you use the old Malloc() call.
  */
 
-long
+unsigned long
 xfmalloc(amount,mode)
-long amount;
+unsigned long amount;
 int mode;
 {
     REG MD *ret;
 
     DBCMD(1,"print xfmalloc amt: (lpeek (`a6 + 8)) mode: (wpeek (`a6 + c));_c");
 
-    if (amount == -1L) return mbiggest(&pmd,mode);
+    if (amount == 0xffffffffL) return mbiggest(&pmd,mode);
     else {
 	ret = ffit(amount,&pmd,mode);
 	if (ret != NULPTR) return (long)UNFLAG(ret->m_start);
@@ -434,9 +437,9 @@ int mode;
  * Needs to know what *kind* of memory to allocate...  If P_RAMALLOC is
  * set, try fast RAM first, then slow RAM.  Else just slow.
  */
-long
+unsigned long
 xmalloc(amount)
-long amount;
+unsigned long amount;
 {
     DBCMD(1,"print -n xmalloc amt: (lpeek (`a6 + 8)) >>;_c");
 
@@ -559,10 +562,10 @@ PD *pid;
 long
 xaddalt(blk,siz)
 void *blk;
-long siz;
+unsigned long siz;
 {
     REG MD *m;
-    REG long s;
+    REG unsigned long s;
 
     DBCMD(1,"print xmaddalt blk: (lpeek (`a6 + 8)) siz: (lpeek (`a6 + c));_c");
 

@@ -4,23 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/05/02 16:29:03 $
+* $Date: 90/05/09 16:46:58 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.20  90/05/09  16:46:58  apratt
+* Fixed scc tx int code so it works (oops).
+*
+* Documented a feature of dosound that's always been true: it returns
+* the current sound-routine pointer, or zero if none.
+* If the new pointer you pass in is negative, it doesn't change it.
+*
 * Revision 2.19  90/05/02  16:29:03  apratt
 * Fixed rsconf so when changing rsmode (flow-control mode): if txoff,
 * causes a bsr to sender (to wake up the transmission if anything's
 * buffered), and if rxoff, causes XON or raising RTS.  This didn't work
 * before.
-*
+* 
 * Changed sender and scc_sender to allow sending the byte at sendnow even
 * if txoff is set, so you can tell the host to XOFF even if he has told
 * you to XOFF.
-*
+* 
 * Revision 2.18  90/04/30  18:39:36  apratt
 * Changed some things in MFP serial port code.  Made kickstart, rsconf
 * more common to the two MFP's.
@@ -213,7 +220,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.19 $
+* $Revision: 2.20 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3524,14 +3531,11 @@ scc_getc:
 	LOG	"sbuf"
 	add.w	#(chaobufptr-chaibufptr),a0	; advance to output iorec
 	move.w	bufhead(a0),d0
+	cmp.w	buftail(a0),d0
 	beq	scc_nodata	; abort if output buffer empty
 	bsr	getbyte		; else get byte (to d0)
 scc_gotc:
 	SCCw	#8,d0		; write the char to xmit it
-scc_nodata:
-	LOG	"sabt"
-	rts
-
 scc_nodata:
 scc_sdone:
 	move.l	(sp)+,a0
@@ -5398,7 +5402,7 @@ kt3:	move.l	#skeytran,d0
 	rts
 
 *************************************************************************
-*	void	dosound(ptr)						*
+*									*
 *		RESTORE BIOS KEYBOARD TRANSLATION TABLE			*
 *									*
 *	entry:								*

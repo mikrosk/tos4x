@@ -3,17 +3,20 @@
 * $Author: lozben $
 * =======================================================================
 *
-* $Date: 89/08/24 16:54:58 $
+* $Date: 89/08/25 12:23:16 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.20  89/08/25  12:23:16  lozben
+* EsetShift() now always returns old shift mode register value.
+*
 * Revision 2.19  89/08/24  16:54:58  lozben
 * Added EgetShift() and EsetShft() xbios function calls. Deleted
 * EsetRez() and EsetPhysBase() xbios function calls.
-*
+* 
 * Revision 2.18  89/08/18  13:44:47  apratt
 * All changes are TT only:  added _FRB cookie pointing to a 64K buffer
 * in slow RAM for ACSI transfers to/from fast RAM.  Only present if there
@@ -281,7 +284,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.19 $
+* $Revision: 2.20 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -4229,10 +4232,12 @@ crctab:
 	dc.w	$b75b,$a77a,$9719,$8738,$f7df,$e7fe,$d79d,$c7bc
 	dc.w	$48c4,$58e5,$6886,$78a7,$0840,$1861,$2802,$3823
 	bsr	wvbl			; wait for start of vertical-blank
+	move.w	shiftmd(a5),-(sp)	; save return value
 	move.w	4(sp),shiftmd(a5)	; set shift mode register
 	clr.w	vblsem(a5)		; disable vblank processing
 	dc.w	$1080,$00a1,$30c2,$20e3,$5004,$4025,$7046,$6067
 	move.w	#1,vblsem(a5)		; re-enable vblank
+	dc.w	$02b1,$1290,$22f3,$32d2,$4235,$5214,$6277,$7256
 	dc.w	$b5ea,$a5cb,$95a8,$8589,$f56e,$e54f,$d52c,$c50d
 	dc.w	$34e2,$24c3,$14a0,$0481,$7466,$6447,$5424,$4405
 	dc.w	$a7db,$b7fa,$8799,$97b8,$e75f,$f77e,$c71d,$d73c

@@ -1,12 +1,17 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.11 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.12 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/03 00:14:20 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/09 17:37:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.12  1991/05/09  17:37:28  apratt
+* Split out dotsok and added trailok, fixed logic and trailing SLASH,
+* changed dirnext's end-of-dir return from ENMFIL to EFILNF.
+* Removed extended flag arg from nextcl call.
+*
 * Revision 1.11  1991/05/03  00:14:20  apratt
 * Added acceptance of trailing backslash when dotsok; dotsok is
 * assumed to be a flag saying "I came from Dsetpath" and we must
@@ -76,13 +81,16 @@ idea behind EBADRQ is that retrying the request won't do any good: it's
 intrinsically bad, not just "can't do that right now."
 
 EBADRQ errors: any component includes a '*' or '?' character, any component
-is empty, last component is "." or "..", any component is an invalid file
-name.  Also a component like "..abc" or other unparsable.
+is empty (except last when dotsok), last component is "." or ".." (and not
+dotsok), any component is an invalid file name.  Also a component like
+"..abc" or other unparsable.
 
-Call with flags == FN_DOTSOK to enable finding . and .. in the last
-component; call with FN_EARLY to return E_OK before searching in the last
-dir for the last component.  FN_DOTSOK is used only in Dsetpath
-to enable Dsetpath("..").
+Call with (flags | FN_DOTSOK) to enable finding . and .. in the last
+component; call with FN_TRAILOK to allow a trailing slash (old GEMDOS
+Dsetpath allows this); call with FN_EARLY to return E_OK before searching
+in the last dir for the last component.  FN_DOTSOK is used in Dsetpath to
+enable Dsetpath(".."), and also in Fattrib (same reason), and FN_TRAILOK 
+is used in Dsetpath to enable Dsetpath("foo\") which some programs do.
 
 If the file doesn't exist, but you got all the way to the last directory,
 then EFILNF is returned and that directory's dev and cluster are valid.
@@ -123,7 +131,7 @@ DMD *dmd;
 
 Partly a macro. Advances (fresh) dir to the next slot in the directory.
 'dmd' is &drvtbl[dir->dir_drv] (saves multiplying inside loops). Returns
-zero and leaves dir fresh for success.  ENMFIL means everything succeeded
+zero and leaves dir fresh for success.  EFILNF means everything succeeded
 and you fell off the end of the dir.  ERROR means something went wrong (bad
 FAT). In each case, dir_curcl is unchanged, meaning it's the last cluster
 of the dir, but dir_recno is bad and the dir isn't fresh.  Can also return
@@ -197,11 +205,12 @@ int flags;
     uint attr;
     long err;
     FCB fcb, *pfcb;
-    int dotsok;
-    int earlyflag;
+    int dotsok, earlyflag, trailok;
 
-    dotsok = (flags == FN_DOTSOK);
-    earlyflag = (flags == FN_EARLY);
+    /* just because these are bitmapped doesn't mean they combine well */
+    dotsok = (flags & FN_DOTSOK);
+    trailok = (flags & FN_TRAILOK);
+    earlyflag = (flags & FN_EARLY);
 
     DBCMD(0x20,"print fn2dir -s (lpeek (lpeek (`a6 + 8))) "
 		"flags -x (wpeek (`a6 + 10)) dir: (lpeek (`a6 + c));_c");
@@ -214,7 +223,7 @@ int flags;
     }
     else dev = run->p_curdrv;
 
-    if (dev > MAXDEVS) return EDRIVE;
+    if (dev >= MAXDEVS) return EDRIVE;
     if (ckdrv(dev)) return EPTHNF;
     dmd = &drvtbl[dev];
 
@@ -260,14 +269,14 @@ int flags;
 	}
 
 	/*
-	 * if name is last component...
+	 * if (last component; trailing slash OK if trailok)
 	 *     if earlyflag, bail out now.
 	 *     if isdots(),
-	 *	   if dotsok, return EROOT (can only happen from Dsetpath).
+	 *	   if dotsok, do nothing (yet).
 	 *	   else return EBADRQ.
 	 */
 
-	if (!*end) {
+	if (!*end || (trailok && *end == SLASH && !*(end+1))) {
 	    if (earlyflag) {
 		*pname = name;
 		DBCMD(0x20,"print early return: *pname= "
@@ -276,13 +285,10 @@ int flags;
 				"dirx (lpeek (`a6 + c));_c");
 		return E_OK;
 	    }
-	    if (isdots(name)) {
-		if (dotsok) {
-		    /* end of name; return EROOT */
-		    DBCMD(0x20,"print dot or dot-dot in root dir: EROOT;_c");
-		    return EROOT;
-		}
-		else return EBADRQ;
+	    else if (isdots(name) && !dotsok) {
+		/* dots in last component; don't look unless dotsok */
+		DBCMD(0x20,"print dots in last component and not dotsok;_c");
+		return EBADRQ;
 	    }
 	}
 
@@ -317,7 +323,9 @@ int flags;
 	    c = pfcb->f_name[0];
 	    if (!c) goto nomatch;
 	    if (match(&fcb,pfcb)) goto didmatch;
-	    if (err = dirnext(dir,dmd)) return err;
+	    err = dirnext(dir,dmd);
+	    if (err == EFILNF) break;
+	    else if (err) return err;
 	}
 
 nomatch:
@@ -342,6 +350,7 @@ didmatch:
 dotmatch:
 	oname = name;
 	name = end;
+
 	if (*name == SLASH) {
 	    /* fail if found a file but not at end of path */
 	    if (!(attr & FA_SUBDIR)) return EPTHNF;
@@ -351,10 +360,9 @@ dotmatch:
 
     /*
      * End still points to end of last component; check for trailing SLASH.
-     * Dsetpath("\foo\bar\") is legal, so this is no error if dotsok
-     * (on the assumption that only Dsetpath uses FN_DOTSOK).
+     * Dsetpath("\foo\bar\") is legal, so this is no error if trailok.
      */
-    if (*end == SLASH && !dotsok) return EBADRQ;
+    if (*end == SLASH && !trailok) return EBADRQ;
 
     DBCMD(0x20,"print fn2dir returns, dir:;dirf (lpeek (`a6 + c));_c");
     *pname = oname;
@@ -393,7 +401,7 @@ DIR *dir;
  * dirnext: advance dir to point to the next slot.  This will advance to
  * the end of the last record of the last cluster in the dir, and won't
  * stop at null-byte entries.  Returns E_OK and fresh dir on success,
- * ENMFIL on failure (in which case dir_curcl is the last cluster), and
+ * EFILNF on failure (in which case dir_curcl is the last cluster), and
  * other errors. In any error case, dir isn't fresh any more.
  *
  * This is partly a macro: the fcb and recoffs fields are bumped to the
@@ -435,14 +443,14 @@ DMD *dmd;
     /* did you fall off this cluster? (RD is one big cluster) */
 
     if (!dir->dir_clust) {
-	if (dir->dir_recno >= dmd->m_recdata) return ENMFIL;
+	/* root dir; fallen off the end yet? */
 	if (dir->dir_recno >= dmd->m_recdata) return EFILNF;
     }
     else {
 	/*
 	 * Not root dir; fallen off this cluster yet?
 	 *
-	    if (xcl == 0xffff) return ENMFIL;
+	 * We subtract off recdata from recno because the AND with clrm
 	 * is only valid for sector numbers which are zero-based w.r.t
 	 * the start of the data part of the disk.
 	 */
@@ -469,7 +477,8 @@ DMD *dmd;
 
     return E_OK;
 }
-    uint cl, rec, i;
+
+long
 dirslot(dir)
 DIR *dir;
 {
@@ -479,7 +488,7 @@ DIR *dir;
     DMD *dmd = &drvtbl[dir->dir_dev];
     uint cl, rec;
     int i;
-	    if (err == ENMFIL) break;
+
     if (err = dirfirst(dir,dmd)) return err;
 
     DBCMD(0x20,"print dirslot: dir after dirfirst:;dirf (lpeek (`a6 + 8));_c");
@@ -493,7 +502,7 @@ DIR *dir;
 	}
     }
 
-    if (!(cl = nextcl(dir->dir_curcl,dmd,TRUE,NULL))) {
+    /* end of all clusters */
     DBCMD(0x20,"print dirslot fell off dir:;dirx (lpeek (`a6 + 8));_c");
 
     /* total error if RD because you can't extend it */

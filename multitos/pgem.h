@@ -497,7 +497,7 @@ WORD	ob_delit( WORD idx );
 
 WORD	ob_edit( REG LONG tree, REG WORD obj, WORD in_char, REG WORD *idx, WORD kind );
 
-
+WORD	propStrWidth(BYTE *s);
 
 
 
@@ -1274,4 +1274,4 @@ VOID	gsx_tcalc(LONG ptext,
 VOID	gsx_tblt(REG WORD x, REG WORD y, WORD tb_nc);
 VOID	gsx_xline(WORD ptscount, REG WORD *ppoints);
 UWORD	set_cufont(WORD font, WORD font_id, WORD size);
-WORD	str2intin(BYTE *);
+WORD	str2intin(UBYTE *);

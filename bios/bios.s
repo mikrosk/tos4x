@@ -4,13 +4,16 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/11/14 23:42:20 $
+* $Date: 1991/11/14 23:51:46 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.42  1991/11/14  23:51:46  apratt
+* Added a comment about hidden interaction between ikbdws and ikbdput.
+*
 * Revision 2.41  1991/11/14  23:42:20  apratt
 * Fixed two bugs reported from Germany.  First, the wrong argument was
 * pulled off the stack in the SCC Rsconf code, so you couldn't cause a
@@ -117,7 +120,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.41 $
+* $Revision: 2.42 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\bios.s,v $
@@ -1413,6 +1416,10 @@ ikbdox:
 *	entry:								*
 *									*
 *	void	ikbdwc(chr)						*
+*	word	chr							*
+*									*
+* Update:								*
+*	Once ikbd has cleared the character from the acia delay 1/100	*
 *	of a sec so that the ikbd can digest the char.			*
 *	(Actually, we delay 5ms which is 1/200 sec; long enough. AKP)	*
 *									*
@@ -1462,12 +1469,14 @@ ikput3:	cmp.b	(a0),d2		; changed?
 *		put string to ikbd routine				*
 *									*
 *	entry:								*
+*									*
+*	void	ikbdws(size,ptr)					*
+*	word	size							*
 *	long	ptr							*
 *									*
 * This code calls a hidden entry point in ikbdwc above, called		*
 * ikbdput.  Ikbdput may not touch registers a2 or d3.  (Sigh - AKP)	*
 *									*
-	moveq	#$0,d3
 *************************************************************************
 
 	.globl	ikbdws

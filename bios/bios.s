@@ -4,18 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/26 17:44:39 $
+* $Date: 91/05/21 16:54:10 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.32  91/05/21  16:54:10  apratt
+* Changed error handling in midi/ikbd so I could hook in a TSR to fix the
+* overrun problems.  The overrun fixing might one day be part of the OS.  The
+* change is that the error handler in ikbdvecs gets control BEFORE the byte
+* has been read from the chip, so it must read the data to clear the error. 
+* Also, if there is an error, the data byte is not presumed valid and is not
+* used.  Set OLDIKBD to 1 to get the old behavior back.
+*
 * Revision 2.31  91/04/26  17:44:39  apratt
 * Removed the STPAD conditional around MIDI code.  Bconmap probably isn't as
 * unconditional as it's cracked up to be: it's not been tested when neither
 * STPLUS nor TT is true.
-*
+* 
+* 
 * Revision 2.30  91/04/11  12:13:54  apratt
 * Removed PAL condition from spain -- now it's always PAL.
 * 
@@ -60,7 +69,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.31 $
+* $Revision: 2.32 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -87,6 +96,20 @@
 * 
 
 .include "switches.s"
+
+*
+* OLDIKBD: the sequence of operations for errors on the data channel is new
+* as of 5/91.  Before that, the overrun bit was the only one which caused a
+* jump through the error handler, and in that case the byte in the receive
+* register was actually handled as a valid byte, which is wrong, BEFORE
+* the error handler was called.  Now either the error handler or the data
+* handler is called, but not both.  In this case the error handler has to
+* clear the error.
+*
+* You get the old behavior back if you set OLDIKBD to 1.
+*
+
+OLDIKBD		equ	0
 
 * SPARROW and TT are both M68030.
 
@@ -1593,7 +1616,11 @@ initmfp:
 
 *	initialize the midi buffer record structure
 
-	move.l	#aciaexit,d0	;init to ikbd and midi error handler address
+.if OLDIKBD
+	bsr	lbmove		;do block move and return
+.else
+	move.l	#verror,d0	;init to ikbd and midi error handler address
+.endc
 
 *	mark the altkp accumulator as invalid
 	move.w	#-1,altkp
@@ -4050,17 +4077,45 @@ vecikbd:
 	lea	keyboard,a1	;point to keyboard register base
 	movea.l vkbderr.w,a2	;load in the jump vector
 	bra	astatus		;goto general acia status check routine
-	btst.l	#0,d2		;see if receiver buffer is full
-	beq.b	mk1		;nope...it's empty
+.if OLDIKBD
+
+astatus:
 	move.b	comstat(a1),d2	;grab device status
+	btst.l	#7,d2		;make sure it was an interrupt request
+	beq.b	aciaexit	;nope...it's empty
+	btst.l	#0,d2
+	beq	mk1
+	movem.l	d2/a0-a2,-(sp)
+	bsr.b	arcvrint
+	movem.l	(sp)+,d2/a0-a2
+mk1:	andi.b	#%00100000,d2
+.else
+	move.b	d2,d0
+	and.b	#%00110000,d0	;error indication?
+	bne	mk1		;yes, take the error vector
+	btst	#0,d2		;see if receiver buffer is full
+	beq.b	aciaexit	;nope...it's empty
+	movem.l	d2/a0-a2,-(sp)
 	bsr.b	arcvrint	;yes...get byte
 	movem.l	(sp)+,d2/a0-a2
-mk1:	andi.b	#%00100000,d2	;mask off bits already tested
-	beq.b	aciaexit	;see if any other status bits are on...
-	move.b	iodata(a1),d0	;grab data byte from acia data register
-	jmp	(a2)		;yes so branch to pre-inited error subroutine
+	rts			;and return
+
+* You get here when an error bit is set; we jump to an error handler
+* which must clear the error and rts.  The default handler for vkbderr
+* and vmiderr are both verror.
+
+mk1:	jmp	(a2)
+
+*
+* verror is the default value stuffed into vkbderr; it reads the data
+* register to clear the error condition and returns.
+*
+
+verror:	move.b	iodata(a1),d0	;grab data byte from acia data register
+				; and fall through to RTS
 aciaexit:
 	rts
+.endc
 	beq	aciaexit
 	move.b	iodata(a1),d0
 	jmp	(a2)

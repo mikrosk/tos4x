@@ -15,7 +15,7 @@
 ;
 ;************************************************************************
 
-.include "e:\\include\\spardef.inc"
+.include "spardef.inc"
 
 
 ; soundcmd sub-opcodes
@@ -52,8 +52,12 @@ LASTCMD		=	SETPRESCALE
 ;		Never fails
 ;
 ;************************************************************************
+; stack args:
+snd_op		equ 4
+snd_data	equ 6
+;
 soundcmd:
-	move.w	6(sp),d0
+	move.w	snd_op(sp),d0
 	cmp.w	#LASTCMD,d0
 	bgt	.error
 	tst.w	d0
@@ -76,8 +80,9 @@ soundcmd:
 ;	Returns:	d0 = current left volume setting.
 ;	uses:		d0
 ; ************************************************************************
+
 ltatten:
-	move.w	8(sp),d0
+	move.w	snd_data(sp),d0
 	bmi	.get
 	asl.w	#4,d0		; Align
 	and.w	#$0F00,d0
@@ -102,7 +107,7 @@ ltatten:
 ;	uses:		d0
 ; ************************************************************************
 rtatten:
-	move.w	8(sp),d0
+	move.w	snd_data(sp),d0
 	bmi	.get
 	and.w	#$00F0,d0
 	and.w	#$FF0F,auxb_ctl	; Strip it
@@ -124,7 +129,7 @@ rtatten:
 ;	uses:		d0
 ; ************************************************************************
 ltgain:
-	move.w	8(sp),d0
+	move.w	snd_data(sp),d0
 	bmi	.get
 	and.w	#$00F0,d0
 	and.w	#$FF0F,auxa_ctl
@@ -145,7 +150,7 @@ ltgain:
 ;	uses:		d0
 ; ************************************************************************
 rtgain:
-	move.w	8(sp),d0
+	move.w	snd_data(sp),d0
 	bmi	.get
 	asr.w	#4,d0		; Align
 	and.w	#$000F,d0
@@ -171,7 +176,7 @@ rtgain:
 ;	uses:		d0
 ; ************************************************************************
 adderout:
-	move.w	8(sp),d0
+	move.w	snd_data(sp),d0
 	bmi	.get
 	and.w	#$0003,d0
 	and.w	#$FFFC,dacrec_ctl
@@ -195,7 +200,7 @@ adderout:
 ;	uses:		d0
 ; ************************************************************************
 adcinput:
-	move.w	8(sp),d0
+	move.w	snd_data(sp),d0
 	bmi	.get
 	asl.w	#8,d0
 	and.w	#$0300,d0
@@ -217,7 +222,7 @@ adcinput:
 ;	uses:		d0
 ; ************************************************************************
 setprescale:
-	move.w	8(sp),d0
+	move.w	snd_data(sp),d0
 	bmi	.get
 	and.w	#$0003,d0
 	and.w	#$FFFC,snd_modectl

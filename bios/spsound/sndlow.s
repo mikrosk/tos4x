@@ -18,7 +18,7 @@
 ;
 ; ***********************************************************************
 
-.include "e:\\include\\spardef.inc"
+.include "spardef.inc"
 
 
 
@@ -85,6 +85,9 @@ locksnd:
 ;		or SNDNOTLOCK
 ;
 ;************************************************************************
+; stack args:
+unlo_chan	equ 4	; sound channel to close
+;
 unlocksnd:
 	tst.b	chanlock
 	beq	.error
@@ -108,8 +111,13 @@ unlocksnd:
 ;				MI  Error
 ;	
 ;************************************************************************
+; stack args:
+setb_reg	equ 4	; register to set (0=play 1=record)
+setb_start	equ 6	; start address
+setb_end	equ 10	; end address
+;
 setbuffer:
-	tst.w	6(sp)
+	tst.w	setb_reg(sp)
 	beq	.play
 	bset	#RS,snd_dmsctl+1	; Setting record registers.
 	bra	.cont
@@ -117,18 +125,18 @@ setbuffer:
 	bclr	#RS,snd_dmsctl+1	; Setting play registers.
 .cont:
 	clr.w	d0
-	move.b	11(sp),d0
+	move.b	setb_start+3(sp),d0
 	move.w	d0,ST_SNDL		; set DMA destination address
-	move.b	10(sp),d0
+	move.b	setb_start+2(sp),d0
 	move.w	d0,ST_SNDM
-	move.b	9(sp),d0
+	move.b	setb_start+1(sp),d0
 	move.w	d0,ST_SNDH
 ;
-	move.b	15(sp),d0
+	move.b	setb_end+3(sp),d0
 	move.w	d0,END_SNDL		; set DMA destination address
-	move.b	14(sp),d0
+	move.b	setb_end+2(sp),d0
 	move.w	d0,END_SNDM
-	move.b	13(sp),d0
+	move.b	setb_end+1(sp),d0
 	move.w	d0,END_SNDH
 	clr.l	d0
 	rts
@@ -147,8 +155,12 @@ setbuffer:
 ;				MI  Error
 ;	
 ;************************************************************************
+; stack args:
+setm_type	equ 4	; sound type
+			; (0=8bit mono, 1=16bit stereo, 2=8bit stereo)
+;
 setmode:
-	move.w	6(sp),d0
+	move.w	setm_type(sp),d0
 	asl.w	#6,d0			; Align it
 	and.w	#$FF3F,snd_modectl	; Strip old mode
 	or.w	d0,snd_modectl		; Set it.		
@@ -169,14 +181,18 @@ setmode:
 ;				MI  Error
 ;	
 ;************************************************************************
+; stack args:
+sett_nplay	equ 4	; # of play tracks
+sett_nrecd	equ 6	; # of record tracks
+;
 settrack:
-	move.w	6(sp),d0		; Number of play tracks.
+	move.w	sett_nplay(sp),d0	; Number of play tracks.
 	asl.w	#8,d0			; Align Number of tracks
 	and.w	#$FCFF,	snd_modectl	; Strip old number
 	or.w	d0,snd_modectl		; Set Play tracks
 ;
 .if FALCON
-	move.w	8(sp),d0		; Set number of record tracks.
+	move.w	sett_nrecd(sp),d0	; Set number of record tracks.
 	asl.w	#8,d0			; Align Number of tracks
 	and.w	#$FCFF,dacrec_ctl	; Strip old number
 	or.w	d0,dacrec_ctl		; Set it.		
@@ -196,8 +212,11 @@ settrack:
 ;	Returns:	d0	0 - No Error.
 ;				MI  Error
 ;************************************************************************
+; stack args:
+setm_track	equ 4	; monitor track to play
+;
 setmontrack:
-	move.w	6(sp),d0		; Track to monitor
+	move.w	setm_track(sp),d0	; Track to monitor
 	asl.w	#8,d0			; Align Number of tracks
 	asl.w	#4,d0
 	and.w	#$CFFF,	snd_modectl	; Strip old number
@@ -209,7 +228,7 @@ setmontrack:
 ;************************************************************************
 ; setinterrupt
 ;
-;	Set the type ot interrupt timer A or MFP i7
+;	Set the type of interrupt timer A or MFP i7
 ;
 ;
 ;	Given:		4(sp)	Opcode
@@ -220,13 +239,17 @@ setmontrack:
 ;				MI  Error
 ;	
 ;************************************************************************
+; stack args:
+seti_which	equ 4	; 0=timer A, 1=MFP i7
+seti_type	equ 8	; 1=play, 2=record, 3=play/record
+;
 setinterrupt:
 	move.w	snd_dmsctl,d1
-	move.w	8(sp),d0
-	asl.w	#8,d0			; Aligned for MFPI7 interrupt
-	tst.w	6(sp)
+	move.w	seti_type(sp),d0
+	asl.w	#8,d0			; Align for MFPI7 interrupt
+	tst.w	seti_which(sp)
 	bne	.mfpi7
-	asl.w	#2,d0			; Allign for timerA
+	asl.w	#2,d0			; Align for timerA
 	and.w	#$F3FF,d1		; Strip old timerA setting
 	bra	.cont
 .mfpi7:
@@ -257,15 +280,19 @@ func_error:
 ;	Returns:	d0	0 - No Error.
 ;	
 ;***********************************************************************
+; stack args:
+dspt_xmit	equ 4	; 1=enable output, 0=disable
+dspt_recv	equ 6	; 1=disable tristate, 0=enable
+;
 dsptristate:
-	tst.w	6(sp)
+	tst.w	dspt_xmit(sp)
 	beq	.cont
 	bset	#7,src_pathclk+1	; DSPXMIT enable
 	bra	.cont1
 .cont:
 	bclr	#7,src_pathclk+1	; DSPXMIT tristate
 .cont1:
-	tst.w	8(sp)
+	tst.w	dspt_recv(sp)
 	beq	.cont2
 	bset	#7,recv_pathclk+1	; DSPRECV enable
 	bra	.cont3
@@ -285,16 +312,20 @@ dsptristate:
 ;	Returns:	d0	0 - No Error.
 ;	
 ;***********************************************************************
+; stack args:
+gpio_mode	equ 4	; 0=set, 1=read, 2=write
+gpio_val	equ 6
+;
 gpio:
 	clr.l	d0
-	tst.w	6(sp)
+	tst.w	gpio_mode(sp)
 	beq	.set
-	cmp.w	#1,6(sp)
+	cmp.w	#1,gpio_mode(sp)
 	beq	.read
 ;
 ; Must be write.
 ;
-	move.w	8(sp),d0	; Get data
+	move.w	gpio_val(sp),d0	; Get data
 	move.w	d0,gpio_data	; Write it
 	clr.l	d0
 	rts	
@@ -303,7 +334,7 @@ gpio:
 	and.w	#$0007,d0
 	rts	
 .set:
-	move.w	8(sp),d0	; Get data
+	move.w	gpio_val(sp),d0	; Get data
 	and.w	#$0007,d0
 	move.w	d0,gpio_ctl	; Set direction bits.
 	clr.l	d0
@@ -333,8 +364,15 @@ gpio:
 ;
 ;	Returns:	d0	0 - No Error.
 ;***********************************************************************
+; stack args:
+devc_src	equ 4	; 3=ADC, 2=extinp, 1=dspxmit, 0=dmaplay
+devc_dst	equ 6	; %%3=DAC %%2=EXTOUT, %%1=DSPRECV, %%0=DMARECV
+devc_sclk	equ 8	; 0=int(25.175), 1=ext, 2=23MHz
+devc_prescale	equ 10	; 6, 8, 10, >=12
+devc_protocol	equ 12	; boolean
+;
 devconnect:
-	move.w	6(sp),d0
+	move.w	devc_src(sp),d0
 	bmi	.error
 	cmp.w	#3,d0
 	bgt	.error
@@ -348,51 +386,48 @@ devconnect:
 	rts	
 
 
-;	10(sp).w		source clock
 micpsg:
 	and.w	#$0FFF,src_pathclk
-	btst	#0,10+1(sp)
+	btst	#0,devc_sclk+1(sp)
 	beq	intclk
 	or.w	#$2000,src_pathclk
 	bra	extclk
 
-;	10(sp).w		source clock
 extinp:
- 	move.w	10(sp),d0
+ 	move.w	devc_sclk(sp),d0
 	asl.w	#8,d0
 	asl.w	#1,d0
 	and.w	#$F0FF,src_pathclk
 	or.w	d0,src_pathclk
 	bset	#0,src_pathclk		; No handshaking
-	tst.w	14(sp)
+	tst.w	devc_protocol(sp)
 	bne	do_prescale		; IF(1) No handshake mode.
 	bclr	#0,src_pathclk		; No handshaking	
 	bra	do_prescale
 		
-;	10(sp).w	source clock
 dspxmit:
-	move.w	10(sp),d0
+	move.w	devc_sclk(sp),d0
 	asl.w	#5,d0
 	and.w	#$FF8F,src_pathclk
 	or.w	d0,src_pathclk
 	bset	#4,src_pathclk+1	; No handshaking
-	tst.w	14(sp)
+	tst.w	devc_protocol(sp)
 	bne	do_prescale		; IF(1) No handshake mode.
 	bclr	#4,src_pathclk+1	; No handshaking	
 	bra	do_prescale
 
-;	10(sp).w		source clock
+;	devc_sclk(sp).w		source clock
 dmaplay:
-	move.w	10(sp),d0
+	move.w	devc_sclk(sp),d0
 	asl.w	#1,d0
 	and.w	#$FFF0,src_pathclk
 	or.w	d0,src_pathclk
 ;
 	bset	#0,src_pathclk+1	; Disable handshaking.
-	tst.w	14(sp)
+	tst.w	devc_protocol(sp)
 	bne	do_prescale		; IF(1) No handshake mode.
 	bclr	#3,src_pathclk+1	; Assume DSPRECV
-	btst	#1,8+1(sp)		; If(DSPRECV) Good assume enable
+	btst	#1,devc_dst+1(sp)	; If(DSPRECV) Good assume enable
 	bne	denable
 	bset	#3,src_pathclk+1	; ELSE bad assume
 denable:
@@ -400,19 +435,19 @@ denable:
 
 ; Setup Prescaler
 do_prescale:
-	btst	#0,10+1(sp)
+	btst	#0,devc_sclk+1(sp)
 	beq	intclk
 
 ; Setup external prescaler
 extclk:
-	move.w	12(sp),d0
+	move.w	devc_prescale(sp),d0
 	and.w	#$00FF,prescale
 	asl.w	#8,d0
 	or.w	d0,prescale	
 	bra	dmarec
 
 intclk:
-	move.w	12(sp),d0
+	move.w	devc_prescale(sp),d0
 	and.w	#$FF00,prescale
 	or.w	d0,prescale	
 ;
@@ -421,50 +456,50 @@ intclk:
 	move.w	recv_pathclk,d2	; d2 = recv_pathclk
 ;
 dmarec:
-	move.w	8(sp),d1	; d1 = destination bitmap
+	move.w	devc_dst(sp),d1	; d1 = destination bitmap
 	btst	#0,d1
 	beq	dsprecv
-	move.w	6(sp),d0	; d0 = source
+	move.w	devc_src(sp),d0	; d0 = source
 	asl.w	#1,d0
 	and.w	#$FFF0,d2
 	or.w	d0,d2		; or in source.	
 ;
 	bset	#0,d2		; Assume no handshaking
-	tst.w	14(sp)		; IF(1) NO Handshaking
-	bne	dsprecv
+	tst.w	devc_protocol(sp)
+	bne	dsprecv		; IF(1) NO Handshaking
 	bclr	#0,d2		; Enables handshaking.
 	bclr	#3,d2		; Assume handshaking source DSPXMIT
-	cmp.w	#1,6(sp)	; IF(source == DSPXMIT) good assume
+	cmp.w	#1,devc_src(sp)	; IF(source == DSPXMIT) good assume
 	beq	dsprecv		
 	bset	#3,d2		; ELSE EXTINP bad assume
 ;
 dsprecv:
 	btst	#1,d1
 	beq	extout
-	move.w	6(sp),d0	; d0 = source
+	move.w	devc_src(sp),d0	; d0 = source
 	asl.w	#5,d0
 	and.w	#$FF8F,d2	; Retain tristate bit
 	or.w	d0,d2		; or in source.	
 	bset	#4,d2		; Assume NO handshakeing
-	tst.w	14(sp)		; Protocol
-	bne	extout
+	tst.w	devc_protocol(sp)
+	bne	extout		; IF(1) NO Handshaking
 	bclr	#4,d2		; Handshaking BAD assume
 extout:
  	btst	#2,d1
 	beq	hphones
-	move.w	6(sp),d0	; d0 = source
+	move.w	devc_src(sp),d0	; d0 = source
 	asl.w	#8,d0
 	asl.w	#1,d0
 	and.w	#$F0FF,d2
 	or.w	d0,d2		; or in source.	
 	or.w	#$0100,d2	; assume NO handshaking
-	tst.w	14(sp)		; Protocol
+	tst.w	devc_protocol(sp)
 	bne	hphones
 	and.w	#$FEFF,d2	; BAD Assume handshaking
 hphones:
 	btst	#3,d1
 	beq	skip
-	move.w	6(sp),d0	; d0 = source
+	move.w	devc_src(sp),d0	; d0 = source
 	asl.w	#8,d0
 	asl.w	#5,d0
 	and.w	#$0FFF,d2
@@ -486,11 +521,16 @@ skip:
 ;	Returns:	d0	Current status of the codec.
 ;				MI  Error
 ;************************************************************************
+; stack args:
+snds_reset	equ 4	; reset if 1
+;
 sndstatus:
-	tst.w	6(sp)
+	tst.w	snds_reset(sp)
 	beq	.cont
 	bsr	mute
 	bsr	unmute
+	bset.b	#3,dacrec_ctl+1	; reset entire sound system
+	bclr.b	#3,dacrec_ctl+1
 .cont:
 	move.w	auxa_inp,d0
 	asr.w	#4,d0
@@ -522,7 +562,7 @@ unmute:
 	nop
 	nop
 	nop
-	nop				; Wait some cycles fo4r codec.
+	nop				; Wait some cycles for codec.
 	rts
 
 ;************************************************************************
@@ -539,8 +579,11 @@ unmute:
 ;	Returns:	d0	0 - No Error.
 ;
 ;************************************************************************
+; stack args:
+buff_op		equ 4	; %%3=rr %%2=re %%1=pr %%0=pe, -1=return current
+;
 buffoper:
-	move.w	6(sp),d0
+	move.w	buff_op(sp),d0
 	bmi	.settings
 	move.w	snd_dmsctl,d1
 	and.w	#$FF00,d1		; d1 = play and record all off
@@ -603,8 +646,11 @@ buffoper:
 ;	Returns:	d0	0 - No Error.
 ;
 ;************************************************************************
+; stack args:
+buff_array	equ 4	; -> array of 4 longs
+;
 buffptr:
-	move.l	6(sp),a0	; a0 -> users buffer.
+	move.l	buff_array(sp),a0 ; a0 -> users buffer.
 	movem.l	d1-d3,-(sp)	; Registers used.
 	move.l	#0,-(sp)	; Space to place stuff.
 ;
@@ -634,6 +680,14 @@ buffptr:
 	movem.l	(sp)+,d1-d3		; Registers used.
 	clr.l	d0
 	rts
+
+	.bss
+	.globl oldvol,chanlock
+;
+; These variables are for the sound system only
+;
+oldvol:		.ds.w	1		; old volume before mute operation.
+chanlock:	.ds.b	1		; Sound semiphore.
 
 	.data
 devoperation:

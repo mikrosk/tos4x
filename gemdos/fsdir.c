@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.14  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.13  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *
@@ -77,6 +80,7 @@ char *p;
     uint cltemp;
     char *ptemp = p;
 
+    DBCMD(1,"print xchdir -s (lpeek (+ `a6 8));_c");
     if (!*ptemp) return 0;	/* Dsetpath("") is a no-op */
     if (*(ptemp+1) == ':') {
 	/* drive spec */
@@ -93,7 +97,10 @@ char *p;
 	return E_OK;
     }
 
-    if (err = fn2dir(&p,&dir,FN_DOTSOK)) return err;
+    if (err = fn2dir(&p,&dir,FN_DOTSOK)) {
+	if (err == EFILNF) return EPTHNF;
+	else return err;
+    }
     if (!(dir.dir_fcb->f_attrib & FA_SUBDIR)) return EACCDN;
 
     cltemp = dir.dir_fcb->f_clust;
@@ -121,6 +128,7 @@ xgetdir(buf,drv) /*+ return text of current dir into specified buffer */
 char *buf;
 int drv;
 {
+  DBCMD(0x01,"print xgetdir buf: (lpeek (+ `a6 8)) drv: (wpeek (+ `a6 c));_c");
   return xgetndir(buf,0x7fffffffL,drv);
 }
 
@@ -230,6 +238,8 @@ DMD *dmd;
  * mkdir: create directory.
  */
 
+char dotdotstr[12] = "..         ";
+
 long
 xmkdir(s)
 char *s;
@@ -241,10 +251,11 @@ char *s;
     DMD *dmd;
     FCB *fcb;
     FCB fcbhold;
-    static char dotdotstr[12] = "..         ";
     int i;
     BCB *bcb;
     uint dirtime, dirdate;
+
+    DBCMD(0x01,"print xmkdir -s (lpeek (+ `a6 8));_c");
 
     /* allocate a cluster, initialize it, ixcreat the file, and link them */
 
@@ -452,6 +463,7 @@ xsfirst(name,att)
 char *name;
 int att;
 {
+    DBCMD(0x01,"print xsfirst -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c));_c");
     att |= FA_RO | FA_ARCHIVE;
     return(ixsfirst(name,att,(DTA *)run->p_xdta));
 }
@@ -509,6 +521,8 @@ xsnext() /*+ search next, return into dta */
     long err;
     FCB *pfcb;
     char c;
+
+    DBCMD(0x01,"print xsnext;_c");
 
     dta = run->p_xdta;
 

@@ -1,89 +1,147 @@
-; The order of execution of the macros below should not be significant;
-; Each one matches a certain form of effective address and (hopefully)
-; no other.
-
 store-procedure gas2mac
-  add-mode magic
+  delete-mode magic
+  add-mode exact
+  print fixups
   beginning-of-file
-  set-mark
-  end-of-line
-  !if &not &seq $region "#NO_APP"
-    write-message not a gas file
-    !goto end
-  !endif
-
+  !force replace-string "\15" "\r"
+  beginning-of-file
+  !force replace-string "\12" "\n"
+  beginning-of-file
+  !force replace-string "\10" "\b"
+  beginning-of-file
+  !force replace-string "\11" "\t"
+  beginning-of-file
+  !force replace-string "\33" "\e"
+  beginning-of-file
+  !force replace-string :b .b
   beginning-of-file
   !force replace-string :w .w
-
   beginning-of-file
   !force replace-string :l .l
-
+  beginning-of-file
+  !force replace-string :1 *1
+  beginning-of-file
+  !force replace-string :2 *2
+  beginning-of-file
+  !force replace-string :4 *4
+  beginning-of-file
+  !force replace-string :8 *8
   beginning-of-file
   !force replace-string "0x" "$"
-
-; change jeq to beq, etc. GCC does not emit jmp, so bmp is no problem
   beginning-of-file
   !force replace-string "~tj" "~tb"
-
-; jbsr got changed to bbsr; change it to jsr (which is not optimal)
   beginning-of-file
-  !force replace-string "bbsr" "jsr"
+  !force replace-string "~tbbsr" "~tjsr"
+  beginning-of-file
+  !force replace-string "~tbmp" "~tjmp"
+  beginning-of-file
+  !force replace-string sp@- -(sp)
+  beginning-of-file
+  !force replace-string "~t.ascii" "~t.dc.b"
+  beginning-of-file
+  !force replace-string "\0~"" "~",0"
+  beginning-of-file
+  !force replace-string "~t.word " "~t.dc.w "
+  beginning-of-file
+  !force replace-string "~t.byte " "~t.dc.b "
+  beginning-of-file
+  !force replace-string "~t.long " "~t.dc.l "
+
+  beginning-of-file
+  !force replace-string "~t.skip~t" "~t.dcb.b 0,"
+  beginning-of-file
+  !force replace-string "~t.word~t" "~t.dc.w "
+  beginning-of-file
+  !force replace-string "~t.byte~t" "~t.dc.b "
+  beginning-of-file
+  !force replace-string "~t.long~t" "~t.dc.l "
+  
+  beginning-of-file
+  !force replace-string ~tmovl ~tmovel
+  beginning-of-file
+  !force replace-string ~tmovb ~tmoveb
+  beginning-of-file
+  !force replace-string ~tmovw ~tmovew
+
+  beginning-of-file
+  !force replace-string ";~t" "~n~t"
+
+  beginning-of-file
+  run del-app
+
+  beginning-of-file
+  run fix-movem
+
+  beginning-of-file
+  run fix-skip
+
+; don't need magic mode until now
+  add-mode magic
 
   beginning-of-file
   run fix-postinc
-
-; easy fix to predec when it's sp
   beginning-of-file
-  !force replace-string sp@- -(sp)
-
-  beginning-of-file
-  write-message fix-predec
+  print fix-predec
   run fix-predec
-
   beginning-of-file
-  write-message fix-indirect
+  print fix-indirect
   run fix-indirect
-
   beginning-of-file
-  write-message fix-ind1
+  print fix-ind1
   run fix-ind1
-
   beginning-of-file
-  write-message fix-ind2
+  print fix-ind2
   run fix-ind2
-
   beginning-of-file
-  write-message fix-indexed
+  print fix-indexed
   run fix-indexed
-
   beginning-of-file
-  write-message fix-long
+  print fix-long
   run fix-long
-
   beginning-of-file
-  write-message fix-word
+  print fix-word
   run fix-word
-
   beginning-of-file
-  write-message fix-byte
+  print fix-byte
   run fix-byte
-
-; kill the #NO_APP line and the gcc_compiled line.
+; this fixes up things caused by the fixups
+  delete-mode magic
   beginning-of-file
-  kill-to-end-of-line
+  replace-string "~tbp.l" "~tbpl"
+  beginning-of-file
+  !force replace-string ".b(" "("
+  beginning-of-file
   next-line
+  insert-space
   kill-to-end-of-line
+  print done
   set $status 1
-  write-message done
-*end
 !endm
 
-; change any opcode ending in 'l' to '.l' like movel into move.l.
-; (might also have to change mov into move, but that is not done yet)
+store-procedure del-app
+*loop
+  !force search-forward "#APP"
+  !if &not $status
+    !goto end1
+  !endif
+  beginning-of-line
+  kill-to-end-of-line
+  !goto loop
+*end1
+  beginning-of-file
+  !force search-forward "#NO_APP"
+  !if &not $status
+    !goto end2
+  !endif
+  beginning-of-line
+  kill-to-end-of-line
+  !goto loop
+*end2
+!endm
 
 store-procedure fix-long
 *loop
-  !force search-forward "^~t[^. ]*l "
+  !force search-forward "~t[^. ~t]*l[~t ]"
   !if &not $status
     !goto end
   !endif
@@ -92,12 +150,10 @@ store-procedure fix-long
   !goto loop
 *end
 !endm
-
-; similar to fix-long but changes 'w' to '.w'
 
 store-procedure fix-word
 *loop
-  !force search-forward "^~t[^. ]*w "
+  !force search-forward "~t[^. ~t]*w[~t ]"
   !if &not $status
     !goto end
   !endif
@@ -106,12 +162,10 @@ store-procedure fix-word
   !goto loop
 *end
 !endm
-
-; same for 'b' to '.b'
 
 store-procedure fix-byte
 *loop
-  !force search-forward "^~t[^. ]*b "
+  !force search-forward "~t[^. ~t]*b[~t ]"
   !if &not $status
     !goto end
   !endif
@@ -121,11 +175,9 @@ store-procedure fix-byte
 *end
 !endm
 
-; change sp@+ or a[0-7]@+ into (sp)+ form
-
 store-procedure fix-postinc
 *loop
-  !force search-forward "[sa][0-7p]@+"
+  !force search-forward "[asp][0-7pc]@+"
   !if &not $status
     !goto end
   !endif
@@ -137,11 +189,9 @@ store-procedure fix-postinc
 *end
 !endm
 
-; change sp@- or a[0-7]@- into -(sp) form
-
 store-procedure fix-predec
 *loop
-  !force search-forward "[sa][0-7p]@-"
+  !force search-forward "[asp][0-7pc]@-"
   !if &not $status
     !goto end
   !endif
@@ -153,11 +203,11 @@ store-procedure fix-predec
 *end
 !endm
 
-; fix-ind1: fix a4@(a2.w)	into (a4,a2.w)
-
+; fix-ind1: fix a4@(a2:w) 
+; fix-ind2: fix a4@(0,d1:l)
 store-procedure fix-ind1
 *loop
-  !force search-forward "[as][0-7p]@\([das][0-7p]\.[wl]\)"
+  !force search-forward "[asp][0-7pc]@\([das][0-7p]\.[wl]\)"
   !if &not $status
     !goto end
   !endif
@@ -177,11 +227,9 @@ store-procedure fix-ind1
 *end
 !endm
 
-; fix-ind2: fix a4@($20,a2.w)	into $20(a4,a2.w)
-
 store-procedure fix-ind2
 *loop
-  !force search-forward "[as][0-7p]@\([^),]*,[^)]*\)"
+  !force search-forward "[asp][0-7pc]@\([^),]*,[^)]*\)"
   !if &not $status
     !goto end
   !endif
@@ -198,11 +246,9 @@ store-procedure fix-ind2
 *end
 !endm
 
-; fix a4@($20)		into $20(a4)
-
 store-procedure fix-indexed
 *loop
-  !force search-forward "[sa][0-7p]@\([^)]*\)"
+  !force search-forward "[asp][0-7pc]@\([^)]*\)"
   !if &not $status
     !goto end
   !endif
@@ -221,11 +267,9 @@ store-procedure fix-indexed
 *end
 !endm
 
-; fix a4@ 		into (a4)
-
 store-procedure fix-indirect
 *loop
-  !force search-forward "[sa][0-7p]@[^(]"
+  !force search-forward "[asp][0-7pc]@[^(]"
   !if &not $status
     !goto end
   !endif
@@ -238,3 +282,31 @@ store-procedure fix-indirect
 *end
 !endm
 
+store-procedure fix-movem
+*loop
+  !force search-forward "~tmoveml #$"
+  !if $status 
+    set-mark
+    search-forward ","
+    backward-character
+    set %temp $region
+    search-reverse "~t"
+    forward-character
+    kill-to-end-of-line
+    insert-string "dc.w $48e7,$"
+    insert-string %temp
+    !goto loop
+  !endif
+!endm
+
+store-procedure fix-skip
+*loop
+  !force search-forward "~t.skip "
+  !if $status
+    5 delete-previous-character
+      insert-string "dcb.b "
+      end-of-line
+      insert-string ",0"
+      !goto loop
+  !endif
+!endm

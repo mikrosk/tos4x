@@ -3,6 +3,7 @@
  * work, but for now are unreal.
  */
 
+#include <osbind.h>
 #include "fs.h"
 
 long _dblev;
@@ -43,37 +44,6 @@ void *w;
 	*p = c1;
 }
 
-long
-xterm(code)
-int code;
-{
-	DBMSG(-1,"somebody called xterm");
-	return 0;
-}
-
-long
-x0term()
-{
-	return xterm(0);
-}
-
-long
-xtermres(size,rc)
-long size;
-int rc;
-{
-	return xterm(0);
-}
-
-long 
-xexec(code,cmd,tail,env)
-int code;
-char *cmd, *tail, *env;
-{
-	DBMSG(-1,"somebody called exec");
-	return 0;
-}
-
 BCB *bufl[2];
 
 /*
@@ -112,9 +82,57 @@ uint bootdev = 0;
 voidfn
 upd_tod()
 {
-#if REAL
 	long x = (realdate << 16) | (realtime);
 	trap14(0x16,x);
-#endif
 }
 
+MD initmd;
+MD initaltmd;
+
+void
+getmpb(mpb)
+MPB *mpb;
+{
+    long size;
+    void *base;
+
+    size = Mxalloc(-1L,0) / 2;
+    base = (void *)Mxalloc(size,0);
+    if (base == NULL) panic1("can't malloc ST RAM");
+    initmd.m_link = &initaltmd;
+    initmd.m_own = NULL;
+    initmd.m_start = base;
+    initmd.m_length = size;
+
+    size = Mxalloc(-1L,1) / 2;
+    base = (void *)Mxalloc(size,1);
+    if (base == NULL) panic1("can't malloc TT RAM");
+    initaltmd.m_link = NULL;
+    initaltmd.m_own = NULL;
+    initaltmd.m_start = base + 1;	/* make odd for alt. RAM */
+    initaltmd.m_length = size;
+
+    mpb->mp_mfl = &initmd;
+    mpb->mp_mal = NULL;
+    mpb->mp_rover = NULL;
+}
+
+void
+dojmp(addr)
+long addr;
+{
+	void (*p)() = (void (*)())addr;
+	(*p)();
+}
+
+void
+clksync()
+{
+	;
+}
+
+void 
+gouser()
+{
+	DBCMD(-1,"print somebody called gouser!");
+}

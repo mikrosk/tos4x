@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.14  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.13  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *
@@ -381,8 +384,11 @@ char *p2;			/* new name */
 
     if (dir1.dir_clust == dir2.dir_clust) {
 	/* same directory. Copy new name in. Error on illegal file names */
-	if (err = name2fcb(p2,NULL,dir2.dir_fcb)) return err;
-	dirdirty(&dir2);
+	/* Have to freshen dir1 because its offset filed is old file's slot. */
+	DBCMD(0x20,"print same directory, just reuse slot;_c");
+	dir2dir(&dir1);
+	if (err = name2fcb(p2,NULL,dir1.dir_fcb)) return err;
+	dirdirty(&dir1);
 	return 0;
     }
     else {

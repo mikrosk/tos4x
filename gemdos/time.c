@@ -1,12 +1,15 @@
 /*
 ***************************     TIME.C     ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\time.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\rcs\time.c,v $
 * =======================================================================
 * $Author: apratt $ 	$date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: time.c,v $
+* Revision 2.9  1991/03/28  17:39:36  apratt
+* THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+*
 * Revision 2.8  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *
@@ -107,11 +110,7 @@ datok:		realdate &= 0xFFE0;		/* bump month */
 long
 xgetdate()
 {
-#if REAL
 	return realdate;
-#else
-	return realdate = trap1(0x2a);
-#endif
 }
 
 
@@ -154,11 +153,7 @@ REG	int day;
 long
 xgettime()
 {
-#if REAL
 	return realtime;
-#else
-	return realtime = trap1(0x2c);
-#endif
 }
 
 

@@ -1,18 +1,23 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/21 17:23:11 $
+* $Date: 89/03/08 15:59:37 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.2  89/03/08  15:59:37  apratt
+* Contains Slavik's Xbios calls & other changes for TT.  Insignificant
+* changes if not TT.  Some things are conditional on STPLUSVIDEO+TT,
+* which is meant to be an OR of those two assembly-time conditions.
+*
 * Revision 2.1  89/02/21  17:23:11  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
-*
+* 
 * Revision 1.35  89/02/17  12:09:32  apratt
 * Fixed byte-count for clearing screen at clrm_2, and
 * fixed priv handler: must clear & disable caches after clobbering
@@ -181,7 +186,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.1 $
+* $Revision: 2.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -266,7 +271,7 @@ STPLUSVIDEO	=	0	; @check@
 
 LONGFRAME	=	0	; @check@
 
-systype		=	rom	; 'rom' or 'ram' @check@
+systype		=	ram	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
@@ -709,7 +714,12 @@ SPAR_CONF	equ	$ffff8006	; read here to auto-config
 
 shiftmd		equ	$ffff8260	; video	shift mode (resolution)
 SPAR_VMC	equ	$ffff82c0	; video master control
-.ifne STPLUSVIDEO
+.ifne TT
+ttcolor0	equ	$ffff8400	; color palette #0 for TT
+shiftmd		equ	$ffff8262	; TT shift mode (overrides above equ)
+.endc
+dbaseh		equ	$ffff8201	; display base high
+.ifne STPLUSVIDEO+TT
 *--- ST PLUS shifter
 shiftmd		=	$ffff8260	; video	shift mode (resolution)
 * that the low bit of this register will always read as zero.
@@ -1150,9 +1160,9 @@ notpal:	lea	color0(a5),a1		; a1 ->	hardware reg
 * from the STylus touch-screen hardware.  This is as good a place to
 	move.b	#$01,dbaseh(a5)		; set high ptr
 	clr.b	dbasel(a5)		; set low ptr
-   .ifne STPLUSVIDEO
+.ifne STPLUSVIDEO+TT
 	clr.b	dbasell(a5)		; set lo byte ptr
-   .endc
+.endc
  endc
 	move.b	#$80,$ffff827f		; write LCD and power control
 
@@ -1289,9 +1299,9 @@ mt_done:
 	move.b	d0,dbasel(a5)		; dbasel = d0 >> 8
 	swap	d0
 	move.b	d0,dbaseh(a5)		; dbaseh = d0 >> 16
- .ifne STPLUSVIDEO
+.ifne STPLUSVIDEO+TT
 	clr.b	dbasell(a5)
- .endc
+.endc
 	move.l	d5,a0			; start at the end
 	move.l	#$400,d4		; where to end
 	moveq	#0,d0			; d0-d3 = zeros
@@ -1375,7 +1385,7 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 	move.l	a0,_v_bas_ad(a5)
 	move.b	_v_bas_ad+1(a5),dbaseh(a5) ; load high addr
 	move.b	_v_bas_ad+2(a5),dbasel(a5) ; load low (really, medium) addr
- .ifne STPLUSVIDEO
+ .ifne STPLUSVIDEO+TT
 	move.b	_v_bas_ad+3(a5),dbasell(a5)	; load lo byte addr
  .endc
 *  Setup display base,
@@ -1597,10 +1607,20 @@ TBCR	equ	$fffffa1b		* timer B control reg
 	dbra	d1,ikbdlp1
 	clr.l	a5
 	move.b	shiftmd(a5),d0		; copy hardware rez bits to
+.ifeq TT
 	and.b	#3,d0			;   software shadow
 	cmp.b	#3,d0
-	bne	tb_x			; 3 not allowed; make it hirez
-	moveq	#2,d0
+	bne	tb_x
+	moveq	#2,d0			; 3 illegal; make it 2 (hirez)
+.endc
+.ifne TT
+	and.b	#7,d0
+	cmp.b	#3,d0
+	bne	tb_x
+	cmp.b	#5,d0
+	bne	tb_x
+	moveq	#6,d0			; 3 and 5 illegal; make it 6 (hirez)
+.endc
 tb_x:	move.b	d0,sshiftmd(a5)		; set software rez
 
 	move.b	gpip(a5),d0		; monochrome monitor attached?
@@ -1610,10 +1630,22 @@ tb_x:	move.b	d0,sshiftmd(a5)		; set software rez
 .ifne DMASND
 	bpl	nomono			; (POSITIVE means color for DMASND)
 .endc
+.ifeq TT
+* don't wait if TT: vwait doesn't work and it's not necessary.
 	lea	vwt_r(pc),a6		; a6 -> ret addr
 	bra	vwait			; wait for vblank
+
 vwt_r:	move.b	#2,shiftmd(a5)		; set hardware highrez
 	move.b	#2,sshiftmd(a5)		; set software highrez
+.endc
+.ifne TT
+	move.b	shiftmd(a5),d0		; get shift reg
+	and.b	#$f8,d0			; clear mode bits
+	or.b	#6,d0			; set mode 6 (hirez)
+	move.b	d0,shiftmd(a5)		; set hardware hirez
+	move.b	#6,sshiftmd(a5)		; set software hirez
+.endc
+	move.b	#$80,$ffff827f		; write LCD and power control
 nomono:
 	move.b	#$80,$889		; $889 is "shadow shadow"
 	moveq.l	#2,d1			; STPAD is always mono
@@ -2082,7 +2114,7 @@ ca_r:	rts
 
 
 
- .ifeq STPLUSVIDEO
+.ifeq STPLUSVIDEO
 
 .ifeq TT
 colors:	dc.w	$777			; 0 white
@@ -2110,9 +2142,9 @@ colors:	dc.w	$000			; 0 black (TT shifter's busted)
 .ifne TT
 	dc.w	$777			; 15 white (TT shifter's busted)
 .endc
- .endc
+.endc
 
- .ifne STPLUSVIDEO
+.ifne STPLUSVIDEO
 
 * full-magnitude colors for STPLUS palette means 'f' not 7
 
@@ -2214,28 +2246,54 @@ v_read2:
 	move.b	shiftmd(a5),d0		; get current rez
  .endc
 
+.ifeq TT
 ***	READ sound status (to d0)
 ***	READ gpip (to d1)
 ***	IF gpip != d1 then try again
+.endc
+.ifne TT
+***	IF d0 != 0 invert d1
+***
+*** Then proceed with the old code to check for the appropriate value
+.endc
 ***
 *** We have to read sound status more than once because it might be active
 *** when we test it, then go inactive before we read MONOMON.  Moreover,
 *** it might spike while reading gpip, then settle again.  This sequence
 *** doesn't quite ensure lack of trouble, but it does give some hope.
+***
+*** STPAD doesn't have any of this cruft - you can't change monitors!
+.ifeq TT
 	move.w	#2000,d0		; delay 2..3 ms to wait for mono's
 v_d23:	dbra	d0,v_d23		;  window of vulnerability to end
-	move.b	#2,d0			; trans to high rez
+	move.b	#2,d0			; set mode 2 (high rez)
+.endc
+.ifne TT
+	move.w	sr,-(sp)
+.endc
 v_read1:
 	move.b	dmasndc+1,d0		; read sound state once
 	move.b	gpip,d1			; get gpip with monomon
 	btst	#7,d1
 	sne	d1
 	move.b	defshiftmd(a5),d0	; get preferred rez
+.ifeq TT
 	sne	d2
 	cmp.b	d1,d2
 	bne	v_read1			; no - start over
 swmon2:	move.b	d0,sshiftmd(a5)		; set shadow & hardware shift-mode
 	move.b	d0,shiftmd(a5)
+.endc
+.ifne TT
+
+* d0 now holds good DMA sound state value; d1 holds good I7 value
+
+swmon2:	move.b	d0,sshiftmd(a5)
+	move.b	shiftmd(a5),d1
+	not.b	d1			; no - invert it to get true MONOMON
+
+	move.b	d1,shiftmd(a5)
+.endc
 	move.l	swv_vec(a5),a0		; go through "change rez" panic vector
 .if (TT == 0)
 	and.b	#3,d0			; strip bucky bits
@@ -2247,7 +2305,12 @@ swmon2:	move.b	d0,sshiftmd(a5)		; set shadow & hardware shift-mode
 	tst.l	colorptr(a5)		; if(colorptr != NULL)....
 *--- low rez: switch to high if gpip%%7 == 0
 	move.l	colorptr(a5),a0		; a0 ->	user's color base
-	lea	color0,a1		; a1 ->	hardware palette base
+.ifeq TT
+	lea	color0(a5),a1		; a1 ->	hardware palette base
+.endc
+.ifne TT
+	lea	ttcolor0(a5),a1		; a1 -> hardware palette base
+.endc
 	move.w	#16-1,d0		; d0 = count
 vbl2:	move.w	(a0)+,(a1)+		; load a palette
 	dbra	d0,vbl2			; ...and repeat
@@ -2257,14 +2320,11 @@ vbl2:	move.w	(a0)+,(a1)+		; load a palette
 vbl1:	tst.l	screenpt(a5)		; if(screenpt == NULL) don't;
 
 	move.l	screenpt(a5),_v_bas_ad(a5)	; set OS variable
-	move.l	_v_bas_ad(a5),d0		; d0 ->	screen bottom
- .ifne STPLUSVIDEO
-	move.b	d0,dbasell(a5)		; for STPLUS use these 8 bits
- .endc
-	lsr.l	#8,d0			; strip	lower 8	bits
-	move.b	d0,dbasel(a5)		; load "low" pointer
-	lsr.w	#8,d0
-	move.b	d0,dbaseh(a5)		; load "high" pointer
+.ifne STPLUSVIDEO+TT
+	move.b	_v_bas_ad+3(a5),dbasell(a5)	; for STPLUS use these 8 bits
+.endc
+	move.b	_v_bas_ad+2(a5),dbasel(a5)	; load "low" pointer
+	move.b	_v_bas_ad+1(a5),dbaseh(a5)	; load "high" pointer
 swmon1:	btst.l	#7,d1			; bit is 1 when no mono
 	beq	swmon3			; no change (still highrez)
 	move.b	defshiftmd.w,d0		; get preferred rez
@@ -2465,8 +2525,14 @@ b_supr:	move.w	(sp)+,d0		; get function#
 .endif
 	move.l	(a0),a0			; indirect through RAM...
 *
+.ifeq TT
 trp14tab:
 *
+.endc
+.ifne TT
+trp14tab:
+	jsr	(a0)			; call BIOS function
+.endc
 * restore registers, cleanup stack and return:
 * DO NOT TOUCH D0 HERE: It is either a return value or the fn number itself.
 
@@ -2544,11 +2610,43 @@ trp13tab:
 	dc.l	bioskeys		; 24: reset keyboard to powerup default
 	dc.l	ikbdws			; 25: write string to ikbd
 
-* 0x41..0x48 are assigned to Arabic TOS for their use.  Don't ask me 
-* what that use is.  If you use up 0x2a..0x2f you'll have to pad
-* this table with seven "assigned" entries before you get to the
-* "unused" ones.
+.ifne TT
+	dc.l	jenabint		; 27: enable mfp interrupt
+	dc.l	giaccess		; 28: read/write sound chip
+	dc.l	offgibit		; 29: reset bit in sound chip register
+	dc.l	ongibit			; 30: set bit in sound chip register
+	dc.l	xbtimer			; 31: initialize mfp timer
 	dc.l	dosound			; 32: startup sound daemon
+	dc.l	setprt			; 33: get/set printer configuration
+	dc.l	ikbdvecs		; 34: return ptr to base of kbd vars
+	dc.l	kbrate			; 35: get/set keyboard repeat rate
+	dc.l	_prtblk			; 36: _prtblk primitive
+	dc.l	wvbl			; 37: wait for next vblank
+	dc.l	supexec			; 38: execute in super mode
+	dc.l	puntaes			; 39: throw away AES
+
+	dc.l	unimpl			; 40: COOK THIS!  Kbad's cookie call
+	dc.l	_floprate		; 41: get/set floppy seek rate
+
+	dc.l	_EsetRez		; 80: TT shifter stuff
+	dc.l	_EsetPhysbase		; 81
+	dc.l	_bconmap		; 44: _bconmap call
+	dc.l	unimpl			; 45: bconctl (when ready)
+.if TT
+	dc.l	NVMaccess		; 46: nvmaccess
+	dc.l	_EsetMono		; 86
+	dc.l	unimpl
+.endif
+.if (TT == 0)
+	dc.l	_waketime		; 47: non-TT alarm maintenance
+.else
+	dc.l	unimpl			; 47: unimpl on TT.
+.endif
+
+* 0x30..0x3f: assigned to M.Schmal's MetaDOS
+
+.endc
+	dc.l	unimpl			; 49: assigned
 	dc.l	unimpl			; 50: assigned
 	dc.l	unimpl			; 66: assigned
 	dc.l	unimpl			; 67: assigned
@@ -2713,9 +2811,9 @@ _get_mpb:
 	bls	nottram
 	move.b	dbasel(a5),d0		; load and shift bits 8..15
 	lea.l	ttmd.w,a2
- .ifne	STPLUSVIDEO
+.ifne	STPLUSVIDEO+TT
  	move.b	dbasell(a5),d0		; load low byte for STPLUS
- .endc
+.endc
 
 	sub.l	#$01000000,d0
 	move.l	d0,8(a2)		; ttmd.m_length = (length)
@@ -2736,7 +2834,12 @@ nottram:
 *
 * Returns:	D0.L = original vector value
 	move.b	shiftmd(a5),d0		; get screen rezolution
+.ifeq TT
 	bmi	setex1			; punt if (d1 < 0)
+.endc
+.ifne TT
+setex1:	rts
+.endc
 
 *+
 * _tickcal - return system timer calibration value (in ms)
@@ -2759,16 +2862,24 @@ f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
 	move.b	dbasel,d0		; load and shift bits 8..15
 	move.b	9(sp),dbaseh(a5)	; set bits 16..23 of hardware pointer
 	move.b	$a(sp),dbasel(a5)	; set bits 8..15 of hardware pointer
- .ifne STPLUSVIDEO
+.ifne STPLUSVIDEO+TT
  	move.b	$b(sp),dbasell(a5)	; STPLUS set low 8 bits, too
- .endc
+.endc
 phydone:
 	rts				; return pointer in d0
 
 
 	move.b	$d(sp),sshiftmd(a5)	; set software shadow
 	bsr	wvbl			; wait for start of vertical-blank
+.ifeq TT
 	move.b	sshiftmd(a5),shiftmd(a5) ; set hardware location
+.endc
+.ifne TT
+	move.b	shiftmd(a5),d0
+	rts
+
+	move.b	d0,shiftmd(a5)		; set hardware rez
+.endc
 	clr.w	vblsem(a5)		; disable vblank processing
 *
 	move.w	#1,vblsem(a5)		; re-enable vblanks
@@ -2793,15 +2904,21 @@ _getrez:
 *-
 _setscreen:
 
+.ifeq TT
 *--- set logical location:
 	lea	color0(a5),a0		; a0 -> base of palette memory
+.endc
+.ifne TT
+	and.w	#$1ff,d1		; force TT color range
+	lea	ttcolor0(a5),a0		; a0 -> base of palette memory
+.endc
 	bmi	f5a
- .ifeq STPLUSVIDEO
+.ifeq STPLUSVIDEO+TT
 *--- set physical location:
- .endc
- .ifne STPLUSVIDEO
+.endc
+.ifne STPLUSVIDEO+TT
 	and.w	#$0fff,d0		; STPLUS has different dirty bits 
- .endc
+.endc
 	tst.w	6(sp)			; if new color is <0, don't set it
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
  	move.b	$b(sp),dbasell		; STPLUS set low 8 bits, too
@@ -2971,9 +3088,9 @@ _term:
 savp_2:	move.l	(sp)+,proc_pc.w		; save bogus PC + exception number
 	move.b	dbasel(a5),d0
 .else
- .ifne STPLUSVIDEO
+.ifne STPLUSVIDEO+TT
 	move.b	dbasell(a5),d0
- .endc
+.endc
 	movem.l	d0-d7/a0-a7,proc_regs
 	add.w	mindex(pc,d7.w),a0	; a0 -> base of mem to draw at
 	move.l	usp,a0			; save USP
@@ -3294,6 +3411,7 @@ mushroom:				* (sic)
 *--- screen resolution table (pixels) for printScreen
 reztab:	dc.w	320,640,640		; widths
 	dc.w	200,200,400		; heights
+.ifeq TT
 
 *  Wait for vblank, return.
 *  (Hacky, timer method from JWT).
@@ -3323,8 +3441,8 @@ tb_3:	cmp.b	(a0),d4			; has timer changed?
 	dbra	d3,tb_3			; wait for 2ms w/o change
 	move.b	#$10,(a1)		; reset timer B
 	jmp	(a6)			; return
+.endc
 * around VBLANK.  THEORY 3 most clearly states "it's safe just after
-
 noblank1:
 * THEORY 1: if you get any ticks on Timer B, it's safe.
 *	move.b	iera,d0			; save old iera
@@ -3502,6 +3620,244 @@ TB_e:	move.l	a1,8(a0)		;; restore original bus error vector
 *    meaning in the future.
 *
 * BUG reported: if you don't have a blitter, Blitmode(-1) returns 0. If you
+	clr.w	d1
+.ifne TT
+	move.b	(a0),d3		;get next byte in stream
+	add.l	a1,a0		;increment by stride
+	eor.b	d3,d1		;eor with right shifted crc (high byte)
+	add.w	d1,d1		;*2; faster than lsl.w
+	move.w	0(a2,d1.w),d4	;use as offset into crctab
+	eor.w	d4,d0		;eor with lsl'd crc
+	subq.l	#1,d2		;decr count
+	bne	crclp		;until all bytes crc'd
+	rts
+
+.data
+
+*	divisor for crc
+crctab:
+	dc.w	$0000,$1021,$2042,$3063,$4084,$50a5,$60c6,$70e7
+	dc.w	$8108,$9129,$a14a,$b16b,$c18c,$d1ad,$e1ce,$f1ef
+* _EsetRez: - Set low three bits of the high byte of the EST Shift Mode reg.
+*             Old rezolution is returned in d0.w
+	dc.w	$9339,$8318,$b37b,$a35a,$d3bd,$c39c,$f3ff,$e3de
+* Synopsis:	_EsetRez
+*		WORD _EsetRez(rez)
+*		WORD rez;
+	dc.w	$b75b,$a77a,$9719,$8738,$f7df,$e7fe,$d79d,$c7bc
+_EsetRez:
+        move.b  ESHIFTMD,d0		; move old rez into d0.
+	move.b	d0,d2			; 
+        and.w	#7,d0			; d0 = old rez mode (return value)
+        move.w	4(sp),d1		; move new rez value into d1
+        bmi	strz			; if rez is negative do nothing
+        and.b	#7,d1			; keep new mode bits
+	move.b	d1,sshiftmd(a5)		; set software shadow
+        and.b   #$f8,d2			; keep everything except mode bits
+        or.b    d1,d2			; give d2 new mode bits
+        move.w  d0,-(sp)		; wvbl clobbers d0 only
+	bsr	wvbl			; wait for start of vertical-blank
+	move.b	d2,ESHIFTMD		; set hardware reg to new resolution
+	clr.w	vblsem(a5)		; disable vblank processing
+	dc.w	$1080,$00a1,$30c2,$20e3,$5004,$4025,$7046,$6067
+	move.w	#1,vblsem(a5)		; re-enable vblanks
+        move.w	(sp)+,d0		; d0 has old rez value
+strz:	rts	
+	dc.w	$34e2,$24c3,$14a0,$0481,$7466,$6447,$5424,$4405
+	dc.w	$a7db,$b7fa,$8799,$97b8,$e75f,$f77e,$c71d,$d73c
+	dc.w	$26d3,$36f2,$0691,$16b0,$6657,$7676,$4615,$5634
+	dc.w	$d94c,$c96d,$f90e,$e92f,$99c8,$89e9,$b98a,$a9ab
+	dc.w	$cb7d,$db5c,$eb3f,$fb1e,$8bf9,$9bd8,$abbb,$bb9a
+* _EsetPhysBase - Set the physical screen location.
+*                 Old screen location is returned in d0.l
+*
+* Synopsis:	_EsetPhysBase
+*		LONG _EsetPhysBase(physLoc)
+*		LONG physLoc;
+	dc.w	$7c26,$6c07,$5c64,$4c45,$3ca2,$2c83,$1ce0,$0cc1
+_EsetPhysbase:
+.endif
+*--- Get Est physical display base
+ 
+	moveq.l	#0,d0			; cleanup pointer-to-be
+	move.b	ESTVBH,d0		; load and shift bits 16..23
+	swap	d0
+	move.b	ESTVBM,d0		; load and shift bits 8..15
+	lsl.w	#8,d0
+        move.b	ESTVBL,d0		; load bits 0..7
+
+*--- Set Est physical display base, bits 0..2 are ignored by hardware reg
+        
+	tst.b   4(sp)			; see if new phys loc is neg
+	bmi	estpb			; if(physloc < 0) then ignore it
+	move.b	5(sp),ESTVBH		; set bits 16..23 of hardware pointer
+	move.b	6(sp),ESTVBM		; set bits 8..15 of hardware pointer
+	move.b	7(sp),ESTVBL		; set bits 0..7 of hardware pointer
+
+estpb:	rts
+        
+
+
+.if TT
+**********************************************************************
+*
+* TT Video calls
+*
+
+*******
+*******
+ESHIFTMD	equ	$ffff8262	; EST video shift mode regiter
+ELUTBANK	equ	$ffff8263	; EST bank select register
+
+
+* - High byte (bits 16..23), middle byte (bits 8..15), low byte (bits 0..7)
+ESTVBH		equ	$ffff8201	; EST Video Base High Byte (= dbaseh)
+ESTVBM		equ	$ffff8203	; EST Video Base Middle Byte (= dbasel)
+ESTVBL		equ	$ffff820d	; EST Video Base Low Byte
+
+
+
+*+
+* _EsetShift: - Set the TT shify mode register
+*
+* Synopsis:	_EsetShift
+*		WORD _EsetShift(shftMode)
+*		WORD shftMode;
+*-
+_EsetShift:
+	bsr	noblank1		; wait until not blanking
+	moveq.l	#0,d0			; pre-clear return code
+	move.w	6(sp),shiftmd		; set shift mode register
+	move.w	shiftmd,d0		; d0 <- curr rez
+	and.w	#7,d0			; mask off unwanted bits
+	move.b	d0,sshiftmd.w		; set software shadow
+	clr.w	vblsem.w		; disable vblank processing
+	jsr	esc_init		; re-initialize glass tty routines
+	move.w	#1,vblsem.w		; re-enable vblank
+	move.w	(sp)+,d0		; d0 <- gets old shift mode value
+	rts	
+
+
+
+*+
+* _EgetShift: - Get the TT shify mode register
+*
+* Synopsis:	_EgetShift
+*		WORD _EgetShift()
+*-
+_EgetShift:
+	moveq.l	#0,d0			; pre-clear return code
+	move.w	shiftmd,d0		; d0 <- shift mode register value
+	rts	
+
+
+*+
+*
+* _EsetBank - set the bank number of the EST hardware shift register.
+*             Old Bank number is returned in d0.w
+*
+* Synopsis:	_EsetBank
+*		WORD _EsetBank(bankNum)
+*		WORD bankNum;
+*-
+_EsetBank:
+	moveq.l	#0,d0			; pre-clear return code
+	move.w	ESHIFTMD,d0		; d0 is the return value
+	and.w	#$f,d0			; return old bank number
+	tst.w	4(sp)			; see if new bank < 0
+	bmi	estbnk			; if so, leave without changing bank
+	move.b	5(sp),ELUTBANK		; set new bank number
+estbnk:	rts
+
+
+
+*+
+*
+* _EsetColor - set EST look up table entry with a new color.
+*              Old color is returned d0.w
+*
+* Synopsis:	_EsetColor
+*		WORD _EsetColor(colorNum, color)
+*		WORD colorNum, color;
+*-
+_EsetColor:
+	moveq.l	#0,d0			; pre-clear return code
+	lea	ESTLUT,a0		; load EST look up table address
+	move.w	4(sp),d0		; load table offset
+	and.w	#$ff,d0			; offset must be < 256 (prevent buserr)
+	add.w	d0,d0			; turn offset into word index
+	add.w	d0,a0			; a0 -> color register
+	move.w	(a0),d0			; return old color in d0.w
+	and.w	#$0fff,d0		; mask dirty bits
+	move.w	6(sp),d1		; d2 <- new color
+	bmi	stclr			; if color < 0 leave
+	move.w	d1,(a0)			; load new color into lut
+stclr:	rts
+
+
+
+*+
+* _EsetPalette - Set the contents of a contiguous set of EST hardware color
+*                LookUp Table registers.
+*
+* Synopsis:	_EsetPalette
+*		VOID _EsetPalette(colorNum, count, palettePtr)
+*		WORD colorNum, count;
+*		LONG palettePtr;
+*-
+	dbra	d1,eset_loop		; do untill count = -1
+	move.w	4(sp),d0		; d0 <- colorNum
+	and.w	#$ff,d0			; colorNum  must be < 256
+	move.w	d0,a0			; a0 becomes index for dest.
+	adda.w	a0,a0			; make a0 a word index
+	sub.w	#256,d0			; d0 = colorNum - 256
+* _EsetMono - Turn EST hardware shift register, hyper mono bit on/off.
+	move.w	6(sp),d1		; d1 <- count (set by the user)
+	cmp.w	d0,d1			; check to see if count > maxCount
+* Synopsis:	_EsetMono
+	move.w	d0,d1			; count <- maxCount
+
+eset_ok:
+_EsetMono:
+	bra	eset_dec
+
+eset_loop:
+	move.w	(a1)+,(a0)+		; load look up table
+
+eset_dec:
+	dbra	d1,eset_loop		; do untill count = -1
+	rts
+	
+
+*+
+* _EgetPalette - Get the contents of a contiguous set of EST hardware color
+*                color LookUp Table registers.
+*
+* Synopsis:	_EgetPalette
+*		VOID _EgetPalette(colorNum, count, palettePtr)
+*		WORD colorNum, count;
+*		LONG palettePtr;
+*-
+_EgetPalette:
+	move.w	4(sp),d0		; d0 <- colorNum
+	and.w	#$ff,d0			; colorNum  must be < 256
+	move.w	d0,a0			; a0 becomes index for source.
+	sub.w	#256,d0			; d0 = colorNum - 256
+	neg.w	d0			; d0 <- maxCount
+	move.w	6(sp),d1		; d1 <- count (set by the user)
+	cmp.w	d0,d1			; check to see if count > maxCount
+	ble	eget_ok			; branch if count is ok
+	move.w	d0,d1			; count <- maxCount
+
+eget_ok:
+	move.l	8(sp),a1		; a1 <- palettePtr (destination)
+	lea	ESTLUT(a0),a0		; a0 <- lutPtr (source)
+	bra	eget_dec
+
+eget_loop:
+.endc
+
+
 eget_dec:
 	dbra	d1,eget_loop		; do untill count = -1
 	rts

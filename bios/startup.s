@@ -4,13 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/28 08:24:44 $
+* $Date: 1992/02/29 21:24:18 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.92  1992/02/29  21:24:18  apratt
+* Moved and improved FPU probe and Frestore.  Haven't really tested it.
+*
+* Fixed the bug that caused coldboot vectors not to revector to _term.
+* Moved the coldboot vectoring code to happen as soon as RAM is good.
+*
+* Took out the Sparrow code that tests and sets the PWRFAIL bit,
+* because it doesn't work (yet).
+*
+* Changed boot_dev_tab to attempt only IDE unit 0 and SCSI unit 0 if Sparrow.
+*
 * Revision 2.91  1992/02/28  08:24:44  apratt
 * Changed TT to M68030 in some places, where it's really CPU dependency we're
 * talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
@@ -307,7 +318,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.91 $
+* $Revision: 2.92 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -1038,8 +1049,6 @@ reset1:
 *	pmove	tdis,tt1
 	dc.l	$f0390800,tdis		; hand-assembled because MAS
 	dc.l	$f0390c00,tdis		; has bugs...
-	frestore tdis			; (TDIS used again as null FPU state)
-
 .data
 tdis:	dc.l	0
 .text
@@ -1315,8 +1324,8 @@ sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 
 .if SPARROW
 	move.w	SPAR_CONF,d0		; read to auto-config mem cntrlr
-	bset.b	#6,$ffff8007		; test and set power-fail bit
-	beq	sp_cold			; yes, cold-boot
+;	bset.b	#6,$ffff8007		; test and set power-fail bit
+;	beq	sp_cold			; yes, cold-boot
 	cmp.l	#memmagic,memvalid.w	; check first magic number
 	bne	sp_cold			; no - this is a cold boot
 	cmp.l	#memmag2,memval2.w	; check again (for paranoia)
@@ -1709,9 +1718,114 @@ mt_pr:
 
 reset4:
 	move.l	#_supstk+supsiz,sp	; setup SSP now
-	move.l	#coldboot,$8		; bus error during boot -> coldboot
-	move.l	#coldboot,$c		; addr error - same thing
-	move.l	#coldboot,$10		; illegal instruction - same thing
+
+*+
+*  Initialize interrupt vectors
+*
+* This was much lower in the boot cycle but I've moved it here because
+* we want exceptions during boot to vector to coldboot.
+*
+* First, all exceptions are vectored to "coldboot."  Then some exceptions
+* are vectored to appropriate places: trap 2, Divide-by-zero, and NMI are
+* pointed at an RTE, other traps point to their handlers, etc.
+*
+* Later on (search for "bloop:") we vector those exceptions that still
+* point to 'coldboot' so they point to the bomb handler '_term' instead.
+*
+* We set all these exceptions to vector to 'coldboot' on the theory that a
+* bus error while TOS is booting is A Bad Thing.  The theory is that  the
+* cold boot will fix whatever went wrong, like a bogus address in resvector
+* or some other system variable.  (Well, actually, a bogus resvector will
+* have been taken before now, but you know what I mean.)
+*-
+	lea	_rte(pc),a3		; a3 -> handy RTE
+	lea	_rts(pc),a4		; a4 -> handy RTS
+
+*--- set up all vectors to coldboot (in bios.s):
+
+	lea	coldboot,a1		; a1 -> coldboot
+	lea	$8,a0			; a0 -> interrupt RAM
+	move.w	#64-1,d0		; d0 = count
+sei1:	move.l	a1,(a0)+		; write vector
+	dbra	d0,sei1			; (loop to write more vectors)
+
+* Divide by zero -> RTE.
+
+	move.l	a3,$14			; divide-by-zero vector -> rte
+
+* Vector NMI to RTE: it's possible to get NMI on STPAD when the
+* battery is low, but it's also possible that the threshholds are
+* not correct, so in the boot sequence we "disable" NMI.  Bombs
+* are never a good response to NMI, so anything that actually uses
+* it will install a vector.
+
+	move.l	a3,$7c			; NMI -> RTE
+
+*--- point vectored interrupts at RTEs
+sei2:	moveq	#7-1,d0			; d0 = DBRA count
+	lea	$64,a1			; a1 -> first slot
+sei3:	move.l	#_rte,(a1)+		; point interrupt at RTE
+	dbra	d0,sei3			; ... and loop for all 7
+
+*--- install OS interrupt vectors:
+	move.l	#vbl,$70		; vblank handler
+	move.l	#hbl,$68		; hblank handler
+	move.l	a3,$88			; (empty) trap#2 handler
+	move.l	#trp13h,$b4		; trap #13 handler
+	move.l	#trp14h,$b8		; trap #14 handler
+	move.l	#line1010,$28		; line 1010 handler
+	move.l	a4,etv_timer.w		; default timer-tick vector -> rts
+	move.l	#_critich,etv_critic.w 	; default critical error handler
+	move.l	a4,etv_term.w		; default terminate vector -> rts
+
+*+
+*  Setup the vblank deferred vector list.
+*  (This data structure is ugly,
+*   but we seem to be stuck with it).
+*
+*-
+	lea	_vbl_list.w,a0		; a0 -> default list of vbl locs
+	move.l	a0,_vblqueue.w		; install ptr to them
+	move.w	#dnvbls-1,d0		; clear vbl vectors
+avbl:	clr.l	(a0)+			;	one at a time
+	dbra	d0,avbl
+
+*+
+*  Initialize soft vectors for character devices.  The
+*  vectors have been moved into RAM to make it possible
+*  to efficiently intercept them later on.
+*
+*  This only happens in TOS 1.2 and later.  On TT with Bconmap,
+*  the vectors for device 1 (the mappable one) get (re-)written
+*  by mapinit, which is called by initmfp.
+*-
+
+	lea	CHRDEVTAB,a0		; a0 -> routines
+	move.w	#xconstat,a1		; a1 -> RAM vectors
+
+	moveq	#(4*8)-1,d0		; = #vectors to install
+chdev1:	move.l	(a0)+,(a1)+
+	dbra	d0,chdev1
+
+*+
+* Initialize the SCU to enable interrupts etc.
+* This code runs on all machines; on machines with no SCU
+* you get a bus error and bail out right away.
+*
+* Sparrow note: ttscu doesn't exist, and the system hangs when you touch it.
+*-
+
+	move.l	$8,a0
+	move.l	sp,a1
+	move.l	#scuberr,$8
+.if (SPARROW == 0)
+	move.b	#$40,ttvmeimsk		; enable int priority 6
+	move.b	#$14,ttsysimsk		; enable int priorities 2, 4
+.endif
+
+scuberr:
+	move.l	a0,$8
+	move.l	a1,sp
 
 .if SPARROW
 *
@@ -2223,38 +2337,66 @@ nofdc:
 
 	move.l	#"_FPU",(a0)+		; always install SOME cookie
 
-* probe for FPU: line-F exception means there is none. Coprocessor
-* violation does, too, but should "never happen." However, it did in some
-* machines, so here it is.  I think it actually means there's something
-* wrong on the data bus...
+* Frestore a null state to zap that FPU.  This involves catching all the
+* possible exceptions that can cause:
+*
+*	$2c	line-f (there is no FPU)
+*	$34	coprocessor protocol violation (Shouldn't Happen)
+*	$c0-$d8	misc. exceptions caused by previous FPU instruction
 
-	move.l	$2c,a1
-	move.l	$34,a2
-	move.l	sp,a3
-
+	moveq.l	#0,d7		; pre-clear d7, which will be the _FPU value
+	sub.w	#10*3,sp	; get some local variable space
+	move.l	$2c,(sp)
+	move.l	$34,4(sp)
 	move.l	#nofpu,$2c
 	move.l	#nofpu,$34
-	fmove.l	fp0,d0			; test a simple FPU inst.
-	move.l	#$00020000,(a0)+	; found 6888x: set %10 bit 
-	bra	fpudone
+	lea.l	4(sp),a1
+	move.l	#$c0,a2
+	move.l	#yesfpu,d0
+	move.l	(a2),(a1)+
+	move.l	d0,(a2)+
+	move.l	(a2),(a1)+
+	move.l	d0,(a2)+
+	move.l	(a2),(a1)+
+	move.l	d0,(a2)+
+	move.l	(a2),(a1)+
+	move.l	d0,(a2)+
+	move.l	(a2),(a1)+
+	move.l	d0,(a2)+
+	move.l	(a2),(a1)+
+	move.l	d0,(a2)+
+	move.l	(a2),(a1)+
+	move.l	d0,(a2)+
 
+	clr.l	-(sp)		; get a quick zero to Frestore
+	move.l	sp,a2		; remember the pre-exception stack pointer
+	frestore (sp)
+yesfpu:
+	move.l	#$00020000,d7	; d7 is what we'll stuff in the _FPU cookie
 nofpu:
-	clr.l	(a0)+			; no 6888x found
-fpudone:
-	move.l	a1,$2c			; clean up after exception (or not).
-	move.l	a2,$34
-	move.l	a3,sp
+	move.l	a2,sp		; clean off exception stack (if any)
+	addq	#4,sp		; get rid of that "quick zero"
+	move.l	(sp)+,$34	; restore "cp violation exception"
+	move.l	(sp)+,$2c	; restore "line-F exception"
+	move.l	(sp)+,$c0	; restore the seven FPU exceptions
+	move.l	(sp)+,$c4
+	move.l	(sp)+,$c8
+	move.l	(sp)+,$cc
+	move.l	(sp)+,$d0
+	move.l	(sp)+,$c4
+	move.l	(sp)+,$c8
 
-* What the heck - probe for SFP004 whether or not you're a TT.
+	move.l	d7,(a0)+	; write d7 as _FPU cookie's value
+
+* Probe for SFP004 (always)
 
 	move.l	$8,a1			; save bus error vector
 	move.l	sp,a2			; and SP for cleaning up later
-	move.l	#xfpudone,$8		; catch bus error
+	move.l	#sfpdone,$8		; catch bus error
 	move.w	$fffffa40,d0		; probe for SFP004
 	bset.b	#0,-3(a0)		; found SFP004: set %01 bit
-	bra	xfpudone
 
-xfpudone:
+sfpdone:
 	move.l	a1,$8			; clean up
 	move.l	a2,sp
 
@@ -2287,115 +2429,6 @@ nofrb:
 
 	clr.l	(a0)+			; last entry is null
 	move.l	#DEFCSIZE,(a0)+		; with size for its value
-
-*+
-*  Initialize interrupt vectors
-*
-*  Exception vectors are pointed to the system critical error handler
-*  (_term).  On ST's, the high byte of the vector (bits 24..31) contains
-*  the exception number.  If TT, the exception number comes off the stack
-*  in the frame word.
-*
-*  Trap 2, Divide-by-zero, and NMI are pointed at an RTE.
-*
-*  The HBLANK, VBLANK, line 1010, [someday: line 1111], trap 13, trap 14,
-*  and "extended" trap vectors are initialized appropriately.
-*
-* New code: we set all these exceptions to vector to 'coldboot' on the
-* theory that a bus error while TOS is booting is A Bad Thing. We will
-* revector the ones that still point to coldboot just before the first
-* possible time we could jump to user code.  The theory of setting the
-* bomb vectors to coldboot is that the cold boot will fix whatever went
-* wrong, like a bogus address in resvector or some other system variable.
-*-
-	lea	_rte(pc),a3		; a3 -> handy RTE
-	lea	_rts(pc),a4		; a4 -> handy RTS
-
-*--- set up bomb vectors to coldboot (in bios.s):
-
-	lea	coldboot,a1		; a1 -> coldboot
-	lea	$8,a0			; a0 -> interrupt RAM
-	move.w	#64-1,d0		; d0 = count
-sei1:	move.l	a1,(a0)+		; write vector
-	dbra	d0,sei1			; (loop to write more vectors)
-
-* Divide by zero -> RTE.
-
-	move.l	a3,$14			; divide-by-zero vector -> rte
-
-* Vector NMI to RTE: it's possible to get NMI on STPAD when the
-* battery is low, but it's also possible that the threshholds are
-* not correct, so in the boot sequence we "disable" NMI.  Bombs
-* are never a good response to NMI, so anything that actually uses
-* it will install a vector.
-
-	move.l	a3,$7c			; NMI -> RTE
-
-*--- point vectored interrupts at RTEs
-sei2:	moveq	#7-1,d0			; d0 = DBRA count
-	lea	$64,a1			; a1 -> first slot
-sei3:	move.l	#_rte,(a1)+		; point interrupt at RTE
-	dbra	d0,sei3			; ... and loop for all 7
-
-*--- install OS interrupt vectors:
-	move.l	#vbl,$70		; vblank handler
-	move.l	#hbl,$68		; hblank handler
-	move.l	a3,$88			; (empty) trap#2 handler
-	move.l	#trp13h,$b4		; trap #13 handler
-	move.l	#trp14h,$b8		; trap #14 handler
-	move.l	#line1010,$28		; line 1010 handler
-	move.l	a4,etv_timer.w		; default timer-tick vector -> rts
-	move.l	#_critich,etv_critic.w 	; default critical error handler
-	move.l	a4,etv_term.w		; default terminate vector -> rts
-
-*+
-*  Setup the vblank deferred vector list.
-*  (This data structure is ugly,
-*   but we seem to be stuck with it).
-*
-*-
-	lea	_vbl_list.w,a0		; a0 -> default list of vbl locs
-	move.l	a0,_vblqueue.w		; install ptr to them
-	move.w	#dnvbls-1,d0		; clear vbl vectors
-avbl:	clr.l	(a0)+			;	one at a time
-	dbra	d0,avbl
-
-*+
-*  Initialize soft vectors for character devices.  The
-*  vectors have been moved into RAM to make it possible
-*  to efficiently intercept them later on.
-*
-*  This only happens in TOS 1.2 and later.  On TT with Bconmap,
-*  the vectors for device 1 (the mappable one) get (re-)written
-*  by mapinit, which is called by initmfp.
-*-
-
-	lea	CHRDEVTAB,a0		; a0 -> routines
-	move.w	#xconstat,a1		; a1 -> RAM vectors
-
-	moveq	#(4*8)-1,d0		; = #vectors to install
-chdev1:	move.l	(a0)+,(a1)+
-	dbra	d0,chdev1
-
-*+
-* Initialize the SCU to enable interrupts etc.
-* This code runs on all machines; on machines with no SCU
-* you get a bus error and bail out right away.
-*
-* Sparrow note: ttscu doesn't exist, and the system hangs when you touch it.
-*-
-
-	move.l	$8,a0
-	move.l	sp,a1
-	move.l	#scuberr,$8
-.if (SPARROW == 0)
-	move.b	#$40,ttvmeimsk		; enable int priority 6
-	move.b	#$14,ttsysimsk		; enable int priorities 2, 4
-.endif
-
-scuberr:
-	move.l	a0,$8
-	move.l	a1,sp
 
 *+
 *  "The other half" of the BIOS handles character I/O;
@@ -2969,10 +3002,14 @@ crcstride	equ	2
 .endif
 
 * the if's above determine whether this code appears, and the stride used.
+* (Note again: we don't bail out here on TT even if you've been up a while,
+* because otherwise there's no chance to hit ALT to go to ST LOW.)
 
 .if crcstride
+.if (TT == 0)
 	cmp.l	#EIGHTY_SECONDS,_hz_200
 	bhs	crcdone			; skip if we've been alive a while
+.endif
 
 .if crcstride == 1
 	move.l	#(256*1024)-2,d7	; PAD roms, 256Kb
@@ -3143,7 +3180,7 @@ norezchg:
 	lea.l	$8,a1			; start of places to check
 	move.w	#64-1,d0		; count
 bloop:
-	cmp.l	#coldboot,(a1)
+	cmp.l	#coldboot,(a1)+
 	bne	bloop1
 	move.l	a0,(a1)
 bloop1:	add.l	d1,a0
@@ -3679,7 +3716,7 @@ dmafail:
 boot_dev_tab:	dc.b	8,9,$a,$b,$c,$d,$e,$f,0,1,2,3,4,5,6,7,$ff
 .else
 .if SPARROW
-boot_dev_tab:	dc.b	$10,$11,8,9,$a,$b,$c,$d,$e,$f,$ff
+boot_dev_tab:	dc.b	$10,8,$ff
 .else
 boot_dev_tab:	dc.b	$10,$11,0,1,2,3,4,5,6,7,$ff
 .endif

@@ -4,16 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/03 13:23:37 $
+* $Date: 91/05/21 16:57:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.4  91/05/21  16:57:45  apratt
+* Removed things which were ifdef DAS_BOOT, and left in unconditionally those
+* things which were ifndef DAT_BOOT.  Added Protobt type 5 for quad density,
+* against future need.  Changed some magic numbers into #defined constants.
+*
 * Revision 2.3  90/08/03  13:23:37  apratt
 * TTOS FINAL RELEASE
-*
+* 
 * Revision 2.2  89/11/27  14:50:03  apratt
 * Added a fourth Protobt() disk type: 1.44MB (18 sec/2side/80trk).
 * 
@@ -49,7 +54,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.3 $
+* $Revision: 2.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -58,8 +63,6 @@
 *************************************************************************
 */
 #include "portab.h"
-/* #define	DAS_BOOT 1
- */
 
 /*
  * ST Disk support (and random BIOS functions)
@@ -570,7 +573,6 @@ WORD recno, dev, count;
 }
 
 
-#ifndef DAS_BOOT
 /*
  * Random number generator parameters.
  * (from Knuth, vol II)
@@ -594,7 +596,6 @@ LONG rand()
     seed = (RAND_A * seed + RAND_C);
     return (seed >> 8) & 0xffffff;
 }
-#endif
 
 
 #define	BOOT_MAGIC	0x1234		/* magic boot-sector checksum */
@@ -656,7 +657,6 @@ boot()
 
 
 
-#ifndef DAS_BOOT
 /*
  * Prototype BPBs for floppies;
  * used to construct boot sectors.
@@ -687,14 +687,23 @@ char proto_tab[] =
  /*      MD    sec/fat   sec/track  nsides      N hidden */
 	0xf9, 0x05,0x00, 0x09,0x00, 0x02,0x00, 0x00,0x00,
 
- /* AKP: Added type 4: 80 tracks double sided 1.44MB (hi density) */
+ /* AKP: Added type 4: 80 tracks double sided 1.44MB (high density) */
  /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
 	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0xe0,0x00, 0x40,0x0b,
  /*      MD    sec/fat   sec/track  nsides      N hidden */
-	0xf9, 0x06,0x00, 0x12,0x00, 0x02,0x00, 0x00,0x00
+	0xf9, 0x05,0x00, 0x12,0x00, 0x02,0x00, 0x00,0x00,
+
+ /* AKP: Added type 5: 80 tracks double sided 2.88MB (quad density) */
+ /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
+	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0xe0,0x00, 0x80,0x16,
+ /*      MD    sec/fat   sec/track  nsides      N hidden */
+	0xf9, 0x0a,0x00, 0x24,0x00, 0x02,0x00, 0x00,0x00
+/* 10 sectors/fat means you can use this prototype for 40 sectors per track */
 
 };
 
+#define PROTOSIZ 19			/* 19 bytes per proto entry */
+#define NUMPROTO 6			/* 6 entries in table */
 
 
 /*
@@ -749,10 +758,10 @@ WORD dsksiz, execflg;
     /*
      * Install BPB
      */
-    if (dsksiz >= 0)
+    if (dsksiz >= 0 && dsksiz < NUMPROTO)
     {
-	j = dsksiz * 19;
-	for (i = 0; i < 19; ++i)
+	j = dsksiz * PROTOSIZ;
+	for (i = 0; i < PROTOSIZ; ++i)
 	    buf[IBM_BPS + i] = proto_tab[j++];
     }
 
@@ -766,7 +775,6 @@ WORD dsksiz, execflg;
     *p = BOOT_MAGIC - w;
     if (!execflg) ++(*p);
 }
-#endif
 
 
 /*

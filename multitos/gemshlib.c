@@ -1421,7 +1421,7 @@ REG	BYTE		*pname;
 	dos_dta( &D.g_dta[0] );			/* use this		*/
 
 	pname = sh_name( pspec );		/* get the file name	*/
-	strcpy( pname, &tmpname[0] );		/* copy it		*/
+	nstrcpy( pname, &tmpname[0], 13 );		/* copy it		*/
 
 	pname = sh_name( ad_shcmd );	/* first look in program's dir	*/
 	path = (WORD)(pname - ad_shcmd);

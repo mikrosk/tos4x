@@ -1,6 +1,9 @@
 /* kballoc.c - fast allocator for LC5 based on AKP's nalloc2.c
  * ===========================================================================
  * $Log: kballoc.c,v $
+ * Revision 1.2  1993/03/08  20:07:02  ersmith
+ * REAL MultiTOS 1.01
+ *
  * Revision 1.1  1993/02/24  23:52:46  ersmith
  * 1 meg floppy MultiTOS
  *
@@ -161,6 +164,16 @@ REG	BLOCK	*b, *valid;
 	return 1;
 }
 #endif
+
+/*
+ * memory initializor
+ */
+GLOBAL VOID initkballoc()
+{
+	a_first = NULL;
+	a_heap = NULL;
+	minarena = 0;
+}
 
 /* ---------------------------------------------------------------------------
  * First-fit allocator.

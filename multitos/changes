@@ -1,8 +1,32 @@
+====================== MultiTOS 1.01 released ==================
+Changes made 3/05/93:
+
+desktop.c,kballoc.c:
+	Re-initialize the malloc arena blocks every time we restart
+	the desktop; that way, if we die and the user asks to load
+	the desktop, we don't get bus errored.
+
+Changes made 3/04/93:
+
+deskdisk.c:
+	Changed the size of the buffer allocated for the boot sector
+	in floppy to floppy copy operations from 0x158 (huh?) to
+	1024.
+
+Changes made 3/03/93:
+
+deskgrm.rsc:
+	Changed the OK button from an indicator to an activtor (as it
+	is in other languages).
+
 Changes made 2/24/93:
 
+gemshlib.c:
+	In shel_find, changed a "strcpy" into "nstrcpy" so that
+	a temporary variable could not be overflowed. (++HMK)
 gemctrl.c:
 	Moved the clearing of the checkmark. This seems to correct the
-	"menu bar" bug.
+	"menu bar" bug. (++HMK)
 
 Changes made 2/23/93:
 
@@ -14,6 +38,7 @@ deskwin.c:
 	to change a window to drive A:, and drive A: is not responding, the
 	old window contents are still displayed, but the desktop tries to
 	use A: as the drive letter when copying files out of the window.
+	(++HMK).
 gemctrl.c:
 	Changed the screen manager's "sleep time" to a much lower value
 	when resolution changes are in progress; this makes the resolution
@@ -21,10 +46,15 @@ gemctrl.c:
 
 Changes made 2/18/93:
 
+gemshlib.c:
+	Corrected the code that set up the process' name and arguments
+	when launching TOS/TTP applications via a program like MINIWIN
+	(in this case when MINIWIN does a shel_read it should get its
+	own path+name, rather than the TOS/TTP program's).
 deskmenu.c, desk*.rsc:
 	Changed the name of the desktop's "iconified" icon from WINICON
 	to SMILEY, because WINICON was already in use with a completely
-	different meaning.
+	different meaning. (++CJG)
 deskact.c,deskmem.c:
 	Fixed some Mfree's that accidentally got left in during
 	the change to kballoc().
@@ -45,7 +75,7 @@ deskmn.c:
 deskmenu.c:
 	Took out the code for changing resolutions with ALT+number;
 	this isn't implemented for Falcon, and was causing strange
-	error messages if users tried to "change" to the current
+	error messages on TTs if users tried to "change" to the current
 	resolution.
 deskact.c:
 	Made the "Copy files" and "Delete files" dialogs back into
@@ -76,6 +106,7 @@ desk*.c,utility.c:
 	some memory. So far, only 8K has been saved :-(, but perhaps
 	tuning will help.
 
+======================= MultiTOS 1.0 released =======================
 Changes made 1/25/93:
 
 gemgrm.rsc,deskgrm.rsc:

@@ -2,14 +2,17 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.1 $	$Source: f:\multitos/RCS/crysbind.h,v $
+*  $Revision: 1.2 $	$Source: /u2/MRS/osrevisions/aes/crysbind.h,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/02/24 23:52:46 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
 * =======================================================================
 *  $Log: crysbind.h,v $
-*  Revision 1.1  1993/02/24  23:52:46  ersmith
-*  1 meg floppy MultiTOS
+*  Revision 1.2  1993/03/08  20:07:02  ersmith
+*  REAL MultiTOS 1.01
 *
+ * Revision 1.1  1993/02/24  23:52:46  ersmith
+ * 1 meg floppy MultiTOS
+ *
  * Revision 1.3  1993/02/24  22:09:00  ersmith
  * 1 meg floppy MultiTOS release
  *

@@ -1,15 +1,20 @@
 .super
 ***************************     RWA.S      ******************************
 *
-* $Revision: 1.1 $	$Source: e:/tos/gd2\RCS\rwa.mac,v $
+* $Revision: 1.2 $	$Source: e:/tos/gd2\RCS\rwa.mac,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:42:14 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 10:56:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: rwa.mac,v $
-* Revision 1.1  1991/03/28  17:42:14  apratt
-* THIS VERSION BOOTS! DESKTOP OPS WORK!
+* Revision 1.2  1991/06/20  10:56:38  apratt
+* Added a hook so you can easily find the offset to use to load
+* symbols.  Use XBRA just before _enter (which is trap 1), and
+* have mybp just before XBRA.
 *
+; Revision 1.1  1991/03/28  17:42:14  apratt
+; THIS VERSION BOOTS! DESKTOP OPS WORK!
+;
 * Revision 2.12  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -227,6 +232,13 @@ okrc:
 *    Short-circuit Super();
 *
 *-
+.globl mybp
+
+mybp:	dc.l	0
+	dc.b	"XBRA"
+	dc.b	"_DOS"
+ovec:	dc.l	0
+
 _enter:
 	btst.b	#5,(sp)			; in supervisor mode?
 	bne.b	ent_1			; (yes, check super stack)

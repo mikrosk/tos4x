@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/05/05 13:42:55 $
+* $Date: 88/05/12 11:33:07 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.9  88/05/12  11:33:07  apratt
+* Fixed reboot sequences to ignore caps-lock state.
+*
 * Revision 1.8  88/05/05  13:42:55  apratt
 * Added ctl-alt-rshft-delete cold boot code.
-*
+* 
 * Revision 1.7  88/04/20  15:05:32  apratt
 * Changed the comments around Rsconf; no code changes.
 * 
@@ -43,7 +46,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.8 $
+* $Revision: 1.9 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3135,12 +3138,14 @@ ari13	cmp.w	bufhead(a0),d1 ;head=tail?
 	swap	d0		;put scan/ascii in high word
 	clr.w	d0		;clear out low word
 	move.b	kbshift.w,d0	;bring in the kbshift data (ctrl/alt/shift)
-*	now test for the warm-boot combination ALT-CTRL-DELETE (AKP 2/88)
+	swap	d0		;re-adjust order
 	lsl.l	#$8,d0		;now do the shuffling to generate the new
 	lsr.w	#$8,d0		;improved conin format ($kkss00aa)
-	cmp.l	#$0c53001f,d0	;ctl-alt-delete value
 
-	cmp.l	#$0d53001f,d0	;ctl-alt-rshft-delete value
+	bclr.l	#KBCL+16,d2	;mask off caps-lock state
+	cmp.l	#$0c53001f,d2	;ctl-alt-delete value
+
+	cmp.l	#$0d53001f,d2	;ctl-alt-rshft-delete value
 	bclr.l	#KBCL+24,d2	;mask off caps-lock state
 	swap	d2		;get high word
 	cmp.w	#$0c53,d2	;ctl-alt plus delete's scan-code

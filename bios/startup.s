@@ -4,26 +4,44 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/06/18 16:36:11 $
+* $Date: 90/07/19 14:55:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.51  90/07/19  14:55:04  apratt
+* Added ONLY_LONGFRAME code, which you set on TT to just assume
+* longframe.  
+*
+* Removed VBLQ1ST; now VBLQ is always first.  
+*
+* Added pulsing boot colors. 
+*
+* Removed frestore of null state: it is not necessary and it was before
+* we checked for the existence of the 881.  Catch coprocessor violation
+* in the FPU probe; this "shouldn't happen." 
+*
+* Made ttwait/ttdelay use timer C of TTMFP because leaving Timer A free
+* is nicer: Timer A doesn't shade a control register with another timer. 
+*
+* Moved TT screen base to phystop
+*
 * Revision 2.50  90/06/18  16:36:11  apratt
 * Changed date to 6/16/90, boot color to dark blue  (n.b. was a sky blue
 * before; "blue" isn't descriptive enough).
-*
+* 
 * Fixed a BIG BUG: ttwait/ttdelay used STMFP timer A, not TTMFP timer A
 * as intended.
-*
+* 
 * Clobbering code now clobbers PMMU, cache, VBR, and FPU with frestore of
 * null state.
-*
+* 
 * Hit a key to stop the boot delay, then do a warm boot within 90 sec:
 * now you don't wait again.
-*
+* 
+* 
 * Revision 2.49  90/05/21  12:16:46  apratt
 * Moved some conditionals around, changed boot color to green.
 * This rev (cross your fingers) could be sent to developers, etc.
@@ -467,7 +485,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.50 $
+* $Revision: 2.51 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -533,6 +551,11 @@ denmark		=      13 ***DON'T  CHANGE***
 * The switches TT, STPLUS, systype, and country
 * are all moved to the file "switches.s" which is normally a copy
 * of one of the canned switch settings files.
+
+.include "switches.s"
+
+* SPARROW and TT are both M68030.
+
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
 * the chip actually exists (so clearing the control register will
 * not cause a bus error) and that MONOMON is XORed with the sound chip's
@@ -544,11 +567,6 @@ DMASND		equ	1
 DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
-* set VBLQ1ST if you want the VBL queue to be processed as the first
-* thing in VBLANK.
-
-VBLQ1ST		equ	1
-
 .ifeq TT
 version		equ	$0106		; version number *MUST BE EVEN*
 date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
@@ -556,9 +574,12 @@ date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .else
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$06161990	; TT date, $MMDDYYYY @check@
+date		equ	$06291990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010011010000 ; Jun 16, 1990
+dosdate		equ	%0001010011011101 ; Jun 29, 1990
+
+bootcolor	equ	$f00		; change this each release
+
 .endc
 
 *******************************************************************************
@@ -983,6 +1004,7 @@ SPAR_CONF	equ	$ffff8006	; read here to auto-config
 *--- SPARROW video master control register
 SPAR_VMC	equ	$ffff82c0	; video master control
 .ifne TT
+*--- Shifter:
 syncmode	equ	$ffff820a	; video	sync mode
 .endc
 dbaseh		equ	$ffff8201	; display base high
@@ -1238,10 +1260,24 @@ kcl_hook:	ds.l	1	; (5b0)  handler for keyclick
 * more_os_vars used to go here, but it took up NEGATIVE space, so I
 * took it out 12/06/88 AKP.  Don't think this'll break anything.
 
+*----------------------------------------
+*					:
+*	PATCH AREA, here..$7FF		:
+*					:
 *	This space reserved for		:
 *	future RAM-loaded fixes		:
+.ifne TT
 		.globl	fix_it_up
+*
+* ROMs for 68030's use $700-$800 for the PMMU page tables: this has the
+* advantage of making them protected from user-mode access.
+*
+*----------------------------------------
+
+.if M68030
+.globl	fix_it_up
 fix_it_up:	ds.b	$700-$5b4
+.endc
 levelA:		ds.b	$40
 levelB1:	ds.b	$40
 levelB2:	ds.b	$40
@@ -1362,9 +1398,6 @@ sizeof_hdr = *-ostext			; = size of OS header
 	or.b	d0,d1		; d1=b00000vv
 	move.w	d1,SPAR_VMC	; write to VMC.
 .ifne TT
-.mc68881
-	frestore tdis			; causes a restore of the NULL state
-
 .endif
 
 *+
@@ -1897,20 +1930,26 @@ nodmasnd:
 *
 *  TOS builds include a symbol, endaesbss, which is the last RAM address
 *  used anywhere in the OS.  For a RAM TOS, that's not the one we want:
-*  If TT, we allow an extra 16 bytes after the screen, before the end
+*  it includes the OS itself.  In a RAM TOS, we use ostext, which is the
 *  FIRST symbol of the TEXT segment.
 *
 *-
-*  too far.  This $10-byte pad means writing the screen to disk doesn't
-*  cause this.
+.if systype == rom
+	move.l	#endaesbss,a1		; a1 -> end (true end of BSS segment)
+.else
+	lea.l	ostext(PC),a1
+.endif
+	move.l	#endosbss,a0		; a0 -> start (after system vars)
+	moveq	#0,d0			; quick zero
+clrm_1:	move.w	d0,(a0)+		; clobber a word
 	cmp.l	a0,a1			; at end?
 	bne	clrm_1			; (no -- loop for more words)
 .ifeq TT
 .if M68030
 *+
 *  [M68030 only]
-	sub.l	#$25810,a0		; One TT screen plus $10 bytes.
-	move.w	#$2581-1,d1		; clear d1*16 bytes
+*  Initialize the PMMU to implement the cache disable bit.
+*  Set mmusetup for details on this.
 .endc
 *  This has to run after clearing BSS memory.
 *-
@@ -2137,9 +2176,14 @@ gotem:	move.l	a1,$8
 .ifne TT
 .mc68881
 * probe for FPU: line-F exception means there is none.
+* Coprocessor violation does, too, but should "never happen."
+* However, it did in some machines, so here it is.  I think it
+* actually means there's something wrong on the data bus...
 *
-	move.l	sp,a2
+* The low word of the _FPU cookie's value describes software floating point
+* which is installed.  Since there isn't any yet, this is somewhat
 * instructions, and the high bit of the low word means whatever you've got
+* is aware of having a 68040, so it will use line-F instructions for those
 * functions which are present in that processor.
 	move.l	#$20000,(a0)+
 * 	LOW WORD
@@ -2148,7 +2192,8 @@ gotem:	move.l	a1,$8
 	clr.l	(a0)+			; FPU cookie zero means none found
 * 		High bit means S/W is 68040-FPU aware.
 *
-	move.l	a2,sp
+* Usually, the low word is zero when you have a 68881, because there's no
+* need for S/W emulation.  However, when you have the SFP004, you might
 * also have software that turns line-F instructions into the corresponding
 .else
 
@@ -2403,6 +2448,12 @@ setvb2:	move.l	#reseth,swv_vec.w	; RESET system on monitor change
 	move.w	#$2300,sr		; go to IPL 3
 	moveq	#1,d0			; magic bit# = 1
 	bsr	cartscan		; execute cartridge aps
+.if STPAD
+	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
+.endif
+
+.if STPAD
+* HACK HACK HACK
 *
 * After enabling interrupts, wait between 10 and 15 ms (i.e. 3 ticks)
 * to allow characters the keyboard controller is trying to send to come
@@ -2418,21 +2469,63 @@ setvb2:	move.l	#reseth,swv_vec.w	; RESET system on monitor change
 	addq.l	#3,d0
 kbloop:	cmp.l	_hz_200.w,d0
 	bhi	kbloop
-priv:	movem.l	d0/a0,-(sp)
-	move.l	$a(sp),a0		; get PC of offending instr
+	clr.b	kbshift
+.endif
 
+* install a handler for privilege violation which handles move 
+* from sr: it clobbers the offending instruction into a move from CCR. 
+priv:	move.l	a0,-(sp)		; save separately
+	movem.l	d0-d2,-(sp)
+	move.l	$12(sp),a0		; get PC of offending instr
+
+*
 * Take 2: copy the dest EA bits and extension words of the instruction into
 * a "move.w (a0),ea" instruction elsewhere in memory, point a0 to the
 * SR from the exception stack, and jsr there.
-	move.b	#$42,(a0)		; clobber the instruction
+*
+	move.w	#%0011000000010000,pspace.w	; "move.w (a0),<ea>"
+	move.l	#$4e714e71,pspace+2.w	; nop nop (extension words)
+	move.w	#$4e75,pspace+6.w	; rts
+
+* clrcache: common subroutine to clear both caches; clobbers d0.
+* Called also at the tail end of any Rwabs call with bit 0 clear (reads).
+
+clrcache:
+	move.w	sr,-(sp)		; save IPL
+	or.w	#$0700,sr		; go to IPL 7
+	movec	cacr,d0			; get cacr
+	or.l	#$808,d0		; set "clear" bits of both caches
+	movec	d0,cacr			; put cacr back
+	move.w	(sp)+,sr		; restore IPL and 
+	rts				; return.
+
+.bss
+.text
+	beq	p1ext			; yes, one extension word
+priv:	movem.l	d0-d2,-(sp)		; save D regs
+	bne	psdone			; not 7: setup done
+	move.l	$16(sp),a0		; get PC of offending instr
+	beq	p1ext			; reg 0: just one ext word
+	move.w	d0,d1			; copy to d1
+	and.w	#$ffc0,d0		; zero the EA bits
+p1ext:	addq	#2,d2			; count the first ext word
+	bne	priv1			; no.
+psdone:	add.l	d2,18(sp)		; update PC for RTE
+	move.l	#$30004e71,pspace.w	; "move.w d0,<ea> / nop"
+* setup done; put the exception SR address in a0 and jsr to pspace
+	and.w	#%111,d0		; isolate register bits
 .ifne TT
-* if TT, need to clear caches after this instruction
 	cmp.w	#%101000000,d0		; look for mode 5
 .endc
-	movem.l	(sp)+,d0/a0
+p71ext:	addq	#2,d2			; count the first ext word
+	movem.l	(sp)+,d0-d2
+	lea.l	4(sp),a0
+	jsr	pspace
+	move.l	(sp)+,a0
 	bsr	clrcache
 .endif
-priv1:	movem.l	(sp)+,d0/a0
+priv1:	movem.l	(sp)+,d0-d2
+	move.l	(sp)+,a0
 .ifne TT
 	movem.l	8(sp),d0-d2		; get these off the stack now
 	jsr	pspace.w
@@ -2845,6 +2938,18 @@ dmab_to:
 * A simple backspace after the Nth one doesn't work because you may or may
 * not be on an N-column display, where the cursor is ALREADY on the
 * Nth one.  Sigh.
+* color cycling code: pulse with increasing blue
+
+.ifne TT
+	move.w	_frclock+2,d0		; get lo word of frame clock
+	lsr.w	#2,d0			; divide by 4 ('prox 1 sec cycle)
+	and.w	#$f,d0			; get just lo nybble
+	move.w	ttcolor0,d1
+	and.w	#$ff0,d1
+	or.w	d0,d1
+	move.w	d1,ttcolor0
+.endc
+
 	move.l	#$00010002,-(sp)
 	trap	#$d			; poll for char: Bconstat(2)
 	addq.l	#4,sp
@@ -2856,6 +2961,9 @@ nomt:
 	move.l	d7,_hz_200		; you broke out: write 90 sec
 * if (mt_done && _hz_200 >= d6)
 	trap	#$d
+.ifne TT
+	move.w	#bootcolor,ttcolor0
+.endc
 * this is the end of the memory-test/shrinking bar sequence.  We check
 .ifne TT
 * Check the keyboard for a user aborting the timeout
@@ -3013,7 +3121,7 @@ _rts:	rts
 .ifeq TT
 	dc.w	$fff			; 0 white
 .else
-	dc.w	$88f			; 0 blue - 6/16/90 version
+	dc.w	bootcolor		; 0 - boot color
 .endc
 *	Passed:		d1.l = offset
 *			a0 = base of pattern ($1f8 bytes long)
@@ -3299,8 +3407,8 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 
 
 
-* There is code to check _longframe and handle
-* long frames.  I hope it's true that RTE doesn't care what the offset
+*+
+* _critic - critical error handler binding for C
 * Falls-into:	_critich
 * (screwy way to save two bytes...)
 *
@@ -3313,8 +3421,11 @@ _critic:
 * Loads -1 into D0 and returns.
 *
 *-
+_critich:
+.ifeq ONLY_LONGFRAME
 	rts				; return to trap invoker
 
+.endc
 *+
 * trp13h - GEMDOS BIOS trap handler (trap 13)
 * trp14h - Atari BIOS extensions (trap 14)
@@ -3352,8 +3463,11 @@ _critic:
 * part of the format/offset word is, because I just push a zero.
 * 
 *-
+trp14h:	lea	trp14tab(pc),a0		; a0 -> trap14 jump table
+.ifeq ONLY_LONGFRAME
 trp13h:	lea	trp13tab(pc),a0		; a0 -> trap13 jump table
 
+.endc
 traph:	move.l	savptr,a1		; a1 -> register save area
 	move.w	(sp)+,d0		; pop SR and save it
 	move.w	d0,-(a1)		; (need in D0 for user-mode test)
@@ -3362,28 +3476,26 @@ traph:	move.l	savptr,a1		; a1 -> register save area
 .if (ONLY_LONGFRAME == 0)
 	tst.w	_longframe.w		; long frames?
 	beq	trap_1			; nope.
-*------ jump table for GEMDOS functions:
+.endif
+	tst.w	(sp)+			; drop the frame word off the stack
+.ifeq TT
+	movem.l	d3-d7/a3-a7,-(a1)	; save C registers + super stack
+	move.l	a1,savptr		; update save-area pointer
+
+.endc
+	btst	#13,d0			; was in user mode?
 	bne	b_supr			; (was in super: use super stack)
 	move.l	usp,a7			; use user stack
 b_supr:	move.w	(sp)+,d0		; get function#
 	cmp.w	(a0)+,d0		; out of range?
 	bge	b_exit			; (yes, so punt)
 	move.w	d0,d1
-.ifeq TT
-	dc.l	hdv_rw+$80000000	; 4: [indirect] disk read/write
+	lsl.w	#2,d1			; turn d1 into longword index
 	move.l	(a0,d1.w),d1		; get pointer to function handler
 .if (M68030 == 0)
-	dc.l	hdv_bpb+$80000000	; 7: [indirect] get BPB
+	move.l	d1,a0			; doesn't affect CC set by move above
 	bpl	b_1			; points to code
-	dc.l	hdv_mediach+$80000000	; 9: [indirect] media change inquiry
 .else
-	dc.l	tt_rw			; 4: disk read/write (see below)
-	dc.l	_setexc			; 5: set exception vector
-	dc.l	_tickcal		; 6: return tick calibration
-	dc.l	1+hdv_bpb		; 7: [indirect] get BPB
-	dc.l	bcostat			; 8: console status (output)
-	dc.l	1+hdv_mediach		; 9: [indirect] media change inquiry
-.endc
 * can't use high byte of address on M68030: use low bit instead.
 	bclr.l	#0,d1			; clear & test odd bit
 	move.l	d1,a0			; doesn't affect ccr!
@@ -4533,10 +4645,9 @@ cphbra:	bra	cphjmp
 *-
 	.globl	_GETBLT
 	.globl	_SETBLT
-* Uses Timer A of the TT MFP. (could use any timer in any MFP)
-* For documentation purposes, say, "Timer A of the TT MFP is used by
-* TOS to time short delays; it can be used anywhere outside TOS.
-* No initial state is assumed by TOS, and its state is not restored."
+
+Blitmode:
+	jsr	_TEST_BLT		; test for blit chip
 	move.w	d0,d4			; save blt chip status
 	move.w	d0,d5			; save blt chip status
 	lsr.w	#1,d5			; blit chip installed mask (0 or 1)
@@ -4548,7 +4659,7 @@ cphbra:	bra	cphjmp
 	and.w	d5,d0			; force to soft mode if no chip
 	or.w	d4,d0			; replace installed status
 	jsr	_SETBLT			; set blit mode
-*		(That's bit 5 of ipra or ttipra, depending.)
+
 Bmd_1:	move.w	d3,d0			; return "old" blit mode
 	rts
 
@@ -4587,17 +4698,12 @@ TB_e:	move.l	a1,8(a0)		; restore original bus error vector
 
 *
 * Timer routines for TT by AKP 2/16/89
-*
-* ttdelay sets up the timer & starts it counting down, then returns
-* while the timer's counting.  You can tell it timed out by checking
-* bit 5 of ipra: it becomes 1 when the time has expired.
-*
 * (Procedures used by other parts of the BIOS for timing delays.)
-WAITBIT		equ	5		; Timer A (TB is easy; others hard)
+*
 * Uses Timer C of the TT MFP. (could use any timer in any MFP).
 * For documentation purposes, say, "Timer C of the TT MFP is used by
 .ifne TT
-WAITREG		equ	ttipra
+*
 * USAGE:
 *
 *	ttwait	delays for a time specified in D0.W: the high
@@ -4608,23 +4714,27 @@ WAITREG		equ	ttipra
 *
 *	ttdelay	sets up the delay as for ttwait, but returns immediately.
 *		When the time has elapsed, WAITBIT of WAITREG gets set.
-	clr.b	tttacr			; stop the timer
-	rts				; and return
+*		(That's bit 5 of iprb or ttiprb, depending.)
 *		(The timer will run ad infinitum, but who cares?)
 *		(This is not actually used at this time.)
+*
 *	dowait	is either ttwait or stwait, for use during boot.
 *		Only TT can use ttwait after the boot; stwait uses
-	clr.b	tttacr			; stop timer
-	bclr.b	#WAITBIT,ttiera		; disable int
-	move.b	#NOTWAITBIT,ttipra	; clear pending
-	bclr.b	#WAITBIT,ttimra		; mask int
-	bset.b	#WAITBIT,ttiera		; enable int
+*		STMFP Timer A, which is a no-no after booting.
+*
+* This table will tell what values to use.  The "divider" column shows
+* the possible values for the divider and the division it yields.
+* The "units" column tells what size tick you get, which is also
+* the timeout value you'll see if you use a countdown of one.  The
+* "max" column is the length of a timeout if you use a countdown of zero
+* (which means 256).  (All values are rounded.)
+*
+*	 Divider	 Units		  Max
+*	--------	-------		--------
+*	1 (/4)		 1.6 us		416   us
+*	2 (/10)		 4   us		  1   ms
 *	3 (/16)		 6   us		  1.6 ms
-
-	move.b	d0,tttadr		; set data value
-	ror.w	#8,d0			; get mode byte into d0.b
-	move.b	d0,tttacr		; start the clock (mode from d0)
-	rol.w	#8,d0			; restore d0
+*	4 (/50)		20   us		  5   ms
 *	5 (/64)		26   us		  6.6 ms
 *	6 (/100)	40   us		 10   ms
 *	7 (/200)	80   us		 20   ms
@@ -4632,9 +4742,11 @@ WAITREG		equ	ttipra
 * This code works this way:
 *
 *	Stop the timer
-* after that.  You can use 200Hz for timing later, but its granularity
-* is crummy.  I can't think of a good solution.
+*	Disable the interrupt
 *	Clear the pending bit
+*	Mask the interrupt
+*	Enable the interrupt
+*	Load the timer's prescale register with the appropriate value
 *	Set the timer's mode (starts the timer)
 *
 * The interrupt is enabled but masked so the first time the timer
@@ -4783,25 +4895,15 @@ clr4:	movem.l	(sp)+,d3-d7/a3		; restore registers
 * $0 through $E hold "direct map, cache enable" page descriptors.
 * $F holds a "direct map, cache inhibit" page descriptor.
 * 
-.bss
-.align $10
-levelA:		ds.b	$40
-levelB1:	ds.b	$40
-levelB2:	ds.b	$40
-levelC:		ds.b	$40
-rootptr:	ds.b	$8
-	
+* There is no level D table: the translation will never get that far
+* before reaching a page descriptor.  However, D level is used, to mark
+* the five bits you add to the 32K page size for a total mapping
+* granularity of 1MB.
+* 
+* There is only one root pointer, and we don't use the function code
+* same mapping as the full table) but quicker and without touching the
 * ATC. TT0 is set up to map %0xxx xxx1 addresses with cache enabled, and
 * TT1 transparently maps %1xxx xxx0 addresses with cache inhibited. 
-*
-* Ensure 16-byte alignment of all tables.  This only works if this source
-* file is in the source file with the first text segment of the
-* link. Each table has to be on a 16-byte boundary; alignment of other
-* things doesn't matter, as they are just moved into PMMU registers.
-*
-* Even that won't matter in RAM TOS unless the BSS ends up aligned.
-*
-
 * These handle (primarily) TT fast RAM, and the first 16MB of
 * non-cacheable VME space.  Other megabytes happen to be lumped in there,
 * too, but those are the main targets.  TT1 might be re-used to map %0xxx
@@ -4874,12 +4976,12 @@ _levelA:
 	dc.l	$d0000000+%01000001	; $D - cache inhibit
 	dc.l	$e0000000+%01000001	; $E - cache inhibit
 	dc.l	levelB2+%0010		; translates $F nybble
+
+_levelB1:
 	dc.l	levelC+%0010		; translates $00 byte
 	dc.l	$01000000+%00000001	; $01 - cacheable
 	dc.l	$02000000+%00000001	; $02 - cacheable
 	dc.l	$03000000+%00000001	; $03 - cacheable
-tabsize	equ	*-_levelA
-
 	dc.l	$04000000+%00000001	; $04 - cacheable
 	dc.l	$05000000+%00000001	; $05 - cacheable
 	dc.l	$06000000+%00000001	; $06 - cacheable
@@ -4908,7 +5010,7 @@ _levelB2:
 	dc.l	$fb000000+%01000001	; $fb - inhibit
 	dc.l	$fc000000+%01000001	; $fc - inhibit
 
-	pmove	rootptr,crp
+_levelC:
 	dc.l	$00000000+%00000001	; $000/ff0 - enable
 	dc.l	$00100000+%00000001	; $000/ff1 - enable
 	dc.l	$00200000+%00000001	; $000/ff2 - enable

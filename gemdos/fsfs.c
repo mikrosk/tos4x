@@ -1,151 +1,19 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.5 $	$Source: /u2/MRS/osrevisions/gemdos/fsfs.c,v $
+* $Revision: 2.6 $	$Source: fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:41:17 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:04 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
-* Revision 2.5  90/08/03  13:41:17  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.4  90/05/21  12:51:55  apratt
-* Added call to flushall() in ixclose rather than having knowledge of
-* the buffer structure here.
-* 
-* Revision 2.3  89/04/17  17:14:26  kbad
-* YA header change
-* 
-* Revision 2.2  89/03/31  04:10:33  kbad
-* Don't allow Dcreate to clobber existing file (in ixcreat).
-* 
-* Revision 2.1  89/02/21  17:19:38  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.9  89/02/21  15:22:19  kbad
-* Fixed write of tmpofd (should have been &tmpofd.o_time).
-* 
-* Revision 1.8  89/02/21  12:29:28  apratt
-* Fixed a bug: in close, strtcl & fileln were swapped, written, and
-* un-swapped.  If the write failed, they stayed swapped.  Now they're
-* copied to a temp OFD (with time & date), swapped, and the temp one
-* is written.
-* 
-* Also changed/sped up the attribute byte stuff, by using ixread's
-* trick of returning a pointer to the byte in question in the disk buffers.
-* 
-* Revision 1.7  88/10/11  15:49:20  apratt
-* Added code to handle create of volume labels: deny if not in root dir,
-* and delete any other volume label when you create one.  This works
-* fine, and lets you create a volume label with the same name as a file,
-* or vice-versa, with impunity.  Also, the old-style trick of using
-* Fcreate("label",0); Fdelete("label"); Fcreate("newlabel",8) still works.
-* (The create/delete pair is useless, but harmless.)
-* 
-* Revision 1.6  88/10/10  19:06:11  apratt
-* Return EACCDN when using Fattrib to set label bit.
-* (Used to allow labels but not subdirs or other illegal bits.
-* Now labels are totally out of the purview of the OS, except Fsfirst.)
-* 
-* Revision 1.5  88/09/12  11:55:35  apratt
-* Found & killed a bug: Frename("c:\\foo\\x","c:\\") failed BADLY.
-* Note no filename after the target c:\.  Now this case is checked.
-* The greater symptom is that there should be better validity checking
-* of pathnames and filenames.
-* 
-* Revision 1.4  88/08/08  17:41:02  apratt
-* Added call to sftprobe() before Fcreate goes too far.. Before, it
-* created the file, THEN said it was out of handles.
-* 
-* Revision 1.3  88/06/13  15:06:10  apratt
-* Header style change
-* 
-* Revision 1.2  88/05/02  12:43:44  apratt
-* Added dirty test before calling flush in close, so clean buffers don't
-* get invalidated.  The only place where clean buffers need to be
-* invalidated is when a multi-sector write overlaps one, and that happens
-* only in xrw.
-* 
-* Revision 1.1  88/04/26  14:48:20  apratt
-* Version used 4/22/88 to make test ROMs, PLUS Frename bug fix.
+* Revision 2.6  91/01/23  14:30:04  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
 *
 *************************************************************************
 */
 
-/****************************************************************************\
-* 									     *
-* GEMDOS File System File Operations					     *
-* (C)1986 Atari Corp.							     *
-* 									     *
-* ---- Edit history (reverse order, please): ------------------------------  *
-* 									     *
-* 19-Apr-1988 akp	Fixed directory rename code (didn't work when the    *
-*			dir in question was not in the current directory).   *
-* 18-Apr-1988 akp	Fixed Fdatime code -- much better now.		     *
-* 23-Mar-1988 akp	Now I realize why the volume label is so strange:    *
-*			it's not in the same namespace as the files.  That's *
-*			why you can't change it, delete it, or un-label that *
-*			file: it might collide with an existing file of the  *
-*			same name!  So:					     *
-*			* back out deny of Fcreate of same name as label.    *
-*			* back out allowing Fattrib of label.		     *
-*			* leave in allowing Fattrib to SET label attr if     *
-*			  it's the only bit set, and finding the label if    *
-*			  that's the only bit in Fsfirst.		     *
-* 22-Mar-1988 akp	Deny Fcreate of file with same name as volume label. *
-*			Deny xchmod changes to subdirs and those which set   *
-*			the subdir bit.  Recoded to allow changes to all     *
-*			other files (incl. volume label).  Now returns mode  *
-*			of subdirs, rather than saying "file not found".     *
-*			Also deny if 0x80 is set and isn't the only bit.     *
-*			Fixed fatfinger: attr |= FA_ARCHIVE not = in ixcreat *
-* 11-Mar-1988 akp	BUG in xrename -- allows you to rename a file to the *
-*			same name as a folder! (True in old roms) -- fixed.  *
-*			Added drename into this file.			     *
-* 10-Mar-1988 akp	Added check for Frename of a directory -- call	     *
-*			drename(oldpath, newname) if so.		     *
-* 29-Feb-1988 akp	Fixed ixdel so it stops clearing FAT entries at (and *
-*			leaves untouched) values in [fff0..fffe], to leave   *
-*			bad-sector marks which have crept into files.        *
-* 18-Feb-1988 akp	Fixed Fdatime so it doesn't swap the user's input    *
-*			when setting. (Used to leave user's input swapped.)  *
-* 17-Feb-1988 akp	Lintified.					     *
-*			Bug: xrename doesn't check return code from xcreat.  *
-* 03-Feb-1988 akp	Cleaned up REG declarations.			     *
-*			Replaced ixwrite with a macro.			     *
-* 01-Feb-1988 akp	Backed out O_WRITTEN code.  Now archive bit is set   *
-*			in directory only when O_DIRTY was set previously,   *
-*			which is when length or start cluster changed.	     *
-*			If this works, I may set O_DIRTY on any write.	     *
-* 12-Jan-1988 akp	Removed panics: MGET panics when it fails.	     *
-* 02-Dec-1987 akp	Backed out 0xfff0..0xffff check because		     *
-*			root directory "clusters" fall in this range!  What  *
-*			a lose!  Just don't change nonzero FAT entries	     *
-*			to anything fff0..ffff!				     *
-* 13-Oct-1987 akp	Changed check for -1 in cluter to check for any	     *
-*			special FAT value ([0xfff0..0xffff]).		     *
-* 11-Oct-1987 akp	Reversed order of flush in ixclose to flush data     *
-*			before FAT buffers.				     *
-* 22-Oct-1987 akp	Lintified.					     *
-* 13-Oct-1987 akp	Added check: don't set ARCHIVE bit if subdirectory.  *
-* 07-Oct-1987 akp	Added check of return from ixdel in ixcreate.	     *
-*			THIS FIXES THE DUPLICATE-FILE BUG.		     *
-* 25-Sep-1987 akp	Added newcl flag setting to all cluster call loops.  *
-* 22-Sep-1987 akp	Added setting O_WRITTEN flag in ixwrite, and	     *
-*			checking that in ixclose.  If O_WRITTEN, ixclose     *
-*			sets the ARCHIVE bit in the attribute byte.	     *
-* 21-Sep-1987 akp	Added setting of FA_ARCHIVE bit for file create.     *
-* 17-Jan-1986 lmd	Commented and prettified from Digital Research	     *
-* 			source code.					     *
-* 30-Jan-1986 lmd	Broken out from old FS.C			     *
-* 									     *
-\****************************************************************************/
-
 #include "fs.h"
-#include "gemerror.h"
-#include "fsdecl.h"
-
 
 /*
 	Error returns
@@ -160,19 +28,13 @@ NOTE:	I'm not sure that returning immediatly upon an error from ixlseek()
 */
 
 long
-ixclose(x_fd, part)
-OFD *x_fd;			/* file to close */
+ixclose(fd, part)
+OFD *fd;			/* file to close */
 int part;			/* flags */
 {
-  REG OFD *fd;
   REG OFD *p;
   REG OFD **q;
-  REG long tmp;
-  REG int i;
-  BCB *b;
   OFD tmpofd;
-
-  fd = x_fd;
 
   /*
    *  Update FCB in directory if the file length
@@ -256,13 +118,10 @@ int part;			/* flags */
  *
  */
 OFD
-*makofd(x_p)
-DND *x_p;
+*makofd(p)
+DND *p;
 {
-  REG DND *p;
   REG OFD *f;
-
-  p = x_p;
 
   f = MGET(OFD);		/* panics when it fails */
       f->o_strtcl = p->d_strtcl;
@@ -284,17 +143,12 @@ DND *x_p;
  *
  */
 long
-ixread(x_p, x_len, ubufr)
-OFD *x_p;		/* open file */
-long x_len;		/* #bytes to read */
-char *ubufr;		/* -> user buffer */
+ixread(p, len, ubufr)
+OFD *p;			/* open file */
+long len;		/* #bytes to read */
+void *ubufr;		/* -> user buffer */
 {
-  REG OFD *p;
-  REG long len;
   REG long maxlen;
-
-  p = x_p;
-  len = x_len;
 
   /*
    *  Make sure file not opened mode=1 (write-only)
@@ -323,7 +177,7 @@ long
 ixwrite(p, len, ubufr)
 OFD *p;				/* open file */
 long len;			/* #bytes to write */
-char *ubufr;			/* -> user buffer */
+void *ubufr;			/* -> user buffer */
 {
   return xrw(1, p, len, ubufr, usr2xfr);
 }
@@ -333,18 +187,15 @@ char *ubufr;			/* -> user buffer */
  *
  */
 long
-makopn(x_f, dn, h, mod)
-FCB *x_f;		/* raw FCB */
+makopn(f, dn, h, mod)
+FCB *f;			/* raw FCB */
 DND *dn;		/* directory file is in */
 int h;			/* handle number to use */
 int mod;		/* open mode */
 {
-  REG FCB *f;
   REG OFD *p;
   OFD *p2;
   REG DMD *dm;
-
-  f = x_f;
 
   dm = dn->d_drv;
 
@@ -511,8 +362,8 @@ char attr;
   ixwrite(fd, 11L, a);		/* write name, set dirty flag */
   ixclose(fd, CL_DIR);		/* partial close to flush dirty dir sector */
   ixlseek(fd, pos);
-  s = ixread(fd, 32L, NULPTR);
-  f2 = rc = opnfil(s, dn, (f->f_attrib & FA_RO) ? 0 : 2);
+  s = (char *)ixread(fd, 32L, NULPTR);
+  f2 = rc = opnfil((FCB *)s, dn, (f->f_attrib & FA_RO) ? 0 : 2);
 
   if (rc < 0)
     return(rc);
@@ -940,7 +791,6 @@ char *s2;	/* new name (just the name part) */
 {
     char buf[20];
     char *s;
-    REG int i;
     DND *d;
 
     if (eordot(s2,'\0')) return EBADRQ;
@@ -1000,20 +850,15 @@ long n;
   */
 
 long
-ixlseek(x_p,x_n)
-OFD *x_p;
-long x_n;
+ixlseek(p,n)
+OFD *p;
+long n;
 {
-  REG OFD *p;
-  REG long n;
   int curnum,curflg;
   REG int clnum;
   REG int clx;
   REG int i;
   REG DMD *dm;
-
-  p = x_p;
-  n = x_n;
 
   if (n > p->o_fileln)
     return(ERANGE);
@@ -1067,4 +912,3 @@ long x_n;
 
   return(n);
 }
-

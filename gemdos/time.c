@@ -1,50 +1,19 @@
 /*
 ***************************     TIME.C     ******************************
 *
-* $Revision: 2.3 $	$Source: /u2/MRS/osrevisions/gemdos/time.c,v $
+* $Revision: 2.4 $	$Source: time.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:42:56 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: time.c,v $
-* Revision 2.3  90/08/03  13:42:56  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.2  89/04/17  17:15:56  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:22:49  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.2  88/06/13  15:07:05  apratt
-* Header style change
-* 
-* Revision 1.1  88/04/26  14:48:31  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.4  91/01/23  14:30:40  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
 
-/****************************************************************************\
-* 									     *
-* GEMDOS Time and Date Functions					     *
-* (C)1986 Atari Corp.							     *
-* 									     *
-* ---- Edit history (reverse order, please): ------------------------------  *
-* 									     *
-* 03-Feb-1988 akp	Changed some register declarations.		     *
-* 03-Dec-1987 akp	Added calls to 'upd_tod()' to update the BIOS's	     *
-*			clocks when Tsettime() / Tgettime() are called.	     *
-* 17-Jan-1986 lmd	Commented and prettified from Digital Research	     *
-* 			source code.					     *
-* 									     *
-\****************************************************************************/
 #include "fs.h"
-#include "gemerror.h"
-
-extern unsigned int time, date;		/* declared in fs.c */
-extern int nday[];			/* declared in sup.c */
-
 
 /*
  * Get Date.

@@ -1,119 +1,22 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.9 $	$Source: /u2/MRS/osrevisions/gemdos/mem.c,v $
+* $Revision: 2.10 $	$Source: mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:42:12 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:22 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
-* Revision 2.9  90/08/03  13:42:12  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.8  90/05/21  12:52:30  apratt
-* Old Alcyon doesn't implement unsigned long, so I had to implement it
-* by hand in freeit() for sorting the free list based on address: 
-* legitimate RAM addresses (i.e. A24/D16 VME RAM) can be signed-negative.
-* 
-* Revision 2.7  90/04/30  15:32:40  apratt
-* Added a check to QUANTize the block passed in to xmaddalt.
-* 
-* Revision 2.6  90/04/24  11:00:48  apratt
-* Changed from the two-pmd system for alt. RAM to a single PMD. The
-* low bit of the start address is 1 for alt. RAM.  Removed use of rover.
-* Added QUANTUM (compile-time constant) for rounding initial blocks
-* and requests to word, long, or MMU-page-size boundaries.  Added xmfreeall,
-* used by ixterm, and xaddalt, a user call for adding alt. RAM.
-* 
-* Revision 2.5  89/12/27  14:42:29  apratt
-* Split code which handles the second discontiguous memory block out
-* to be compiled only ifdef FASTRAM.
-* 
-* Revision 2.4  89/07/31  18:08:26  apratt
-* Previous rev had FASTBASE at 00200000, for testing on a 4M machine.
-* This rev has it at 01000000 as TT requires.
-* 
-* Revision 2.3  89/07/18  14:07:09  apratt
-* Added code to handle two noncontiguous RAM blocks and p_hflags.
-* 
-* Revision 2.2  89/04/17  17:15:08  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:21:19  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.3  88/09/01  15:59:41  apratt
-* Added new function xmchown(block,pid) which changes the
-* owner of a block, when all you know is its starting address.
-* Used by Pexec mode 6 (which is what mode 4 should have been).
-* 
-* Revision 1.2  88/06/13  15:06:39  apratt
-* Header style change
-* 
-* Revision 1.1  88/04/26  14:48:26  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.10  91/01/23  14:30:22  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
 
-/* mem.c */
-
-/***************************************************************************\
-* 									     *
-* GEMDOS TPA management							     *
-* (C)1986 Atari Corp.							     *
-* 									     *
-* ---- Edit history (reverse order, please): ------------------------------  *
-* 									     *
-* 15-Apr-1988 akp	Fixed a fatfinger: xsetblk which didn't shrink any   *
-*			actually caused the block to be freed!  Fixed now.   *
-* 09-Mar-1988 akp	Changed MGET(MD) to getsmall().			     *
-* 03-Mar-1988 akp	Split ospool code out to pool.c			     *
-* 23-Feb-1988 akp	Added test for zero return from xmgetblk in xsetblk. *
-* 22-Feb-1988 akp	Started backing out Malloc changes.  OSPool blocks   *
-*			are now of two sizes, not one.			     *
-* 18-Feb-1988 akp	Lintified.					     *
-* 03-Feb-1988 akp	Changed some register declarations.		     *
-* 12-Dec-1988 akp	Removed panics except in mget().		     *
-* 29-Dec-1987 akp	Added callno placement in low byte of word before    *
-*			an OSPOOL block.  High byte is block size.	     *
-* 21-Dec-1987 akp	Added panic in xminit for badly-formed initial mpb.  *
-* 17-Dec-1987 akp	Changed again so free blocks have critical info in   *
-*			the *middle* of the block.  Microsoft Write and	     *
-*			First Word (Plus?) failed when critical info was     *
-*			at the end.					     *
-* 18-Nov-1987 akp	Changed scheme so free blocks have the pointer info  *
-*			at the *end* so overflowing an allocated block is    *
-*			less likely to do damage and critical information    *
-*			is clustered (free-block info is immediately	     *
-*			followed by allocated-block info).		     *
-*			Specifically, there is a bug in the desktop which    *
-*			copies more than the number of bytes allocated	     *
-*			(in app_rdicon, the call to rom_ram(4,...)).	     *
-*			Also add sanity checks for critical info (-DSANITY). *
-*			Beartrap below removed: it stopped happening or I    *
-*			fixed it; I can't remember which.		     *
-* 02-Nov-1987 akp	Added beartrap in ffit: mem blk points to itself!    *
-*			Find out how this can happen!			     *
-* 15-Oct-1987 akp	Added freleaf call to xmgetblk.			     *
-* 13-Oct-1987 akp	Added entry point for xmunhook, called by xtermres.  *
-*    Oct-1987 akp	Changed Malloc to use TPA for its structures.        *
-*			Added xminit entry to initialize this (called by     *
-*			cinit()).					     *
-* 29-Sep-1987 akp	Split process routines out to proc.c.		     *
-*			Added code to make all ospool requests the same size *
-*			(as computed in fs.h -- the max of pool structs).    *
-* 17-Jan-1986 lmd	Commented and prettified from Digital Research	     *
-* 			source code.					     *
-* 									     *
-\****************************************************************************/
 #include "fs.h"
-#include "fsdecl.h"
-#include "gemerror.h"
 
 
 MPB pmd;
-extern PD *run;
 
 /************************************************************************
  *									*
@@ -191,10 +94,10 @@ This code gets rid of the dumb "rover" idea.  What a dog!
  * initialize memory allocator
  */
 
+void
 xminit()
 {
 REG MD *p;
-REG MD **q;
 REG long s;
 REG long adjust;
 
@@ -342,16 +245,13 @@ REG int fval;
  * Shrink an allocated block.
  */
 long
-xsetblk(n,blk,x_len)
+xsetblk(n,blk,len)
 int n;
-char *blk;
-long x_len;
+void *blk;
+long len;
 {
 REG	MD *m;
 REG	MD *p;
-REG	long len;
-
-	len = x_len;
 
 /*
  * Traverse the list of memory descriptors looking for this block.
@@ -405,18 +305,16 @@ found:
 /*
  * Free block of TPA memory.
  */
-freeit(x_m,mp)
-MD *x_m;
+void
+freeit(m,mp)
+MD *m;
 MPB *mp;
 {
-REG	MD *m;
 REG	MD *p;
 REG	MD **q;
 	MD *p1;
-REG	long ptemp;
-REG	long mtemp;
+REG	void *mtemp;
 
-	m = x_m;
 	p1 = 0;		/* this is p's prev */
 
 	/*
@@ -427,18 +325,11 @@ REG	long mtemp;
 	 * The "start" field may be odd for alt RAM.  That
 	 * won't hurt anything, and is preserved even through
 	 * the coalescing phase.
-	 *
-	 * Addresses are unsigned!  Since the old Alcyon compiler
-	 * (4.0 something) doesn't implement unsigned long, we have
-	 * to fake it... Sigh. (5/90)
 	 */
 
 	mtemp = m->m_start;
 	for (p = *(q = &mp->mp_mfl); p ; p1=p, p = *(q = &p->m_link)) {
-	    ptemp = p->m_start;
-	    if ((ptemp > 0) && (mtemp > 0) && (mtemp < ptemp)) break;
-	    else if ((ptemp < 0) && (mtemp > 0)) break;
-	    else if ((ptemp < 0) && (mtemp < 0) && (mtemp < ptemp)) break;
+	    if (mtemp < p->m_start) break;	/* relies on unsigned compare */
 	}
 
 	m->m_link = p;
@@ -501,8 +392,8 @@ int mode;
     if (amount == -1L) return mbiggest(&pmd,mode);
     else {
 	ret = ffit(amount,&pmd,mode);
-	if (ret != NULPTR) return UNFLAG(ret->m_start);
-	else return NULPTR;
+	if (ret != NULPTR) return (long)UNFLAG(ret->m_start);
+	else return (long)NULPTR;
     }
 }
 
@@ -530,7 +421,7 @@ long amount;
  */
 long
 xmfree(addr)
-long addr;
+void *addr;
 {
 REG	MD *p;
 REG	MD **q;
@@ -555,6 +446,7 @@ found:
  * this is called by xtermres.
  */
 
+void
 xmunhook(pid)
 PD *pid;
 {
@@ -578,6 +470,7 @@ PD *pid;
  * This is called by ixterm.
  */
 
+void
 xmfreeall(pid)
 PD *pid;
 {
@@ -604,14 +497,12 @@ PD *pid;
  * Pexec mode 6 (which is "just go" as God intended it to be).
  */
 
-xmchown(x_blk,pid)
-char *x_blk;
+void
+xmchown(blk,pid)
+void *blk;
 PD *pid;
 {
     REG MD *m;
-    REG char *blk;
-
-    blk = x_blk;
 
     for (m = pmd.mp_mal; m; m = m->m_link) {
 	if (UNFLAG(m->m_start) == blk) {
@@ -630,7 +521,7 @@ PD *pid;
 
 long
 xaddalt(blk,siz)
-char *blk;
+void *blk;
 long siz;
 {
     REG MD *m;

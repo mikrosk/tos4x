@@ -1,12 +1,15 @@
 /*
 ***************************   GEMERROR.H   ******************************
 *
-* $Revision: 2.3 $	$Source: /u2/MRS/osrevisions/gemdos/gemerror.h,v $
+* $Revision: 2.4 $	$Source: gemerror.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:42:05 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:20 $    $Locker:  $
 * =======================================================================
 *
 * $Log: gemerror.h,v $
+* Revision 2.4  91/01/23  14:30:20  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 * Revision 2.3  90/08/03  13:42:05  apratt
 * TTOS FINAL RELEASE
 * 
@@ -25,16 +28,16 @@
 *
 * =======================================================================
 *
-* $Revision: 2.3 $
+* $Revision: 2.4 $
 * =======================================================================
 *
-* $Source: /u2/MRS/osrevisions/gemdos/gemerror.h,v $
+* $Source: gemerror.h,v $
 * =======================================================================
 *
 *************************************************************************
 */
 
-/* standard error numbers for GEMDOS /
+/* standard error numbers for GEMDOS */
 
 /* BIOS level errors */
 

@@ -1,77 +1,29 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.3 $	$Source: /u2/MRS/osrevisions/gemdos/fshand.c,v $
+* $Revision: 2.4 $	$Source: fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:41:29 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:08 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
-* Revision 2.3  90/08/03  13:41:29  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.2  89/04/17  17:14:36  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:20:12  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.5  88/10/11  13:23:12  apratt
-* Added a guard against Fforce()-ing to an invalid handle.
-* 
-* Revision 1.4  88/10/05  13:03:40  apratt
-* In xclose, there's a pointer being used as shorthand.
-* I did it wrong when closing a "standard" handle (0-5).
-* Now it's right.
-* 
-* Revision 1.3  88/08/08  17:40:00  apratt
-* Added sftprobe() to remove duplicate code, and fixed a range check
-* in getofd().
-* 
-* Revision 1.2  88/06/13  15:06:20  apratt
-* Header style change
-* 
-* Revision 1.1  88/04/26  14:48:22  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.4  91/01/23  14:30:08  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
 
-/****************************************************************************\
-* 									     *
-* GEMDOS File System Handle Operations					     *
-* (C)1986 Atari Corp.							     *
-* 									     *
-* ---- Edit history (reverse order, please): ------------------------------  *
-* 									     *
-* 18-Apr-1988 akp	Made getofd into a function again, added check.	     *
-* 22-Mar-1988 akp	Fixed zero-length-write-never-returns bug (and read) *
-* 03-Feb-1988 akp	Changed some register declarations, getofd -> macro. *
-* 01-Feb-1988 akp	Added "p->o_flag |= O_DIRTY" to xwrite, for	     *
-*			archive bit handling.				     *
-* 12-Jan-1988 akp	Fixed Fclose: when closing a standard handle, it     *
-*			reverts to the BIOS device, not 0.		     *
-* 17-Jan-1986 lmd	Commented and prettified from Digital Research	     *
-* 			source code.					     *
-* 30-Jan-1986 lmd	Broken out from old FS.C			     *
-* 									     *
-\****************************************************************************/
-
 #include "fs.h"
-#include "gemerror.h"
-#include "fsdecl.h"
 
 /*
  * Return a valid handle;
  * if the handle refers to standard device,
  * return what the handle really refers to.
  */
-syshnd(x_h)
-int x_h;
+int
+syshnd(h)
+int h;
 {
-	REG int h;
-
-	h = x_h;
 	if ((h >= NUMSTD) ||
 	    ((h = run->p_uft[h]) > 0))
 		h -= NUMSTD;
@@ -112,7 +64,7 @@ int h;
 	if ((h = run->p_uft[h]) > 0)
 		fptr->f_ofd = sft[h-NUMSTD].f_ofd;
 	else
-		fptr->f_ofd = (long) h;
+		fptr->f_ofd = (OFD *) h;
 
 	fptr->f_use = 1;
 
@@ -132,19 +84,12 @@ int std,h;
 
 
 long
-ixforce(x_std,x_h,x_p)	/* h   must NOT be a standard handle */
-PD *x_p;		/* std must	be a standard handle */
-int x_std;
-int x_h;
+ixforce(std,h,p)	/* h   must NOT be a standard handle */
+PD *p;			/* std must	be a standard handle */
+int std;
+int h;
 {
-	REG PD *p;
-	REG int std;
-	REG int h;
 	REG long fh;
-
-	p = x_p;
-	std = x_std;
-	h = x_h;
 
 	if ((std < 0) || (std >= NUMSTD))
 		return(EIHNDL);
@@ -158,7 +103,7 @@ int x_h;
 
 		if (!getofd(h)) return (EIHNDL);	/* AKP 10/88 */
 
-		if ((fh = sft[h-NUMSTD].f_ofd) < 0L)
+		if ((fh = (long)(sft[h-NUMSTD].f_ofd)) < 0L)
 			p->p_uft[std] = fh;
 		else
 		{
@@ -245,7 +190,7 @@ long
 xread(h,len,ubufr) /*+ read len (long) bytes from handle h */
 int h;
 long len;
-char *ubufr;
+void *ubufr;
 {
 REG	OFD	*p;
 
@@ -271,7 +216,7 @@ long
 xwrite(h,len,ubufr) /*+ write len (long), handle h, buffer */
 int h;
 long len;
-char *ubufr;
+void *ubufr;
 {
 REG	OFD	*p;
 
@@ -318,6 +263,7 @@ int mod;
 	return(makopn(f, dn, h, mod));
 }
 
+int
 sftprobe()
 {
     REG int i;
@@ -328,4 +274,3 @@ sftprobe()
 	    return i;
     return -1;
 }
-

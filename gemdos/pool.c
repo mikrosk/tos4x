@@ -1,71 +1,17 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.8 $	$Source: /u2/MRS/osrevisions/gemdos/pool.c,v $
+* $Revision: 2.9 $	$Source: pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:42:23 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
-* Revision 2.8  90/08/03  13:42:23  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.7  90/04/24  11:04:53  apratt
-* Changed back to single-pmd memory model, and removed rover code.
-* There is no rover any more.
-* 
-* Revision 2.6  90/01/02  18:05:27  apratt
-* Fixed compact (at last!) - marking of vacated slot was wrong
-* (marked the slot it was vacated TO!).
-* 
-* Revision 2.5  89/12/27  14:43:16  apratt
-* Split code which handles the second discontiguous memory block out
-* to be compiled only ifdef FASTRAM.
-* 
-* Revision 2.4  89/12/21  14:19:56  apratt
-* Fixed another bug, not serious but bad: 'advance' didn't check to see
-* if a block was cut before treating it as such.  Fortunately, it would
-* have to find 0x00000001 in a field, which is a little unlikely in
-* most big-block structs.  Also, after calling mdmove, the slot which 
-* was vacated should have its m_own set to 1, not 0 (fixed).
-* 
-* Revision 2.3  89/12/20  18:00:44  apratt
-* Fixed two BIG BUGS in this file.
-* First, it could move the MD which the pmd's rover pointed to,
-* causing infinite loops and other fun things.  Second, it didn't
-* look on the fast-RAM lists (pmdfast) when looking for the md's
-* it was moving.  Both fixed.
-* 
-* Revision 2.2  89/04/17  17:15:19  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:21:35  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.3  88/07/06  10:14:13  apratt
-* Removed incorrect '&' operator from "clear block before returning it"
-* code.  Don't know why this ever compiled.  It worked before, and
-* there's probably no change to the compiler output.  Aztec C caught it.
-* 
-* Revision 1.2  88/06/13  15:06:47  apratt
-* Header style change
-* 
-* Revision 1.1  88/04/26  14:48:28  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.9  91/01/23  14:30:26  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
-
-/***********************************************************************\
-* 									*
-* GEMDOS OSpool management						*
-* (C)1986 Atari Corp.							*
-* 									*
-* ---- Edit history (reverse order, please): ---------------------------*
-* 									*
-* 03-Mar-1988 akp	Started this new ospool allocator.		*
-*									*
-\***********************************************************************/
 
 /***********************************************************************
 
@@ -106,8 +52,6 @@ and extra checking.
 **********************************************************************/
 
 #include "fs.h"
-#include "fsdecl.h"
-#include "gemerror.h"
 
 #ifdef POOLDEBUG
 
@@ -120,29 +64,7 @@ int _debug = 0;
 
 #endif POOLDEBUG
 
-struct block {
-    struct block *b_next;	/* next block in the heap */
-    char b_type;		/* see Bis* predicates below */
-    char b_callno;		/* used only if the block is big */
-    union {
-	char b_big[64];		/* either one big block, or... */
-	MD b_mem[4];	/* four small blocks */
-				/* if m_own is 1, little block is free */
-    } b_data;
-};
-
-#define LSIZE sizeof(struct block)
-#define HEADSIZE 6		/* size of header before data */
-
-/* btype predicates */
-
-#define Bisfree(bp) ((bp)->b_type == 0)		/* big and free */
-#define Bisused(bp) ((bp)->b_type < 0)		/* big but used */
-#define Biscut(bp)  ((bp)->b_type > 0)		/* cut up (have to check */
-						/* free-ness individually) */
-#define Bmakefree(bp) ((bp)->b_type = 0)
-#define Bmakeused(bp) ((bp)->b_type = -1)
-#define Bmakecut(bp)  ((bp)->b_type = 1)
+/* struct block and Bis* predicates and Bmake* actions are in fs.h */
 
 char *root[20];			/* still used so people can give us pool */
 
@@ -152,12 +74,7 @@ struct block *blockhead;	/* head of list of blocks in the system */
 
 char osmem[LENOSM];
 
-/* forward declarations */
-
-struct block *compact(), *newpool();
-MD *advance();
-char *freleaf();
-
+void
 poolinit()
 {
     Debug("print Enter xminit");
@@ -170,17 +87,12 @@ poolinit()
  * addheap: cut a chunk of memory into big blocks.
  */
 
-addheap(x_ptr,x_size)
-struct block *x_ptr;
-long x_size;
+void
+addheap(ptr,size)
+void *ptr;
+long size;
 {
-    REG struct block *ptr;
-    REG long size;
-    REG struct block *p;
-    REG int i;
-
-    ptr = x_ptr;
-    size = x_size;
+    struct block *bp = ptr;
 
     Debug("print Enter addheap ptr: `a5 size: `d7");
 
@@ -190,12 +102,12 @@ long x_size;
     Debug("print addheap: rounded size is `d7");
 
     while (size) {
-	ptr->b_next = blockhead;
-	blockhead = ptr;
-	Bmakefree(ptr);
+	bp->b_next = blockhead;
+	blockhead = bp;
+	Bmakefree(bp);
 	size -= LSIZE;
 	Debug("print addheap block at `a5");
-	ptr++;
+	bp++;
     }
 
     Debug("print addheap returns");
@@ -216,7 +128,7 @@ long x_size;
  *
  ***********************************************************************/
 
-struct _dnd
+DND
 *getbig()
 {
     REG struct block *ptr;
@@ -269,7 +181,7 @@ struct _dnd
     
     Debug("print Last resort: call freleaf");
 
-    if (ptmp = freleaf()) {
+    if (ptmp = (char *)freleaf()) {
 	ptr = (struct block *)(ptmp-HEADSIZE);
 	goto gotone;
     }
@@ -288,10 +200,10 @@ gotone:
 
     /* clear block before returning it */
 
-    for (ptmp = &(ptr->b_data); ptmp < (ptr+1); ptmp += 4)
+    for (ptmp = (char *)(&(ptr->b_data)); ptmp < (char *)(ptr+1); ptmp += 4)
     	*(long *)ptmp = 0L;
 
-    return (char *)(&ptr->b_data);
+    return (DND *)(&ptr->b_data);
 }
 
 /************************************************************************
@@ -411,7 +323,7 @@ MD
     /* there was no more pool */
     
     Debug("print newpool struck out");
-    if (ptmp = freleaf()) {
+    if (ptmp = (char *)freleaf()) {
 	Debug("print -n Freleaf worked!");
 	ptr = (struct block *)(ptmp-HEADSIZE);
 	goto cutit;
@@ -433,7 +345,10 @@ cutit:
 
 gotmd:
     /* clear block before returning it (incidentally marks as not free) */
-    md->m_link = md->m_start = md->m_length = md->m_own = 0L;
+    md->m_link = NULPTR;
+    md->m_start = NULPTR;
+    md->m_length = 0;
+    md->m_own = NULPTR;
 
     return md;
 }
@@ -577,25 +492,19 @@ notdone:
  * These are the four list headers which the md might be on
  */
 
-extern MPB pmd;
-
 static MD **mplist[] = {
     &pmd.mp_mfl, &pmd.mp_mal
 };
 #define MPLSIZE (sizeof(mplist)/sizeof(MD **))
 
-mdmove(x_target,x_dest)
-MD *x_target, *x_dest;
+void
+mdmove(target,dest)
+MD *target, *dest;
 {
-    REG MD *target;
-    REG MD *dest;
     MD **qq;
     REG MD *p;
     REG MD **q;
     REG int i;
-
-    target = x_target;
-    dest = x_dest;
 
     Debug("print -n mdmove `a5 into `a4");
 
@@ -611,7 +520,7 @@ MD *x_target, *x_dest;
 
     Debug("print fails.");
 
-    return 1;		/* error! small block isn't on either list */
+    return;		/* error! small block isn't on either list */
 
 foundit:
 
@@ -620,7 +529,7 @@ foundit:
 
     *dest = *target;	/* structure copy including "next" pointer */
     *q = dest;		/* link target's prev to new location */
-    return 0;
+    return;
 }
 
 /*
@@ -665,6 +574,7 @@ int *pdindex;
 	}
 	dindex = 0;
     }
+    return NULL;	/* never happens */
 }
 
 /************************************************************************
@@ -678,7 +588,7 @@ int *pdindex;
 
 long
 freebig(ptmp)
-char *ptmp;
+void *ptmp;
 {
     REG struct block *ptr;
 
@@ -695,17 +605,15 @@ char *ptmp;
     return 0;
 }
 
-long
-freesmall(x_ptr)
-MD *x_ptr;
+void
+freesmall(ptr)
+MD *ptr;
 {
-    REG MD *ptr;
     REG struct block *p;
     REG MD *md;
     REG int i;
 
     Debug("print enter freesmall `a5");
-    ptr = x_ptr;
 
     for (p = blockhead; p; p = p->b_next) {
 	if ((char *)p < (char *)ptr && (char *)(p+1) > (char *)ptr) {
@@ -727,7 +635,7 @@ MD *x_ptr;
 			}
 			*(long *)&(md->m_own) = 1;
 			Debug("print success! freesmall returns");
-			return 0;
+			return;
 		    }
 	    }
 	    /* panic: the MD is within a block but not at a slice boundary */

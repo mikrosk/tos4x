@@ -1,41 +1,17 @@
 /*
 ***************************    FSCOMM.C    ******************************
 *
-* $Revision: 2.3 $	$Source: /u2/MRS/osrevisions/gemdos/fscomm.c,v $
+* $Revision: 2.4 $	$Source: fscomm.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:41:03 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:00 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscomm.c,v $
-* Revision 2.3  90/08/03  13:41:03  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.2  89/04/17  17:14:11  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:19:07  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.2  88/06/13  15:06:00  apratt
-* Header style change
-* 
-* Revision 1.1  88/04/26  14:48:18  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.4  91/01/23  14:30:00  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
-
-/****************************************************************************\
-* 									     *
-* GEMDOS File System							     *
-* Common Storage (FS)							     *
-* (C)1986 Atari Corp.							     *
-* 									     *
-* ---- Edit history (reverse order, please): ------------------------------  *
-* 									     *
-* 31-Jan-1986 lmd	Broken out from FS.C				     *
-* 									     *
-\****************************************************************************/
 
 #include "fs.h"
 

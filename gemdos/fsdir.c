@@ -1,105 +1,25 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.5 $	$Source: /u2/MRS/osrevisions/gemdos/fsdir.c,v $
+* $Revision: 2.6 $	$Source: fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:41:09 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:30:00 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
-* Revision 2.5  90/08/03  13:41:09  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.4  90/05/21  12:52:43  apratt
-* Changed xrmdir's return when trying to remove the root: was EACCDN, now
-* EBADRQ.  EACCDN was interpreted by some programs as "subdirectory not
-* empty" which would give a user a bad error message.
-* 
-* Revision 2.3  90/05/16  10:59:25  apratt
-* Added a check so Ddelete of the root doesn't bomb.
-* 
-* Revision 2.2  89/04/17  17:14:17  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:19:17  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.6  89/01/24  15:38:28  apratt
-* Fixed a bug I introduced.  I caused a search for "A:\*\*.*" to go into
-* an infinite loop, constantly looking for "????????.???" in the root
-* directory of A:, starting from the beginning each time. This is fixed 
-* by short-circuiting the problem: if a directory component contains a '?'
-* character, we return EPTHNF early.  (All this in findit().)
-* 
-* Revision 1.5  88/08/18  17:54:52  apratt
-* Changed handling of current directory slots (diruse, dirtbl) to be
-* more nearly correct, all in xchdir.  Now it doesn't do anything
-* if the chdir fails (before, it decremented the diruse count for
-* the current dir).  Also looks for an existing dirtbl slot with
-* the right DND before using up a new one.  Also, in all places
-* where diruse's were getting decremented, there are now checks
-* so it doesn't get decremented from 0 to -1... But with the
-* new improved chdir this may never happen anyway.
-* 
-* Revision 1.4  88/08/16  17:47:30  apratt
-* Add check: don't decrement diruse[i] past zero.  This blocks, but
-* does not fix, the diruse mismanagement.
-* 
-* Revision 1.3  88/06/30  13:55:03  apratt
-* Removed swap of date & time when creating .. directory entry.
-* (It's already swapped in o_time and o_date)
-* 
-* Revision 1.2  88/06/13  15:06:02  apratt
-* Header style change
-* 
-* Revision 1.1  88/04/26  14:48:19  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.6  91/01/23  14:30:00  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
 
-/****************************************************************************\
- * 									     *
- * GEMDOS File System Directory Management				     *
- * (C)1986 Atari Corp.							     *
- * 									     *
- * ---- Edit history (reverse order, please): ------------------------------ *
- * 									     *
- * 28-Mar-1988 akp	Added checks to mkdir to be sure it will succeed.    *
- * 24-Mar-1988 akp	Fixed fsfirst so it behaves like before wrt attr.    *
- *			Removed check for MGET error because it panics.	     *
- * 11-Mar-1988 akp	Removed panic for too many current directories.	     *
- *			Changed panic for mkdir to Panic(0).		     *
- * 17-Feb-1988 akp	Lintified.					     *
- * 03-Feb-1988 akp	Changed some register declarations.		     *
- * 12-Jan-1988 akp	Removed panics (MGET panics when it fails, and the   *
- *			other panics "can't happen").  Removed debug msgs.   *
- * 06-Jan-1988 akp	Totally replaced Fsfirst / Fsnext.		     *
- * 29-Dec-1987 akp	Added dndtouch() macro to lock dnd's in use.	     *
- * 28-Dec-1987 akp	More changes; only cache dir's we *use*.	     *
- *			Changed duplicate detection again: xmkdir calls	     *
- *			makdnd before the file's start cluster is known.     *
- *			Current system is slower but infallible: same name,  *
- *			same parent means it's a duplicate.		     *
- * 22-Dec-1987 akp	Changed compare for duplicate entries in makdnd:     *
- *			this has been wrong for a long time.		     *
- * 21-Oct-1987 akp	Lintified					     *
- * 20-Oct-1987 akp	Added DND locking in Fsfirst/Fsnext and makdnd.	     *
- * 22-Sep-1987 akp	Added swp68 of date & time for . and .. in mkdir.    *
- * 17-Jan-1986 lmd	Commented and prettified from Digital Research	     *
- * 			source code.					     *
- * 30-Jan-1986 lmd	Broken out from old FS.C			     *
- * 									     *
- \****************************************************************************/
-
 #include "fs.h"
-#include "gemerror.h"
-#include "fsdecl.h"
 
 /* dndtouch: lock this dnd by marking it as used in this OS call */
 
 #define dndtouch(dnd) (*(((char *)(dnd))-1) = callno)
 
+void
 ixdirdup(h, dn, p)
 int h;			/* current dir slot# */
 int dn;			/* directory number */
@@ -115,24 +35,20 @@ PD *p;			/* -> basepage */
  *
  */
 DND
-*makdnd(x_p, x_b)
-DND *x_p;
-FCB *x_b;
+*makdnd(p, b)
+DND *p;
+FCB *b;
 {
-  REG DND *p;
-  REG FCB *b;
   OFD *fd;
   REG DND *p1;
   int temp;
   
-  p = x_p;
-  b = x_b;
   temp = b->f_clust;
   swp68(temp);
 
     /* don't add duplicate entries */
   for (p1 = p->d_left; p1; p1 = p1->d_right)
-    if (xcmps(b,p1))		/* same parent, same name */
+    if (xcmps(b->f_name,p1->d_name))		/* same parent, same name */
       return p1;
 
   fd = p->d_ofd;
@@ -166,13 +82,12 @@ FCB *x_b;
  *
  */
 FCB
-*scan(x_p, n, att, posp)
-DND *x_p;		/* directory to scan */
+*scan(p, n, att, posp)
+DND *p;			/* directory to scan */
 char *n;		/* filename */
 int att;		/* search attributes */
 long *posp;		/* directory position */
 {
-  REG DND *p;
   REG OFD *fd;
   REG FCB *b;
   DND *p1;
@@ -180,7 +95,6 @@ long *posp;		/* directory position */
   long srchpos;
   char d[12];			/* buffer for name and attribute byte */
   
-  p = x_p;
   p1 = NULPTR;			/* initialize this like old GEMDOS did. */
   dndtouch(p);			/* lock the directory we're scanning in */
 
@@ -215,7 +129,7 @@ long *posp;		/* directory position */
 	if ((*posp == -1) &&			/*  if looking for a dir */
 	  (b->f_name[0] != '.') &&		/*   and not . or .. */
 	  (b->f_attrib & FA_SUBDIR) &&		/*   and is subdir */
-	  (b->f_name[0] != 0xe5)) {		/*   and isn't erased */
+	  (b->f_name[0] != 0xffffffe5)) {	/*   and isn't erased */
 	    if (!(p1 = makdnd(p, b))) {		/*    add to cache. */
 		return (NULPTR);
 	    }
@@ -232,7 +146,7 @@ long *posp;		/* directory position */
 
   if (!m) {
       /* no match: were we looking for erased files? */
-      if (b && (*n == 0xe5)) {
+      if (b && (*n == 0xffffffe5)) {
 	return(b);		/* yes: return b (which is 1st zero slot) */
       }
       return(NULPTR);		/* no: total miss; return null */
@@ -311,7 +225,7 @@ int dflag;			/* if true, no file name is present */
   char *n;
   REG DND *p;
   REG DND *pp;
-  DND **newp;
+  DND *newp;
 
   REG int i;
   char s[11];
@@ -364,7 +278,7 @@ int dflag;			/* if true, no file name is present */
 	    {
 	      p = 0;
 	      if (pp)
-		  p = scan(pp, n, FA_SUBDIR, &negone);
+		  p = (DND *)scan(pp, n, FA_SUBDIR, &negone);
 	    }
 	  else {
 	    p = newp;
@@ -417,7 +331,7 @@ long
 xchdir(p)
 char *p;
 {
-  REG long l;
+  REG DND *l;
   REG int dr;
   REG int dphy;
   REG int odr;
@@ -502,16 +416,11 @@ char *buf;
 /*
  *  Fill in DTA buffer with Fsfirst/Fsnext information
  */
-makbuf(x_f, x_ubufr)
-FCB *x_f;
-DTA *x_ubufr;
+void
+makbuf(f, ubufr)
+FCB *f;
+DTA *ubufr;
 {
-  REG FCB *f;
-  REG DTA *ubufr;
-
-  ubufr = x_ubufr;
-  f = x_f;
-
   ubufr->fattrib = f->f_attrib;
   ubufr->ftime = f->f_time;
   ubufr->fdate = f->f_date;
@@ -519,7 +428,7 @@ DTA *x_ubufr;
   swp68(ubufr->fdate);
   ubufr->flength = f->f_fileln;
   swp68l(ubufr->flength);
-  packit(f,ubufr->fname);
+  (void)packit(f->f_name,ubufr->fname);
 }
 
 
@@ -528,10 +437,9 @@ DTA *x_ubufr;
  *
  */
 FCB
-*dirinit(x_dn)
-DND *x_dn;
+*dirinit(dn)
+DND *dn;
 {
-  REG DND *dn;
   REG OFD *fd;
   int num;
   REG int i;
@@ -540,7 +448,6 @@ DND *x_dn;
   DMD *dm;
   REG FCB *f1;
   
-  dn = x_dn;
   fd = dn->d_ofd;
   num = (dm = fd->o_dmd)->m_recsiz;
   for (i2 = 1; i2 < dm->m_clsiz; i2++)
@@ -595,7 +502,7 @@ char *s;
   }
   ixlseek(f,0L);			/* seek back to beginning */
 
-  xmovs(22, dots, &fcb);
+  xmovs(22, dots, &(fcb.f_name[0]));
   fcb.f_attrib = FA_SUBDIR;
   fcb.f_time = time;
   swp68(fcb.f_time);
@@ -610,7 +517,7 @@ char *s;
   /*
    * Write ".." directory entry
    */
-  xmovs(22, dots2, &fcb);
+  xmovs(22, dots2, &(fcb.f_name[0]));
   fcb.f_attrib = FA_SUBDIR;
   fcb.f_time = f->o_dirfil->o_time;	/* o_time & o_date are 8088 format */
   fcb.f_date = f->o_dirfil->o_date;	/* already; no need to swap them.  */
@@ -673,7 +580,7 @@ char *p;
     {
       if (!(f = (FCB *) ixread(fd,32L,NULPTR)))
 	break;
-    } while (f->f_name[0] == 0x0e5);
+    } while (f->f_name[0] == 0xffffffe5);
   
   if (f)
     if (f->f_name[0] != 0)
@@ -785,7 +692,7 @@ xsnext() /*+ search next, return into dta */
     REG unsigned int cl;
     long rdpos;
     REG FCB *f;
-    char *buf;
+    char *buf = NULL;	/* initialized to shut compiler up */
     char d[12];
     REG int first;
 
@@ -843,7 +750,7 @@ xsnext() /*+ search next, return into dta */
 	}
 
 	/* set f to the offset within that sector to start with */
-	f = buf + (pos % dm->m_recsiz);
+	f = (FCB *)(buf + (pos % dm->m_recsiz));
 
 	/* f points to dir slot to start searching at */
 	/* if f falls off end of this sector, go back and get another one. */
@@ -877,5 +784,4 @@ found:
     newcl = TRUE;		/* just in case */
     return OK;
 }
-
 

@@ -1,77 +1,19 @@
 /*
 ***************************     CON.C      ******************************
 *
-* $Revision: 2.4 $	$Source: /u2/MRS/osrevisions/gemdos/con.c,v $
+* $Revision: 2.5 $	$Source: con.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:40:23 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:29:46 $    $Locker:  $
 * =======================================================================
 *
 * $Log: con.c,v $
-* Revision 2.4  90/08/03  13:40:23  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.3  89/07/18  14:09:59  apratt
-* Changed the conbrk loop so if you're in block mode and nothing's
-* waiting, you don't wait in a Bconstat loop, you call Bconin outright.
-* 
-* Revision 2.2  89/04/17  17:13:29  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:17:39  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.3  88/06/13  15:05:38  apratt
-* Header style change
-* 
-* Revision 1.2  88/05/04  11:45:33  apratt
-* Added 'return' keyword to printer output (Cprnout), because old desktop
-* (and God knows who else) relied on getting the BIOS return code back
-* from this.  The return code is undocumented, and is 0 for success and
-* -1 for failure (timeout).  In fact, the return is unspecified if the
-* printer->serial port hack bit is set.
-* 
-* Revision 1.1  88/04/26  14:48:15  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.5  91/01/23  14:29:46  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
 
-/****************************************************************************\
-* 									     *
-* GEMDOS Console System							     *
-* (C)1986 Atari Corp.							     *
-* 									     *
-* ---- Edit history (reverse order, please): ------------------------------  *
-* 									     *
-* 14-Mar-1988 akp	Marked ^X handling as stupid but left it in.	     *
-*			Removed &0xff from bconin() -- fat fingers.	     *
-*			Worked out unsigned char without using the type,     *
-*			because of the lack of unsigned char in Alcyon	     *
-*			version 4.04.					     *
-* 02-Mar-1988 akp	Fixed ^C handling again: added block mode to conbrk. *
-*			This is so ctl-char handling is identical for	     *
-*			buffered and unbuffered characters.		     *
-*			Also: swallow up to 16 bytes per call to (non-       *
-*			blocking) conbrk rather than the whole input buffer, *
-*			becaues otherwise you get indefinite postponement    *
-*			on high-speed input devices (19.2Kbaud AUX:).	     *
-* 18-Feb-1988 akp	Lintified.					     *
-* 17-Feb-1988 akp	Fixed stupid semi-circular queue.		     *
-*			Full/empty condition is the count; insptr and remptr *
-*			are POSTincremented with wrap.  Both full and empty  *
-*			buffers have insptr == remptr; use kbchar[h] to	     *
-*			check the state.				     *
-* 03-Feb-1988 akp	Changed some register declarations.		     *
-* 29-Jan-1988 akp	Moved calls to conbrk so they cause a break at the   *
-*			right time (before the ^C is read, not after).	     *
-* 21-Oct-1987 akp	Cleaned up for lint (not very much).		     *
-* 15-Jan-1986 lmd	Commented and prettified from Digital Research	     *
-* 			source code.  This file pretty much needs to	     *
-* 			be completely re-written.			     *
-* 									     *
-\****************************************************************************/
 #include "fs.h"
-#include "fsdecl.h"
 
 
 /*
@@ -84,8 +26,6 @@ long *insptr[3];
 long *remptr[3];
 
 int glbcolumn[3];			/* column position */
-
-extern PD *run;
 
 #define UBWORD(x) (((int)x)&0x00ff)
 
@@ -183,19 +123,15 @@ xauxostat()
  * Also, I don't call bconstat on PRN: (device 0) because it's explicitly
  * not supported by the BIOS.
  */
-conbrk(x_h,x_block)
-int x_h;
-int x_block;
+
+void
+conbrk(h,block)
+int h;
+int block;
 {
-    REG int h;
-    REG int block;
     REG long ch;
     REG int stop;
     REG int c;
-    REG int count;
-
-    h = x_h;
-    block = x_block;
 
     stop = 0;
 
@@ -236,6 +172,7 @@ int x_block;
 /*
  * Flush type-ahead buffer.
  */
+void
 buflush(h)
 int h;
 {
@@ -246,13 +183,11 @@ int h;
 /*
  * qins: add a character to a queue if it'll fit, and move insptr.
  */
-qins(x_h,ch)
-REG int x_h;
+void
+qins(h,ch)
+int h;
 long ch;
 {
-    REG int h;
-
-    h = x_h;
     if (kbchar[h] < KBBUFSZ) {
 	/* queue isn't full: add to it */
 	*insptr[h]++ = ch;
@@ -269,21 +204,19 @@ long ch;
 /*
  * Internal version of Conout.
  */
-conout(x_h,x_ch)
-int x_h;
-int x_ch;
+long
+conout(h,ch)
+int h;
+int ch;
 {
-    REG int h;
-    REG int ch;
-
-    h = x_h;
-    ch = x_ch;
+    long s;
 
     conbrk(h,0);		/* check for control-s break */
-    bconout(h,ch);		/* output character to console */
+    s = bconout(h,ch);		/* output character to console */
     if (ch >= ' ') glbcolumn[h]++;	/* keep track of screen column */
     else if (ch == cr) glbcolumn[h] = 0;
     else if (ch == bs) glbcolumn[h]--;
+    return s;
 }
 
 
@@ -296,7 +229,7 @@ long
 xtabout(ch)
 int ch;
 {
-	tabout(run->p_uft[1]+3,ch & 0xff);
+	return tabout(run->p_uft[1]+3,ch & 0xff);
 }
 
 
@@ -305,21 +238,18 @@ int ch;
  * (WE DON'T NEED THIS).
  */
 long
-tabout(x_h,x_ch)
-int x_h;
-int x_ch;
+tabout(h,ch)
+int h;
+int ch;
 {
-    REG int h;
-    REG int ch;
-
-    h = x_h;
-    ch = x_ch;
+    long s;
 
     ch &= 0xff;				/* should be unsigned */
-    if (ch == tab) do
-	conout(h,' ');
-    while (glbcolumn[h] & 7);
-    else conout(h,ch);
+    if (ch == tab) do {
+	s = conout(h,' ');
+    } while (glbcolumn[h] & 7);
+    else s = conout(h,ch);
+    return s;
 }
 
 
@@ -327,16 +257,15 @@ int x_ch;
  * Console Output;
  * with tab and control-character expansion.
  */
-cookdout(x_h,x_ch)
-int x_h;
-int x_ch;
+long
+cookdout(h,ch)
+int h;
+int ch;
 {
-    REG int h;
-    REG int ch;
+    long s;
     
-    h = x_h;
-    ch = x_ch & 0xff;			/* hack off like unsigned char */
-    if (ch == tab) tabout(h,ch);	/* if tab, expand it */
+    ch &= 0xff;				/* hack off like unsigned char */
+    if (ch == tab) s = tabout(h,ch);	/* if tab, expand it */
     else
     {
 	if ( ch < ' ' )
@@ -344,8 +273,9 @@ int x_ch;
             conout( h,'^' );
 	    ch |= 0x40;
 	}
-    conout(h,ch);			/* output the character */
+    	s = conout(h,ch);			/* output the character */
     }
+    return s;
 }
 
 
@@ -356,7 +286,7 @@ long
 xauxout(ch)
 int ch;
 {
-	bconout(run->p_uft[2]+3,ch);
+	return bconout(run->p_uft[2]+3,ch);
 }
 
 
@@ -386,13 +316,11 @@ int ch;
  * mode in conbrk, they're all buffered.)
  */
 long
-getch(x_h)
-int x_h;
+getch(h)
+int h;
 {
-	REG int h;
 	REG long temp;
 
-	h = x_h;
 	if (kbchar[h])
 	{
 		temp = *remptr[h]++;
@@ -426,13 +354,11 @@ x7in()
  * Calls conbrk in block mode.
  */
 long
-conin(x_h)
-int x_h;
+conin(h)
+int h;
 {
-    REG int h;
     REG long ch;
 
-    h = x_h;
     conbrk(h,1);
     conout( h,(int)(ch = getch(h)) );
     return(ch);
@@ -489,7 +415,7 @@ REG	int i;
 		i = run->p_uft[0]+3;
 		return(constat(i) ? getch(i) : 0L);
 	}
-	bconout(run->p_uft[1]+3, parm);
+	return bconout(run->p_uft[1]+3, parm);
 }
 
 
@@ -501,23 +427,22 @@ long
 xprt_line(p)
 char *p;
 {
-	prt_line(run->p_uft[1]+3,p);
+	return prt_line(run->p_uft[1]+3,p);
 }
 
 
 /*
  * Print line.
  */
-prt_line(x_h,x_p)
-int x_h;
-char *x_p;
+long
+prt_line(h,p)
+int h;
+char *p;
 {
-    REG int h;
-    REG char *p;
+    long s = 0;
 
-    h = x_h;
-    p = x_p;
-    while( *p ) tabout( h, *p++ );
+    while( *p ) s = tabout( h, *p++ );
+    return s;
 }
 
 
@@ -530,6 +455,7 @@ char *x_p;
 /*
  * Newline, advance to appropriate column on device.
  */
+void
 newline(h,startcol)
 REG int startcol;
 REG int h;
@@ -548,6 +474,7 @@ REG int h;
  * Backup one character;
  * yeah, they're assuming a video terminal.
  */
+int
 backsp(h,cbuf,retlen, col)
 int h;
 int retlen;
@@ -588,31 +515,28 @@ int col;			/* starting console column	*/
  * Read Line from Console.
  */
 long
-readline(x_p)	/* function 10 */
-char *x_p;	/* max length, return length, buffer space */
+readline(p)	/* function 10 */
+char *p;	/* max length, return length, buffer space */
 {
-	REG char *p;
-
-	p = x_p;
 	p[1] = cgets(run->p_uft[0]+3,(((int) p[0]) & 0x0ff),&p[2]);
+	return p[1];	/* this was an accident before; preserved. AKP 1/91 */
 }
 
 
 /*
  * Read string.
  */
-cgets(x_h,maxlen,buf)
-int x_h;
+long
+cgets(h,maxlen,buf)
+int h;
 int maxlen;
 char *buf;
 {
 	char ch;
 	int i;
-	REG int h;
 	REG int stcol;
 	REG int retlen;
 
-	h = x_h;
 	stcol = glbcolumn[h];		/* set up starting column */
 	for (retlen = 0; retlen < maxlen; )
 	{
@@ -625,7 +549,6 @@ char *buf;
 			case rub:
 				retlen = backsp(h,buf,retlen,stcol);
 				break;
-/*			case ctrlc: warmboot(); /* never happens */
 			case ctrlx:
 				do retlen = backsp(h,buf,retlen,stcol);
 				while (retlen);

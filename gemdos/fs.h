@@ -1,54 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.8 $	$Source: /u2/MRS/osrevisions/gemdos/fs.h,v $
+* $Revision: 2.9 $	$Source: fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 90/08/03 13:40:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 14:29:50 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
-* Revision 2.8  90/08/03  13:40:36  apratt
-* TTOS FINAL RELEASE
-* 
-* Revision 2.7  90/07/19  17:17:02  apratt
-* Changed version number to 0x1900; previous comments referred to this
-* number before, but the code actually had 0x1800.  Now, 0x1900
-* is GEMDOS for TT from 7/19 onward (hopefully the final TT ROM rev).
-* 
-* Revision 2.6  90/05/04  16:04:13  apratt
-* Changed version number... 0x1900 is for 5/90 TT TOS (but not 5/1/90).
-* May change again before TT TOS release; who can say?
-* 
-* Revision 2.5  90/04/24  10:58:51  apratt
-* Comment change: mp_rover in MPB is not used.
-* 
-* Revision 2.4  90/01/03  15:21:06  apratt
-* Updated version number to 1.7 (0x1700) -- reflects the version
-* with the fixed OS POOL bug.
-* 
-* Revision 2.3  89/07/18  14:09:25  apratt
-* Added PRG structure and changed PD structure to include p_hflags
-* and p_minfast (which isn't actually supported in fsproc.c, is it?).
-* 
-* Revision 2.2  89/04/17  17:13:50  kbad
-* YA header change
-* 
-* Revision 2.1  89/02/21  17:18:10  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.4  88/08/08  17:42:41  apratt
-* Removed ixwrite macro; the code is smaller when it's a function.
-* (Not much, but every byte helps!)
-* 
-* Revision 1.3  88/06/13  15:07:07  apratt
-* Header style change
-* 
-* Revision 1.2  88/04/28  18:17:15  apratt
-* Added divmod macro for faster FAT code.
-* 
-* Revision 1.1  88/04/26  14:48:32  apratt
-* Version used 4/22/88 to make test ROMs
-* 
+* Revision 2.9  91/01/23  14:29:50  apratt
+* Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+*
 *************************************************************************
 */
 
@@ -61,21 +22,16 @@
 *									*
 \***********************************************************************/
 
-/***********************************************************************\
-*									*
-* Edit history (reverse order)						*
-*									*
-* 18-Apr-1988 akp	Removed getofd macro, added range checking to	*
-*			getofd function.				*
-* 09-Mar-1988 akp	Changed MGET to call getbig, added GETMD	*
-*			for MD allocations.				*
-*			Added xmfreblk -> freebig macro			*
-* 03-Feb-1988 akp	Added ixwrite, getofd macros			*
-* 29-Sep-1987 akp	Added OSBLKSIZ #define for same-size pool code	*
-* 22-Sep-1987 akp	Added m_fatrec to DMD struct for cluster code	*
-* 21-Sep-1987 akp	Added FA_ARCHIVE: the archive attribute bit	*
-*									*
-\***********************************************************************/
+/* prototypes and GCC qualifiers */
+
+#if __ANSI__
+#define _P(x) x
+#else
+#define _P(x) ()
+#define void char
+#define volatile
+#define const
+#endif
 
 /*
  * VERSION NUMBERS
@@ -100,7 +56,7 @@
  */
 #define	NULL	0L
 #define	OK	0
-#define NULPTR	((char *) 0)
+#define NULPTR	((void *) 0)
 #define TRUE	1
 #define FALSE	0
 #define	MAXDEVS	16		/* max number of block devices */
@@ -199,8 +155,8 @@ DTA
 PD
 {
 /* 0x00 */
-	long	p_lowtpa;	/* -> base of TPA */
-	long	p_hitpa;	/* -> end (+1) of TPA */
+	PD	*p_lowtpa;	/* -> base of TPA */
+	void	*p_hitpa;	/* -> end (+1) of TPA */
 	long	p_tbase;	/* -> text base */
 	long	p_tlen;		/* size of text segment */
 /* 0x10 */
@@ -209,7 +165,7 @@ PD
 	long	p_bbase;	/* -> BSS base */
 	long	p_blen;		/* size of BSS segment */
 /* 0x20 */
-	char	*p_xdta;	/* current DTA (Disk Transfer Address) */
+	DTA	*p_xdta;	/* current DTA (Disk Transfer Address) */
 	PD	*p_parent;	/* parent PD */
 	long	p_hflags;	/* process flags (see P_ below) */
 	char	*p_env;		/* at offset 2ch (eat your heart out, Lee) */
@@ -243,6 +199,8 @@ PRG
 	int g_absflg;
 };
 
+#define P_MAGIC		0x601a
+
 /* bits in g_hflags and p_hflags */
 
 #define P_NOCLRBSS	1
@@ -258,7 +216,7 @@ PRG
 MD
 {
 	MD	*m_link;	/* -> next MD on list */
-	long	m_start;	/* starting address */
+	void	*m_start;	/* starting address */
 	long	m_length;	/* number of bytes there */
 	PD	*m_own;		/* -> owner's basepage */
 };
@@ -431,3 +389,51 @@ FTAB
 
 #define CL_DIR 0x0002	/* this is a directory file, flush, do not free */
 #define CL_FULL 0x0004  /* even though its a directory, full close */
+
+struct block {
+    struct block *b_next;	/* next block in the heap */
+    char b_type;		/* see Bis* predicates below */
+    char b_callno;		/* used only if the block is big */
+    union {
+	char b_big[64];		/* either one big block, or... */
+	MD b_mem[4];	/* four small blocks */
+				/* if m_own is 1, little block is free */
+    } b_data;
+};
+
+#define LSIZE sizeof(struct block)
+#define HEADSIZE 6		/* size of header before data */
+
+/* btype predicates */
+
+#define Bisfree(bp) ((bp)->b_type == 0)		/* big and free */
+#define Bisused(bp) ((bp)->b_type < 0)		/* big but used */
+#define Biscut(bp)  ((bp)->b_type > 0)		/* cut up (have to check */
+						/* free-ness individually) */
+#define Bmakefree(bp) ((bp)->b_type = 0)
+#define Bmakeused(bp) ((bp)->b_type = -1)
+#define Bmakecut(bp)  ((bp)->b_type = 1)
+
+#include "proto.h"
+#include "gemerror.h"
+#include "fsdecl.h"
+
+/*
+ * prototypes for functions which aren't in C
+ */
+
+int setjmp _P(( long *jmpbuf ));	/* takes three longs */
+void longjmp _P(( long *jmpbuf,int error ));
+long trap13 _P(( int,... ));
+void s68 _P(( void *word_to_swap ));
+void s68l _P(( void *long_to_swap ));
+void clear _P(( void *start, void *last_plus_1 ));
+void usr2xfr _P(( int n, void *d, void *s ));
+void xfr2usr _P(( int n, void *s, void *d ));
+
+volatile void gouser _P(( void ));
+void dojmp _P(( long addr ));
+void clksync _P(( void ));
+void osinit _P(( void ));
+long oscall _P(( int,... ));
+void upd_tod _P(( void ));

@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.16  1991/04/30  12:12:38  apratt
+* Converted DBCMDs to new infix DB style
+*
 * Revision 2.15  1991/04/05  18:38:22  apratt
 * Misc fixes making it work
 *
@@ -88,7 +91,7 @@ char *p;
     uint cltemp;
     char *ptemp = p;
 
-    DBCMD(1,"print xchdir -s (lpeek (+ `a6 8));_c");
+    DBCMD(1,"print xchdir -s (lpeek (`a6 + 8));_c");
     if (!*ptemp) return 0;	/* Dsetpath("") is a no-op */
     if (*(ptemp+1) == ':') {
 	/* drive spec */
@@ -140,7 +143,7 @@ xgetdir(buf,drv) /*+ return text of current dir into specified buffer */
 char *buf;
 int drv;
 {
-  DBCMD(0x01,"print xgetdir buf: (lpeek (+ `a6 8)) drv: (wpeek (+ `a6 c));_c");
+  DBCMD(0x01,"print xgetdir buf: (lpeek (`a6 + 8)) drv: (wpeek (`a6 + c));_c");
   return xgetndir(buf,drv,0x7fffffffL);
 }
 
@@ -204,10 +207,10 @@ DMD *dmd;
     	return len;
     }
 
-    DBCMD(0x100,"print _getndir, pbuf (lpeek (+ `a6 8)) "
-		"< (lpeek (lpeek (+ `a6 8))) > "
-		"len (lpeek (+ `a6 c)) dir (lpeek (+ `a6 10)) holds:;"
-		"dirf (lpeek (+ `a6 10));_c");
+    DBCMD(0x100,"print _getndir, pbuf (lpeek (`a6 + 8)) "
+		"< (lpeek (lpeek (`a6 + 8))) > "
+		"len (lpeek (`a6 + c)) dir (lpeek (`a6 + 10)) holds:;"
+		"dirf (lpeek (`a6 + 10));_c");
 
     /* set up dir2 as dir's parent */
     dir2.dir_dev = dir->dir_dev;
@@ -286,7 +289,7 @@ char *s;
     BCB *bcb;
     uint dirtime, dirdate;
 
-    DBCMD(0x01,"print xmkdir -s (lpeek (+ `a6 8));_c");
+    DBCMD(0x01,"print xmkdir -s (lpeek (`a6 + 8));_c");
 
     /* allocate a cluster, initialize it, ixcreat the file, and link them */
 
@@ -433,7 +436,7 @@ char *p;
     uint dev;
     char c;
 
-    DBCMD(1,"print xrmdir -s (lpeek (+ `a6 8));_c");
+    DBCMD(1,"print xrmdir -s (lpeek (`a6 + 8));_c");
 
     if (err = fn2dir(&p,&dir,FN_NORM)) {
 	if (err == EFILNF) return EPTHNF;
@@ -507,7 +510,7 @@ xsfirst(name,att)
 char *name;
 int att;
 {
-    DBCMD(0x01,"print xsfirst -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c));_c");
+    DBCMD(0x01,"print xsfirst -s (lpeek (`a6 + 8)) -x (wpeek (`a6 + c));_c");
     if (att != FA_LABEL) att |= FA_RO | FA_ARCHIVE;
     return(ixsfirst(name,att,(DTA *)run->p_xdta));
 }

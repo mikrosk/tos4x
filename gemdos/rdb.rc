@@ -5,10 +5,11 @@ load c:\apratt\rdb.rc
 load fs.db
 
 alias a "dw`sp[f]"
-alias xskip "b #f (lpeek `sp);g"
-getsym dos.sys (+ `stubbp 11c)
+alias xskip "b #f lpeek(`sp);g"
+getsym dos.sys `stubbp+11c
 load bios.db
-alias dobios 'b#8 ._trap13 ; alias br8 "_db13 (+ `sp 4);_13enter";b#9 (- ._trap14 2); alias br9 "if `bios_ret print BIOS returns `d0;_13leave"'
+alias dobios 'b#8 ._trap13 ; alias br8 "_db13 `sp+4;_13enter";b#9 ._trap14-2; \
+	alias br9 "if `bios_ret print BIOS returns `d0;_13leave"'
 alias unbios 'nb #8;unalias br8;nb #9;unalias br9'
 
 # this alias is used in DBCMDs in the source

@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.12 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
+* $Revision: 2.13 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.13  1991/04/30  12:12:38  apratt
+* Converted DBCMDs to new infix DB style
+*
 * Revision 2.12  1991/04/05  18:38:22  apratt
 * Misc fixes making it work
 *
@@ -85,16 +88,15 @@ OFD
 int h;
 {
 	if (h <= -NUMBIOS || h >= run->p_uftsize) {
-	    DBCMD(8,"print syshnd (wpeek (+ `a6 8)) >> NULL;_c");
+	    DBCMD(8,"print syshnd (wpeek (`a6 + 8)) >> NULL;_c");
 	    return NULL;			/* too small/big */
 	}
 	if (h < 0) {
-	    DBCMD(8,"print syshnd (wpeek (+ `a6 8)) >> BIOS dev;_c");
+	    DBCMD(8,"print syshnd (wpeek (`a6 + 8)) >> BIOS dev;_c");
 	    return ofdtty(h+3);		/* old-style BIOS dev */
         }
-	DBCMD(8,"print syshnd (wpeek (+ `a6 8)) >> "
-	    "(lpeek (+ (lpeek (+ (lpeek .run) 3c)) (* (wpeek (+ `a6 8)) 4)));"
-	    "_c");
+	DBCMD(8,"print syshnd (wpeek (`a6 + 8)) >> "
+	    "lpeek(lpeek(.run)+3c + (4 * wpeek(a6+8))); _c");
 	return run->p_uft[h];
 }
 
@@ -129,7 +131,7 @@ int h;
 	OFD *ofd;
 	PD *_run = run;
 
-	DBCMD(1,"print xdup (wpeek (+ `a6 8));_c");
+	DBCMD(1,"print xdup (wpeek (`a6 + 8));_c");
 	if ((h<0) ||
 	    (h >= _run->p_uftsize) ||
 	    ((ofd = _run->p_uft[h]) == NULL))
@@ -155,7 +157,7 @@ long
 xforce(std,h)
 int std,h;
 {
-	DBCMD(1,"print xforce (wpeek (+ `a6 8)) (wpeek (+ `a6 a));_c");
+	DBCMD(1,"print xforce (wpeek (`a6 + 8)) (wpeek (`a6 + a));_c");
 	return(ixforce(std,h,run));
 }
 
@@ -247,7 +249,7 @@ PD *pd;
     OFD *ofd;
     DFD *dfd;
 
-    DBCMD(1,"print ixclose (wpeek (+ `a6 8)) (lpeek (+ `a6 a));_c");
+    DBCMD(1,"print ixclose (wpeek (`a6 + 8)) (lpeek (`a6 + a));_c");
 
     /*
      * A while ago, I "guaranteed" that any close would flush all dirty
@@ -314,7 +316,7 @@ PD *pd;
 	pd->p_uft[h] = ofdtty(biosdev[h]);
     }
 
-    DBCMD(8,"print end of xclose:;uft (lpeek .run);_c");
+    DBCMD(8,"print end of xclose:;uft (lpeek(.run));_c");
     return E_OK;
 }   
 
@@ -421,8 +423,8 @@ void *ubufr;
 {
 	OFD *ofd;
 
-	DBCMD(1,"print xread (wpeek (+ `a6 8)) (lpeek (+ `a6 a)) "
-		"(lpeek (+ `a6 e));_c");
+	DBCMD(1,"print xread (wpeek (`a6 + 8)) (lpeek (`a6 + a)) "
+		"(lpeek (`a6 + e));_c");
 
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
@@ -465,8 +467,8 @@ void *ubufr;
 {
 	OFD *ofd;
 
-	DBCMD(1,"print xwrite (wpeek (+ `a6 8)) (lpeek (+ `a6 a)) "
-		"(lpeek (+ `a6 e));_c");
+	DBCMD(1,"print xwrite (wpeek (`a6 + 8)) (lpeek (`a6 + a)) "
+		"(lpeek (`a6 + e));_c");
 
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
@@ -532,7 +534,7 @@ int attr;
 	long err;
 	DIR dir;
 
-	DBCMD(1,"print xcreat -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c));_c");
+	DBCMD(1,"print xcreat -s (lpeek (`a6 + 8)) -x (wpeek (`a6 + c));_c");
 
 	/* deny creates of subdirs; also of labels with any other bit set */
 	if ((attr & FA_SUBDIR) || ((attr & FA_LABEL) && (attr != FA_LABEL)))
@@ -557,7 +559,7 @@ int mod;
     DIR dir;
     long err;
 
-    DBCMD(1,"print xopen -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c));_c");
+    DBCMD(1,"print xopen -s (lpeek (`a6 + 8)) -x (wpeek (`a6 + c));_c");
 
     /* ttyopen returns -1 if NOT a tty name, else opens it */
     if ((err = ttyopen(name)) != -1) return err;
@@ -640,8 +642,8 @@ uint mod;
     DFD *dfd;
     OFD *ofd;
 
-    DBCMD(8,"print ixopen dir: (lpeek (+ `a6 8)) mode (wpeek (+ `a6 c));"
-	    "dirf (lpeek (+ `a6 8));_c");
+    DBCMD(8,"print ixopen dir: (lpeek (`a6 + 8)) mode (wpeek (`a6 + c));"
+	    "dirf (lpeek (`a6 + 8));_c");
 
     /* fail if opening for mode other than zero and file is RO */
     if (mod && (dir->dir_fcb->f_attrib & FA_RO)) return EACCDN;
@@ -703,7 +705,7 @@ uint mod;
 
     run->p_uft[h] = ofd;
 
-    DBCMD(8,"print end of ixopen:;uft (lpeek .run);_c");
+    DBCMD(8,"print end of ixopen:;uft lpeek(.run);_c");
     return h;
 }
 
@@ -722,8 +724,8 @@ int flg;
 {
     OFD *ofd;
 
-    DBCMD(1,"print xlseek (lpeek (+ `a6 8)) (wpeek (+ `a6 c)) "
-	    "(wpeek (+ `a6 e));_c");
+    DBCMD(1,"print xlseek (lpeek (`a6 + 8)) (wpeek (`a6 + c)) "
+	    "(wpeek (`a6 + e));_c");
 
     if ((ofd = syshnd(h)) == NULL) return EIHNDL;
     if (ofdisatty(ofd)) return 0;
@@ -802,7 +804,7 @@ int flg;
 
     ofd->o_bytnum = n;
 
-    DBCMD(8,"print end of xlseek:;uft (lpeek .run);_c");
+    DBCMD(8,"print end of xlseek:;uft lpeek(.run);_c");
     return(n);
 }
 
@@ -830,8 +832,8 @@ int wrt;			/* 0:get, 1:set */
     DFD *dfd;
     int t[2];			/* buffer to hold user input for swapping */
 
-    DBCMD(1,"print xdatime -x08 (lpeek (lpeek (+ `a6 8))) (wpeek (+ `a6 c)) "
-	    "(wpeek (+ `a6 e));_c");
+    DBCMD(1,"print xdatime -x08 (lpeek (lpeek (`a6 + 8))) (wpeek (`a6 + c)) "
+	    "(wpeek (`a6 + e));_c");
 
     ofd = syshnd(h);
     if (ofd == NULL || ofdisatty(ofd)) return EIHNDL;
@@ -858,7 +860,7 @@ int wrt;			/* 0:get, 1:set */
     dfd->dfd_date = t[1];
     dfd->dfd_dirty = 1;
 
-    DBCMD(8,"print end of xdatime;uft (lpeek .run);_c");
+    DBCMD(8,"print end of xdatime;uft lpeek(.run);_c");
     return E_OK;
 }
 
@@ -884,7 +886,7 @@ long
 xsetdta(addr)
 DTA *addr;
 {
-	DBCMD(1,"print xsetdta (lpeek (+ `a6 8));_c");
+	DBCMD(1,"print xsetdta (lpeek (`a6 + 8));_c");
 	run->p_xdta = addr;
 	return 0;		/* Return success! AKP 1/91 */
 }
@@ -898,7 +900,7 @@ long
 xsetdrv(drv)
 uint drv;
 {
-	DBCMD(1,"print xsetdrv (wpeek (+ `a6 8));_c");
+	DBCMD(1,"print xsetdrv (wpeek (`a6 + 8));_c");
 	if (drv > MAXDEVS) return EDRIVE;
 	run->p_curdrv = drv;
 	return( trap13(0x0A) );	/* return Drvmap() */

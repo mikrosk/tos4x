@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.17  1991/04/30  12:12:38  apratt
+* Converted DBCMDs to new infix DB style
+*
 * Revision 2.16  1991/04/05  18:38:22  apratt
 * Misc fixes making it work
 *
@@ -79,7 +82,7 @@ voidfn
 dirdirty(dir)
 DIR *dir;
 {
-    DBCMD(2,"print -n dirdirty ; dirf (lpeek (+ `a6 8)) ; _c");
+    DBCMD(2,"print -n dirdirty ; dirf (lpeek (`a6 + 8)) ; _c");
     dir->dir_bcb->b_dirty = 1;
     flush(dir->dir_bcb);
 }
@@ -90,7 +93,7 @@ uint dev;
 {
     BCB *b;
 
-    DBCMD(2,"print fatdirty (wpeek (+ `a6 8));_c");
+    DBCMD(2,"print fatdirty (wpeek (`a6 + 8));_c");
     for (b = bufl[0]; b; b = b->b_link) {
 	if (b->b_bufdrv == dev && b->b_dirty) {
 	    flush(b);
@@ -118,7 +121,7 @@ BCB *b;
   DMD *dmd;
   int i;
 
-  DBCMD(2,"print -n flush ;bcb (lpeek (+ `a6 8));_c");
+  DBCMD(2,"print -n flush ;bcb (lpeek (`a6 + 8));_c");
   dmd = b->b_dmd;
   n = b->b_buftyp;
   d = b->b_bufdrv;
@@ -137,8 +140,8 @@ BCB *b;
 	b->b_bufdrv = B_INVALID; /* invalidate now in case of error */
 
 	/* this DBCMD contains &b so b isn't placed in a register */
-	DBCMD(0x200,(&b,"print -n Write:;bcb (lpeek (+ `a6 8));"
-		    "dw (lpeek (+ (lpeek (+ `a6 8)) 10))[200];_c"));
+	DBCMD(0x200,(&b,"print -n Write:;bcb (lpeek (`a6 + 8));"
+		    "dw lpeek(lpeek(a6+8)+10)[200];_c"));
 
 	rwabs(1,b->b_bufr,1,b->b_bufrec,d);
 
@@ -214,9 +217,9 @@ DMD *dmd;
 	uint d;
 	uint end;
 
-	DBCMD(4,"print usrio rw: (wpeek (+ `a6 8)) count: (wpeek (+ `a6 a)) "
-	      "start: (wpeek (+ `a6 c)) ubuf: (lpeek (+ `a6 e)) "
-	      "dmd: (lpeek (+ `a6 12));_c");
+	DBCMD(4,"print usrio rw: (wpeek (`a6 + 8)) count: (wpeek (`a6 + a)) "
+	      "start: (wpeek (`a6 + c)) ubuf: (lpeek (`a6 + e)) "
+	      "dmd: (lpeek (`a6 + 12));_c");
 
 	d = dmd->m_drvnum;
 	strt += dmd->m_recdata;
@@ -247,6 +250,9 @@ DMD *dmd;
  * buffer isn't actually read from disk; this is for extending files, where
  * the contents of the old record don't matter.  (For increased  security,
  * zero the buffer before returning it.)
+ *
+ * This code is non-structured: if the buffer is found, still have to go
+ * back and read it to resolve a "maybe changed" result from Mediach().
  */
 
 void
@@ -259,15 +265,15 @@ BCB **pbcb;
     BCB *b;
     uint n;
     long err;
-    BCB *p;
-    BCB *mtbuf;
+    BCB *mtbuf, **mtprev;
     REG BCB **q;
     BCB **phdr;
     int doread;
     int mcflag = 0;
+    BCB *lastb, **lastq;
 
-    DBCMD(2,"print getrec recn: (wpeek (+ `a6 8)) dmd: (lpeek (+ `a6 a)) "
-	  "flg: (wpeek (+ `a6 e)) pbcb: (lpeek (+ `a6 10));_c");
+    DBCMD(2,"print getrec recn: (wpeek (`a6 + 8)) dmd: (lpeek (`a6 + a)) "
+	  "flg: (wpeek (`a6 + e)) pbcb: (lpeek (`a6 + 10));_c");
 
     if (wrtflg == 2) doread = 0, wrtflg = 1;
     else doread = 1;
@@ -279,95 +285,111 @@ BCB **pbcb;
     else if (recn < dmd->m_recdata) n = 1;
     else n = 2;
 
-    mtbuf = 0;
+    mtbuf = NULL;
+    mtprev = NULL;
 
     phdr = &bufl[buflist(n)];
 
-    /* set b to the matching buffer or the LAST empty buffer */
+    /* set b to the matching buffer or the LAST empty	*/
+    /* buffer, and q to the link field of b's prev.	*/
+
     for (b = *(q = phdr); b; b = *(q = &b->b_link)) {
 	if ((b->b_bufdrv == dmd->m_drvnum) && (b->b_bufrec == recn)) {
-	    break;
+	    goto found;
 	}
 
 	/* empty buffer? remember it */
 	if (b->b_bufdrv == B_INVALID) {
 	    mtbuf = b;
+	    mtprev = q;
 	}
+
+	/* copy B and Q now so if we miss, lastb and lastq are	*/
+	/* set to the last buffer and its prev's link field.	*/
+	lastb = b;
+	lastq = q;
     }
-    if (!b) {
-	/*
-	 * We went to the end of the list. if mtbuf, set b to it and q to
-	 * its prev's link else set b to last buffer in the list & q to
-	 * prev's link
-	 */
 
-	DBCMD(2,"print cache miss;_c");
+    /*
+     * We went to the end of the list. if mtbuf, set b to it and q to
+     * its prev's link, else set b to last buffer in the list & q to
+     * prev's link
+     */
 
-	if (mtbuf) {
-	    /* miss, but there's an empty */
-	    b = mtbuf;
-	}
-
-	/* 
-	 * need to set q to link field of b's prev, or set b to last buf &
-	 * q to its prev's link field
-	 * 
-	 * The label doio is used to actually do the I/O when there's a
-	 * cache hit, but the the mediach state is 1 (so we check)
-	 */
-doio:
-	for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
-	    if (b == p)
-		break;
-
-	b = p;
-
-	/* if our victim is in use & dirty, flush him */
-	if (b->b_bufdrv != B_INVALID && b->b_dirty) {
-	    DBCMD(2,"print flush victim;_c");
-	    flush(b);
-	}
-
-	/* INVALIDATE this buffer because the rwabs might fail! */
-	b->b_bufdrv = B_INVALID;
-
-	/* set this up now for DB purposes. Doesn't matter as drv=INVALID. */
-
-	b->b_bufrec = recn;
-	b->b_dirty = 0;
-	b->b_buftyp = n;
-	b->b_dmd = dmd;
-
-	/* do the read if doread, or mediach was/is nonzero */
-
-	if (doread || mcflag == 1 || mediach(dmd->m_drvnum)) {
-	    /* &b appears in this DBCMD so it doesn't go in a register. */
-	    /* I only hope it goes in (- `a6 4) since it's the first auto. */
-	    DBCMD(0x400,(&b,"print Read:;bcb (lpeek (- `a6 4));_c"));
-	    rwabs(0,b->b_bufr,1,recn,dmd->m_drvnum);
-	    DBCMD(0x400,"dw (lpeek (+ (lpeek (- `a6 4)) 10))[200];_c");
-	}
-
-	/* read succeeded (or wasn't necessary) so validate the buffer */
-	b->b_bufdrv = dmd->m_drvnum;
+    if (mtbuf) {
+	/* miss, but there's an empty */
+	DBCMD(2,"print miss, but there is an empty buffer;_c");
+	b = mtbuf;
+	q = mtprev;
     }
     else {
-	/* cache hit */
-	/* use a buffer, but first validate media */
-	DBCMD(2,"print cache hit;_c");
-	if (err = mediach(b->b_bufdrv)) {
-	    if (err == 1) {
-		mcflag = 1;
-		goto doio; /* media may be changed */
-	    }
-	    else if (err == 2) {
-		/* media definitely changed */
-		errdrv = b->b_bufdrv;
-		rwerr = E_CHNG; /* media change */
-		longjmp(errbuf,rwerr);
-	    }
+	DBCMD(2,"print miss, no empties, must pick a victim;_c");
+	b = lastb;
+	q = lastq;
+    }
+
+    /* 
+     * b is last buf or empty buf, q is link field of b's prev.
+     * The label doio is used to actually do the I/O when there's a
+     * cache hit, but the the mediach state is 1 (so we check)
+     */
+doio:
+
+    /* if our victim is in use & dirty, flush him */
+    if (b->b_bufdrv != B_INVALID && b->b_dirty) {
+	DBCMD(2,"print flush victim;_c");
+	flush(b);
+    }
+
+    /* INVALIDATE this buffer because the rwabs might fail! */
+    b->b_bufdrv = B_INVALID;
+
+    /* set this up now for DB purposes. Doesn't matter as drv=INVALID. */
+
+    b->b_bufrec = recn;
+    b->b_dirty = 0;
+    b->b_buftyp = n;
+    b->b_dmd = dmd;
+
+    /* do the read if doread, or mediach was/is nonzero */
+
+    if (doread || mcflag == 1 || mediach(dmd->m_drvnum)) {
+	/* &b appears in this DBCMD so it doesn't go in a register. */
+	/* I only hope it goes in (- `a6 4) since it's the first auto. */
+	DBCMD(0x400,(&b,"print Read:;bcb (lpeek (`a6 - 4));_c"));
+	rwabs(0,b->b_bufr,1,recn,dmd->m_drvnum);
+	DBCMD(0x400,"dw (lpeek (lpeek (`a6 - 4)) + 10)[200];_c");
+    }
+
+    /* read succeeded (or wasn't necessary) so validate the buffer */
+    b->b_bufdrv = dmd->m_drvnum;
+
+    goto alldone;
+
+found:
+    /* cache hit; b is the buffer, q is the link field of its prev. */
+    /* use the buffer, but first validate media. */
+    DBCMD(2,"print cache hit;_c");
+    if (err = mediach(b->b_bufdrv)) {
+	if (err == 1) {
+	    DBCMD(2,"print media may be changed;_c");
+	    mcflag = 1;
+	    goto doio; /* media may be changed */
+	}
+	else if (err == 2) {
+	    /* media definitely changed */
+	    DBCMD(2,"print media changed!;_c");
+	    errdrv = b->b_bufdrv;
+	    rwerr = E_CHNG; /* media change */
+	    longjmp(errbuf,rwerr);
+	}
+	else {
+	    panic1("Mediach neither 0, nor 1, nor 2");
 	}
     }
+
+alldone:
+    /* when we get here, b is our buffer and q is the link field of its prev */
 
     /* make this block most-recently-used in its list */
     *q = b->b_link;
@@ -482,7 +504,7 @@ DMD *dmd;
     char *fptr;		/* points to first byte of fatword */
     char *q;		/* points to buf[offset] once that's known */
 
-    DBCMD(4,"print clfix (wpeek (+ `a6 8)) becomes (wpeek (+ `a6 a));_c");
+    DBCMD(4,"print clfix (wpeek (`a6 + 8)) becomes (wpeek (`a6 + a));_c");
 
     if (dmd->m_16) {
 	/* compute byte offset into FAT */
@@ -856,10 +878,10 @@ void (*bufxfr) _P((uint, void *, void *));
     ulong bytnum;
     uint curcl, currec, recoffs;
 
-    DBCMD(4,"print xrw flg: (wpeek (+ `a6 8)) "
-	  "ofd: (lpeek (+ `a6 a)) "
-	  "len: (lpeek (+ `a6 e)) "
-	  "ubufr: (lpeek (+ `a6 12));_c");
+    DBCMD(4,"print xrw flg: (wpeek (`a6 + 8)) "
+	  "ofd: (lpeek (`a6 + a)) "
+	  "len: (lpeek (`a6 + e)) "
+	  "ubufr: (lpeek (`a6 + 12));_c");
 
     dfd = ofd->o_dfd;
     dmd = &drvtbl[dfd->dfd_dev];
@@ -907,7 +929,7 @@ void (*bufxfr) _P((uint, void *, void *));
 
     /* fill in the OFD fields so we can print them using the stack offset */
     DBCMD(4,(ofd->o_curcl = curcl, ofd->o_currec = currec, 
-	    "print OFD at top of xrw call:;do_ofd (lpeek (+ `a6 a));_c"));
+	    "print OFD at top of xrw call:;do_ofd (lpeek (`a6 + a));_c"));
 
     recoffs = bytnum & dmd->m_rbm;
 
@@ -1014,7 +1036,7 @@ eof:
 	dfd->dfd_dirty = 1;
     }
 
-    DBCMD(4,"print OFD after xrw call:;do_ofd (lpeek (+ `a6 a));_c");
+    DBCMD(4,"print OFD after xrw call:;do_ofd (lpeek (`a6 + a));_c");
     return rc;
 }
 

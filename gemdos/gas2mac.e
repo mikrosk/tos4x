@@ -1,5 +1,8 @@
 ; replace \" with ""
 ; replace \15 with \r, \12 with \n, etc.
+; replace {# with { and :# with : (bitfield)
+; replace :[wl]:[248] with .[wl]*[248] (020 addressing mode)
+; replace "tst.l a0" with "cmp.w #0,a0" (mas doesn't know it's legal)
 ; replace :b with .b, etc.
 ; replace :4 with *4, etc. (scale in d0.size*scale)
 ; replace 0x with $
@@ -19,6 +22,8 @@
 ; indirect: a3@ -> (a3)
 ; ind1: a4@(a2.w) -> (a4,a2.w)
 ; ind2: a4@(99,a2.w) -> 99(a4,a2.w)
+; ind3: a4@(a2.w*2) -> (a4,a2.w*2)
+; ind4: a4@(99,a2.w*2) -> 99(a4,a2.w*2)
 ; indexed: a4@(99) -> 99(a4)
 ; long, word, byte: movel -> move.l
 ; [this fixes bpl into bp.l; fix it back]
@@ -41,19 +46,37 @@ store-procedure gas2mac
   beginning-of-file
   !force replace-string "\33" "\e"
   beginning-of-file
+  !force replace-string {# {
+  beginning-of-file
+  !force replace-string :# :
+  beginning-of-file
+  !force replace-string ":l:8" ".l*8"
+  beginning-of-file
+  !force replace-string ":l:4" ".l*4"
+  beginning-of-file
+  !force replace-string ":l:2" ".l*2"
+  beginning-of-file
+  !force replace-string ":w:8" ".l*8"
+  beginning-of-file
+  !force replace-string ":w:4" ".w*4"
+  beginning-of-file
+  !force replace-string ":w:2" ".w*2"
+  beginning-of-file
+  !force replace-string "tstl a" "cmpw #0,a"
+  beginning-of-file
   !force replace-string :b .b
   beginning-of-file
   !force replace-string :w .w
   beginning-of-file
   !force replace-string :l .l
-  beginning-of-file
-  !force replace-string :1 *1
-  beginning-of-file
-  !force replace-string :2 *2
-  beginning-of-file
-  !force replace-string :4 *4
-  beginning-of-file
-  !force replace-string :8 *8
+;  beginning-of-file
+;  !force replace-string :1 *1
+;  beginning-of-file
+;  !force replace-string :2 *2
+;  beginning-of-file
+;  !force replace-string :4 *4
+;  beginning-of-file
+;  !force replace-string :8 *8
   beginning-of-file
   !force replace-string ".lcomm" ".comm"
   beginning-of-file
@@ -114,6 +137,12 @@ store-procedure gas2mac
   beginning-of-file
   print fix-ind2
   run fix-ind2
+  beginning-of-file
+  print fix-ind3
+  run fix-ind3
+  beginning-of-file
+  print fix-ind4
+  run fix-ind4
   beginning-of-file
   print fix-indexed
   run fix-indexed
@@ -228,6 +257,9 @@ store-procedure fix-predec
 
 ; fix-ind1: fix a4@(a2.w)
 ; fix-ind2: fix a4@(0,d1.l)
+; fix-ind3: fix a4@(d2.w*2)
+; fix-ind4: fix a4@(0,d2.w*2)
+
 store-procedure fix-ind1
 *loop
   !force search-forward "[asp][0-7pc]@\([das][0-7p]\.[wl]\)"
@@ -257,6 +289,37 @@ store-procedure fix-ind2
     search-reverse \(
     delete-next-character
     kill-region
+    delete-previous-character
+    2 backward-character
+    yank
+    insert-string (
+    !goto loop
+  !endif
+!endm
+
+store-procedure fix-ind3
+*loop
+  !force search-forward "[asp][0-7pc]@\([das][0-7p]\.[wl]\*[248]\)"
+  !if $status
+    search-reverse "@"
+    2 delete-next-character
+    insert-string ,
+    3 backward-character
+    insert-string (
+    !goto loop
+  !endif
+!endm
+
+store-procedure fix-ind4
+*loop
+  !force search-forward "[asp][0-7pc]@\([^,)]*,[^)]*\)"
+  !if $status
+    search-reverse ,
+    set-mark
+    search-reverse (
+    forward-character
+    kill-region
+    delete-previous-character
     delete-previous-character
     2 backward-character
     yank

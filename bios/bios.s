@@ -3,17 +3,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/12/21 12:15:42 $
+* $Date: 89/02/06 12:20:25 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.20  89/02/06  12:20:25  apratt
+* Added a timeout to Gettime ... if time doesn't arrive in 1 sec, return 0.
+*
 * Revision 1.19  88/12/21  12:15:42  apratt
 * Added comments around the ctl-alt-delete reset code, and saved 1 word
 * nearby.  Big deal.
-*
+* 
 * Revision 1.18  88/12/13  16:12:13  apratt
 * Added (a5) to lots of otherwise-long accesses, both to low RAM and
 * high I/O space.
@@ -89,7 +92,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.19 $
+* $Revision: 1.20 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -776,10 +779,15 @@ jdostime:
 	move.b	#$-1,newtod(a5)	;set handshaking flag
 
 	.globl	gettime
-gtod1:	tst.b	newtod(a5)		;see if the new time of day is in yet...
+	move.l	_hz_200(a5),a0	; use an A register for
+gettime:
+	move.b	#-1,newtod.w	;set handshaking flag
+gtod1:	cmp.l	_hz_200(a5),a0	; has 1 sec elapsed?
+	bsr	ikbdput
+	tst.b	newtod(a5)	;see if the new time of day is in yet...
 	add.w	#200,a0		; cheap sign-extension (1 sec timeout)
 	move.l	datetime(a5),d0
-	rts
+gtod1:	cmp.l	_hz_200.w,a0	; has 1 sec elapsed?
 	bcs	gtod2		; give up: no time is coming
 	tst.b	newtod.w	;see if the new time of day is in yet...
 	bne.b	gtod1

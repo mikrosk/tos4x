@@ -4,16 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/05 17:47:24 $
+* $Date: 88/04/20 17:02:21 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 1.4  88/04/20  17:02:21  apratt
+* Added initializing bflags in getbpb to zero -- 12-bit FATs.
+* (Previously, this field went uninitialized... Just lucky, I guess.)
+*
 * Revision 1.3  88/04/05  17:47:24  apratt
 * Removed unsigned declarations (they don't work in old Alcyon)
-*
+* 
 * Revision 1.2  88/02/26  17:02:16  apratt
 * Changed boot params to match MSDOS better: floppies get 3 sectors/FAT
 * and a media-descriptor byte of F9.
@@ -24,7 +28,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 1.3 $
+* $Revision: 1.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -294,6 +298,7 @@ WORD dev;
     p->rdlen = (u2i(diskbuf + IBM_NDIRS) << 5) / p->recsiz;
     p->datrec = p->fatrec + p->rdlen + p->fsiz;
     p->numcl = (u2i(diskbuf + IBM_NSECTS) - p->datrec) / p->clsiz;
+    p->bflags = 0;	/* Floppies always have 12-bit FATs */
 
     q->dnsides = u2i(diskbuf + IBM_NSIDES);		/* "extra" info */
     q->dspt = u2i(diskbuf + IBM_SPT);

@@ -3,20 +3,23 @@
 * $Author: lozben $
 * =======================================================================
 *
-* $Date: 87/11/20 14:24:44 $
+* $Date: 87/11/25 18:17:00 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.2  87/11/25  18:17:00  lozben
+* Added new flags for finland, norway, and turkey.
+*
 * Revision 1.1  87/11/20  14:24:44  lozben
 * Initial revision
-*
+* 
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.1 $
+* $Revision: 1.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -40,7 +43,9 @@ italy		=	6 ***DON'T  CHANGE***
 sweden   	=	7 ***DON'T  CHANGE***
 swissfra   	=	8 ***DON'T  CHANGE***
 swissger 	=	9 ***DON'T  CHANGE***
-
+turkey		=      10 ***DON'T  CHANGE***
+finland		=      11 ***DON'T  CHANGE***
+norway		=      12 ***DON'T  CHANGE***
 *+
 *		         ***CHANGE THESE (DOWN HERE)***
 *************************************************************************
@@ -67,9 +72,9 @@ swissger 	=	9 ***DON'T  CHANGE***
 systype		=	ram		; 'rom' or 'ram'
 country		=	spain      	; 'usa', etc....
 version		=	$0102		; version number
-date		=	$09041987	; date, $MMDDYYYY
+date		=	$11241987	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		=	%0000111100100100	;sept 4 '87
+dosdate		=	%0000111101111000	;nov 24 '87
 
 *--- for RAM:
  ifeq systype-ram
@@ -134,6 +139,17 @@ osconf		equ	%01111
 osconf		equ	%10001
  endc
 
+ ifeq country-turkey
+osconf		equ	%10011
+ endc
+
+ ifeq country-finland
+osconf		equ	%10101
+ endc
+
+ ifeq country-norway
+osconf		equ	%10111
+ endc
 
 
 *************************************************************************
@@ -733,7 +749,6 @@ os_dosdate:	dc.w	dosdate		;($1e) DOS-format date the system was built
 
 *+
 *  Magic variable region
-*					; ($20 = 0 if 40-folder bug fixed)
 *    I want to get at these someday
 *	-lmd
 *

@@ -1,12 +1,15 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\pool.c,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:47:08 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
+* Revision 2.15  1991/04/30  12:12:38  apratt
+* Converted DBCMDs to new infix DB style
+*
 * Revision 2.14  1991/03/28  17:47:08  apratt
 * THIS VERSION WORKS! DESKTOP OPS WORK!
 *
@@ -99,8 +102,8 @@ long size;
 {
     struct block *bp = ptr;
 
-    DBCMD(16,"print Enter addheap ptr: (lpeek (+ `a6 8)) "
-	     "size: (lpeek (+ `a6 c));_c");
+    DBCMD(16,"print Enter addheap ptr: (lpeek (`a6 + 8)) "
+	     "size: (lpeek (`a6 + c));_c");
 
     /* round size down to large block size */
     size = (size/LSIZE)*LSIZE;
@@ -258,7 +261,7 @@ struct block
 	return 0;
     }
 
-    DBCMD(16,"print newpool returns (lpeek ._blockhe);_c");
+    DBCMD(16,"print newpool returns lpeek(._blockhe);_c");
 
     return blockhead;
 }
@@ -495,7 +498,7 @@ MD *target, *dest;
     REG MD **q;
     REG int i;
 
-    DBCMD(16,"print -n mdmove (lpeek (+ `a6 8)) into (lpeek (+ `a6 c));_c");
+    DBCMD(16,"print -n mdmove (lpeek (`a6 + 8)) into (lpeek (`a6 + c));_c");
 
     /* outer loop steps qq through mfl and mal of both pmd's */
     /* inner loop goes through the list at qq */
@@ -581,7 +584,7 @@ void *ptmp;
 {
     REG struct block *ptr;
 
-    DBCMD(16,"print enter freebig (lpeek (+ `a6 8));_c");
+    DBCMD(16,"print enter freebig (lpeek (`a6 + 8));_c");
     ptr = (struct block *)(ptmp-HEADSIZE);
 
     if (Bisfree(ptr)) {
@@ -602,7 +605,7 @@ MD *ptr;
     REG MD *md;
     REG int i;
 
-    DBCMD(16,"print enter freesmall (lpeek (+ `a6 8));_c");
+    DBCMD(16,"print enter freesmall (lpeek (`a6 + 8));_c");
 
     for (p = blockhead; p; p = p->b_next) {
 	if ((char *)p < (char *)ptr && (char *)(p+1) > (char *)ptr) {

@@ -1,12 +1,15 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.16 $	$Source: e:/tos/gd2\rcs\fsproc.c,v $
+* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.17  1991/04/30  12:12:38  apratt
+* Converted DBCMDs to new infix DB style
+*
 * Revision 2.16  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -49,7 +52,7 @@ xtermres(blkln, rc)
      int rc;			/* return code */
      long blkln;		/* amount to keep */
 {
-    DBCMD(1,"print xtermres len: (lpeek (+ `a6 8)) rc: (wpeek (+ `a6 c));_c");
+    DBCMD(1,"print xtermres len: (lpeek (`a6 + 8)) rc: (wpeek (`a6 + c));_c");
 
     xmshrink(0, run, blkln);	/* shrink main block */
 
@@ -71,7 +74,7 @@ unsigned int rc;
 {
     REG	PD *r;
 
-    DBCMD(1,"print xterm rc: (wpeek (+ `a6 8));_c");
+    DBCMD(1,"print xterm rc: (wpeek (`a6 + 8));_c");
 
     dojmp(trap13(5,0x102,-1L));		/* call terminate vector */
 
@@ -107,7 +110,7 @@ PD *r;			/* -> basepage */
 {
     REG	int i;
   
-    DBCMD(0x40,"print ixterm pd: (lpeek (+ `a6 8));_c");
+    DBCMD(0x40,"print ixterm pd: (lpeek (`a6 + 8));_c");
 
     /*
      *  Close all handles (but only bother with open ones)
@@ -241,8 +244,8 @@ char *v;		/* enviroment string (0, 3, 5, 7) */
 	long fastmax, slowmax, minfast;
 	OFD **uftstart;
 
-	DBCMD(1,"_dopexec (wpeek (+ `a6 8)) (lpeek (+ `a6 a)) "
-		   "(lpeek (+ `a6 e)) (lpeek (+ `a6 12)) ;_c");
+	DBCMD(1,"_dopexec (wpeek (`a6 + 8)) (lpeek (`a6 + a)) "
+		   "(lpeek (`a6 + e)) (lpeek (`a6 + 12)) ;_c");
 
 	v_pdp = NULPTR;
 	v_env = NULPTR;
@@ -496,8 +499,8 @@ PD *lp;				/* -> basepage */
   char *codbas;		/* start of text segment */
   ulong flen,n0,bsslen,tpasiz;
 
-  DBCMD(0x40,"print xpgmld prg: (lpeek (+ `a6 8)) (wpeek (+ `a6 c)) "
-	     "(lpeek (+ `a6 e)) PRG:;prg (lpeek (+ `a6 8));_c");
+  DBCMD(0x40,"print xpgmld prg: (lpeek (`a6 + 8)) (wpeek (`a6 + c)) "
+	     "(lpeek (`a6 + e)) PRG:;prg (lpeek (`a6 + 8));_c");
 
   flen = prg->g_tsize + prg->g_dsize;
 

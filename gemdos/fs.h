@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.20  1991/04/30  12:12:38  apratt
+* Converted DBCMDs to new infix DB style
+*
 * Revision 2.19  1991/04/05  18:38:22  apratt
 * Misc fixes making it work
 *
@@ -84,13 +87,13 @@
 #define __assert(exp,file,line) ( \
 	sprintf(assertbuf,"Failed assert: \"" exp "\" file %s line %ld",\
 		file,(long)line), \
-	DBMSG(-1,assertbuf))
+	panic1(assertbuf))
 extern char assertbuf[];
 extern void sprintf();
 #define voidfn void
 #else
 #define _P(x) ()
-#define ASSERT(exp) ((exp) ? 0 : DBMSG(-1,"Failed assert"))
+#define ASSERT(exp) ((exp) ? 0 : panic1("Failed assert"))
 #define void char
 #define voidfn void
 #define volatile

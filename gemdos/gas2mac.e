@@ -1,7 +1,34 @@
+; replace \" with ""
+; replace \15 with \r, \12 with \n, etc.
+; replace :b with .b, etc.
+; replace :4 with *4, etc. (scale in d0.size*scale)
+; replace 0x with $
+; change jne to bne, etc., but this gives bbsr and bmp, so change them back.
+; change sp@- to -(sp), 
+; change .ascii to .dc.b
+; change \0" to ",0
+; change .word to dc.w, .long to dc.l, .byte to dc.b
+; change movl to movel, etc., prior to fixing movel to move.l
+; change ;<tab> to a new line
+; remove #NO_APP type lines
+; replace movem instructions with dc.w's that do what is needed
+; .skip 99 -> dcb.b 99,0
+; postincrement a3@+ -> (a3)+
+; predecrement a3@- -> -(a3)
+; indirect: a3@ -> (a3)
+; ind1: a4@(a2.w) -> (a4,a2.w)
+; ind2: a4@(99,a2.w) -> 99(a4,a2.w)
+; indexed: a4@(99) -> 99(a4)
+; long, word, byte: movel -> move.l
+; [this fixes bpl into bp.l; fix it back]
+; [it also fixes something into .b( which should be (]
+
 store-procedure gas2mac
   delete-mode magic
   add-mode exact
   print fixups
+  beginning-of-file
+  !force replace-string "\~"" "~"~""
   beginning-of-file
   !force replace-string "\15" "\r"
   beginning-of-file
@@ -48,15 +75,6 @@ store-procedure gas2mac
   !force replace-string "~t.long " "~t.dc.l "
 
   beginning-of-file
-  !force replace-string "~t.skip~t" "~t.dcb.b 0,"
-  beginning-of-file
-  !force replace-string "~t.word~t" "~t.dc.w "
-  beginning-of-file
-  !force replace-string "~t.byte~t" "~t.dc.b "
-  beginning-of-file
-  !force replace-string "~t.long~t" "~t.dc.l "
-  
-  beginning-of-file
   !force replace-string ~tmovl ~tmovel
   beginning-of-file
   !force replace-string ~tmovb ~tmoveb
@@ -87,6 +105,7 @@ store-procedure gas2mac
   print fix-indirect
   run fix-indirect
   beginning-of-file
+; fix-ind1 and fix-ind2 must run before fix-indexed
   print fix-ind1
   run fix-ind1
   beginning-of-file
@@ -121,165 +140,158 @@ store-procedure gas2mac
 store-procedure del-app
 *loop
   !force search-forward "#APP"
-  !if &not $status
-    !goto end1
+  !if $status
+    beginning-of-line
+    kill-to-end-of-line
+    !goto loop
   !endif
-  beginning-of-line
-  kill-to-end-of-line
-  !goto loop
-*end1
+
   beginning-of-file
   !force search-forward "#NO_APP"
-  !if &not $status
-    !goto end2
+  !if $status
+    beginning-of-line
+    kill-to-end-of-line
+    !goto loop
   !endif
-  beginning-of-line
-  kill-to-end-of-line
-  !goto loop
-*end2
 !endm
 
 store-procedure fix-long
 *loop
   !force search-forward "~t[^. ~t]*l[~t ]"
-  !if &not $status
-    !goto end
+  !if $status
+    2 backward-character
+    insert-string .
+    !goto loop
   !endif
-  2 backward-character
-  insert-string .
-  !goto loop
-*end
 !endm
 
 store-procedure fix-word
 *loop
   !force search-forward "~t[^. ~t]*w[~t ]"
-  !if &not $status
-    !goto end
+  !if $status
+    2 backward-character
+    insert-string .
+    !goto loop
   !endif
-  2 backward-character
-  insert-string .
-  !goto loop
-*end
 !endm
 
 store-procedure fix-byte
 *loop
   !force search-forward "~t[^. ~t]*b[~t ]"
-  !if &not $status
-    !goto end
+  !if $status
+    2 backward-character
+    insert-string .
+    !goto loop
   !endif
-  2 backward-character
-  insert-string .
-  !goto loop
-*end
 !endm
 
-store-procedure fix-postinc
-*loop
-  !force search-forward "[asp][0-7pc]@+"
-  !if &not $status
-    !goto end
-  !endif
-  2 delete-previous-character
-  insert-string )+
-  4 backward-character
-  insert-string (
-  !goto loop
-*end
-!endm
+!if &seq $version "3.10"
+  store-procedure fix-postinc
+  *loop
+    !force search-forward "[asp][0-7pc]@+"
+    !if $status
+      2 delete-previous-character
+      insert-string )+
+      4 backward-character
+      insert-string (
+      !goto loop
+    !endif
+  !endm
+!else
+  store-procedure fix-postinc
+  *loop
+    !force search-forward "[asp][0-7pc]@\+"
+    !if $status
+      2 delete-previous-character
+      insert-string )+
+      4 backward-character
+      insert-string (
+      !goto loop
+    !endif
+  !endm
+!endif
 
 store-procedure fix-predec
 *loop
   !force search-forward "[asp][0-7pc]@-"
-  !if &not $status
-    !goto end
+  !if $status
+    2 delete-previous-character
+    insert-string )
+    3 backward-character
+    insert-string -(
+    !goto loop
   !endif
-  2 delete-previous-character
-  insert-string )
-  3 backward-character
-  insert-string -(
-  !goto loop
-*end
 !endm
 
-; fix-ind1: fix a4@(a2:w) 
-; fix-ind2: fix a4@(0,d1:l)
+; fix-ind1: fix a4@(a2.w)
+; fix-ind2: fix a4@(0,d1.l)
 store-procedure fix-ind1
 *loop
   !force search-forward "[asp][0-7pc]@\([das][0-7p]\.[wl]\)"
-  !if &not $status
-    !goto end
+  !if $status
+    delete-previous-character
+    set-mark
+    4 backward-character
+    kill-region
+    delete-previous-character
+    delete-previous-character
+    insert-string )
+    3 backward-character
+    insert-string (
+    2 forward-character
+    insert-string ,
+    yank
+    !goto loop
   !endif
-  delete-previous-character
-  set-mark
-  4 backward-character
-  kill-region
-  delete-previous-character
-  delete-previous-character
-  insert-string )
-  3 backward-character
-  insert-string (
-  2 forward-character
-  insert-string ,
-  yank
-  !goto loop
-*end
 !endm
 
 store-procedure fix-ind2
 *loop
   !force search-forward "[asp][0-7pc]@\([^),]*,[^)]*\)"
-  !if &not $status
-    !goto end
+  !if $status
+    search-reverse ,
+    set-mark
+    search-reverse \(
+    delete-next-character
+    kill-region
+    delete-previous-character
+    2 backward-character
+    yank
+    insert-string (
+    !goto loop
   !endif
-  search-reverse ,
-  set-mark
-  search-reverse \(
-  delete-next-character
-  kill-region
-  delete-previous-character
-  2 backward-character
-  yank
-  insert-string (
-  !goto loop
-*end
 !endm
 
 store-procedure fix-indexed
 *loop
   !force search-forward "[asp][0-7pc]@\([^)]*\)"
-  !if &not $status
-    !goto end
+  !if $status
+    delete-previous-character
+    set-mark
+    search-reverse (
+    forward-character
+    kill-region
+    delete-previous-character
+    delete-previous-character
+    insert-string )
+    3 backward-character
+    yank
+    insert-string (
+    !goto loop
   !endif
-  delete-previous-character
-  set-mark
-  search-reverse (
-  forward-character
-  kill-region
-  delete-previous-character
-  delete-previous-character
-  insert-string )
-  3 backward-character
-  yank
-  insert-string (
-  !goto loop
-*end
 !endm
 
 store-procedure fix-indirect
 *loop
   !force search-forward "[asp][0-7pc]@[^(]"
-  !if &not $status
-    !goto end
+  !if $status
+    backward-character
+    delete-previous-character
+    insert-string )
+    3 backward-character
+    insert-string (
+    !goto loop
   !endif
-  backward-character
-  delete-previous-character
-  insert-string )
-  3 backward-character
-  insert-string (
-  !goto loop
-*end
 !endm
 
 store-procedure fix-movem

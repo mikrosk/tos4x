@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.9 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.10 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.10  1991/04/30  12:12:38  apratt
+* Converted DBCMDs to new infix DB style
+*
 * Revision 1.9  1991/04/05  18:38:22  apratt
 * Misc fixes making it work
 *
@@ -195,8 +198,8 @@ int flags;
     dotsok = (flags == FN_DOTSOK);
     earlyflag = (flags == FN_EARLY);
 
-    DBCMD(0x20,"print fn2dir -s (lpeek (lpeek (+ `a6 8))) "
-		"flags -x (wpeek (+ `a6 10)) dir: (lpeek (+ `a6 c));_c");
+    DBCMD(0x20,"print fn2dir -s (lpeek (lpeek (`a6 + 8))) "
+		"flags -x (wpeek (`a6 + 10)) dir: (lpeek (`a6 + c));_c");
 
     if (!*name) return EBADRQ;
     if (*(name+1) == COLON) {
@@ -263,9 +266,9 @@ int flags;
 	    if (earlyflag) {
 		*pname = name;
 		DBCMD(0x20,"print early return: *pname= "
-			    "-s (lpeek (lpeek (+ `a6 8))) "
-			    "dir -x (lpeek (+ `a6 c)) is:;"
-				"dirx (lpeek (+ `a6 c));_c");
+			    "-s (lpeek (lpeek (`a6 + 8))) "
+			    "dir -x (lpeek (`a6 + c)) is:;"
+				"dirx (lpeek (`a6 + c));_c");
 		return E_OK;
 	    }
 	    if (isdots(name)) {
@@ -301,8 +304,8 @@ int flags;
 
 	if (err = dirfirst(dir,dmd)) return err;
 
-	DBCMD(0x20,"print scan new dir level. dir (lpeek (+ `a6 c)) is:;"
-			"dirf (lpeek (+ `a6 c));_c");
+	DBCMD(0x20,"print scan new dir level. dir (lpeek (`a6 + c)) is:;"
+			"dirf (lpeek (`a6 + c));_c");
 
 	while (1) {
 	    pfcb = dir->dir_fcb;
@@ -344,7 +347,7 @@ dotmatch:
     /* end still points to end of last component; check for trailing SLASH */
     if (*end == SLASH) return EBADRQ;
 
-    DBCMD(0x20,"print fn2dir returns, dir:;dirf (lpeek (+ `a6 c));_c");
+    DBCMD(0x20,"print fn2dir returns, dir:;dirf (lpeek (`a6 + c));_c");
     *pname = oname;
     return E_OK;
 }
@@ -359,8 +362,8 @@ DIR *dir;
     fcb = getrec(dir->dir_recno,dmd,0,&dir->dir_bcb);
     dir->dir_fcb = (FCB *)(fcb + dir->dir_recoffs);
 
-    DBCMD(0x20,"print dir2dir returns, dir (lpeek (+ `a6 8)) is:;"
-		"dirf (lpeek (+ `a6 8));_c");
+    DBCMD(0x20,"print dir2dir returns, dir (lpeek (`a6 + 8)) is:;"
+		"dirf (lpeek (`a6 + 8));_c");
 
     return E_OK;
 }
@@ -409,8 +412,8 @@ DMD *dmd;
     /* you only call this if you fell off the end of this record */
 
     DBCMD(0x20,
-	"print _dirnext, dir: (lpeek (+ `a6 8)) dmd: (lpeek (+ `a6 c));"
-	"dirx (lpeek (+ `a6 8));dmd (lpeek (+ `a6 c));_c");
+	"print _dirnext, dir: (lpeek (`a6 + 8)) dmd: (lpeek (`a6 + c));"
+	"print -n (DIR) ; dirx lpeek(a6 + 8);"
 	"print -n (DMD) ; dmd lpeek(a6 + c);_c");
 
     curcl = dir->dir_curcl;
@@ -444,7 +447,7 @@ DMD *dmd;
 		return ERROR;
 	    }
 	    dir->dir_curcl = xcl;
-    DBCMD(0x20,"print _dirnext returns, dir:;dirf (lpeek (+ `a6 8));_c");
+	    dir->dir_recno = realcl2rec(dir->dir_curcl,dmd);
 	}
 	/* (else recno is fine; it's the next rec of this clust) */
     }
@@ -461,7 +464,7 @@ DMD *dmd;
 dirslot(dir)
 DIR *dir;
 {
-    DBCMD(0x20,"print dirslot: dir after dirfirst:;dirf (lpeek (+ `a6 8));_c");
+    FCB *fcb;
     BCB *bcb;
     long err;
     DMD *dmd = &drvtbl[dir->dir_dev];
@@ -473,7 +476,7 @@ DIR *dir;
     DBCMD(0x20,"print dirslot: dir after dirfirst:;dirf (lpeek (`a6 + 8));_c");
 
     while (1) {
-    DBCMD(0x20,"print dirslot fell off dir:;dirx (lpeek (+ `a6 8));_c");
+	fcb = dir->dir_fcb;
 	if (fcb->f_name[0] == 0 || fcb->f_name[0] == ERASED) return E_OK;
 	if (err = dirnext(dir,dmd)) {
 	    if (err == EFILNF) break;

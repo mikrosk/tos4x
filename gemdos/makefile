@@ -1,11 +1,14 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\makefile.,v $
+# $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $     $Locker:  $
+# $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.18  1991/04/30  12:12:38  apratt
+# Converted DBCMDs to new infix DB style
+#
 # Revision 2.17  1991/04/05  18:38:22  apratt
 # Misc fixes making it work
 #
@@ -49,13 +52,6 @@ CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
 	mas -u $*.s
 	rm $*.s
 
-.c.oo:
-	$(CC) $(CFLAGS) -S -DUNREAL $*.c
-	emacs @gas2mac.rc $*.s 
-	mas -u $*.s
-	mv $*.o $*.oo
-	rm $*.s
-
 .mac.o:
 	mas -u $*.mac
 
@@ -72,17 +68,13 @@ rwa.o: rwa.mac
 
 ################
 
-CFILES =	fscl.c fscomm.c fsdir.c fsfs.c fshand.c scan.c \
-		setup.c time.c panic.c mem.c pool.c sup.c con.c \
+CFILES =	fscl.c fsdir.c fsfs.c fshand.c scan.c \
+		time.c panic.c mem.c pool.c sup.c con.c \
 		fsproc.c
 
-OFILES =	fscl.o fscomm.o fsdir.o fsfs.o fshand.o scan.o \
-		time.o panic.o pool.o sup.o con.o \
+OFILES =	fscl.o fsdir.o fsfs.o fshand.o scan.o \
+		time.o panic.o mem.o pool.o sup.o con.o \
 		fsproc.o
-
-gtest.prg: ftest.o fcmds.o docall.o traps.o unreal.oo setup.oo mem.oo $(OFILES) 
-		cc -o $@ $< -l syserr.o
-		prgflags 7 7 $@
 
 DS=dossys
 LDOBJS	=	$(DS)\self.o $(DS)\ld_dos.o $(DS)\clear.o $(DS)\clock.o \
@@ -93,10 +85,8 @@ dos.sys:	gemdos.o
 		aln -l -o dos.sys $(LDOBJS) gemdos.o
 
 
-gemdos.o:	rwa.o setup.o mem.o $(OFILES) 
+gemdos.o:	rwa.o $(OFILES) 
 		aln -u -p -l -o $@ $<
-
-#$(OFILES):	fs.h
 
 fs.h:		fsdecl.h gemerror.h
 

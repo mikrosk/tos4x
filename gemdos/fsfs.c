@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.15  1991/04/30  12:12:38  apratt
+* Converted DBCMDs to new infix DB style
+*
 * Revision 2.14  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -173,8 +176,8 @@ int attr;			/* attribute byte */
     long err;
     DFD *dfd;
 
-    DBCMD(1,"print xchmod -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c)) "
-	    "(wpeek (+ `a6 e));_c");
+    DBCMD(1,"print xchmod -s (lpeek (`a6 + 8)) -x (wpeek (`a6 + c)) "
+	    "(wpeek (`a6 + e));_c");
 
     attr &= 0xff;
 
@@ -215,7 +218,7 @@ char *name;
     int youflag = 0;
     int i;
 
-    DBCMD(1,"print xdelete -s (lpeek (+ `a6 8));_c");
+    DBCMD(1,"print xdelete -s (lpeek (`a6 + 8));_c");
 
     /* return any error (file not found, bad request, etc.) */
     if (err = fn2dir(&name,&dir,FN_NORM)) return err;
@@ -359,8 +362,8 @@ char *p2;			/* new name */
     FCB fcbhold;
     uint cl;
 
-    DBCMD(1,"print xrename (wpeek (+ `a6 8)) "
-	    "-s (lpeek (+ `a6 a)) (lpeek (+ `a6 e));_c");
+    DBCMD(1,"print xrename (wpeek (`a6 + 8)) "
+	    "-s (lpeek (`a6 + a)) (lpeek (`a6 + e));_c");
 
     /* try to find the old file, return any error. */
 

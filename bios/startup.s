@@ -4,16 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/12/07 14:50:23 $
+* $Date: 91/01/31 13:57:42 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.62  90/12/07  14:50:23  apratt
-* changed version number for 2.05/3.05
+* Revision 2.63  91/01/31  13:57:42  apratt
+* Changed noblank1 to save & restore iera bit 0. Now vers x.06
 *
+* Revision 2.63  91/01/31  13:57:42  apratt
+* Changed noblank1 to save & restore iera bit 0. Now vers x.06
+* 
 * Revision 2.62  90/12/07  14:50:23  apratt
 * changed version number for 2.05/3.05
 * 
@@ -51,7 +54,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.62 $
+* $Revision: 2.63 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -115,21 +118,21 @@ DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
-version		equ	$0205		; version number
-date		equ	$12051990	; STPLUS date, $MMDDYYYY @check@
+version		equ	$0206		; version number
+date		equ	$01311991	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010110000101 ; Dec 5, 1990
+dosdate		equ	%0001011000111111 ; Jan 31, 1991
 .else
 .ifne TT
-version		equ	$0305		; version number (need not be even)
-date		equ	$12051990	; TT date, $MMDDYYYY @check@
+version		equ	$0306		; version number (need not be even)
+date		equ	$01311991	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010110000101 ; Dec 5, 1990
+dosdate		equ	%0001011000111111 ; Jan 31, 1991
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
-version		equ	$0145
-date		equ	$12051990
+version		equ	$0146
+date		equ	$01311991
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010110000101 ; Dec 5, 1990
+dosdate		equ	%0001011000111111 ; Jan 31, 1991
 .endc
 .endc
 
@@ -3765,10 +3768,15 @@ p_width:	ds.w	1		; width and height
 p_height:	ds.w	1
 p_left:		ds.w	1		; left & right leading
 p_right:	ds.w	1
+p_srcres:	ds.w	1		; source rez (0, 1, 2)
+p_dstres:	ds.w	1		; destination rez (0, 1)
+p_colpal:	ds.l	1		; -> color palettes
+p_type:		ds.w	1		; printer type (0, 1)
+p_port:		ds.w	1		; printer port (0, 1)
 *-
 
 *
-	move.b	#$00,tbcr		; halt the timer
+	clr.b	tbcr			; halt the timer
 	clr.b	tbdr			; load a zero there
 	move.b	#$08,tbcr		; start timer B in event-count mode
 tb_1:	tst.b	tbdr			; changed yet?
@@ -3776,12 +3784,15 @@ tb_1:	tst.b	tbdr			; changed yet?
 	jmp	(a6)			; return
 * around VBLANK.  THEORY 3 most clearly states "it's safe just after
 * get DE's, because if you get (a rising edge of) DE then you know you're
+	move.b	iera,d0			; save old iera
+	and.b	#1,d0			; (really only old timer B enable)
 	bclr	#0,iera			; disable Timer B's interrupt
-	move.b	#$00,tbcr		; halt the timer
+	clr.b	tbcr			; halt the timer
 	clr.b	tbdr			; load a zero there
 	move.b	#$08,tbcr		; start timer B in event-count mode
 tb_2:	tst.b	tbdr			; changed yet?
 	beq	tb_2			; (not yet)
+	or.b	d0,iera			; OR in old enable bit for timer B
 	rts				; return
 
 noblank1:
@@ -4379,8 +4390,8 @@ crctab:
 	dc.w	$3653,$2672,$1611,$0630,$76d7,$66f6,$5695,$46b4
 	dc.w	$b75b,$a77a,$9719,$8738,$f7df,$e7fe,$d79d,$c7bc
 	dc.w	$48c4,$58e5,$6886,$78a7,$0840,$1861,$2802,$3823
+	dc.w	$c9cc,$d9ed,$e98e,$f9af,$8948,$9969,$a90a,$b92b
 	dc.w	$5af5,$4ad4,$7ab7,$6a96,$1a71,$0a50,$3a33,$2a12
-	bsr	noblank1		; wait until not blanking
 	dc.w	$dbfd,$cbdc,$fbbf,$eb9e,$9b79,$8b58,$bb3b,$ab1a
 	dc.w	$6ca6,$7c87,$4ce4,$5cc5,$2c22,$3c03,$0c60,$1c41
 	move.b	shiftmd,d0		; d0 <- curr rez

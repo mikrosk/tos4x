@@ -1,5 +1,8 @@
 /*	MINTBIND.H		7/15/91			D.Mui		*/
 
+#ifndef _MINTBIND_H_
+#define _MINTBIND_H_
+
 #define	Syield()		gemdos(0xff)
 #define Fpipe(ptr)		gemdos(0x100, ptr)
 #define Fcntl(f, arg, cmd)	gemdos(0x104, f, arg, cmd)
@@ -41,4 +44,6 @@
 #define Dos_tab()		gemdos(-1)
 #define Bios_tab()		bios(-1)
 #define Xbios_tab()		xbios(-1)
+
+#endif
 

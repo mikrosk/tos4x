@@ -11,6 +11,8 @@
 /*	New rsc update		12/9/87			D.Mui		*/
 /*	Change fm_alert to make alert box moves	11/6/90	D.Mui		*/
 /*	Changed fm_build and fm_alert to build 3d buttons 7/16/92 D.Mui	*/
+/*	Convert to Lattice C 5.51			  2/17/93 C.Gee */
+/*	Force the use of prototypes			  2/24/93 C.Gee */
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -27,16 +29,14 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <rslib.h>
-#include <aesmint.h>
-#include <gemusa.h>
+#include "machine.h"
+#include "objaddr.h"
+#include "rslib.h"
+#include "aesmint.h"
+#include "gemusa.h"
 
 #define MAX_MSGS     5
 #define MAX_BTNS     3
@@ -48,14 +48,6 @@
 #define INTER_WSPACE 2
 #define INTER_HSPACE 0
 
-						/* in GSXIF.C		*/
-EXTERN	VOID	bb_restore();
-EXTERN	VOID	bb_save();
-EXTERN	WORD	ob_add();
-EXTERN	VOID	ob_draw();
-EXTERN	VOID	ob_actxywh();
-EXTERN 	VOID	rs_obfix();
-EXTERN	WORD	fm_show();
 
 EXTERN	WS	gl_ws;
 EXTERN	UWORD	gl_alrtcol;
@@ -83,8 +75,8 @@ OBJECT	*critobj[MAXERR];		/* critical error objects	*/
 GLOBAL 	BYTE	gl_nils[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
 
 GLOBAL	WORD	ml_alrt[MAXERR] = 
-		{ALRT00CRT,ALRT01CRT,ALRT02CRT,ALRT03CRT,ALRT04CRT,
-			ALRT05CRT, ALRTDSWAP, ALRTINSS };
+ 		{ALRT00CR,ALRT01CR,ALRT02CR,ALRT03CR,ALRT04CR,
+ 			ALRT05CR, ALRTDSWA, ALRTINSS };
 MLOCAL	WORD	ml_ted[MAXERR] = { A00,A01,A02,A03,-1,-1,A06,-1 };
 
 GLOBAL	WORD	tmpmoff;
@@ -98,7 +90,7 @@ WORD	al_center;
 *	Routine to break a string into smaller strings.  Breaks occur
 *	whenever an | or a ] is encountered.
 */
-	WORD
+	VOID
 fm_strbrk(tree, palstr, stroff, pcurr_id, pnitem, pmaxlen)
 	LONG		tree;
 	LONG		palstr;
@@ -230,13 +222,13 @@ fm_build(tree, haveicon, nummsg, mlenmsg, numbut, mlenbut)
 	i = max( i, mlenmsg );   	/* find the max char length	*/
 				 	/* find the max char height	*/
 	j = max( nummsg, 1 );
-	r_set(&al, 0x0L, i+2, j);	/* this is the alert box 	*/
+	r_set( ( WORD *)&al, 0x0, 0x0, i+2, j);	/* this is the alert box 	*/
 					/* this is the message object   */
-	r_set(&ms, 2, 0x0300, mlenmsg, 1);
+	r_set( ( WORD *)&ms, 2, 0x0300, mlenmsg, 1);
 
 	if (haveicon)
 	{
-	  r_set(&ic, 1, 1, icw, ich);
+	  r_set( ( WORD *)&ic, 1, 1, icw, ich);
 	  al.g_w += icw + 1;
 	  al.g_h = max( al.g_h, 1 + ich );		
 	  ms.g_x += icw;
@@ -250,7 +242,7 @@ fm_build(tree, haveicon, nummsg, mlenmsg, numbut, mlenbut)
 
 	/* set the button	*/
 
-	r_set( &bt, i, al.g_h - 2, mlenbut, 1 ); 
+	r_set( ( WORD *)&bt, i, al.g_h - 2, mlenbut, 1 ); 
 
 	/* now make the al.g_h smaller	*/
 
@@ -261,7 +253,7 @@ fm_build(tree, haveicon, nummsg, mlenmsg, numbut, mlenbut)
 	ob_setxywh(tree, ROOT, &al);
 
 	for(i=0; i<NUM_ALOBJS; i++)
-	  LBCOPY(OB_NEXT(i), &gl_nils[0], 6);
+	  LBCOPY( ( BYTE *)OB_NEXT(i), &gl_nils[0], 6);
 
 						/* add icon object	*/
 	if (haveicon)
@@ -317,8 +309,8 @@ fm_alert( defbut, palstr )
 	Debug1( "calls Fm_alert\r\n" );
 	wm_update( 3 );
 						/* init tree pointer	*/
-	rs_gaddr(ad_sysglo, R_TREE, ALERT, &addr);
-	tree = addr;
+	rs_gaddr(ad_sysglo, R_TREE, ALERT, ( LONG *)&addr);
+	tree = ( LONG )addr;
 
 	spec = LLGET( OB_SPEC(ROOT) );
 	spec &= 0xFFFFFF80L;
@@ -352,7 +344,7 @@ fm_alert( defbut, palstr )
 
 	if (inm != 0)
 	{
-	  rs_gaddr(ad_sysglo, R_FRIMG, 0, &ptr);
+	  rs_gaddr(ad_sysglo, R_FRIMG, 0, ( LONG *)&ptr);
 	  LLSET(OB_SPEC(1), ptr[inm-1] );
 	}
 						/* convert to pixels	*/
@@ -378,7 +370,7 @@ fm_alert( defbut, palstr )
 	LWSET(OB_HEIGHT(ROOT), y );
 						/* center tree on screen*/
 
-	r_set(&f, 0, gl_hbox, gl_rscreen.g_w, gl_rscreen.g_h-gl_hbox );
+	r_set( ( WORD *)&f, 0, gl_hbox, gl_rscreen.g_w, gl_rscreen.g_h-gl_hbox );
 	
 	ob_center(tree, &m);
 
@@ -484,36 +476,36 @@ eralert( n, d )
 	drive_let = ( d + 'A' ) << 8;	/* make it a 2 char string!	*/
 
 	gsx_gclip( &t );
-
+ 
 /*
  * Kludge for MultiTOS on single floppy, no hard drive systems;
  * if the error alert is the "Please insert disk B: into drive A:"
  * one, and it's not for a floppy, then we change it to
  * "Please insert system disk into drive A:".
  */
-	if (n == MAXERR-2 && d > 1)
-	  {
-		n = MAXERR-1;
-	  }
+ 	if (n == MAXERR-2 && d > 1)
+ 	  {
+ 		n = MAXERR-1;
+ 	  }
 	obj = critobj[n];
 
 	if ( ml_ted[n] != -1 )		/* set the drive name */
-	  inf_sset( obj, ml_ted[n], pdrive_let );
+	  inf_sset( ( LONG )obj, ml_ted[n], ( BYTE *)pdrive_let );
 
-	ob_center( obj, &m );
+	ob_center( ( LONG )obj, &m );
 		
 	tmp = gl_tmp;	/* save old blt buffer */
 	gl_tmp = gl_crit;	
 	bb_save( &m ); 
 
 	gsx_sclip( &m );
-	ob_draw( obj, ROOT, MAX_DEPTH );
+	ob_draw( ( LONG )obj, ROOT, MAX_DEPTH );
 	
 	do
 	{	
 	  if ( gl_button & 0x01 )
 	  {
- 	    ret = ob_find( obj, 0, MAX_DEPTH, gl_xrat, gl_yrat );
+ 	    ret = ob_find( ( LONG )obj, 0, MAX_DEPTH, gl_xrat, gl_yrat );
 	    if ( ret != -1 )
 	    {
 	      if ( obj[ret].ob_flags & EXIT )
@@ -564,27 +556,27 @@ fm_error(n)
 	  case 2:			/* file not found	*/
 	  case 18:			/* no more files	*/
 	  case 3:			/* path not found	*/
-		string = ALRT18ERR;
+		string = ALRT18ER;
 		break;
 	  case 4:			/* too many open files	*/
-		string = ALRT04ERR;
+		string = ALRT04ER;
 		break;
 	  case 5:			/* access denied	*/
-		string = ALRT05ERR;
+		string = ALRT05ER;
 		break;
 	  case 8:			/* insufficient memory	*/
 	  case 10:			/* invalid environmeny	*/
 	  case 11:			/* invalid format	*/
-		string = ALRT08ERR;
+		string = ALRT08ER;
 		break;
 	  case 15:			/* invalid drive	*/
-		string = ALRT15ERR;
+		string = ALRT15ER;
 		break;
 	  default:
-		string = ALRTXXERR;
+		string = ALRTXXER;
 	}
 
-	ret = fm_show(string, (string == ALRTXXERR) ? &n : NULLPTR, 1 );
+	ret = fm_show(string, (string == ALRTXXER) ? &n : NULLPTR, 1 );
 
 	return( ret != 1 );
 }
@@ -601,7 +593,7 @@ ctlmouse( mon )
 {
 	if ( mon )
 	{
-	  gr_mouse( M_ARROW|0xC000, (BYTE*)0 );
+	  gr_mouse( M_ARROW|0xC000, ( MFORM *)0L );
 	  tmpmon = gl_mouse;		/* save the mouse on flag	*/
 	  tmpmoff = gl_moff;
 #if 0

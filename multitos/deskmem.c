@@ -1,4 +1,6 @@
 /*	DESKMEM.C		7/18/89 - 10/4/89	D.Mui		*/
+/*	Converted to Lattice C 5.51	02/18/93	C.Gee		*/
+
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -6,16 +8,16 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <osbind.h>
-#include <deskwin.h>
-#include <extern.h>
-#include <deskusa.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "osbind.h"
+#include "deskwin.h"
+#include "extern.h"
+#include "deskusa.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
 
 BYTE	*lp_start;
 BYTE	*lp_mid;
@@ -28,7 +30,7 @@ UWORD	apsize;
 /*	Init the application buffer	*/
 
 	WORD
-apbuf_init()
+apbuf_init( VOID )
 {
 	REG UWORD	i;
 	REG APP		*app,*app1;
@@ -36,30 +38,31 @@ apbuf_init()
 	
 	apsize += APP_NODE;
 	
-	if ( ! ( app = malloc( (LONG)( sizeof( APP ) * apsize ) ) ) )
+	if ( ! ( app = ( APP *)malloc( (LONG)( sizeof( APP ) * apsize ) ) ) )
 	  return( FALSE );
 
 	for ( i = 0; i < apsize; i++ )/* set up linked array	*/
-	  app[i].a_next = &app[i+1];
+	  app[i].a_next = ( BYTE *)&app[i+1];
 
-	app[i-1].a_next = (APP*)0;	
+/*	app[i-1].a_next = (APP*)0;	*/
+	app[i-1].a_next = ( BYTE *)0;
 
 	if ( applist )		/* we already has an app buffer	*/		
 	{			/* then copy the old stuff	*/
 	  app1 = app;
 	  while( applist )
 	  {			/* save the link list	*/
-	    appsave = app1->a_next;
+	    appsave = ( APP *)app1->a_next;
 	    *app1 = *applist;
-	    app1->a_next = appsave;
-	    applist = applist->a_next;
+	    app1->a_next = ( BYTE *)appsave;
+	    applist = ( APP *)applist->a_next;
 	    if ( !applist )
 	    {				/* new free app starts at	*/
-	      appfree = app1->a_next;
-	      app1->a_next = (APP*)0;
+	      appfree = ( APP *)app1->a_next;
+	      app1->a_next = ( BYTE *)0;
 	    }
 	    else
-	      app1 = app1->a_next;	
+	      app1 = ( APP *)app1->a_next;	
 	  }
 	
 	  applist = app;		/* new using list		*/
@@ -79,7 +82,7 @@ apbuf_init()
 /*	Initalize some memory buffer	*/
 
 	WORD
-mem_init( )
+mem_init( VOID )
 {
 	/* Allocate write string buffer	*/
 
@@ -107,7 +110,7 @@ m_1:	  do1_alert( FCNOMEM );
 
 	BYTE	
 *lp_fill( path, buf )
-	REG BYTE	*path;
+	BYTE	*path;
 	BYTE	**buf;
 {
 	REG BYTE	*ptr;
@@ -128,8 +131,8 @@ lp_1:	    *buf = (BYTE*)0;
 
 	  if ( *path == '@' )
 	  {
-	    *ptr++ = 0;
 	    path++;
+	    *ptr++ = 0;
 	    break;
 	  }
 
@@ -146,7 +149,7 @@ lp_1:	    *buf = (BYTE*)0;
 /*	Do the garbage collection of the buffer		*/
 
 	WORD
-lp_collect( )
+lp_collect( VOID )
 {
 	REG WORD	i;
 	BYTE	*addr;
@@ -180,7 +183,7 @@ lp_collect( )
 	while( app )
 	{
 	  lp_fill( app->a_name, &app->a_name );
-	  app = app->a_next;
+	  app = ( APP *)app->a_next;
 	}
 
 	free( lp_start );

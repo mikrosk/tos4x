@@ -22,71 +22,40 @@
  * 07/09/92  cjg   - Use gl_button instead of a graf_mkstate...
  * 09/22/92  cjg   - Clip to the intersection of the screen and menu
  * 01/13/93  cjg   - Added MTOP_FLAG() and MB_FLAG() usage.
+ *
+ * 02/11/93  cjg   - Converted to Lattice 5.51
+ * 02/19/93  cjg   - Force the use of prototypes
  */
 
 
 /* INCLUDE FILES
  * ================================================================
  */
-#include <portab.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <osbind.h>
+#include "pgem.h"
+#include "pmisc.h"
 
-#include "mn_tools.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "osbind.h"
+
 
 
 /* EXTERNS
  * ================================================================
  */
-
-/* MN_MENU.C */
-EXTERN WORD     Menu_Insert();
-EXTERN VOID     Menu_Delete();
-EXTERN MENU_PTR GetMenuPtr();
-EXTERN VOID	CheckMenuHeight();
-EXTERN WORD	CountMenuItems();
-EXTERN VOID	RestoreMenu();
-EXTERN VOID	AdjustMenuPosition();
-
-
-/* MN_EVENT.C */
-EXTERN LONG     EvntSubMenu();
-EXTERN BOOLEAN	Pop_Blit();
-
 EXTERN OBJECT   *CurTree;
 EXTERN WORD     CurMenu;
 EXTERN WORD     CurObject;
 EXTERN WORD	CurScroll;
 EXTERN WORD	CurKeyState;
-
-/* MN_MBAR.C */
 EXTERN BOOLEAN  MenuBar_Mode;
 EXTERN MENU_PTR gl_menuptr;
+EXTERN GRECT    gl_rfull;
+EXTERN WORD     gl_button;
 
 
-/* in MN_TOOLS.C */
-EXTERN VOID	ObjcDraw();
-
-/* in DESKIF.S */
-EXTERN WORD	wm_update();
-
-/* in OPTIMIZE.S */
-EXTERN BOOLEAN  min();
-
-/* GEMOBLIB.C */
-
-/* APGSXIF.S */
-EXTERN VOID   gsx_sclip();
-EXTERN GRECT  gl_rfull;
-
-EXTERN VOID   ob_gclip();	/* cjg 09/22/92 */
-
-EXTERN WORD gl_button;
 
 /* GLOBALS
  * ================================================================
@@ -131,10 +100,7 @@ MENU	*MData;			/* the output menu structure	 */
     WORD         MenuID;	/* The menu id for the menu node */
     LONG         obj;		/* return value from evnt_submenu*/
     GRECT        rect;		/* GRECT for dummy variable      */
-    BOOLEAN      flag = FALSE;	/* VALID/INVALID variable        */
-    MRETS	 mk;
-    GRECT	 clip;		/* cjg 09/22/92 */
-    WORD	 dummy;
+    BOOLEAN      flag;		/* VALID/INVALID variable        */
 
     flag = FALSE;		/* Set to Invalid return data    */
 
@@ -144,13 +110,6 @@ MENU	*MData;			/* the output menu structure	 */
     if( !MenuBar_Mode )		/* PopUp Menu Routines!          */
     {
       /* Wait for the up button */
-/*
-      do
-      {
-        gr_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
-      }while( mk.buttons );      
-*/
-
 	do
 	{
 	}while( gl_button );
@@ -161,7 +120,7 @@ MENU	*MData;			/* the output menu structure	 */
       /* Get the new Menu ID! */
       if( ( MenuID = Menu_Insert( tree, Menu->mn_menu )) > 0 )
       {
-        MenuPtr = GetMenuPtr( MenuID );			/* Get the ptr   */
+        MenuPtr = ( MENU_PTR )GetMenuPtr( MenuID );	/* Get the ptr   */
         MWIDTH( MenuPtr )  = ObW( MPARENT( MenuPtr ));  /* Set the width */
         MHEIGHT( MenuPtr ) = ObH( MPARENT( MenuPtr ));  /* and height    */
 
@@ -234,12 +193,6 @@ MENU	*MData;			/* the output menu structure	 */
      */
     if( !MenuBar_Mode )
     {
-/*
-      do
-      {
-        gr_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
-      }while( mk.buttons );      
-*/
 	do
 	{
 	}while( gl_button );
@@ -286,10 +239,10 @@ WORD		start_obj;		/* the obj we want on top   */
     MTOP_FLAG( MenuPtr )      = ObFlags( MFIRST_CHILD( MenuPtr ) );
     MTOP_TXT( MenuPtr )[0]    = '\0';
 
-    MB_OBJ( MenuPtr )    = MLAST_CHILD( MenuPtr );
-    MB_STATE( MenuPtr )  = ObState( MLAST_CHILD( MenuPtr ) );
-    MB_FLAG( MenuPtr )   = ObFlags( MLAST_CHILD( MenuPtr ) );
-    MB_TXT( MenuPtr )[0] = '\0';
+    MB_OBJ( MenuPtr )         = MLAST_CHILD( MenuPtr );
+    MB_STATE( MenuPtr )       = ObState( MLAST_CHILD( MenuPtr ) );
+    MB_FLAG( MenuPtr )        = ObFlags( MLAST_CHILD( MenuPtr ) );
+    MB_TXT( MenuPtr )[0]      = '\0';
 
     MBUFFER( MenuPtr )        = NULL;
     MPREV( MenuPtr )	      = NULL;

@@ -33,73 +33,32 @@
  * 01/13/93  cjg   - Set ObFlag() to SUBMENU if a submenu is attached.
  *		   - The extended object type contains the Menu ID.
  *		   - Check for IsSubMenu()
+ *
+ * 02/11/93  cjg   - Convert to Lattice C 5.51
+ * 02/19/93  cjg   - Force the use of prototypes
  */
 
 
 /* INCLUDE FILES
  * ================================================================
  */
-#include <portab.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <osbind.h>
+#include "pgem.h"
+#include "pmisc.h"
 
-#include "mn_tools.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "osbind.h"
 
 
 /* EXTERNS
  * ================================================================
  */
-
-/* in MN_MENU.C */
-EXTERN WORD       Menu_Insert();
-EXTERN VOID       Menu_Delete();
-EXTERN VOID	  CheckMenuHeight();
-EXTERN VOID	  RestoreMenu();
-EXTERN VOID	  AdjustMenuPosition();
-EXTERN MENU_PTR   GetMenuPtr();
 EXTERN MENU_PTR   MenuList;
+EXTERN WORD	  gl_wchar;
+EXTERN GRECT      gl_rfull;
 
-
-/* in MN_EVENT.C */
-EXTERN LONG       EvntSubMenu();
-EXTERN BOOLEAN	  Pop_Blit();
-
-
-/* in MN_POPUP.C */
-EXTERN VOID       AssignMenuData();
-
-
-/* in MN_INDEX.C */
-EXTERN WORD	  FindIndex();
-EXTERN WORD	  Get_New_Index();
-EXTERN PNODE_PTR  FindProcess();
-EXTERN INDEX_PTR  GetIndexPtr();
-EXTERN VOID	  DeleteIndex();
-
-
-/* in GEMOBLIB.C */
-EXTERN VOID	ob_offset();
-
-/* in OPTIMIZE.S */
-EXTERN WORD	strlen();
-
-/* in APGSXIF.S */
-EXTERN WORD	gl_wchar;
-EXTERN GRECT    gl_rfull;
-
-
-EXTERN VOID     ObjcDraw();
-EXTERN VOID	ob_gclip(); /* cjg 09/22/92 */
-
-/* PROTOTYPES
- * ================================================================
- */
-MENU_PTR ShowSubMenu();
 
 
 
@@ -300,7 +259,7 @@ MENU   *Menu;
 		break;
 
 	case 2: /* REMOVE */
-		result = mn_setmn( id, tree, item, NULLPTR );
+		result = mn_setmn( id, tree, item, ( MENU *)NULLPTR );
 		break;
 	
         default:
@@ -361,12 +320,12 @@ MENU		*Menu;
        /* If the Menu == NULLPTR, we really wanted to just remove
         * the submenu, so return TRUE! SUCCESS
 	*/
-	if( Menu == NULLPTR )
+	if( Menu == ( MENU *)NULLPTR )
 	   return( TRUE );
      }
 
      /* Make sure the menu structure is not NULL */
-     if( Menu == NULLPTR )	
+     if( Menu == ( MENU *)NULLPTR )	
        return( FALSE );		
 
 
@@ -418,14 +377,13 @@ MENU		*Menu;
  *         TRUE - returns the tree, parent, item and scroll status in Menu.
  */
 BOOLEAN
-mn_getmn( id, tree, item, itree, Menu )
+mn_getmn( id, tree, item, Menu )
 WORD		id;		/* Process id		      */
 OBJECT		*tree;		/* the tree we want to check  */
 WORD		item;		/* the menu item  for above   */
 MENU		*Menu;
 {
    PNODE_PTR ProcPtr;		/* ptr to the process node  */
-   UWORD     type;		/* the extended object type */
    WORD      Index;		/* the Index ID ( temp )    */
    REG INDEX_PTR IndexPtr;	/* ptr to the index node... */
    BOOLEAN   flag;		/* SUCCESS or FAILUE        */
@@ -472,7 +430,6 @@ WORD		id;		/* Process id		     */
 OBJECT		*tree;		/* the tree fo the menu...   */
 WORD		item;		/* see above...		     */
 {
-   UWORD     type;		/* the Extended Object Types */
    WORD      Index;		/* Index ID! 		     */
    PNODE_PTR ProcPtr;		/* ptr to the process node   */
 
@@ -572,7 +529,6 @@ OBJECT	        *tree;
 WORD		obj;			/* menu item we pop with      */
 {
    MENU_PTR SubPopPtr;			/* The MenuPtr of the Submenu */
-   UWORD    type;			/* The type of the menu item  */
    WORD     MenuIndex;			/* The Submenu Menu ID        */
    GRECT    rect;			/* Rect of the Menu item      */
    REG WORD xpos;			/* xpos, ypos of new submenu  */
@@ -583,7 +539,7 @@ WORD		obj;			/* menu item we pop with      */
    if( ( obj != NIL ) && IsG_String( obj ) && IsSubMenu( obj ) )
    {
 
-     ob_actxywh( tree, obj, &rect );
+     ob_actxywh( ( LONG )tree, obj, &rect );
 
      /* We won't check for a valid menuid here, since the
       * CheckForSubMenu() routines already did that.

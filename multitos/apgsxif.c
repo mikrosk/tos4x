@@ -14,11 +14,16 @@
 *	-------------------------------------------------------------
 */
 
-#include <portab.h>
-#include <machine.h>
-#include <obdefs.h>
-#include <vdidefs.h>
-#include <aesmint.h>
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "vdidefs.h"
+#include "aesmint.h"
+
+#include "pgem.h"
+#include "pmisc.h"
+
+EXTERN	VOID 	gsx2( VOID );
 
 EXTERN	WORD	min();
 EXTERN	BYTE	AE_PNTSIZE[];
@@ -86,7 +91,7 @@ GLOBAL GRECT	gl_rcenter;	/* center of the screen		*/
 GLOBAL GRECT	gl_rmenu;	/* menu area			*/
 
 
-	VOID
+	BOOLEAN
 gsx_sclip(pt)
 	GRECT		*pt;
 {
@@ -94,7 +99,7 @@ gsx_sclip(pt)
 
 	ppts = &ptsin[0];
 
-	r_get(pt, &gl_xclip, &gl_yclip, &gl_wclip, &gl_hclip);
+	r_get( (WORD *)pt, &gl_xclip, &gl_yclip, &gl_wclip, &gl_hclip);
 
 	if ( gl_wclip && gl_hclip )
 	{
@@ -114,7 +119,7 @@ gsx_sclip(pt)
 gsx_gclip(pt)
 	GRECT		*pt;
 {
-	r_set(pt, gl_xclip, gl_yclip, gl_wclip, gl_hclip);
+	r_set( (WORD *)pt, gl_xclip, gl_yclip, gl_wclip, gl_hclip);
 }
 
 
@@ -304,7 +309,7 @@ gsx_xcbox(pt)
 	gsx_xline( 3, &ppts[0] );
 }
 
-
+VOID
 gsx_fix(pfd, theaddr, wb, h)
 	REG FDB			*pfd;
 	REG LONG		theaddr;
@@ -330,7 +335,7 @@ gsx_fix(pfd, theaddr, wb, h)
 }
 
 
-	WORD
+	VOID
 gsx_blt(saddr, sx, sy, swb, daddr, dx, dy, dwb, w, h, rule, fgcolor, bgcolor)
 	LONG		saddr;
 	REG UWORD		sx, sy, swb;
@@ -355,9 +360,10 @@ gsx_blt(saddr, sx, sy, swb, daddr, dx, dy, dwb, w, h, rule, fgcolor, bgcolor)
 	ppts[6] = dx + w - 1;
 	ppts[7] = dy + h - 1 ;
 	if (fgcolor == -1)
-	  vro_cpyfm( rule, &ppts[0], &gl_src, &gl_dst);
+	  vro_cpyfm( rule, &ppts[0], (WORD *)&gl_src, (WORD *)&gl_dst);
 	else
-	  vrt_cpyfm( rule, &ppts[0], &gl_src, &gl_dst, fgcolor, bgcolor);
+	  vrt_cpyfm( rule, &ppts[0], (WORD *)&gl_src, (WORD *)&gl_dst, 
+		fgcolor, bgcolor);
 	gsx_mon();
 }
 
@@ -386,7 +392,7 @@ gsx_trans(saddr, swb, daddr, dwb, h, fg, bg)
 	gl_src.fd_nplanes = 1;
 
 	gsx_fix(&gl_dst, daddr, dwb, h);
-	vrn_trnfm( &gl_src, &gl_dst );
+	vrn_trnfm( (WORD *)&gl_src, (WORD *)&gl_dst );
 }
 
 
@@ -405,7 +411,7 @@ s_pntsize( buffer )
 	
 	if ( asctobin( buffer, &l ) )
 	{
-	  if ( size = l )
+	  if ( size = (WORD)l )
 	  {
 	    if ( gl_fsm )
 	      vst_arbpt( size, &gl_wptschar, &gl_hptschar, &gl_wchar, &gl_hchar );
@@ -449,7 +455,7 @@ gsx_lfont( buffer )
 }
 
 
-	WORD
+	VOID
 gsx_start()
 {
 /*	REG WORD	nc;*/
@@ -472,7 +478,7 @@ gsx_start()
 
 	gl_spd = 0;
 
-	if ( aescookie( 0x46534d43L, &l ) )	/* FSMC */
+	if ( aescookie( 0x46534d43L, (LONG *)&l ) )	/* FSMC */
 	{
 	  if ( *l == 0x5F535044L ) /* _SPD */
 	    gl_spd = 1;
@@ -499,9 +505,9 @@ gsx_start()
 					/* Load AES font type	*/
 	Debug1( "Set font\r\n" );
 
-	s_aescnf( AE_FONTID, &gsx_lfont );
+	(VOID) s_aescnf( AE_FONTID,  (WORD (*)()) &gsx_lfont );
 
-	s_aescnf( AE_PNTSIZE, &s_pntsize );
+	(VOID) s_aescnf( AE_PNTSIZE, (WORD (*)()) &s_pntsize );
 
 /* if font is not initialized, assume system font */
 /* ++ERS 12/18/92 */
@@ -546,13 +552,13 @@ gsx_start()
 	vsl_type( 7 );		/* User defined line pattern */
 	vsl_width( 1 );		/* line width	*/
 	vsl_udsty( 0xffff );	/* Line pattern	*/	
-	r_set(&gl_rscreen, 0, 0, gl_width, gl_height);
-	r_set(&gl_rfull, 0, gl_hbox, gl_width, (gl_height - gl_hbox));
-	r_set(&gl_rzero, 0, 0, 0, 0);
-	r_set(&gl_rcenter, (gl_width-gl_wbox)/2, (gl_height-(2*gl_hbox))/2, 
+	r_set((WORD *)&gl_rscreen, 0, 0, gl_width, gl_height);
+	r_set((WORD *)&gl_rfull, 0, gl_hbox, gl_width, (gl_height - gl_hbox));
+	r_set((WORD *)&gl_rzero, 0, 0, 0, 0);
+	r_set((WORD *)&gl_rcenter, (gl_width-gl_wbox)/2, (gl_height-(2*gl_hbox))/2, 
 			gl_wbox, gl_hbox);
-	r_set(&gl_rmenu, 0, 0, gl_width, gl_hbox);
-	ad_intin = ADDR(&intin[0]);
+	r_set((WORD *)&gl_rmenu, 0, 0, gl_width, gl_hbox);
+	ad_intin = (LONG)(ADDR(&intin[0]));
 }
 
 
@@ -581,7 +587,7 @@ bb_fill(mode, fis, patt, hx, hy, hw, hh)
 	  vsf_style( patt );
 	  gl_patt = patt;
 	}
-	vr_recfl( &ppts[0], &gl_dst );
+	vr_recfl( &ppts[0], (WORD *)&gl_dst );
 }
 
 
@@ -614,7 +620,7 @@ ch_height(fn)
 
 /*	Calculate where to put the text		*/
 
-	WORD
+	VOID
 gsx_tcalc(font, ptext, ptextw, ptexth, pnumchs)
 	REG WORD		font;
 	LONG		ptext;
@@ -627,7 +633,7 @@ gsx_tcalc(font, ptext, ptextw, ptexth, pnumchs)
 
 	wc = ch_width(font);		/* get the width and height of the text */ 
 	hc = ch_height(font);
-	*pnumchs = LBWMOV(ad_intin, ptext);
+	*pnumchs = LBWMOV((BYTE *)ad_intin, (BYTE *)ptext);
 					/* figure out the min width of  text	*/
 	*ptextw = min(*ptextw, *pnumchs * wc );
 					/* figure out the min height of text	*/
@@ -642,7 +648,7 @@ gsx_tcalc(font, ptext, ptextw, ptexth, pnumchs)
 }  /* gsx_tcalc */
 
 
-	WORD
+	VOID
 gsx_tblt(tb_f, x, y, tb_nc)
 	REG WORD		tb_f;
 	REG WORD		x, y;

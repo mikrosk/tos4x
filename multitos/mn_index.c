@@ -14,7 +14,10 @@
  * 05/14/92 cjg - Pass in Process id's to appropriate functions
  * 05/29/92 cjg - Limit for indexs is now 64 MAximum.
  *		- Menu IDs range from 128 - 192
- * 6/4/92	- Fixed at getnewproc()
+ * 06/04/92	- Fixed at getnewproc()
+ * 
+ * 02/11/93 cjg - Convert to Lattice C 5.51
+ * 02/19/93 cjg - Force the use of Prototypes 
  */
 
 
@@ -61,27 +64,21 @@
 /* INCLUDE FILES
  * ================================================================
  */
-#include <portab.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <osbind.h>
+#include "pgem.h"
+#include "pmisc.h"
 
-#include "mn_tools.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "osbind.h"
+
 
 
 /* EXTERNS
  * ================================================================
  */
-EXTERN	BYTE	*dos_xalloc();
 
-/* Must be declared here, or else redeclarations occur */
-PNODE_PTR	FindProcess();
-PNODE_PTR	GetNewProc();
-INDEX_PTR	GetIndexPtr();
 
 
 /* GLOBALS
@@ -118,7 +115,8 @@ WORD   	imenu;			/* the menu object that we are looking for */
    REG CNODE_PTR CurPtr;	/* Pointer to the current Cluster structure*/
    PNODE_PTR 	 ProcPtr;	/* Pointer to the current Process structure*/
 
-   if( ( ProcPtr = FindProcess( id )) == NULLPTR )  /* Look for the process node */
+   /* Look for the process node */
+   if( ( ProcPtr = FindProcess( id )) == ( PNODE_PTR )NULLPTR )
      return( 0 );
 
    if( !PCOUNT( ProcPtr ) )		/* No Nodes are active	     */
@@ -174,15 +172,18 @@ WORD	imenu;			/* the menu object to attach	   */
    REG PNODE_PTR ProcPtr;	/* Pointer to the process structure*/
    WORD      	 Index;		/* The available Index ID!         */
 
-   if( (ProcPtr = FindProcess( id ))==NULLPTR )/* Look for the process node*/
+   /* Look for the process node*/
+   if( (ProcPtr = FindProcess( id )) == ( PNODE_PTR )NULLPTR )
    {
-	if( (ProcPtr = GetNewProc( id ))==NULLPTR)	/* Create a new process node */
+	/* Create a new process node */
+	if( (ProcPtr = GetNewProc( id )) == ( PNODE_PTR )NULLPTR )
             return( 0 );		/* Return a 0 index ( error )*/
    }
    if( (Index = GetNewID( ProcPtr ))==NULL)   	/* Get an Index ID!          */
      return( 0 );				/* No more- sorry            */
 
-   if( (IndexPtr = GetIndexPtr( ProcPtr, Index ))==NULLPTR )      /* Get the pntr         */
+   /* Get the pntr         */
+   if( (IndexPtr = GetIndexPtr( ProcPtr, Index )) == ( INDEX_PTR )NULLPTR )
      return( 0 );
 
    ActiveTree( itree );				  /* fill the struct      */
@@ -219,7 +220,7 @@ WORD		id;		/* process id for the node    */
 
    PID( CurPtr )    = id;	/* Install the new process id */
    PCOUNT( CurPtr ) = 0;	/* Clear the # of IDs used    */
-   PNEXT( CurPtr )  = NULLPTR;	/* Clear ptr to next process  */
+   PNEXT( CurPtr )  = ( PNODE_PTR )NULLPTR;	/* Clear ptr to next process  */
 
    CPtr = &PCLUSTER( CurPtr );	/* Get pointer to cluster     */
    InitCluster( CPtr );	        /* Initialize the cluster     */
@@ -268,7 +269,8 @@ WORD	id;				  /* process id to use      */
     REG PNODE_PTR NewPtr;		  /* Ptr to New Process     */
 
     /* Allocate memory for a new process structure */
-    if( (NewPtr = ( PNODE_PTR )dos_xalloc( (LONG)sizeof( PNODE ), 3 )) > NULLPTR )
+    if( (NewPtr = ( PNODE_PTR )dos_xalloc( (LONG)sizeof( PNODE ), 3 ))
+	 > ( PNODE_PTR )NULLPTR )
     {
        InitProcess( NewPtr, id );   
 
@@ -321,7 +323,8 @@ WORD	id;					/* process id to free up */
 
     if( IndexList )				/* Test the head list    */
     {
-      if( (CurPtr = FindProcess( id ))>NULLPTR)/* Find the process!     */
+      /* Find the process!     */
+      if( (CurPtr = FindProcess( id )) > ( PNODE_PTR )NULLPTR)
       {						/* YES! found the process*/	
           if( CurPtr == IndexList )		/* Check if its the head */
           {					/* Its the first structure, so*/
@@ -338,7 +341,7 @@ WORD	id;					/* process id to free up */
               }
           }
           FreeClusters( CurPtr );	/* Free up clusters to this PID  */
-	  dos_free( CurPtr );		/* Free up the Process structure */
+	  dos_free( ( LONG )CurPtr );	/* Free up the Process structure */
       }
    }
 }
@@ -364,7 +367,7 @@ REG CNODE_PTR	CurPtr;		      /* ptr to the current cluster */
    REG WORD i;			      /* Counter		    */
    REG INDEX_PTR IndexPtr;	      /* Ptr to Index structure     */
 
-   CNEXT( CurPtr ) = NULLPTR;	      /* Clear ptr to next cluster  */
+   CNEXT( CurPtr ) = ( CNODE_PTR )NULLPTR;   /* Clear ptr to next cluster  */
    for( i = 0; i < CMAX; i++ ) /* Init each index node       */
    {
       IndexPtr = &CTABLE( CurPtr )[i];       /* Get index node pointer */
@@ -372,7 +375,7 @@ REG CNODE_PTR	CurPtr;		      /* ptr to the current cluster */
       {					     /* and update the vars    */
         INDEX_STATUS( IndexPtr )   = FALSE;  /* FALSE - unused         */
         INDEX_ID( IndexPtr )       = 0;	     /* Clear the rest of the  */
-        INDEX_TREE( IndexPtr )     = NULLPTR;/* variables...           */
+        INDEX_TREE( IndexPtr )     = ( OBJECT *)NULLPTR;/* variables...           */
         INDEX_MENU( IndexPtr )     = NIL;
         INDEX_OBJ( IndexPtr )      = NIL;
 	INDEX_FLAGSCROLL(IndexPtr) = FALSE;
@@ -393,7 +396,7 @@ GetNewCluster( VOID )
 {
     REG CNODE_PTR NewPtr;		/* Ptr to the new cluster*/
 
-    if( ( NewPtr = ( CNODE_PTR )dos_xalloc( ( LONG )sizeof( CNODE ), 3 )) > NULLPTR )
+    if( ( NewPtr = ( CNODE_PTR )dos_xalloc( ( LONG )sizeof( CNODE ), 3 )) > ( CNODE_PTR )NULLPTR )
        InitCluster( NewPtr );
     return( NewPtr );
 }
@@ -433,8 +436,8 @@ PNODE_PTR	ProcPtr;		/* ptr to the process node           */
          PrevPtr = CurPtr;		/* so that we can free up the last   */
          CurPtr  = CNEXT( CurPtr );	/* cluster in use.                   */
        }
-       CNEXT( PrevPtr ) = NULLPTR;	/* Clear pointer pting to this node  */
-       dos_free( CurPtr );		/* And delete it.                    */
+       CNEXT( PrevPtr ) = ( CNODE_PTR )NULLPTR;	/* Clear pointer pting to this node  */
+       dos_free( ( LONG )CurPtr );	/* And delete it.                    */
     }
 
     /* Now, need to zero out the 8 nodes in the process structure */
@@ -505,7 +508,7 @@ PNODE_PTR	ProcPtr;	/* ptr to the process node  */
            /* If we got this far, then we ran out of room in the cluster
             * and need to allocate a new cluster.
             */
-            if( ( CurPtr = GetNewCluster()) == NULLPTR ) /* error */
+            if( ( CurPtr = GetNewCluster()) == ( CNODE_PTR )NULLPTR ) /* error */
 		return( 0 );
             CNEXT( PrevPtr ) = CurPtr;  /* Attach the cluster onto the end*/
             PrevPtr = CurPtr;		/* and reset the previous ptr.    */
@@ -590,7 +593,7 @@ BOOLEAN		flag;				/* See above description...*/
 
     if( ProcPtr )				/* Make sure its valid     */
     {
-       if( (IndexPtr = GetIndexPtr( ProcPtr, index ))>NULLPTR)/* Get ptr to Index struct */
+       if( (IndexPtr = GetIndexPtr( ProcPtr, index ))>(INDEX_PTR)NULLPTR)/* Get ptr to Index struct */
        {
            if( !flag )				/* FALSE! - decrement first*/
            {

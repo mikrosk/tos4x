@@ -1,11 +1,15 @@
 /* kballoc.c - fast allocator for LC5 based on AKP's nalloc2.c
  * ===========================================================================
  * $Log: kballoc.c,v $
- * Revision 1.2  1993/03/08  20:07:02  ersmith
- * REAL MultiTOS 1.01
+ * Revision 1.3  1993/03/10  20:12:42  ersmith
+ * Lattice port
+ *
  *
  * Revision 1.1  1993/02/24  23:52:46  ersmith
  * 1 meg floppy MultiTOS
+ *
+ * Revision 1.0  1993/02/03  21:26:46  ersmith
+ * MultiTOS version 1.0
  *
  * 911025 kbad added mavail(), mheap()
  * 910508 kbad
@@ -35,37 +39,17 @@
 #define NOISY	0	/* 1 to write tracking chars to stdout */
 #define VALIDATE 0	/* 1 for SLOW validity checks on malloc/free */
 
-#include <osbind.h>
+#include "pmisc.h"
+#include "osbind.h"
 
-#if 0	/* DEBUGON */
-#include <stdio.h>
-#else
-typedef unsigned long size_t;
-#endif
 
-#if 0	/* NOISY && DEBUGON */
-#define DBconout(c) Cconout(c)
-#else
 #define DBconout(c) /**/
-#endif
 
-#if 0	/* DEBUGON	*/
-#define ding() Bconout(2,'\a');
-#endif
 
-/*
- * Portability & debug assist definitions
- */
-#define REG	register
-#define MLOCAL	static
-#define GLOBAL	/* */
-#define VOID	/* */ /* void for ANSI, else empty comment */
 #if 0
-typedef void	*VOIDP;	/* void* for ANSI, else char* */
-#else
-typedef char	*VOIDP;
 #define __NOPROTO
 #endif
+
 
 #ifndef NULL
 #define NULL	((VOIDP)0L)
@@ -79,18 +63,7 @@ typedef char	*VOIDP;
 #define __PROTO(a) ()
 #endif
 
-VOIDP	lmalloc __PROTO(( long ));
-VOID	free __PROTO(( VOIDP ));
-VOIDP	malloc __PROTO(( size_t ));
-VOIDP	lcalloc __PROTO(( long, long ));
-VOIDP	calloc __PROTO(( size_t, size_t ));
-VOIDP	lrealloc __PROTO(( VOIDP, long ));
-VOIDP	realloc __PROTO(( VOIDP, size_t ));
-VOID	mdump( VOID );
-long	mavail( VOID );
-VOID	mheap __PROTO(( VOIDP, size_t ));
-
-#define ALIGN (sizeof(short)-1)
+#define ALIGN (sizeof(WORD)-1)
 
 /* ---------------------------------------------------------------------------
  * block header: every memory block has one.
@@ -108,7 +81,7 @@ typedef struct block
 	struct block *b_valid;
 #endif
 	struct block *b_next;   /* NULL for last guy; next alloc or next free */
-	long b_size;
+	LONG b_size;
 } BLOCK;
 
 #define ALLOC_MAGIC	((BLOCK*)0x614C6F43L) /* 'aLoC' */
@@ -121,7 +94,7 @@ typedef struct block
 typedef struct arena
 {
 	struct arena *a_next;
-	long a_size;
+	LONG a_size;
 	struct block *a_ffirst; /* head of free list */
 #if VALIDATE
 	struct block *a_afirst; /* head of alloc list */
@@ -135,9 +108,16 @@ typedef struct arena
  * unbalanced: 25K on a 520ST and 200K on a Mega 4, so it's tempered by
  * the constant MAXARENA as the largest minimum you'll get (I chose 100K).
  */
-MLOCAL ARENA *a_first = NULL;
-MLOCAL ARENA *a_heap = NULL;
-MLOCAL long minarena = 0;
+
+/* --------------------------------------------------------------------------
+ * If this is going into ROM, then one cannot initialize the variables.
+ */
+MLOCAL ARENA *a_first;
+MLOCAL ARENA *a_heap;
+MLOCAL LONG minarena;
+
+
+
 
 #if 0
 #define MAXARENA (100L*1024L)
@@ -149,7 +129,7 @@ MLOCAL long minarena = 0;
 /* ---------------------------------------------------------------------------
  * Validate ALL arenas & blocks of memory. Return 0 if any are invalid.
  */
-MLOCAL int mvalid(VOID)
+MLOCAL WORD mvalid(VOID)
 {
 REG	ARENA	*a;
 REG	BLOCK	*b, *valid;
@@ -181,11 +161,11 @@ GLOBAL VOID initkballoc()
  * else get a new arena of max(minarena, size) bytes.
  */
 GLOBAL VOIDP lmalloc(size)
-REG long size;
+REG LONG size;
 {
 REG	ARENA	*a;
 REG	BLOCK	*b, *mb, **q;
-REG	long	temp, minsize;
+REG	LONG	temp, minsize;
 
 	DBconout('A');
 
@@ -217,7 +197,7 @@ REG	long	temp, minsize;
 				if (mb->b_size >= minsize)
 				{
 					DBconout('c');
-					b = (BLOCK*)(((char*)(b+1)) + size);
+					b = (BLOCK*)(((BYTE*)(b+1)) + size);
 					b->b_size = mb->b_size - minsize;
 					b->b_next = mb->b_next;
 					*q = b;
@@ -247,7 +227,7 @@ REG	long	temp, minsize;
 
 		if (!minarena)
 		{
-			minarena = (long)Malloc(-1L) / 20;
+			minarena = (LONG)Malloc(-1L) / 20;
 			if (minarena > MAXARENA) minarena = MAXARENA;
 		}
 
@@ -282,7 +262,7 @@ REG	long	temp, minsize;
 		{
 		/* Space left over, set up a free block */
 			DBconout('c');
-			b = a->a_ffirst = (BLOCK*)((char*)(mb+1) + size);
+			b = a->a_ffirst = (BLOCK*)((BYTE*)(mb+1) + size);
 			b->b_next = NULL;
 			b->b_size = temp - minsize;
 #if VALIDATE
@@ -300,7 +280,7 @@ REG	long	temp, minsize;
 #else
 	mb->b_next = ALLOC_MAGIC;
 #endif
-	return ++mb;
+	return( ( VOIDP )++mb );
 }
 
 
@@ -330,7 +310,7 @@ REG	BLOCK	*b, *pb, *fb;
 		a = NULL;
 
 	/* Find the arena this block lives in */
-	while ( a && (fb < (BLOCK*)a || fb > (BLOCK*)(((char*)a)+a->a_size)) )
+	while ( a && (fb < (BLOCK*)a || fb > (BLOCK*)(((BYTE*)a)+a->a_size)) )
 		a = *(qa = &a->a_next);
 
 	if (!a)
@@ -369,7 +349,7 @@ REG	BLOCK	*b, *pb, *fb;
 	 */
 	if (pb)
 	{
-		if ((BLOCK*)(((char*)(pb+1)) + pb->b_size) == fb)
+		if ((BLOCK*)(((BYTE*)(pb+1)) + pb->b_size) == fb)
 		{
 		/* absorb adjacent block */
 			DBconout('b');
@@ -381,7 +361,7 @@ REG	BLOCK	*b, *pb, *fb;
 	else a->a_ffirst = fb;
 
 	/* Coalesce forward: if the next block is adjacent, absorb it */
-	if (b && (BLOCK*)(((char*)(fb+1)) + fb->b_size) == b)
+	if (b && (BLOCK*)(((BYTE*)(fb+1)) + fb->b_size) == b)
 	{
 		DBconout('f');
 		fb->b_size += sizeof(BLOCK) + b->b_size;
@@ -404,28 +384,28 @@ REG	BLOCK	*b, *pb, *fb;
 GLOBAL VOIDP malloc(size)
 size_t size;
 {
-	return (lmalloc((long)size));
+	return (lmalloc((LONG)size));
 }
 
 /* ---------------------------------------------------------------------------
  */
 GLOBAL VOIDP lcalloc(count,size)
-long count;
-REG long size;
+LONG count;
+REG LONG size;
 {
 	VOIDP	buf;
-REG	long	frag, *lp;
-	char	*cp;
+REG	LONG	frag, *lp;
+	BYTE	*cp;
 
 	size *= count;
 	if ( (buf = lmalloc(size)) != NULL )
 	{
 	/* clear longs, then leftovers */
-		lp = (long*)buf;
+		lp = (LONG*)buf;
 		frag = (size & 3) + 1;
 		size = (size >> 2) + 1;
 		while (--size) *lp++ = 0;
-		cp = (char*)lp;
+		cp = (BYTE*)lp;
 		while (--frag) *cp++ = 0;
 	}
 	return buf;
@@ -436,7 +416,7 @@ REG	long	frag, *lp;
 GLOBAL VOIDP calloc(count,size)
 size_t count, size;
 {
-	return lcalloc((long)count,(long)size);
+	return lcalloc((LONG)count,(LONG)size);
 }
 
 /* ---------------------------------------------------------------------------
@@ -446,12 +426,12 @@ size_t count, size;
  */
 GLOBAL VOIDP lrealloc(xrb,size)
 VOIDP xrb;
-REG long size;
+REG LONG size;
 {
 REG	BLOCK	*rb = (BLOCK*)xrb;
 REG	BLOCK	*b;
-REG	long	frag, *ls, *ld;
-	char	*cs, *cd;
+REG	LONG	frag, *ls, *ld;
+	BYTE	*cs, *cd;
 
 	DBconout('R');
 
@@ -459,23 +439,23 @@ REG	long	frag, *ls, *ld;
 	if (size < 0) return NULL;
 	size = (size+ALIGN) & ~ALIGN;
 
-	ls = (long*)rb; 	/* save start address of original block */
+	ls = (LONG*)rb; 	/* save start address of original block */
 	rb--;				/* get block header address */
 
 	/* get a new block and copy */
-	if ((b = (BLOCK*)(ld = lmalloc(size))) == NULL) return NULL;
+	if ((b = (BLOCK*)(ld = ( LONG *)lmalloc(size))) == NULL) return( ( VOIDP )NULL );
 
 	if (rb->b_size < size) size = rb->b_size;
 	frag = (size & 3) + 1;
 	size = (size >> 2) + 1;
 	while (--size) *ld++ = *ls++;
-	cs = (char*)ls;
-	cd = (char*)ld;
+	cs = (BYTE*)ls;
+	cd = (BYTE*)ld;
 	while (--frag) *cd++ = *cs++;
 
 	free(rb+1);
 	DBconout('r');
-	return b;
+	return( ( VOIDP )b );
 }
 
 /* ---------------------------------------------------------------------------
@@ -484,19 +464,19 @@ GLOBAL VOIDP realloc(ptr,size)
 VOIDP ptr;
 size_t size;
 {
-	return lrealloc(ptr,(long)size);
+	return lrealloc(ptr,(LONG)size);
 }
 
 /* ---------------------------------------------------------------------------
  */
 #if DEBUGON
-GLOBAL ARENA *watch_arena = NULL;
+GLOBAL ARENA *watch_arena;
 
 GLOBAL VOID mdump( VOID )
 {
 REG	ARENA *a;
 REG	BLOCK *b;
-	int i;
+	WORD i;
 
 puts("\033H");
 	for (a = a_first; a; a = a->a_next)
@@ -508,7 +488,7 @@ puts("\033H");
 			for (i=0, b = a->a_ffirst; b; b = b->b_next)
 			{
 				printf("$%p[%05lx]$%p %s",
-						b, b->b_size, (char*)(b+1)+b->b_size,
+						b, b->b_size, (BYTE*)(b+1)+b->b_size,
 						(++i == 3) ? i=0,"\n\033K" : "");
 				if (b->b_size > a->a_size) ding();
 			}
@@ -522,10 +502,10 @@ puts("\033H");
 /* ---------------------------------------------------------------------------
  * Return the total number of bytes of memory available for allocation.
  */
-GLOBAL long mavail( VOID )
+GLOBAL LONG mavail( VOID )
 {
-	long	*p, *prev;
-	long	chunk, total;
+	LONG	*p, *prev;
+	LONG	chunk, total;
 	ARENA	*a;
 	BLOCK	*b;
 
@@ -543,16 +523,16 @@ GLOBAL long mavail( VOID )
 	if (!a_heap)
 	{
 		prev = NULL;
-		while ( (chunk = (long)Malloc(-1L)) > 0L )
+		while ( (chunk = (LONG)Malloc(-1L)) > 0L )
 		{
 			total += chunk;
-			p = Malloc(chunk);
-			*p = (long)(prev);
+			p = ( LONG *)Malloc(chunk);
+			*p = (LONG)(prev);
 			prev = p;
 		}
 		while ((p = prev) != NULL)
 		{
-			prev = *(long **)p;
+			prev = *(LONG **)p;
 			Mfree(p);
 		}
 	}

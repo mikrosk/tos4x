@@ -7,6 +7,8 @@
 /*	Fix at ob_draw of get_par	3/9/87	Derek Mui		*/
 /*	Restore back into C language from Ver 3.01	8/29/90	D.Mui	*/
 /*	Added 3D and color icon			7/7/92	D.Mui		*/
+/*	Convert to Lattice C 5.51	        02/16/93	C.Gee   */
+/*	Force to use prototypes			02/23/93	C.Gee	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -23,25 +25,24 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "objaddr.h"
+
+
 
 #define ADJOUTLPIX 	3
 #define ADJSHADPIX 	SHADOW
 
+
+
+
 /*****************************************************************/
 /*                   COLOR ICON DECLARATIONS                     */
 /*****************************************************************/
-
-BYTE	*dos_xalloc();
-WORD 	*fix_mono(), *fix_res();
-
 WORD gl_colmask[128];		/* global mask used by color icons */
 				/* WARNING:  The size of this array has been */
 				/* set to 128 words and no bound checking is */
@@ -87,17 +88,13 @@ WORD	rgb_tab[] = { 0xFFDF,
 0x4180, 0x4100, 0x4080, 0xFFDF, 0x0 
 };
 
-EXTERN WORD reverse();
-EXTERN expand_data();
+
 
 /******************** END COLOR *******************************/
 
 						/* in GSXBIND.C		*/
 #define vsf_color( x )		gsx_1code(S_FILL_COLOR, x)
 
-EXTERN VOID	gsx_moff();
-EXTERN VOID	gsx_mon();
-EXTERN WORD	gsx_chkclip();
 
 EXTERN	GRECT	gl_rfull;
 EXTERN WORD	gl_width;
@@ -125,7 +122,7 @@ EXTERN UWORD	gl_indbutcol, gl_actbutcol, gl_alrtcol;
 
 	UWORD
 far_call( fcode,fdata )
-	WORD	(*fcode)();
+	WORD	(*fcode)( LONG );
 	LONG	fdata;
 {
     return( (*fcode)(fdata) );
@@ -140,7 +137,7 @@ far_call( fcode,fdata )
 ob_sysvar(mode, which, inval1, inval2, outval1, outval2)
 UWORD	mode, which, inval1, inval2, *outval1, *outval2;
 {
-    int	ret;
+    WORD  ret;
 
     ret = TRUE;			    /* assume OK */
 
@@ -298,10 +295,10 @@ ob_user(tree, obj, pt, spec, curr_state, new_state)
 	pb.pb_obj = obj;
 	pb.pb_prevstate = curr_state;
 	pb.pb_currstate = new_state;
-	rc_copy(pt, &pb.pb_x); 
-	gsx_gclip(&pb.pb_xc);
+	rc_copy( ( WORD *)pt, ( WORD *)&pb.pb_x); 
+	gsx_gclip( ( GRECT *)&pb.pb_xc);
 	pb.pb_parm = LLGET(spec+4);
-	return(  far_call(LLGET(spec), ADDR(&pb)) );
+	return(  far_call( ( WORD(*)())LLGET(spec), ( LONG )&pb ));
 }
 
 
@@ -326,7 +323,7 @@ WORD	    icol;	/* interior color */
     if (clip)
 	gsx_sclip(prect);
 
-    rc_copy(prect, &r);
+    rc_copy( ( WORD *)prect, ( WORD *)&r);
 
     if (th > 0) {			/* if border is inside,	    */
 	r.g_x += th;			/* object area is 1 pixel   */
@@ -535,7 +532,7 @@ just_draw(tree, obj, sx, sy)
 						/*  shadow, & thickness	*/
 	if (gl_wclip && gl_hclip)
 	{
-	  rc_copy(pt, &c);
+	  rc_copy( ( WORD*)pt, ( WORD *)&c);
 	  if (state & OUTLINED)
 	    gr_inside(&c, -3);
 	  else
@@ -544,7 +541,7 @@ just_draw(tree, obj, sx, sy)
 	    return;
 	}
 						/* for all tedinfo	*/
-	rc_copy( pt, &c );			/*   types get copy of	*/
+	rc_copy( ( WORD *)pt, ( WORD *)&c );	/*   types get copy of	*/
 						/*   ted and crack the	*/
 						/*   color word and set	*/
 						/*   the text color	*/
@@ -559,7 +556,7 @@ just_draw(tree, obj, sx, sy)
 	    case G_FBOXTEXT:
 	    case G_TEXT:
 	    case G_FTEXT:
-		  LBCOPY(&edblk, spec, sizeof(TEDINFO));
+		  LBCOPY( ( BYTE *)&edblk, ( BYTE *)spec, sizeof(TEDINFO));
 		  gr_crack(edblk.te_color, &bcol, &tcol, &ipat, &icol, &tmode);
 	/* if it's a 3D background object, draw it in 3D color */
 	/* this can get complicated, because gr_text will always draw a white
@@ -699,13 +696,13 @@ just_draw(tree, obj, sx, sy)
 	  {
 	    case G_FTEXT:
 	    case G_FBOXTEXT:
-		LSTCPY(&D.g_rawstr[0], edblk.te_ptext);
-		LSTCPY(&D.g_tmpstr[0], edblk.te_ptmplt);
+		LSTCPY(&D.g_rawstr[0], ( BYTE *)edblk.te_ptext);
+		LSTCPY(&D.g_tmpstr[0], ( BYTE *)edblk.te_ptmplt);
 		ob_format(edblk.te_just, &D.g_rawstr[0], &D.g_tmpstr[0], 
 			&D.g_fmtstr[0]);
 						/* fall thru to gr_gtext*/
 	    case G_BOXCHAR:
-		edblk.te_ptext = &D.g_fmtstr[0];
+		edblk.te_ptext = ( LONG )&D.g_fmtstr[0];
 		if (obtype == G_BOXCHAR)
 		{
 		  D.g_fmtstr[0] = ch;
@@ -745,7 +742,7 @@ just_draw(tree, obj, sx, sy)
 		gr_inside(pt, -tmpth);
 		break;
 	    case G_IMAGE:
-		LBCOPY(&bi, spec, sizeof(BITBLK));
+		LBCOPY( ( BYTE *)&bi, ( BYTE *)spec, sizeof(BITBLK));
 		if (state & SELECTED)
 		{
 		/* If selected, XOR the background before drawing the image */
@@ -758,27 +755,27 @@ just_draw(tree, obj, sx, sy)
 				bi.bi_hl, MD_TRANS, bi.bi_color, WHITE);
 		break;
 	    case G_ICON:
-		LBCOPY(&ib, spec, sizeof(ICONBLK));
+		LBCOPY( ( BYTE *)&ib, ( BYTE *)spec, sizeof(ICONBLK));
 		ib.ib_xicon += pt->g_x;
 		ib.ib_yicon += pt->g_y; 
 		ib.ib_xtext += pt->g_x;
 		ib.ib_ytext += pt->g_y; 
 		gr_gicon(state, ib.ib_pmask, ib.ib_pdata, ib.ib_ptext,
 		  ib.ib_char, ib.ib_xchar, ib.ib_ychar,
-		  &ib.ib_xicon, &ib.ib_xtext);
+		  ( GRECT *)&ib.ib_xicon, ( GRECT *)&ib.ib_xtext);
 		state &= ~SELECTED;
 		break;
 	    case G_CICON:
 		/* Identical to the monochrome icon case (above) */
 		/* except for the gr_cicon() call.		 */
-		LBCOPY(&ib, spec, sizeof(ICONBLK));
+		LBCOPY( ( BYTE *)&ib, ( BYTE *)spec, sizeof(ICONBLK));
 		ib.ib_xicon += pt->g_x;
 		ib.ib_yicon += pt->g_y; 
 		ib.ib_xtext += pt->g_x;
 		ib.ib_ytext += pt->g_y; 
-		gr_cicon(state, ib.ib_pmask, ib.ib_pdata, ib.ib_ptext,
+		gr_cicon(state, ib.ib_pmask, ib.ib_pdata, ( BYTE *)ib.ib_ptext,
 		  ib.ib_char, ib.ib_xchar, ib.ib_ychar,
-		  &ib.ib_xicon, &ib.ib_xtext, (CICONBLK *) spec);
+		  ( GRECT *)&ib.ib_xicon, ( GRECT *)&ib.ib_xtext, (CICONBLK *) spec);
 		state &= ~SELECTED;
 		break;
 	    case G_USERDEF:
@@ -790,7 +787,7 @@ just_draw(tree, obj, sx, sy)
 	     (obtype == G_TITLE) ||
              (obtype == G_BUTTON) )
 	{
-	  len = LBWMOV(ad_intin, spec);
+	  len = LBWMOV( ( BYTE *)ad_intin, ( BYTE *)spec);
 	  if (len)
 	  { 				/* 8/3/92 */
 	    if ((state & SELECTED) && obtype == G_BUTTON && chcol)
@@ -938,7 +935,7 @@ ob_draw( tree, obj, depth )
 	  sx = sy = 0;
 
 	gsx_moff();
-	everyobj(tree, obj, last, just_draw, sx, sy, depth);
+	everyobj(tree, obj, last, ( WORD(*)())just_draw, sx, sy, depth);
 	gsx_mon();
 }
 
@@ -971,7 +968,7 @@ ob_find(tree, currobj, depth, mx, my)
 	lastfound = NIL;
 
 	if (currobj == 0)
-	  r_set(&o, 0, 0, 0, 0);
+	  r_set(( WORD *)&o, 0, 0, 0, 0);
 	else
 	{
 	  parent = get_par(tree, currobj);
@@ -1286,7 +1283,8 @@ ob_relxywh(tree, obj, pt)
 	WORD		obj;
 	GRECT		*pt;
 {
-	LWCOPY(ADDR(pt), OB_X(obj), sizeof(GRECT)/2);
+/*	LWCOPY( ADDR(pt), OB_X(obj), sizeof(GRECT)/2); was this CJG */
+	LWCOPY( (WORD*)pt, ( WORD *)OB_X(obj), sizeof(GRECT)/2);
 } /* ob_relxywh */
 
 
@@ -1296,7 +1294,8 @@ ob_setxywh(tree, obj, pt)
 	WORD		obj;
 	GRECT		*pt;
 {
-	LWCOPY(OB_X(obj), ADDR(pt), sizeof(GRECT)/2);
+/*	LWCOPY( OB_X(obj), ADDR(pt), sizeof(GRECT)/2); Was this cjg */
+	LWCOPY( ( WORD *)OB_X(obj), ( WORD *)pt, sizeof(GRECT)/2);
 }
 
 
@@ -1337,7 +1336,9 @@ ob_dxywh(tree, obj, pdx, pdy, pdw, pdh)
 {
 	GRECT relr, actr;
 	ob_relxywh(tree, obj, &relr);
-	ob_gclip(tree, obj, &relr.g_x, &relr.g_y, &actr);
+/*	ob_gclip(tree, obj, &relr.g_x, &relr.g_y, &actr); CJG */
+	ob_gclip(tree, obj, &relr.g_x, &relr.g_y,
+		 &actr.g_x,  &actr.g_y,  &actr.g_w,  &actr.g_h );
 	*pdx = actr.g_x - relr.g_x;
 	*pdy = actr.g_y - relr.g_y;
 	*pdw = actr.g_w - relr.g_w;
@@ -1392,7 +1393,7 @@ ob_gclip(tree, obj, pxoff, pyoff, pxcl, pycl, pwcl, phcl)
 		r.g_h -= border;
 	    }
 	}
-	r_get(&r, pxcl, pycl, pwcl, phcl);
+	r_get( ( WORD *)&r, pxcl, pycl, pwcl, phcl);
 }
 
 
@@ -1441,7 +1442,7 @@ get_prev(tree, parent, obj)
 CICON *
 match_planes( iconlist, planes )
 CICON *iconlist;
-int planes;
+WORD  planes;
 {
     CICON *tempicon;
 
@@ -1459,7 +1460,7 @@ int planes;
 CICON *
 find_eq_or_less( iconlist, planes )
 CICON *iconlist;
-int planes;
+WORD  planes;
 {
     CICON *tempicon,*lasticon;
 
@@ -1491,18 +1492,17 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
 	LONG		pmask;
 	LONG		pdata;
 	BYTE		*ptext;
-	REG WORD		ch;
+	REG WORD	ch;
 	WORD		chx, chy;
-	REG GRECT		*pi;
-	REG GRECT		*pt;
+	REG GRECT	*pi;
+	REG GRECT	*pt;
 	CICONBLK	*cicon;
 {
     REG WORD		fgcol, bgcol, tmp;
 						/* crack the color/char	*/
 						/*   definition word	*/
     CICON *color;
-    int col_select;		/* is there a color select icon */
-    int i,j;
+    WORD  col_select;		/* is there a color select icon */
 
 /*    color = match_planes( cicon->mainlist, gl_nplanes );*/
 /* 8/31/92 DLF  Don't need this routine since mainlist is patched to
@@ -1526,11 +1526,11 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
     if ( color ) {
 	if ( (state & SELECTED) && color->sel_data ) {
 	    col_select = 1;
-	    pdata = color->sel_data;
-	    pmask = color->sel_mask;
+	    pdata = ( LONG )color->sel_data;
+	    pmask = ( LONG )color->sel_mask;
 	} else {
-	    pdata = color->col_data;
-	    pmask = color->mask;
+	    pdata = ( LONG )color->col_data;
+	    pmask = ( LONG )color->mask;
 	}
 	if (state & SELECTED)
 	{
@@ -1579,8 +1579,8 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
 	    fgcol = bgcol;
 	    bgcol = tmp;
 	    if ( !col_select ) {	/* check if we need to darken */
-		convert_mask( pmask, gl_colmask, pi->g_w, pi->g_h );
-		gsx_blt(gl_colmask, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
+		convert_mask( ( WORD *)pmask, gl_colmask, pi->g_w, pi->g_h );
+		gsx_blt( ( LONG )gl_colmask, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
 			gl_width/8, pi->g_w, pi->g_h, MD_TRANS,
 			1, 0); 
 	    }
@@ -1598,7 +1598,7 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
 	gsx_tblt(SMALL, pi->g_x+chx, pi->g_y+chy, 1);
     }
 						/* draw the label	*/
-    gr_gtext(TE_CNTR, SMALL, ptext, pt, MD_TRANS);
+    gr_gtext(TE_CNTR, SMALL, ( LONG )ptext, pt, MD_TRANS);
 
 }
 
@@ -1607,7 +1607,8 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
  *	number of planes is passed in and the source and destination MFDB's
  *	had that value set correctly.  Otherwise, it is the same code.
  */
-	WORD
+/*	WORD*/
+	VOID
 gsx_cblt(saddr, sx, sy, swb, daddr, dx, dy, dwb, w, h, rule, numplanes)
 	LONG		saddr;
 	REG UWORD		sx, sy, swb;
@@ -1636,7 +1637,7 @@ gsx_cblt(saddr, sx, sy, swb, daddr, dx, dy, dwb, w, h, rule, numplanes)
 	ppts[5] = dy;
 	ppts[6] = dx + w - 1;
 	ppts[7] = dy + h - 1 ;
-	  vro_cpyfm( rule, &ppts[0], &gl_src, &gl_dst);
+	  vro_cpyfm( rule, &ppts[0],( WORD *)&gl_src, ( WORD *)&gl_dst);
 	gsx_mon();
 
 }
@@ -1644,11 +1645,12 @@ gsx_cblt(saddr, sx, sy, swb, daddr, dx, dy, dwb, w, h, rule, numplanes)
 /*	Takes a ptr to a mask and copies it to another while dithering
  *	the data.  Note that this does not check the limits of the gl_mask.
  */
+	VOID
 convert_mask( mask, gl_mask, width, height )
 WORD *mask, *gl_mask;
 WORD width, height;
 {
-    int i, j, wdwide, no_bytes;
+    WORD i, j, wdwide, no_bytes;
 
     wdwide = width/16;
     no_bytes = width/8 * height;
@@ -1669,26 +1671,26 @@ WORD width, height;
 WORD *
 fix_mono( ptr, plane_size, tot_res )
 WORD *ptr;
-long *plane_size;
+LONG *plane_size;
 WORD *tot_res;
 {
-    long *temp;
+    LONG *temp;
     WORD width, height;
-    long size;
+    LONG size;
 
     width = ptr[11];
     height = ptr[12];
-    temp = &ptr[17];
+    temp = ( LONG *)&ptr[17];
     *tot_res = (WORD)*temp;
-    *plane_size = size = (long) ((width/16) * height * 2);
-    temp = &ptr[2];
-    *temp = &ptr[19];	/* data */
-    temp = &ptr[0];
-    *temp = (long)&ptr[19] + size;
-    temp = &ptr[4];
-    *temp = (long)&ptr[19] + 2*size;
-    temp = *temp + 12L;
-    return( temp );    
+    *plane_size = size = ( LONG )((width/16) * height * 2);
+    temp = ( LONG *)&ptr[2];
+    *temp = ( LONG )&ptr[19];	/* data */
+    temp = ( LONG *)&ptr[0];
+    *temp = ( LONG )&ptr[19] + size;
+    temp = ( LONG *)&ptr[4];
+    *temp = ( LONG )&ptr[19] + 2L*size;
+    temp = ( LONG *)( *temp + 12L );
+    return( ( WORD *)temp );    
 }
 
 /* FIX_RES()
@@ -1698,45 +1700,46 @@ WORD *tot_res;
 WORD *
 fix_res( ptr, mono_size, next_res )
 WORD *ptr;
-long mono_size;
-long *next_res;
+LONG mono_size;
+LONG *next_res;
 {
-    long *temp, *end;
+    LONG *temp, *end;
     WORD select;
 
-    *next_res = &ptr[9];
+    *next_res = ( LONG )&ptr[9];
 
-    temp = &ptr[5];
-    select = (int) *temp;
-    temp = &ptr[1];
-    *temp = (long) ptr + (long) sizeof( CICON );
-    temp = &ptr[3];
-    *temp = (long)ptr + (long) sizeof( CICON ) + ((long) ptr[0] * mono_size );
-    end = *temp + mono_size;	/* push pointer past the mask */
+    temp = ( LONG *)&ptr[5];
+    select = ( WORD ) *temp;
+    temp = ( LONG *)&ptr[1];
+    *temp = (long) &ptr[0] + (long) sizeof( CICON );
+    temp = ( LONG *)&ptr[3];
+    *temp = (long)&ptr[0] + (long) sizeof( CICON ) + ((LONG) ptr[0] * mono_size );
+    end = ( LONG *)(*temp + mono_size);	/* push pointer past the mask */
     if ( select ) {	/* there are some selected icons */
-	temp = &ptr[5];
-	*temp = end;
-	temp = &ptr[7];	/* selected mask */	
-	end = (long *) ((long) end + ((long) ptr[0] * mono_size ));
-	*temp = end;
-	end = (long *) ((long) end + mono_size);
+	temp = ( LONG *)&ptr[5];
+	*temp = ( LONG )end;
+	temp = ( LONG *)&ptr[7];	/* selected mask */	
+	end = (LONG *) ((LONG) end + ((LONG) ptr[0] * mono_size ));
+	*temp = ( LONG )end;
+	end = (LONG *) ((LONG) end + mono_size);
     }
-    return( end );
+    return( ( WORD *)end );
 }
 
 
 /* FIXUP_CICON()
  * Does fixups on the pointers in the color icon structures.
  */
+VOID
 fixup_cicon( ptr, tot_icons, carray )
 WORD *ptr;
-int tot_icons;
+WORD tot_icons;
 CICONBLK **carray;
 {
-    int tot_resicons, tot_selicons;
-    int i, j, k;
-    long mono_size;	/* size of a single mono icon in bytes */
-    long *next_res;
+    WORD tot_resicons;
+    WORD i, j;
+    LONG mono_size;	/* size of a single mono icon in bytes */
+    LONG *next_res;
     CICONBLK *cicon;
 
     
@@ -1747,10 +1750,10 @@ CICONBLK **carray;
 	if ( tot_resicons )	/* 7/9/92 */
 	{
 	  
-	  cicon->mainlist = ptr;
+	  cicon->mainlist = ( CICON *)ptr;
 	  for ( j = 0; j < tot_resicons; j++ ) {
-	    ptr = fix_res( ptr, mono_size, &next_res );
-	    *next_res = ptr;
+	    ptr = fix_res( ptr, mono_size, ( LONG *)&next_res );
+	    *next_res = ( LONG )ptr;
 	  }
 	  *next_res = 0L;
 	}
@@ -1773,12 +1776,12 @@ get_color_rsc( cicondata )
 
 	array_ptr = (CICONBLK **) cicondata;
 	totalicons = 0;
-	while (*array_ptr++ != -1L) 
+	while (*array_ptr++ != ( CICONBLK *)-1L) 
 	  totalicons++;
 
 	ptr = (CICONBLK *) array_ptr;
 
-	fixup_cicon( ptr, totalicons, (CICONBLK **)cicondata ); /* fixup pointers */
+	fixup_cicon( ( WORD *)ptr, totalicons, (CICONBLK **)cicondata ); /* fixup pointers */
 	trans_cicon( totalicons, (CICONBLK **)cicondata ); /* transform form */
 }
 
@@ -1791,7 +1794,7 @@ get_color_rsc( cicondata )
  * BUG FIX - pass in the number of planes instead of using the global
  *	dlf - 7/14/92
  */
-	WORD
+	VOID
 my_trans(saddr, swb, daddr, dwb, h, nplanes)
 	LONG		saddr;
 	UWORD		swb;
@@ -1807,7 +1810,7 @@ my_trans(saddr, swb, daddr, dwb, h, nplanes)
 	gsx_fix(&gl_dst, daddr, dwb, h);
 	gl_dst.fd_stand = FALSE;	/* 7/23/92 */
 	gl_dst.fd_nplanes = nplanes;
-	vrn_trnfm( &gl_src, &gl_dst );
+	vrn_trnfm( ( WORD *)&gl_src, ( WORD *)&gl_dst );
 }
 
 /* TRANS_CICON()
@@ -1820,14 +1823,15 @@ my_trans(saddr, swb, daddr, dwb, h, nplanes)
  * The data is put in a buffer of the same size or larger (if no match for
  * current resolution).  
  */
+VOID
 trans_cicon( tot_icons, carray )
-int tot_icons;
+WORD tot_icons;
 CICONBLK **carray;
 {
-    int i;
+    WORD i;
     CICONBLK *ciconblk;
-    CICON *cic,*ctemp;
-    int w, h;
+    CICON *ctemp;
+    WORD w, h;
     WORD *databuffer,*selbuffer,*tempbuffer;
     LONG tot_size;
 
@@ -1849,22 +1853,22 @@ CICONBLK **carray;
 		    ciconblk->mainlist = 0L;
 		    return;	/* just quit */
 		}
-		expand_data( ctemp->col_data,tempbuffer,ctemp->mask,
+		expand_data( ( BYTE *)ctemp->col_data,( BYTE *)tempbuffer, ( BYTE *)ctemp->mask,
 			ctemp->num_planes, gl_nplanes, w, h);
-		tran_check( tempbuffer, databuffer, ctemp->mask, 
+		tran_check( ( BYTE *)tempbuffer, ( BYTE *)databuffer, ( BYTE *)ctemp->mask, 
 		   w, h,gl_nplanes );
 		ctemp->col_data = databuffer;
 		if (ctemp->sel_data) {
 		    selbuffer = (WORD *)dos_xalloc( tot_size, 3 );
 		    if ( selbuffer ) {
-			expand_data( ctemp->sel_data,tempbuffer,ctemp->sel_mask,
+			expand_data( ( BYTE *)ctemp->sel_data,( BYTE *)tempbuffer, ( BYTE *)ctemp->sel_mask,
 			   ctemp->num_planes,gl_nplanes, w, h);
-			tran_check( tempbuffer, selbuffer, ctemp->mask, 
+			tran_check( ( BYTE *)tempbuffer, ( BYTE *)selbuffer, ( BYTE *)ctemp->mask, 
 			   w, h, gl_nplanes );
 		    }
 		    ctemp->sel_data = selbuffer;
 		}
-		dos_free(tempbuffer);
+		dos_free( ( LONG )tempbuffer );
 	    } else {   /* just allocate same size, copy over because */
 		       /* we don't want to transform form in place */
 		databuffer = (WORD *)dos_xalloc( tot_size, 3 );
@@ -1872,13 +1876,13 @@ CICONBLK **carray;
 		    ciconblk->mainlist = 0L;
 		    return;
 		}
-		my_trans( ctemp->col_data, w/8, databuffer, w/8, h, 
+		my_trans( ( LONG )ctemp->col_data, w/8, (LONG)databuffer, w/8, h, 
 		    gl_nplanes );
 		ctemp->col_data = databuffer;
 		if (ctemp->sel_data) {
 		    selbuffer = (WORD *)dos_xalloc( tot_size, 3 );
 		    if ( selbuffer ) {
-			my_trans( ctemp->sel_data, w/8, selbuffer, w/8, h,
+			my_trans( ( LONG )ctemp->sel_data, w/8, (LONG)selbuffer, w/8, h,
 			   gl_nplanes );
 		    }
 		    ctemp->sel_data = selbuffer;
@@ -1895,26 +1899,27 @@ CICONBLK **carray;
  * be freeable memory for every icon, since fixup even mallocs memory
  * for non-expanded data (so that we avoid the transform form in place)
  */
+    VOID
 free_cicon( carray )
 CICONBLK **carray;
 {
-    int i;
+    WORD i;
     CICONBLK *ciconblk, **ptr;
     CICON *ctemp;
     WORD tot_icons;
 
     ptr = carray;
     tot_icons = 0;
-    while (*ptr++ != -1L) 
+    while (*ptr++ != ( CICONBLK *)-1L) 
 	tot_icons++;
 
     for (i = 0; i < tot_icons; i++ ) {
 	ciconblk = carray[i];
 	ctemp = ciconblk->mainlist;
 	if (ctemp) {
-	    dos_free( ctemp->col_data );
+	    dos_free( ( LONG )ctemp->col_data );
 	    if ( ctemp->sel_data )
-		dos_free( ctemp->sel_data );
+		dos_free( ( LONG )ctemp->sel_data );
 	}
     }
 }
@@ -1935,19 +1940,19 @@ CICONBLK **carray;
  *	RGB settings per index.  Therefore, we substitute indexes (i.e.
  *	reversed indexes) with RGB.
  */
+VOID
 tran_check( saddr, daddr, mask, w, h, nplanes )
 BYTE *saddr, *daddr, *mask;
-int w, h, nplanes;
+WORD w, h, nplanes;
 {
-    int no_words, no_longs, i;
+    WORD no_words, i;
     WORD *wptr;
-    LONG *lptr;
 
-    my_trans( saddr, w/8, daddr, w/8, h, nplanes );
+    my_trans( ( LONG )saddr, w/8, ( LONG )daddr, w/8, h, nplanes );
 
     if ( nplanes == 16 ) {
 	no_words = w/16 * h * nplanes;
-	wptr = daddr;
+	wptr = ( WORD *)daddr;
 	for ( i = 0; i < no_words; i++ ) {
 	    switch ( wptr[i] ) {
 		case 0x0000:
@@ -1971,17 +1976,17 @@ int w, h, nplanes;
  * packed value 0x8000 is index 0x0001 ).
  * NOTE: This routine has been optimized into assembly.
  */
-unsigned int
+UWORD
 reverse( index )
-int index;
+WORD index;
 {
-    unsigned int mask, result=0x0000;
-    long temp;
-    int i;
+    UWORD mask, result=0x0000;
+    LONG temp;
+    WORD i;
 
     for (i = 0; i < 16; i++ ){
 	mask = 0x0001 << i;
-	temp = (long) mask & index;
+	temp = (long) (mask & index);
 	if (temp)
 	    result |=  0x0001 << (16 - i-1);
     }
@@ -2014,13 +2019,14 @@ WORD index;
  *	tran_check(), 0x0000's are reversed for 0xffff and vice versa.
  * NOTE:  This has been optimized in  an assembly file.
  */
+VOID
 expand_data( saddr, daddr, mask, splanes, dplanes, w, h)
 BYTE *saddr, *daddr, *mask;
-int splanes, dplanes, w, h;
+WORD splanes, dplanes, w, h;
 {
-    int plane_size, orig_size, end_size;
-    register i, n;
-    register BYTE *stemp,*dtemp;
+    WORD plane_size, orig_size, end_size;
+    REG WORD i, n;
+    REG BYTE *stemp,*dtemp;
 
     plane_size = w/8 * h;
     orig_size = plane_size * splanes;

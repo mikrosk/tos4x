@@ -11,31 +11,29 @@
  * 03/24/92 cjg - removed WaitForUpButton()
  * 05/13/92 cjg - used binding calls
  * 05/15/92 cjg - Don't use binding calls - use internal AES calls
+ * 
+ * 02/11/93 cjg - Convert to Lattice C 5.51
+ * 02/19/93 cjg - Force the use of Prototype Files
  */
 
 
 /* INCLUDES
  * ======================================================================
  */
-#include <portab.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <osbind.h>
+#include "pgem.h"
+#include "pmisc.h"
 
-#include "mn_tools.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "osbind.h"
+
 
 
 /* EXTERNS
  * ======================================================================
  */
-/* IN GEMOBLIB.C */
-EXTERN VOID ob_draw();
-EXTERN VOID gsx_sclip();
-
 
 
 /* FUNCTIONS
@@ -50,11 +48,11 @@ EXTERN VOID gsx_sclip();
 VOID
 ObjcDraw( tree, obj, rect )
 OBJECT *tree;
-int    obj;
+WORD   obj;
 GRECT  *rect;
 {
    gsx_sclip( rect );
-   ob_draw( tree, obj, MAX_DEPTH );
+   ob_draw( ( LONG )tree, obj, MAX_DEPTH );
 }
 
 

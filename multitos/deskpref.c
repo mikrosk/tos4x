@@ -8,19 +8,16 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <osbind.h>
-#include <deskusa.h>
-#include <extern.h>
-
-EXTERN	OBJECT	*get_tree();
-EXTERN	WINDOW	*w_gfirst();
-EXTERN	WINDOW	*w_gnext();
-EXTERN	BYTE	*get_string();
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "osbind.h"
+#include "deskusa.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
+#include "pboth.h"
 
 EXTERN	WORD	d_maxcolor;
 
@@ -61,14 +58,14 @@ col_pa_pref( )
 	obj = get_tree( SSCREEN );
 
 	newdesk = background[0].ob_spec;
-	newwin = (UWORD)windspec;
+	newwin = (LONG)windspec;
 					/* set the background pattern */
 	last = ret = obj[DESKPREF].ob_state & SELECTED ? DESKPREF : WINPREF;
 
 	for ( j = COLOR0,i = d_maxcolor; i < 16; i++ )
 	  obj[j+i].ob_flags |= HIDETREE;	
 
-	dr_dial_w( SSCREEN, FALSE );
+	dr_dial_w( SSCREEN, FALSE, 0 /* dummy */ );
 
 	goto c_1;
 	
@@ -116,7 +113,7 @@ c_2:
 	    obj[PATTERN].ob_spec |= obj[ret].ob_spec & 0x0000000FL;
 	  }
 
-	  m_objdraw( obj, OUTBOX, 2, 0, 0, full.w, full.h );
+	  m_objdraw( obj, OUTBOX, 2, 0, 0, full.g_w, full.g_h );
 	  *outpat = obj[PATTERN].ob_spec;
 
 	}/* while */
@@ -138,7 +135,7 @@ c_2:
 	  {
 	    if ( win->w_obj )	/* fixed 6/24/92 */	
 	      win->w_obj[0].ob_spec = windspec;
-	    win = win->w_next;
+	    win = (WINDOW *) win->w_next;
 	  }
 
 	  win = w_gfirst();

@@ -3,6 +3,8 @@
 /*	Restore back into C language from Version 3.01 8/29/90	D.Mui	*/
 /*	Save the current mouse form and add mouse reset	5/8/91	D.Mui	*/
 /*	Modified gr_mouse			6/14/91		D.Mui	*/
+/*	Convert to Lattice C 5.51		2/17/93		C.Gee	*/
+/*	Force the use of prototypes		2/24/93		C.Gee	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -19,20 +21,15 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <rslib.h>
-#include <aesmint.h>
-#include <gemusa.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "rslib.h"
+#include "aesmint.h"
+#include "gemusa.h"
 
-EXTERN	PD	*idtopd();
-EXTERN	VOID	gsx_moff();
-EXTERN	VOID	gsx_mon();
 
 EXTERN	WORD	gl_mouse;
 EXTERN	WORD	gl_moff;
@@ -77,7 +74,7 @@ gr_stilldn(out, x, y, w, h)
 	  }
 	  else
 	  {
-	    if ( ev_mchk( &out ) )
+	    if ( ev_mchk( ( MOBLK *)&out ) )
 	    {
 	      status = TRUE;
 	      break;
@@ -167,9 +164,9 @@ gr_xor(clipped, cnt, cx, cy, cw, ch, xstep, ystep, dowdht)
 	do
 	{
 	  if (clipped)
-	    gsx_xcbox(&cx);
+	    gsx_xcbox( ( GRECT *)&cx);
 	  else
-	    gsx_xbox(&cx);
+	    gsx_xbox( ( GRECT *)&cx);
 	  cx -= xstep;
 	  cy -= ystep;
 	  if (dowdht)
@@ -192,7 +189,7 @@ gr_draw(have2box, po, poff)
 	gsx_xbox(po);
 	if (have2box)
 	{
-	  r_set(&t, po->g_x + poff->g_x, po->g_y + poff->g_y,
+	  r_set( ( WORD *)&t, po->g_x + poff->g_x, po->g_y + poff->g_y,
 		      po->g_w + poff->g_w, po->g_h + poff->g_h );
 	  gsx_xbox(&t);
 	}
@@ -208,7 +205,7 @@ gr_wait(po, poff, mx, my)
 	REG WORD		have2box;
 	REG WORD		down;
 
-	have2box = !rc_equal(&gl_rzero, poff);
+	have2box = !rc_equal( ( WORD *)&gl_rzero, ( WORD *)poff);
 						/* draw old		*/
 	gsx_moff();
 	gr_draw(have2box, po, poff);
@@ -245,7 +242,7 @@ gr_rubwind(xorigin, yorigin, wmin, hmin, poff, pwend, phend)
 	wm_update(3);
 	gr_setup(BLACK);
 
-	r_set(&o, xorigin, yorigin, 0, 0);
+	r_set( ( WORD *)&o, xorigin, yorigin, 0, 0);
 						/* clamp size of rubber	*/
 						/*   box to no smaller	*/
 						/*   than wmin, hmin	*/
@@ -306,7 +303,7 @@ gr_dragbox(w, h, sx, sy, pc, pdx, pdy)
 	gr_setup(BLACK);
 
 	gr_clamp(sx+1, sy+1, 0, 0, &offx, &offy);
-	r_set(&o, sx, sy, w, h);
+	r_set( ( WORD *)&o, sx, sy, w, h);
 						/* get box's x,y from	*/
 						/*   mouse's x,y then	*/
 						/*   constrain result	*/
@@ -441,7 +438,7 @@ gr_slidebox(tree, parent, obj, isvert)
 	REG LONG	divnd, divis;
 	OBJECT		*objc;
 	WORD		pstate,cstate;
-	WORD		ret,setxy,setwh;
+	WORD		ret,setxy;
 
 	pt = &t;
 	pc = &c;
@@ -450,7 +447,7 @@ gr_slidebox(tree, parent, obj, isvert)
 				/* get the relative position	*/
 	ob_relxywh(tree, obj, pt);
 
-	objc = tree;
+	objc = ( OBJECT *)tree;
  	pstate = objc[parent].ob_flags;
 	cstate = objc[obj].ob_flags;	
 
@@ -483,13 +480,13 @@ gr_slidebox(tree, parent, obj, isvert)
 
 	if ( isvert )		/* vertical movement	*/
 	{
-	  divnd = pt->g_y - pc->g_y;
-	  divis = pc->g_h - pt->g_h;
+	  divnd = (LONG)(pt->g_y - pc->g_y);
+	  divis = (LONG)(pc->g_h - pt->g_h);
 	}
 	else			/* horizontal movement	*/
 	{
-	  divnd = pt->g_x - pc->g_x;
-	  divis = pc->g_w - pt->g_w;
+	  divnd = (LONG)(pt->g_x - pc->g_x);
+	  divis = (LONG)(pc->g_w - pt->g_w);
 	}
 
 	if ( setxy )
@@ -500,7 +497,7 @@ gr_slidebox(tree, parent, obj, isvert)
 
 	if (divis)
 	{
-	  ret = ( divnd * 1000 ) / divis;
+	  ret = ( WORD )(( divnd * 1000L ) / divis );
 	  if ( ret > 1000 )
 	    ret = 1000;
 	  return( ret );
@@ -550,7 +547,7 @@ gr_bee( id )
 /*	Check for if it is OK to change the mouse 	*/
 
 	WORD	
-gr_mcheck()
+gr_mcheck( VOID )
 {
 	if ( gl_mkind & 0x8000 )	/* if mouse owns by somebody */
 	{
@@ -651,7 +648,7 @@ gr_mouse( kind, grmaddr )
 	        gl_cmform = currpd->p_mouse.moform;
 	        gl_mkind = currpd->p_mouse.mokind & ~0xC000;
 	        gl_mfid = currpd->p_mouse.moid;
-	        gsx_mfset( &gl_cmform );
+	        gsx_mfset( (LONG)&gl_cmform );
 	      }
 	      break;
 
@@ -661,7 +658,7 @@ gr_mouse( kind, grmaddr )
 	        gl_cmform = gl_omform;		
 	        gl_mkind = gl_omkind;
 	        gl_mfid = gl_omfid;
-	        gsx_mfset( &gl_cmform );
+	        gsx_mfset( (LONG)&gl_cmform );
 	      }
 	      break;
 
@@ -679,11 +676,11 @@ gr_mouse( kind, grmaddr )
 
           if ( mkind != M_USERDEFINE )	/* set new mouse form	*/
   	  {
-  	    rs_gaddr(ad_sysglo, R_FRIMG, 0, &maddr);
-	    grmaddr = LLGET( maddr[MICE0 + mkind] );
+  	    rs_gaddr(ad_sysglo, R_FRIMG, 0, ( LONG *)&maddr);
+	    grmaddr = ( MFORM *)LLGET( maddr[MICE0 + mkind] );
 	  }
 
-          gsx_mfset( grmaddr ); 	/* set new mouse form	*/
+          gsx_mfset( ( LONG )grmaddr ); 	/* set new mouse form	*/
 
 	  gl_mkind = kind & ~0x4000;	/* do these after gsx_mfset */
 	  gl_mfid = currpd->p_pid;

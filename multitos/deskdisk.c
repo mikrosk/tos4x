@@ -37,22 +37,17 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
-EXTERN	LONG	trap14();
-EXTERN	LONG	trap13();
-EXTERN	OBJECT	*get_tree();
-EXTERN	BYTE	*get_string();
-
+#define BEG_UPDATE	1
 #define MAXTRACK	80	/* maximum number of track		*/
 #define FC_NUMOBJS	26
 #define MAXSPT		18	/* Maximum sector / track		*/
@@ -131,10 +126,8 @@ MLOCAL	WORD	d_handle;
 
 /*	format and copy start	*/
 
-	VOID
-fc_start( source, op )
-	BYTE	*source;
-	WORD	op;
+VOID
+fc_start( BYTE *source, WORD op )
 {
 	REG WORD	ret,width;
 	WORD		i,field,operation;
@@ -146,7 +139,7 @@ fc_start( source, op )
 
 	/* Launch process if DESKFMT= is in the environment */
 
-	shel_envrn( &bptr, DESKFMT );
+	shel_envrn( (LONG)&bptr, (LONG)DESKFMT );
 	if ( bptr )
 	{
 	  if ( op == CMD_COPY )		/* copy operation command tail */
@@ -163,9 +156,9 @@ fc_start( source, op )
 
 	  tail[0] = (BYTE)strlen( &tail[1] );
 
-	  ret = shel_write( 0, 0, 1, bptr, tail );
+	  ret = shel_write( 0, 0, 1, (LONG)bptr, (LONG)tail );
 	  if ( !ret )
-	    fill_string( bptr, FTOLAUNCH );
+	    fill_string( bptr, FTOLAUNC );
 	  else
 	    return;
 	}
@@ -193,7 +186,7 @@ fc_2:	  if ( obj[FCHIGH].ob_state & SELECTED )
 	}
 
 
-	destdr = &obj[DESTDR].ob_spec;		/* to set boxchar in DESTDR */
+	destdr = (BYTE *)&obj[DESTDR].ob_spec;		/* to set boxchar in DESTDR */
 	
 	width = obj[FCBARA].ob_width;
 	w_inc = width / MAXTRACK;
@@ -209,7 +202,7 @@ fc_2:	  if ( obj[FCHIGH].ob_state & SELECTED )
 	for ( i = 0 ; i < 7; i++ )
 	  obj[ttable[i]].ob_state = NORMAL;
 
-	inf_sset( obj, FCLABEL, Nostr );
+	inf_sset( (LONG)obj, FCLABEL, Nostr );
 
 	obj[FCBOXF].ob_flags |= HIDETREE;
 	obj[FCBOXC].ob_flags |= HIDETREE;
@@ -322,15 +315,14 @@ fc_1:	  switch( ret )
 
 /*	format disk	*/
 
-	WORD
-fc_format( obj )
-	OBJECT	*obj;
+WORD
+fc_format( OBJECT *obj )
 {
 REG	BYTE	*bufaddr;
 REG	WORD	badindex, ret, i, trackno;
-	LONG	dsb, valuel, value2;
+/*	LONG	dsb, valuel, value2; */
 	WORD	devno, j, k, disktype;
-	WORD	sideno, curtrk,	skew, skewi;
+	WORD	sideno, /*curtrk,*/	skew, skewi;
 	WORD	track, numside, cl;
 REG	WORD	*badtable;
 REG	WORD	*fat;
@@ -348,12 +340,12 @@ memerr:	  do1_alert( FCNOMEM );
 	  return( TRUE );
 	}
 
-	fat = bufaddr;		/* the bad sector table		*/
+	fat = (WORD *)bufaddr;		/* the bad sector table		*/
 
 						/* my bad sector table	    */
-	if ( !(badtable= malloc( FSIZE )) )	/* no memory		    */
+	if ( !(badtable= (WORD *)malloc( FSIZE )) )	/* no memory		    */
 	{
-	  free( bufaddr );
+	  free( (VOIDP)bufaddr );
 	  goto memerr;
 	}
 
@@ -435,19 +427,19 @@ fagain:	     ret = (WORD)( trap14( FORMAT, bufaddr, &sktable[skewi], devno,
 	if ( ! ret )			/* set up the Boot Sector info	*/
 	{
 	  trap14( PROTOBT, bufaddr, 0x01000000L, disktype, 0 ); 
-	  *bufaddr = 0xe9;
+	  *bufaddr = (BYTE)0xe9;
 
-	  if( ret = fc_rwsec(WSECTS, bufaddr, 0x10000L, devno) )
+	  if( ret = fc_rwsec(WSECTS, (LONG)bufaddr, 0x0001,0x0000, devno) )
 	    goto eout1;
 					/* now set up the fat0 and fat1	*/
-	  bpbaddr = trap13( GETBPB, devno );
+	  bpbaddr = (BPB *)trap13( GETBPB, devno );
 
 	  /* 27-Mar-1985 lmd
 	   * write boot sector again
 	   * (this makes the media dirty, with drivemode = "changed")
 	  */
 
-	  if( ret = fc_rwsec(WSECTS, bufaddr, 0x10000L, devno) )
+	  if( ret = fc_rwsec(WSECTS, (LONG)bufaddr, 0x0001,0x0000, devno) )
 	    goto eout1;
 
 	  k = max( bpbaddr->fsiz, bpbaddr->rdlen );
@@ -457,7 +449,7 @@ fagain:	     ret = (WORD)( trap14( FORMAT, bufaddr, &sktable[skewi], devno,
 	  for ( i = 0; i < j; i++ )
 	    fat[i] = 0;	
 				/* get the label	*/
-	  strcpy( (TEDINFO*)(obj[FCLABEL].ob_spec)->te_ptext, label1 );
+	  strcpy((BYTE *)((TEDINFO*)(obj[FCLABEL].ob_spec))->te_ptext, label1 );
 
 	  if ( label1[0] )
 	  {
@@ -475,7 +467,7 @@ fagain:	     ret = (WORD)( trap14( FORMAT, bufaddr, &sktable[skewi], devno,
 				
 	  i = 1 + ( bpbaddr->fsiz * 2 );
 
-	  if( ret = fc_rwsec( WSECTS, bufaddr, bpbaddr->rdlen, i, devno ) )
+	  if( ret = fc_rwsec( WSECTS, (LONG)bufaddr, bpbaddr->rdlen, i, devno ) )
 	    goto eout1;
 
 				/* clean up FAT table	*/
@@ -493,10 +485,10 @@ fagain:	     ret = (WORD)( trap14( FORMAT, bufaddr, &sktable[skewi], devno,
 	    clfix ( cl, fat );
 	  }
 						/* write out fat 0	*/
-	  if( ret = fc_rwsec( WSECTS, fat, bpbaddr->fsiz, 1, devno ) )
+	  if( ret = fc_rwsec( WSECTS, (LONG)fat, bpbaddr->fsiz, 1, devno ) )
 	    goto eout1; 
 						/* write out fat 1	*/
-	  ret = fc_rwsec( WSECTS, fat,
+	  ret = fc_rwsec( WSECTS, (LONG)fat,
 	  		  bpbaddr->fsiz, 1 + bpbaddr->fsiz, devno );
 
 	}
@@ -509,36 +501,35 @@ eout1:
 	{
 	  Dfree( lbuf, devno + 1 );
 	  lbuf[0] = lbuf[0] * lbuf[2] * lbuf[3]; 
-	  merge_str( g_buffer, get_string( FCSIZE ), lbuf );
+	  merge_str( g_buffer, get_string( FCSIZE ), (UWORD *)lbuf );
 	  if ( form_alert( 1, g_buffer ) == 1 )
 	    ret = TRUE;		/* To Continue	*/
 	}
 
-	free( bufaddr );
-	free( badtable );
+	free( (VOIDP)bufaddr );
+	free( (VOIDP)badtable );
 	return( ret );
 }
 
 
 /*	disk copy	*/
 
-	VOID
-fc_copy( obj )
-	OBJECT	*obj;
+VOID
+fc_copy( OBJECT *obj )
 {
 REG	LONG	bootbuf, buf;
 	LONG	bufptr, bufsize;
 	WORD	devnos, devnod;
 REG	DSB	*dsbs, *dsbd;
 	WORD	spc, bps, bpc, disksect, sectbufs, leftover;
-	WORD	checkit, last, ret;
+	WORD	checkit, last;/*, ret; */
 	WORD	dev, sectno, ssect, dsect, trkops;
 REG	WORD	j, op, loop;
 
 #if 0
-	bootbuf = malloc(0x158L );
+	bootbuf = (LONG)malloc(0x158L );
 #else
-	bootbuf = malloc(1024L);	/* assume sector size <= 1K */
+	bootbuf = (LONG)malloc(0x400L );
 #endif
 	if( !bootbuf )
 	{
@@ -549,42 +540,42 @@ errmem:	  do1_alert( FCNOMEM );
 	devnos = ( obj[SRCDRA].ob_state & SELECTED ) ? 0 : 1;
 	devnod = ( devnos ) ? 0 : 1;
 
-chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
+chksrc:	if( !(dsbs = (DSB *)trap13(GETBPB,devnos)) )
 	{
 	  if( do1_alert( FCFAIL ) == 1 ) /* retry */
 	    goto chksrc;
-	  free( bootbuf );
+	  free( (VOIDP)bootbuf );
 	  return;
 	}
 
 /* should spc exist? */
 	spc = dsbs->dspc;			/* sectors per cylinder	   */
 	bps = dsbs->b.recsiz;			/* bytes per sector	   */
-	if (bps > 1024)				/* check the bootbuf we allocated before */
-	{
-	  free(bootbuf);
-	  bootbuf = malloc((long)bps);
-	  if (!bootbuf) goto errmem;
-	}
+ 	if (bps > 1024)				/* check the bootbuf we allocated before */
+ 	{
+ 	  free( (VOIDP) bootbuf);
+ 	  bootbuf = (LONG) malloc((long)bps);
+ 	  if (!bootbuf) goto errmem;
+ 	}
 	bpc = spc * bps;			/* bytes per cylinder	   */
 
 						/* buffer at least a track */
 						/* but try to do the whole disk */
 
 	disksect = spc * (dsbs->dntracks);	/* total sectors on disk    */
-	bufsize = ((LONG)disksect) * bps;
-	buf = malloc( bufsize );
+	bufsize = ((LONG)disksect) * (LONG)bps;
+	buf = (LONG)malloc( bufsize );
 	while (bufsize >= (LONG)bpc && !buf)
 	{
-		bufsize /= 2;
-		buf = malloc(bufsize);
+		bufsize /= 2L;
+		buf = (LONG)malloc(bufsize);
 	}
 	if ( !buf )				/* we have to check, when multitasking */
 	{
-	  free( bootbuf );
+	  free( (VOIDP)bootbuf );
 	  goto errmem;
 	}
-	sectbufs = (bufsize / bps);		/* how many sector buffers  */
+	sectbufs = (WORD)(bufsize / (LONG)bps);		/* how many sector buffers  */
 	leftover = disksect % sectbufs;		/* sectors left for last loop */
 
 	checkit = TRUE;
@@ -600,7 +591,7 @@ chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
 	}
 
 						/* read boot sector	    */
-	if( fc_rwsec(RSECTS, bootbuf, 0x00010000L, devnos) )
+	if( fc_rwsec(RSECTS, (LONG)bootbuf, 0x0001, 0x0000, devnos) )
 	  goto bailout;
 
 	while( loop-- )
@@ -613,7 +604,7 @@ chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
 	    trkops = sectbufs / spc;		/* how many track operations */
 	    for( j = 0; j < trkops; j++ )
 	    {
-	      if( fc_rwsec( op, bufptr, spc, sectno, dev) )
+	      if( fc_rwsec( op, (LONG)bufptr, spc, sectno, dev) )
 	        goto bailout;
 	      sectno += spc;
 	      bufptr += bpc;
@@ -622,7 +613,7 @@ chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
 	    j = sectbufs % spc;
 	    if( j )
 	    {
-	      if( fc_rwsec(op, bufptr, j, sectno, dev) )
+	      if( fc_rwsec(op, (LONG)bufptr, j, sectno, dev) )
 		goto bailout;
 	      sectno += j;
 	      fc_bar( obj, dev );
@@ -635,7 +626,7 @@ chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
 	      {
 		checkit = FALSE;
 fc_c1:
-		dsbd = trap13(GETBPB,devnod);
+		dsbd = (DSB *)trap13(GETBPB,devnod);
 		if( !dsbd )
 		{
 		  if( do1_alert( FCFAIL ) == 1 ) /* retry */
@@ -673,23 +664,20 @@ fc_c1:
 
 						/* change the serialno */
 	trap14( PROTOBT, bootbuf, 0x01000000L, -1, -1 );
-	fc_rwsec(WSECTS, bootbuf, 0x00010000L, devnod);
+	fc_rwsec(WSECTS, (LONG) bootbuf, 0x0001, 0x0000, devnod);
 
 bailout:
-	free( buf );
-	free( bootbuf );
+	free( (VOIDP)buf );
+	free( (VOIDP)bootbuf );
 	return;
 }
 
-	WORD
-fc_rwsec( op, buf, nsect, sect, dev )
-	WORD	op;
-	LONG	buf;
-	WORD	nsect, sect, dev;
+WORD
+fc_rwsec( WORD op, LONG buf, WORD nsect, WORD sect, WORD dev )
 {
 REG	WORD	ret;
 
-rerw:	if( ret = trap13(RWABS, op, buf, nsect, sect, dev) )
+rerw:	if( ret = (WORD)trap13(RWABS, op, buf, nsect, sect, dev) )
 	  if( (ret = do1_alert(FCFAIL)) == 1 ) /* retry */
 	    goto rerw;
 	return( ret ); /* 0=>OK, 2=>error */
@@ -698,13 +686,11 @@ rerw:	if( ret = trap13(RWABS, op, buf, nsect, sect, dev) )
 
 /*     put in the next cluster number 	*/
 
-	VOID
-clfix( cl, fat )
-unsigned	WORD	cl;
-unsigned	WORD	fat[];
+VOID
+clfix( unsigned WORD cl, unsigned WORD fat[] )
 {
 REG	unsigned	WORD  ncl, cluster;
-	unsigned	WORD  temp,num;
+	unsigned	WORD /* temp, */ num;
 
 	num = 0x0FF7;
 
@@ -731,10 +717,8 @@ REG	unsigned	WORD  ncl, cluster;
 
 /*	Inc and redraw slider bar	*/
 
-	VOID
-fc_bar( obj, which )
-	REG OBJECT	*obj;
-	REG WORD	which;
+VOID
+fc_bar( REG OBJECT *obj, REG WORD which )
 {
 	REG WORD	wid;
 
@@ -757,16 +741,14 @@ fc_bar( obj, which )
 
 /*	Draw the bar	*/
 
-	VOID
-fc_draw( obj, which, wait )
-	OBJECT	*obj;
-	WORD	which,wait;
+VOID
+fc_draw( OBJECT *obj, WORD which, WORD wait )
 {
 	GRECT	size;
 	WORD	mode;
 
-	rc_copy( &obj[which].ob_x, &size );
-	objc_offset( obj, which, &size.x, &size.y );
+	rc_copy( (WORD *)&obj[which].ob_x, (WORD *)&size );
+	objc_offset( obj, which, &size.g_x, &size.g_y );
 	if ( wait )
 	  mode = BEG_UPDATE;
 	else
@@ -774,7 +756,8 @@ fc_draw( obj, which, wait )
 
 	if ( wind_update( mode ) )
 	{
-	  draw_loop( d_handle, obj, which, MAX_DEPTH, size.x, size.y, size.w+2, size.h );
+	  draw_loop( d_handle, obj, which, MAX_DEPTH, size.g_x, size.g_y,
+		 size.g_w+2, size.g_h );
  	  wind_update(0);
 	}
 	wait_msg( d_handle, obj );

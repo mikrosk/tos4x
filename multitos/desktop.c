@@ -14,6 +14,7 @@
 /*	Rename deskmain to desktop		5/1/91	D.Mui		*/
 /*	Check control key for nodisk system at re_icon 8/13/91	D.Mui	*/
 /*	Change all the iconblk to ciconblk	7/11/92	D.Mui		*/
+/*      Load rsc file from disk			2/10/92 H.Krober        */
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -21,34 +22,61 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <compiler.h>
-#include <machine.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <osbind.h>
-#include <extern.h>
-#include <mintbind.h>	
-#include <signal.h>
-#include <vdomode.h>
-#include <deskusa.h>
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "osbind.h"
+#include "extern.h"
+#include "mintbind.h"	
+#include "signal.h"
+#include "vdomode.h"
+#include "deskusa.h"
+#include "pdesk.h"
+#include "pmisc.h"
+#include "pboth.h"
+
+/*
+ *	Set the SOFTLOAD flag to implement softloaded desktop resources.
+ *	The desktop will then try to read its resource file from
+ *	[A|C]:\MULTITOS\DESKTOP.RSC. If the load failes because the file
+ *	is not present, a file selector box will ask the user to find
+ * 	the resource file for the system. If this dialog box is exited
+ *	using the 'Cancel' button, the resource will be copied from ROM.
+ *
+ *	NOTE: You have to define SOFTLOAD in gemrom.c, too, because there
+ *	      are the actual functions.
+ */
+#undef SOFTLOAD
+/*
+ *	Version number of the DESKTOP.RSC file. Use "rscvers versnr DESKTOP.RSC"
+ *	to create a DESKTOP.RSC with a version number in the first byte of the
+ *	resource header. This is to prevent user from using the wrong
+ *	resource file.
+ */
+#undef DSKRSVER
+/* 
+ * 	Set the ONERSC flag to indicate that the system just has the
+ *	U.S. desktop resource in ROMs. If the system cannot load the
+ *	DESKTOP.RSC from disk, it will pop up a warning, saying that
+ *	the U.S. version from ROM will be used.
+ *
+ *	-> This message has to get internationalized!
+ */
+
+/* #define  ONERSC		1 */	
 
 typedef struct cblk
 {
-	long		cb_pcontrol;
-	int		*cb_pglobal;
-	long		cb_pintin;
-	long		cb_pintout;
-	long		cb_padrin;
-	long		cb_padrout;		
+	LONG		cb_pcontrol;
+	WORD		*cb_pglobal;
+	LONG		cb_pintin;
+	LONG		cb_pintout;
+	LONG		cb_padrin;
+	LONG		cb_padrout;		
 }CBLK;
 
-
-EXTERN	BYTE	*get_fstring();
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
-EXTERN	OBJECT	*get_tree();
 
 EXTERN	UWORD	d_rezword;
 EXTERN	WORD	icn_whandle;
@@ -57,10 +85,11 @@ EXTERN	BYTE	*lp_start;
 EXTERN	WORD	d_exit;
 EXTERN	BYTE	*q_addr;
 EXTERN	UWORD	apsize;
-EXTERN	OBJECT	*deskptr;		/* desktop resource	*/
+EXTERN	OBJECT	*deskptr;		/* desktop resource	*/ /* this shouldn't be extern anymore, since the rsc is loaded from here now */
 EXTERN	LONG	gl_vdo;
 EXTERN	CBLK	c;
 EXTERN	WORD	ctldown;
+EXTERN	WORD	st_lang;
 
 GLOBAL	WORD	v_handle;
 GLOBAL	WORD	desk_id;
@@ -79,7 +108,7 @@ GLOBAL	UWORD	st_date;
 GLOBAL	UWORD	st_dchar;
 GLOBAL	WORD	st_keybd;
 
-MLOCAL	BYTE	*TIMETABLE[] =
+MLOCAL	BYTE	TIMETABLE[] =	/* was: BYTE *TIMETABLE[], changed for LC */
 {/* Eurotime, Eurodate and seperator */
 	0,0,'/',	/* USA	*/
 	1,1,'.',	/* GERMANY	*/
@@ -90,6 +119,32 @@ MLOCAL	BYTE	*TIMETABLE[] =
 	1,2,'-'		/* SWEDEN,NORWAY,FINLAND*/
 };	
 
+#ifdef SOFTLOAD
+MLOCAL BYTE	*DESKRSC = "C:\\MULTITOS\\DESKTOP.RSC";
+MLOCAL BYTE	*FDESKRSC = "DESKTOP.RSC";
+
+/*
+ *	->> These message have to get internationalized!
+ */
+
+BYTE	*RSCVMSG =	"[1][Desktop resource in MULTITOS|\
+directory has incorrect version|number. Resource was not|loaded from disk.]\
+[ OK ]";
+
+BYTE	*RSCNMSG =	"[1][Desktop resource not found in|MULTITOS \
+directory. Use file|selector to specify it or|click on Cancel in file|\
+selector to use ROM version.][ OK ]";
+
+BYTE	*RSCSMSG = 	"Find DESKTOP.RSC file.";
+
+BYTE	*RSCFMSG =	"[1][Loading the specified resource|file failed. \
+Click on Cancel|in the file selector to use|U.S. ROM resource.][ OK ]";
+
+BYTE	*RSCRMSG =	"[1][No DESKTOP.RSC file loaded.|Using U.S. version \
+from ROM.][ OK ]";
+
+GLOBAL WORD	romdesk;
+#endif
 
 /*	Catch desktop terminate signal */
 
@@ -97,14 +152,14 @@ MLOCAL	BYTE	*TIMETABLE[] =
 desk_term()
 {
 	d_exit = L_EXIT;
-	return;
+	return;			/* DOES THIS BELONG HERE ??? (hmk 2/16/93) */
 	Debug1( "Desktop catches terminate signal\r\n" );
 
-	ciconaddr = (BYTE*)0;
+	ciconaddr = (CICONBLK*) 0;
 #if 0
 	if ( iconmem )
 	{
-	  LBCOPY( temp, c.cb_pglobal, 30 );
+	  LBCOPY( (BYTE *)temp, (BYTE *)c.cb_pglobal, 30 );
 	  *((LONG*)(&c.cb_pglobal[7])) = iconmem;
 	  rsrc_free(); 	
 	  iconmem = (BYTE*) 0;
@@ -112,7 +167,7 @@ desk_term()
 	}
 #endif
 	iconaddr = (OBJECT*) 0;
-	iconmem = (OBJECT*) 0;
+	iconmem = (BYTE*) 0;
 	inf_path[0] = 0;		
 	Pterm(1);
 }
@@ -131,7 +186,7 @@ ch_xcache()
 	WORD
 re_icon( )
 {
-	REG WORD	i,ret;
+	REG WORD	ret;
 	WORD		temp[15];
 	LONG		*ptr;
 	BYTE		buf2[18];	
@@ -141,7 +196,7 @@ re_icon( )
 
 	if ( !ctldown )			/* no control key down */
 	{
-	  LBCOPY( temp, c.cb_pglobal, 30 );
+	  LBCOPY( (BYTE *)temp,(BYTE *)c.cb_pglobal, 30 );
 	  strcpy( cicndata, buf2 );	/* Try color icon file	*/
 	  buf2[0] = ( isdrive() & 0x4 ) ? 'C' : 'A';
  
@@ -153,12 +208,12 @@ re_icon( )
 	      goto i_1;
 	  }
 
-	  ptr = &c.cb_pglobal[7];	/* get the new rsc address	*/
-	  iaddr = *ptr;
+	  ptr = (LONG*) &c.cb_pglobal[7]; /* get the new rsc address	*/
+	  iaddr = (BYTE *) *ptr;
 		
 	  if ( iconmem )		/* free up memory	*/
 	  {				/* use rs_free to free memory	*/
-	    *ptr = iconmem;		/* because it may have color icons */	
+	    *ptr = (LONG) iconmem;	/* because it may have color icons */	
 	    rsrc_free();
 	  }
 
@@ -168,7 +223,7 @@ re_icon( )
 	  iconaddr++;			/* get the icon address	*/
 	  ret = TRUE;
 i_1:					/* restore the pglobal	*/
-	  LBCOPY( c.cb_pglobal, temp, 30 );
+	  LBCOPY( (BYTE *)c.cb_pglobal,(BYTE *)temp, 30 );
 	}
 
 	return( ret );
@@ -185,7 +240,8 @@ ini_icon()
 	REG IDTYPE	*itype;
 	    CICONBLK	*icblk;
 
-	backid = malloc( (LONG)( sizeof( IDTYPE ) * ( maxicon + 1 ) ) );
+	backid = (IDTYPE *) malloc( (LONG)( sizeof( IDTYPE ) * 
+		( maxicon + 1 ) ) );
 
 	if ( !backid )
 	{
@@ -205,12 +261,12 @@ ini_icon()
 	  obj[i].ob_type = G_CICON;	/* 7/11/92 */
 	  obj[i].ob_flags = HIDETREE;
 	  obj[i].ob_state = NORMAL;
-	  obj[i].ob_width = dicon.w;
-	  obj[i].ob_height = dicon.h;
+	  obj[i].ob_width = dicon.g_w;
+	  obj[i].ob_height = dicon.g_h;
 	  icblk = (CICONBLK*)(iconaddr[0].ob_spec);
 	  itype->i_cicon = *icblk;
-	  itype->i_cicon.monoblk.ib_ptext = &itype->i_name[0]; 	
-	  obj[i].ob_spec = &itype->i_cicon;
+	  itype->i_cicon.monoblk.ib_ptext = (LONG) &itype->i_name[0]; 	
+	  obj[i].ob_spec = (LONG) &itype->i_cicon;
 	  itype->i_path = (BYTE*)0;
 	}
 
@@ -230,9 +286,9 @@ adj_menu( which )
 	objc_offset( menu_addr, which, &x, &y );
 	
 	w = obj[which].ob_width + x;
-	if ( w >= ( full.w + full.x ) )
+	if ( w >= ( full.g_w + full.g_x ) )
 	{
-	  x = w - ( full.w + full.x ) + gl_wchar;
+	  x = w - ( full.g_w + full.g_x ) + gl_wchar;
 	  obj[which].ob_x -= x;	
 	}			
 }
@@ -249,8 +305,20 @@ ini_rsc()
 	WORD		w,i;
 	CICONBLK	*icblk;
 
-	Debug1( "Rsrc_rcfix\r\n" );	
-	rsrc_rcfix( deskptr );				
+#ifdef SOFTLOAD
+	if (romdesk) {				/* if loading rsc from */
+						/* disk failed and we  */
+						/* have to use the rom */
+						/* version, then we've */
+						/* to do an rsrc_rcfix */ 
+		Debug1( "Rsrc_rcfix\r\n" );
+		rsrc_rcfix( (LONG)deskptr );
+	}
+#else
+	Debug1( "Rsrc_rcfix\r\n" );
+	rsrc_rcfix( (LONG)deskptr );
+#endif
+		
 	Debug1( "Get tree\r\n" );					
 	menu_addr = get_tree( ADMENU );	/* get the menu address		*/
 			
@@ -267,7 +335,7 @@ ini_rsc()
 	  }
 	}
 
-	background = get_tree( BACKGROUND );
+	background = get_tree( BACKGROU ); /* was BACKROUND, changed for LC */
 					
 	maxicon = background[0].ob_tail;/* max background icon		*/
 
@@ -277,14 +345,15 @@ ini_rsc()
 
 	if ( !ciconaddr )	/* 7/10/92 */
 	{
-	  if ( ciconaddr = malloc( (LONG)( sizeof(CICONBLK) * maxicon ) ) )
+	  if ( ciconaddr = (CICONBLK*) malloc( (LONG)( sizeof(CICONBLK) * 
+	  maxicon ) ) )
 	  {		
 	    for ( i = 0; i < maxicon; i++ )
 	    {
 /*	      ciconaddr[i].monoblk = *((ICONBLK*)background[i+1].ob_spec);	*/
 /*              ciconaddr[i].mainlist = (CICON*)0;	*/
-	      background[i+1].ob_spec = &ciconaddr[i];
-	      backgroubd[i+1].ob_type = G_CICON;
+	      background[i+1].ob_spec = (LONG) &ciconaddr[i];
+	      background[i+1].ob_type = (UWORD) G_CICON;
 	    }
 	  }
 	  else
@@ -294,7 +363,7 @@ ini_rsc()
 	  }
 	}
 
-	rc_copy( &full, &background[0].ob_x );
+	rc_copy( (WORD *)&full, (WORD *)&background[0].ob_x );
 
 	/* Precalculate the disk icon's pline values	*/
 
@@ -306,36 +375,36 @@ ini_rsc()
 	else
 	  iblk = (ICONBLK*)(iconaddr[0].ob_spec);
 
-	rc_copy( &iblk->ib_xicon, &pt );	/* get the icon's xywh	*/
+	rc_copy( &iblk->ib_xicon,(WORD *) &pt );	/* get the icon's xywh	*/
 
-	d_xywh[0] = pt.x;			/* disk icon outline	*/
-	d_xywh[3] = d_xywh[1] = pt.y;
-	d_xywh[4] = d_xywh[2] = d_xywh[0] + pt.w; 
-	d_xywh[5] = d_xywh[3] + pt.h;
+	d_xywh[0] = pt.g_x;			/* disk icon outline	*/
+	d_xywh[3] = d_xywh[1] = pt.g_y;
+	d_xywh[4] = d_xywh[2] = d_xywh[0] + pt.g_w; 
+	d_xywh[5] = d_xywh[3] + pt.g_h;
 	
-	rc_copy( &iblk->ib_xtext, &pt );
-	d_xywh[8] = d_xywh[6] = pt.x + pt.w;
-	d_xywh[13] = d_xywh[7] = pt.y;
-	d_xywh[11] = d_xywh[9] = d_xywh[7] + pt.h;
-	d_xywh[12] = d_xywh[10] = pt.x;
+	rc_copy( &iblk->ib_xtext,(WORD *)&pt );
+	d_xywh[8] = d_xywh[6] = pt.g_x + pt.g_w;
+	d_xywh[13] = d_xywh[7] = pt.g_y;
+	d_xywh[11] = d_xywh[9] = d_xywh[7] + pt.g_h;
+	d_xywh[12] = d_xywh[10] = pt.g_x;
 	d_xywh[16] = d_xywh[14] = d_xywh[0];
 	d_xywh[15] = d_xywh[5];
 	d_xywh[17] = d_xywh[1];
 				
-	dicon.x = 0;			/* precalculate text icon's x,y,w,h */
-	dicon.y = 0;
-	dicon.w = iblk->ib_wtext;
-	dicon.h = iblk->ib_hicon + iblk->ib_htext;
+	dicon.g_x = 0;			/* precalculate text icon's x,y,w,h */
+	dicon.g_y = 0;
+	dicon.g_w = iblk->ib_wtext;
+	dicon.g_h = iblk->ib_hicon + iblk->ib_htext;
 
-	rc_copy( &dicon, &r_dicon );
-	r_dicon.w += 5;
-	r_dicon.h += 7;
-	r_dicon.w += ( full.w % r_dicon.w ) / ( full.w / r_dicon.w );
-	r_dicon.h += ( full.h % r_dicon.h ) / ( full.h / r_dicon.h );
+	rc_copy( (WORD *)&dicon, (WORD *)&r_dicon );
+	r_dicon.g_w += 5;
+	r_dicon.g_h += 7;
+	r_dicon.g_w += ( full.g_w % r_dicon.g_w ) / ( full.g_w / r_dicon.g_w );
+	r_dicon.g_h += ( full.g_h % r_dicon.g_h ) / ( full.g_h / r_dicon.g_h );
 				
 	w = gl_wchar * 14;		/* text outline	*/
 
-	obj = get_tree( TEXTLINES );
+	obj = get_tree( TEXTLINE ); /* was TEXTLINES, changed for LC */
 	f_xywh[9] = f_xywh[8] = f_xywh[6] = f_xywh[3] = f_xywh[1] = f_xywh[0] = 0;
 	f_xywh[2] = w;
 	f_xywh[4] = w;
@@ -346,23 +415,146 @@ ini_rsc()
 	return( TRUE );
 }
 
+#ifdef SOFTLOAD
+/*
+ *	chrscver()
+ *	Check version number or rsc file
+ *	Returns:  1, proper version
+ *		  0, wrong version
+ *		 -1, unable to open
+ */
+WORD
+chkrscver(fname, vers)		/* check version number of rsc file */
+BYTE	*fname;			/* file name */
+BYTE	vers;			/* version number it should have */ 
+{
+	WORD	fd;
+	BYTE	rvers;
+	BYTE	cvers;
+	WORD	rhdr;
+	WORD	ret = 0;
+
+	if ( ( fd = dos_open(fname, 0) ) >= 0 )
+	{
+	  if ( dos_read( fd, 2, (LONG)&rhdr) > 0 )
+	  {
+	     /*
+ 	      *	Check the version number in the 1st byte of the rsc header.
+	      * The format is: %1xxxxxxx
+ 	      *                 |  |
+	      *                 |  +- version number
+	      *                 +---- always one
+	      */
+	     rvers = (BYTE) (rhdr >> 8);	/* just the first byte */
+	     cvers = (BYTE) (vers | 0x80);	/* set version nr. */
+	     if (rvers == cvers) {
+			ret = 1;
+	     }
+	   }
+	   dos_close(fd);
+	} else {
+		ret = -1;
+	}
+	return ret;
+}
+
+
+VOID deskrsc()			/* load the desk rsc from disk */
+{
+	
+	WORD	load = 0;
+	WORD	verflg;
+	UWORD	*rscaddr;
+#ifdef ONERSC
+	WORD	loop = 1;
+	WORD	button = 0;
+	BYTE	path[256];
+	BYTE	fname[16];
+#endif
+
+	*DESKRSC = ( isdrive() & 0x4 ) ? 'C' : 'A';
+
+	/*
+ 	 * Before loading the resource file, check its version
+	 * so that we are using the proper one.
+  	 *
+	 *	Returns:  1, proper version
+	 *		  0, wrong version
+	 *		 -1, unable to open
+	 */
+
+	if ((verflg = chkrscver(DESKRSC, DSKRSVER)) == 1) {
+		load = rsrc_load(DESKRSC);	
+	} else if (verflg == 0) {
+		form_alert(1, RSCVMSG);
+	}
+
+#ifdef	ONERSC
+	if (!load) {
+				/* std. desk rsc not found */
+		if (verflag == -1)	/* file not found */
+			form_alert(1, RSCNMSG);
+		do {
+			
+			strcpy( "C:\\*.RSC", path );
+	    		path[0] = ( isdrive() & 0x04 ) ? 'C' : 'A';
+	    		strcpy( FDESKRSC, fname );
+
+			fsel_exinput(path, fname, &button, RSCSMSG);
+			rep_path(fname, path);
+ 
+			if (button) {
+				if ((verflg = chkrscver(path, DSKRSVER))==0){
+					form_alert(1, RSCVMSG);
+					loop = 1;
+				} else if ((load = rsrc_load(path)) == 0) {
+					form_alert(1, RSCFMSG);
+					loop = 1;
+				} else 
+					loop = 0;
+			} else
+				loop = 0;
+		} while (loop);
+
+	}
+#endif
+	if (!load) {
+#ifdef	ONERSC
+		if (st_lang != 0)	/* No U.S. machine */
+			form_alert(1, RSCRMSG);
+				/* this msg has to get internationalized */
+#endif
+		deskptr = NULL;
+		rom_ram(1, (LONG)deskptr);		/* use ROM desktop rsc */
+		romdesk = TRUE;
+	} else {
+		rsrc_gaddr(0, 0, (LONG *)&rscaddr);
+		romdesk = FALSE;
+		deskptr = (OBJECT *) rscaddr;
+	}
+}
+#endif
 
 MLOCAL	BYTE	DESK_MAGIC[] = "4c4c444D";
 MLOCAL	BYTE	SH_MAGIC[] = "SH_MAGIC=";
 
 /*	Process 2 - Desktop 	*/
 
-	WORD
+	VOID
 deskmain()
 {
 	REG WORD	i;
 	WORD		ret,x,doitonce,code;
-	WORD		*ptr;
-	WORD		buffer[8];
-	OBJECT		*obj;
+	WORD		*ptr;	
 	BYTE		temp[30];
 	LONG		value;
+	WORD		temp1, temp2;
+
+#if 0	/* NOT USED: */
+	WORD		buffer[8];		
+	OBJECT		*obj;
 	LONG		*lptr;
+#endif
 
 	catchsignal( SIGTERM );	/* Redirect all the Signals	*/
 				/* Catch only the terminate signal */	
@@ -376,7 +568,7 @@ deskmain()
 	desk_id = appl_init( );	/* initalize the application	*/
 
 				/* Let AES knows that we will handle AP_TERM 	*/
-	shel_write( 9, 0x1, 0, Nostr, Nostr );
+	shel_write( 9, 0x1, 0,(LONG)Nostr,(LONG)Nostr );
 	
 	ret = graf_handle( &x, &x, &x, &x );
 	v_handle = ret;
@@ -396,14 +588,15 @@ deskmain()
 	icn_whandle = -1;
 	d_exit = L_NOEXIT;
 
-	ciconaddr = (BYTE*)0;	/* 7/10/92 */
+	ciconaddr = (CICONBLK*)0;	/* 7/10/92 */
 
 	Debug1( "Desktop checks cookie\r\n" );
 
 	if ( getcookie( 0x5F414B50L, &value ) )	/* get _AKP cookie */
 	{
-	  st_keybd = value & 0x00FFL;
-	  code = ( value >> 8 ) & 0x00FF;	/* get the keyboard preferences */
+	  st_keybd = (WORD) (value & 0x00FFL);
+	  code = (WORD)(( value >> 8 ) & 0x00FF); 
+					/* get the keyboard preferences */
 	}
 	else
 	  st_keybd = code = 0;
@@ -416,9 +609,9 @@ deskmain()
 
 	code = code * 3;
 					/* set the default IDT stuff */
-	st_time = TIMETABLE[code++];
-	st_date = TIMETABLE[code++];
-	st_dchar = TIMETABLE[code];
+	st_time  = (UWORD) TIMETABLE[code++];
+	st_date  = (UWORD) TIMETABLE[code++];
+	st_dchar = (UWORD) TIMETABLE[code];
 
 	/* The _IDT format is as follow				*/
 	/* HIGH WORD  |	         LOW WORD			*/
@@ -431,31 +624,35 @@ deskmain()
 		
 	if ( getcookie( 0x5F494454L, &value ) )	/* get _IDT cookie */
 	{
-	  st_date = ( value >> 8 ) & 0xFL;	/* get the date preferences */
-	  st_time = ( value >> 12 ) & 0xFL;
-	  if ( !( st_dchar = value & 0xffL ) )
+	  st_date = (UWORD)((value >> 8) & 0xFL); /* get the date preferences */
+	  st_time = (UWORD)(( value >> 12 ) & 0xFL);
+	  if ( !( st_dchar = (UWORD)(value & 0xffL )) )
 	    st_dchar = '/';
 	}
 top:
+	
+#ifdef SOFTLOAD
+	deskrsc();		/* read desktop resource */
+#else
 	Debug1( "Desktop does rom ram\r\n" );
 	Ndebug1( deskptr );
-	rom_ram( 1, deskptr );	/* read in desktop resource	*/
-
+	rom_ram( 1, (LONG)deskptr );	/* read in desktop resource	*/
+#endif
 	Debug1( "Desktop does deskerr\r\n" );
 
 	deskerr();
 
 	ret = TRUE;		/* assume everything is OK	*/
 
-	appnode = (BYTE*)0;	/* No app buffer yet		*/
-	applist = (BYTE*)0;	/* No app list yet		*/
+	appnode = (APP*)0;	/* No app buffer yet		*/
+	applist = (APP*)0;	/* No app list yet		*/
 	apsize = 0;		/* Initalize app size		*/
 	autofile[0] = 0;
 
 	desk_mice( HOURGLASS );	/* busy bee pointer		*/	
 				/* get the full window size	*/
 
-	wind_get( 0, WF_WORKXYWH, &full.x, &full.y, &full.w, &full.h );
+	wind_get( 0, WF_WORKXYWH, &full.g_x, &full.g_y, &full.g_w, &full.g_h );
 
 	Debug1( "Desktop does ini_rsc\r\n" );
 
@@ -522,7 +719,9 @@ m_2:	  desknoerr();
 	}
 
 	Debug1( "Wind_set\r\n" );
-	wind_set( 0, WF_NEWDESK, background, 0, 0 );
+	temp1 = (WORD)((LONG) background >> 16L);
+	temp2 = (WORD)((LONG)background & 0x0000FFFFL);
+	wind_set( 0, WF_NEWDESK, temp1, temp2, 0, 0 );
 
 	Debug1( "Do_view\r\n" );
 	do_view( i );			/* fix up the menu bar	*/
@@ -530,11 +729,13 @@ m_2:	  desknoerr();
 	ch_machine( );			/* check the machine	*/
 					/* set up the right menu text */
 					/* do it here!!!!!!	*/	
-	strcpy( get_fstring( ( m_cpu == 30 ) ? CACHETXT : BLTTXT ), menu_addr[BITBLT].ob_spec );
+	strcpy( get_fstring( ( m_cpu == 30 ) ? CACHETXT : BLTTXT ),
+		(BYTE *) menu_addr[BITBLT].ob_spec );
 
-	menu_addr[SUPERITEM].ob_type = G_USERDEF;
-	chxcache.ub_code = ch_xcache;
-	menu_addr[SUPERITEM].ob_spec = &chxcache;
+	menu_addr[SUPERITE].ob_type = G_USERDEF; /* was SUPERITEM, changed LC */
+	chxcache.ub_code = (LONG) ch_xcache;
+	menu_addr[SUPERITE].ob_spec = (LONG) &chxcache; 
+		/*  +----------------> was SUPERITEM, changed for LC */
 
 	Debug1( "Ch_cache\r\n" );
 	ch_cache( TRUE );		/* set the cache	*/
@@ -551,7 +752,7 @@ m_2:	  desknoerr();
 	}
 
 	Debug1( "Menu_register\r\n" );
-	menu_register( desk_id, get_fstring(DESKNAME) );
+ 	menu_register( desk_id, get_fstring(DESKNAME) );
 
 	Debug1( "Open def\r\n" );
 	open_def();			/* open default windows	*/
@@ -560,7 +761,8 @@ m_2:	  desknoerr();
 	if ( doitonce )
 	{
 	  if ( autofile[0] )
-	    shel_write( 1, ( autofile[1] == '1' ) ? 1 : 0, 0, &autofile[3], Nostr );
+	    shel_write( 1, ( autofile[1] == '1' ) ? 1 : 0, 0,
+		(LONG)&autofile[3],(LONG)Nostr );
 	}
 
 	doitonce = FALSE;
@@ -576,7 +778,7 @@ m_2:	  desknoerr();
 
 	free_windows( );		/* free up all windows	*/	
 
-	wind_set( 0, WF_NEWDESK, 0x0L, 0, 0 );
+	wind_set( 0, WF_NEWDESK, 0, 0, 0, 0 );
 	
 	free( lp_start );		/* free string buffer	*/
 
@@ -599,18 +801,18 @@ m_1:
 	if ( ciconaddr )	/* start everything over again	*/	
 	{
 	  free( ciconaddr );
-	  ciconaddr = (BYTE*)0;
+	  ciconaddr = (CICONBLK *) 0;
 	}
 
 	iconaddr = (OBJECT*) 0;
 
 	if ( iconmem )
 	{
-	  LBCOPY( temp, c.cb_pglobal, 30 );
-	  *((LONG*)(&c.cb_pglobal[7])) = iconmem;
+	  LBCOPY( (BYTE *)temp,(BYTE *) c.cb_pglobal, 30 );
+	  *((LONG*)(&c.cb_pglobal[7])) = (LONG) iconmem;
 	  rsrc_free(); 	
 	  iconmem = (BYTE*) 0;
-	  LBCOPY( c.cb_pglobal, temp, 30 );	
+	  LBCOPY((BYTE *)c.cb_pglobal,(BYTE *)temp, 30 );	
 	}
 
 	inf_path[0] = 0;
@@ -623,7 +825,7 @@ m_6:
 
 /*	Check the machine type and set res table	*/
 
-	WORD
+	VOID
 ch_machine()
 {
 	LONG	value;
@@ -632,12 +834,12 @@ ch_machine()
 			/* _VDO	*/
 	if ( getcookie( 0x5F56444FL, &value ) )
 	{			/* 7/16/92 */
-	  if ( ( ( value >> 16 ) & 0x0000FFFFL ) >= 0x02 )	/* TT	*/
+	  if ( ( ( value >> 16L ) & 0x0000FFFFL ) >= 0x02 )	/* TT	*/
 	    m_st = FALSE;
 	}
 			/* _CPU	*/
 	getcookie( 0x5F435055L, &value );
-	m_cpu = value;
+	m_cpu =  (WORD) value;
 
 	/* the restable is set according to gl_restype value	*/
 
@@ -666,29 +868,40 @@ ch_machine()
 }
 
 
+#pragma inline asm1() { "4e7a"; "0002"; }
+
+#pragma inline asm2() { "4e7b"; "7002"; }
+
+#pragma inline asm3() { "4e7a"; "7002"; }
+
+#pragma inline asm4() { "2007"; }
+
 	LONG
 inq_cache( data )
 	REG LONG	data;
 {
 	BYTE	*old;
-	int	super;
+	WORD	super;
 
-	super = Super( 0x1L );
+	super = (WORD) Super( 0x1L );
 	
 	if ( !super )
-	  old = Super( 0x0L );
-
-	  asm( ".dc.w $4e7a,$0002" ); /* movec.l cacr,d0		*/
+	  old = (BYTE *) Super( 0x0L );
+		asm1();
+	  /*asm( ".dc.w $4e7a,$0002" );*/ /* movec.l cacr,d0		*/
 
 	  if ( data != -1 )
-	    asm( ".dc.w $4e7b,$7002" ); /* movec.l d7,cacr		*/
-
-	  asm( ".dc.w $4e7a,$7002" ); /* movec.l cacr,d7		*/
+		asm2();
+	    /*asm( ".dc.w $4e7b,$7002" );*/ /* movec.l d7,cacr		*/
+	  asm3();
+	  /*asm( ".dc.w $4e7a,$7002" );*/ /* movec.l cacr,d7		*/
 
 	if ( !super )
 	  Super( old );
 
-	asm( ".dc.w $2007" );
+	asm4();
+	/*asm( ".dc.w $2007" );*/
+
 }
 
 

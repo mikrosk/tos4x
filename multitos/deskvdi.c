@@ -7,8 +7,10 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <vdidefs.h>
+#include "portab.h"
+#include "vdidefs.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 MLOCAL WORD	control[12];
 MLOCAL WORD	intin[256];
@@ -27,7 +29,7 @@ EXTERN	WORD	v_handle;
 d_ncode()
 {
 	control[6] = v_handle;
-	desk_vdi( pc );
+	desk_vdi( (LONG *)pc );
 }
 
 
@@ -64,12 +66,12 @@ d_v_pline( number, points )
 	WORD	number;
 	WORD	*points;
 {
-	pc[2] = points;
+	pc[2] = (LONG *) points;
 	control[0] = POLYLINE;
 	control[1] = number;
 	control[3] = 0;
 	d_ncode();
-	pc[2] = ptsin;
+	pc[2] = (LONG *) ptsin;
 }
 
 
@@ -127,7 +129,7 @@ d_setattr( mode, color )
 
 /* desktop open virtual workstation	*/
 
-	WORD
+	VOID
 desk_vopnvwk( handle, resolution, ptr )
 	WORD	*handle;
 	WORD	resolution;
@@ -144,12 +146,12 @@ desk_vopnvwk( handle, resolution, ptr )
 	control[0] = 100;
 	control[1] = 0;
 	control[3] = 11;
-	pc[0] = control;
-	pc[1] = intin;
-	pc[2] = ptsin;
-	pc[3] = intout;
-	pc[4] = ptsout;
-	desk_vdi( pc );
+	pc[0] = (LONG *) control;
+	pc[1] = (LONG *) intin;
+	pc[2] = (LONG *) ptsin;
+	pc[3] = (LONG *) intout;
+	pc[4] = (LONG *) ptsout;
+	desk_vdi( (LONG *)pc );
 	*handle = control[6];
 	*ptr = intout;
 }
@@ -217,9 +219,9 @@ vs_clip( clip_flag, pxyarray )
 	control[0] = 129;
 	control[1] = 2;
 	control[3] = 1;
-	pc[2] = pxyarray;
+	pc[2] = (LONG *) pxyarray;
 	d_ncode();
-	pc[2] = ptsin;
+	pc[2] = (LONG *) ptsin;
 }
 
 
@@ -242,15 +244,15 @@ d_vro_cpyfm( mode, xyarray, psrc, pdst )
 	LONG	*ptr;
 
 	intin[0] = mode;
-	ptr = &control[7];	
-	ptr[0] = psrc;
-	ptr[1] = pdst;
-	pc[2] = xyarray;
+	ptr = (LONG *) &control[7];	
+	ptr[0] = (LONG) psrc;
+	ptr[1] = (LONG) pdst;
+	pc[2] = (LONG *) xyarray;
 	control[0] = 109;
 	control[1] = 4;
 	control[3] = 1;
 	d_ncode();
-	pc[2] = ptsin;
+	pc[2] = (LONG *) ptsin;
 }
 
 

@@ -2,17 +2,17 @@
  * Rlist.c -  Handling rectangle lists for the Window Manager
  *
  * Jun 19 1991	ml.	Created this.
+ * Feb 16, 1993 cgee	Converted to Lattice C 5.51
+ * Feb 23, 1993 cgee	Force the use of prototypes
  *
  */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <windlib.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "windlib.h"
+#include "aesmint.h"
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -22,7 +22,6 @@
 *	-----------------------------------------------------------
 */	
 
-EXTERN	BYTE	*dos_xalloc();
 EXTERN	MEMHDR	*rmhead, *rmtail;   /* rect lists memory linked list */
 
 /*
@@ -32,7 +31,7 @@ EXTERN	MEMHDR	*rmhead, *rmtail;   /* rect lists memory linked list */
  *
  */
 	RLIST
-*newrect()
+*newrect( VOID )
 {
     REG RLIST	*rp;	/* pointer to RLIST structure */
     MEMHDR  	*mp;	/* pointer to memory header */
@@ -45,10 +44,10 @@ EXTERN	MEMHDR	*rmhead, *rmtail;   /* rect lists memory linked list */
     {
 	if ((mp = (MEMHDR *)
 		dos_xalloc((LONG)(NUMRECT*sizeof(RLIST)+sizeof(MEMHDR)),3 )) 
-	    == NULLPTR) 
+	    == ( MEMHDR *)NULLPTR) 
 	{
 	    Debug1( "NO MEMORY for rlist!\r\n" );
-	    return(NULLPTR);
+	    return( ( RLIST *)NULLPTR);
 	} 
 	else 
 	{
@@ -61,7 +60,7 @@ EXTERN	MEMHDR	*rmhead, *rmtail;   /* rect lists memory linked list */
 	    }
 
 	    rmtail->mnext = mp;
-	    mp->mnext = NULLPTR;
+	    mp->mnext = ( MEMHDR *)NULLPTR;
 	    rmtail = mp;
 	    rmtail->numused = 1;
 	    rp = (RLIST *)(rmtail+1);
@@ -76,7 +75,7 @@ EXTERN	MEMHDR	*rmhead, *rmtail;   /* rect lists memory linked list */
     }
 
     rp->rstatus.rused = TRUE;
-    rp->rnext = NULLPTR;
+    rp->rnext = ( RLIST *)NULLPTR;
     return(rp);
 }
 
@@ -134,10 +133,10 @@ char	*rlist;	    /* ptr (or address of ptr) to head of rect. list */
     /* delete unused memory blocks */
 
     if (rmhead != rmtail) {
-	prvmp = nxtmp = NULLPTR;
+	prvmp = nxtmp = ( MEMHDR *)NULLPTR;
 	curmp = rmhead;
 
-	while (curmp != NULLPTR) {
+	while (curmp != ( MEMHDR *)NULLPTR) {
 
 	    nxtmp = curmp->mnext;
 
@@ -148,7 +147,7 @@ char	*rlist;	    /* ptr (or address of ptr) to head of rect. list */
 		} else {
 		    rmhead = nxtmp;
 		}
-		dos_free(curmp);
+		dos_free( ( LONG )curmp);
 
 	    } else {
 		prvmp = curmp;
@@ -160,9 +159,10 @@ char	*rlist;	    /* ptr (or address of ptr) to head of rect. list */
 	if (prvmp != rmtail)
 	    rmtail = prvmp;
     }
-
-
+#if 0
     return TRUE;
+#endif
+
 }
 
 
@@ -253,16 +253,14 @@ delrect(rp, rlist)
     RLIST	*rnextrp;   /* ptr to next rectangle in rectangle list */
     REG RLIST   *currp;	    /* ptr to current rectangle in rectangle list */
     UWORD	hv_piece;   /* flag for new rectangles found */
-    WINDOW	*srchwp();
-    RLIST	*newrect();
 
     /*
      * if cannot locate window in database, or no RLIST 
      * structure is available, return with an error. 
      */
-    if ((wp = srchwp(handle)) == NULLPTR || 
-	(rlist = newrect()) == NULLPTR)
-	return NULLPTR;
+    if ((wp = srchwp(handle)) == ( WINDOW *)NULLPTR || 
+	(rlist = newrect()) == ( RLIST *)NULLPTR)
+	return(  ( RLIST *)NULLPTR );
 
     /* initialize rectangle list */
     if (area == WF_WORKXYWH)
@@ -281,7 +279,7 @@ delrect(rp, rlist)
 	wrect.g_h += SHADOW;
 
 	rnextrp = rlist;	/* start from beginning of rect list */
-	while ((currp = rnextrp) != NULLPTR) {
+	while ((currp = rnextrp) != ( RLIST *)NULLPTR) {
 	    rnextrp = currp->rnext;
 	    if (brkrect(&wrect, &(currp->rect), &hv_piece)) {
 		chgrlist(hv_piece, &wrect, currp, &rlist);
@@ -291,13 +289,13 @@ delrect(rp, rlist)
 
     /* optimize the rectangle list */
     for (currp = rlist; 
-	currp != NULLPTR; 
+	currp != ( RLIST *)NULLPTR; 
 	currp = currp->rnext) {
 
 	rnextrp = currp->rnext;
 	while (rnextrp) {
 	    if (mrgrect(currp, rnextrp)) {  /* try to merge 2 rects */
-		delrect(rnextrp, &rlist);
+		delrect(rnextrp, ( BYTE *)&rlist);
 		rnextrp = currp->rnext;
 	    } else {
 		rnextrp = rnextrp->rnext;   /* progress to the next rect */
@@ -368,7 +366,6 @@ chgrlist(hv_pc, cutrect, oldrp, rlist)
     RLIST   *nrp;	/* ptr to new rectangle generated */
     RLIST   *currp;	/* ptr to current rectangle in expansion */
     UWORD   pc;		/* counter */
-    RLIST   *mkrect();
 
     /*
      * If given rectangle is entirely covered, just delete it 
@@ -383,12 +380,12 @@ chgrlist(hv_pc, cutrect, oldrp, rlist)
 	 */
 
 	old = (GRECT *)&(oldrp->rect);
-	currp = xrlist = NULLPTR;
+	currp = xrlist = ( RLIST *)NULLPTR;
 
 	/* generate a rectangle for each piece */
 	for (pc = TOP; pc <= BOTTOM; pc <<= 1) {
 	    if (hv_pc & pc) {
-		if ((nrp = mkrect(pc, cutrect, old)) == NULLPTR)
+		if ((nrp = mkrect(pc, cutrect, old)) == ( RLIST *)NULLPTR)
 		    return FALSE;
 
 		if (xrlist)
@@ -404,7 +401,7 @@ chgrlist(hv_pc, cutrect, oldrp, rlist)
 	currp->rnext = oldrp->rnext;
 	oldrp->rnext = xrlist;
     }
-    delrect(oldrp, rlist);
+    delrect(oldrp, ( BYTE *)rlist);
     return TRUE;
 }
 
@@ -425,10 +422,9 @@ chgrlist(hv_pc, cutrect, oldrp, rlist)
 {
     RLIST	*rp;	/* ptr to RLIST strucuture of new rectangle */
     REG GRECT	*nrect;	/* ptr to new rectangle */
-    RLIST	*newrect();
 
-    if ((rp = newrect()) == NULLPTR)
-	return NULLPTR;
+    if ((rp = newrect()) == ( RLIST *)NULLPTR)
+	return( ( RLIST *)NULLPTR );
 
     nrect = (GRECT *)&(rp->rect);
 

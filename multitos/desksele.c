@@ -7,18 +7,15 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <compiler.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
-
-EXTERN	WINDOW	*w_gfirst();
-EXTERN	WINDOW	*w_gnext();
-EXTERN	BYTE	*put_name();
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 WORD	x_status;		/* for x_select			*/
 WORD	x_index;		/* For x_next and x_first	*/
@@ -46,7 +43,7 @@ x_deselect( )
 
 	if ( x_type == WINICON )
 	{
-	  dir = x_win->w_memory;
+	  dir = (DIR *) x_win->w_memory;
 	  dir[x_cur].d_state = NORMAL;
 	}
 	else
@@ -85,15 +82,15 @@ m_objfind( obj, mx, my, mode )
 	     y1 = obj[i].ob_y + offy;	     
 
 	     iblk = (CICONBLK*)(obj[i].ob_spec);
-	     rc_copy( &iblk->monoblk.ib_xicon, &pt );
-	     pt.x += x1;
-	     pt.y += y1;
+	     rc_copy( &iblk->monoblk.ib_xicon, (WORD *)&pt );
+	     pt.g_x += x1;
+	     pt.g_y += y1;
  
 	     if ( !inside( mx, my, &pt ) )
 	     {
-	        rc_copy( &iblk->monoblk.ib_xtext, &pt );
-	        pt.x += x1;
-	        pt.y += y1;
+	        rc_copy( &iblk->monoblk.ib_xtext, (WORD *)&pt );
+	        pt.g_x += x1;
+	        pt.g_y += y1;
 	        if ( inside( mx, my, &pt ) )
 		  status = i;
 	     }
@@ -102,9 +99,9 @@ m_objfind( obj, mx, my, mode )
 	   }
 	   else					/* text mode	*/
 	   {
-	     rc_copy( &obj[i].ob_x, &pt );
-	     pt.x += offx;
-	     pt.y += offy;
+	     rc_copy( &obj[i].ob_x, (WORD *)&pt );
+	     pt.g_x += offx;
+	     pt.g_y += offy;
 	     if ( inside( mx, my, &pt ) )
 	       status = i;	
 	   }
@@ -116,7 +113,7 @@ m_objfind( obj, mx, my, mode )
 
 	if ( status == -1 )	/* if fails then try the root	*/
 	{
-	  if ( inside( mx, my, &obj[0].ob_x ) )
+	  if ( inside( mx, my, (GRECT *)&obj[0].ob_x ) )
 	    status = 0;	
 	}
 
@@ -183,7 +180,7 @@ x_select( )
 
 	while( win )
 	{
-	  dir = win->w_memory;
+	  dir = (DIR *)win->w_memory;
 	  for ( i = 0; i < win->w_items; i++ )
 	  {
 	    if ( dir[i].d_state & SELECTED )
@@ -214,7 +211,7 @@ x_next( name, type )
 
 	if ( x_type == WINICON )
 	{
-	  dir = x_win->w_memory;
+	  dir = (DIR *) x_win->w_memory;
 	  limit = x_win->w_items;
 
 	  for ( i = x_index; i < limit; i++ )
@@ -268,7 +265,7 @@ x_first( name, type )
 
 	while( win )			/* inside a window?	*/
 	{
-	  dir = win->w_memory;
+	  dir = (DIR *) win->w_memory;
 	  j = win->w_items;
 
 	  for ( i = 0; i < j; i++ )
@@ -384,7 +381,7 @@ d_sdesk( name, type )
 	BYTE	**name;
 	WORD	*type;
 {
-	WORD		temp,i;
+	WORD		temp;
 	REG IDTYPE	*itype;	
 	
 	while( i_next( x_index, background, &x_index ) )
@@ -395,7 +392,7 @@ d_sdesk( name, type )
 	  if ( temp == DISK )
 	  {
 	    strcpy( wildext, path1 );
-      	    path1[0] = itype->i_cicon.monoblk.ib_char[1];
+      	    path1[0] = (BYTE)itype->i_cicon.monoblk.ib_char;
 	    *name = path1;
 	    *type = temp;
 	    goto xd_1;

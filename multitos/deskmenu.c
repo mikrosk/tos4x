@@ -15,7 +15,9 @@
 /*	  - Add set_video() to do_opt()					*/
 /*	Changes to tb3[] - added VIDITEM object				*/
 /*      Changes to hdkeybd() - added VIDITEM object			*/
-
+/*	Convert to Lattice C 5.51		02/18/93 C.Gee		*/
+/*	Changed 2 uses of WINICON to SMILEY     02/28/93 C.Gee		*/
+/*	These two are TREES called by get_tree().			*/	
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -23,31 +25,19 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <machine.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <message.h>
-#include <gemdefs.h>
-#include <mintbind.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
-
-EXTERN	CICONBLK	**get_color_rsc();	
-EXTERN	BYTE	*get_fstring();
-EXTERN	BYTE	*malloc();
-EXTERN	APP	*app_key();
-EXTERN	BYTE	*get_string();
-EXTERN	WINDOW	*get_win();
-EXTERN	WINDOW	*get_top();
-EXTERN	BYTE	*r_slash();
-EXTERN	BYTE	toupper();
-EXTERN	OBJECT	*get_tree();
-EXTERN	WINDOW	*w_gfirst();
-EXTERN	WINDOW	*w_gnext();
-EXTERN	BYTE	*g_name();
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "message.h"
+/*#include "gemdefs.h"*/
+#include "mintbind.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 EXTERN	LONG	gl_vdo;
 EXTERN	WORD	q_change;
@@ -63,15 +53,14 @@ EXTERN	BYTE	mkeys[];
 EXTERN	BYTE	restable[];
 EXTERN	WORD	ftab[];
 
-EXTERN	WORD	mv_desk();
 EXTERN	WORD	st_keybd;
 
 
 WORD	icn_whandle;
 WORD	d_exit;		/* desktop exit flag	*/
 BYTE	mentable[MAXMENU];
-BYTE	*keytable;
-BYTE	*contable;
+WORD	*keytable;
+WORD	*contable;
 
 /*	Alternate keys table	*/
 
@@ -136,9 +125,9 @@ WORD	tb3[MAXMENU] = { OPENITEM, SHOWITEM, SEAMENU,  DELMENU,  NEWFITEM,
 			 READINF,  MEMMENU,  SAVEITEM, PRINTITE, BITBLT,
 			 VIDITEM };
 
-#if 0	/* no longer used: ++ERS 2/17/93 */
 /*	Alternate Number Table	*/
 
+#if 0	/* no longer used: ++ERS 2/17/93 */
 WORD	altnum[] = { 0x7800, 0x7900, 0x7a00, 0x7c00, 0x7d00, 0x7b00, 0 };
 #endif
 
@@ -159,7 +148,7 @@ ch_key( i )
 	REG BYTE	*str;
 
 	obj = menu_addr;
-	str = obj[tb3[i]].ob_spec;
+	str = ( BYTE *)obj[tb3[i]].ob_spec;
 	l = strlen( str );	  
 	if ( mentable[i] )
 	{
@@ -174,7 +163,7 @@ ch_key( i )
 /*	Put keys into the menus	*/
 	
 	VOID
-put_keys( )
+put_keys( VOID )
 {
 	REG WORD	i;
 
@@ -225,11 +214,10 @@ men_ienable( obj, which, enable )
 /*	Enable or disable the menu item according to current status	*/
 
 	VOID
-menu_verify()
+menu_verify( VOID )
 {
 	WORD	enable;
 	REG 	WORD	i;
-	WINDOW	*win;
 	WORD	type;
 	BYTE	*str;
 			/* If there is a window opened/closed	*/
@@ -282,7 +270,7 @@ menu_verify()
 /*	Select all objects inside the window	*/
 
 	VOID
-sel_all( )
+sel_all( VOID )
 {
 	REG WINDOW	*win;
 	REG DIR		*dir;
@@ -292,7 +280,7 @@ sel_all( )
 	if ( win = w_gfirst() )
 	{
 	  clr_dicons( );
-          dir = win->w_memory;
+          dir = ( DIR *)win->w_memory;
 	  strcpy( g_name( win->w_path ), buffer );
 	  for ( i = 0; i < win->w_items; i++ )
 	  {
@@ -316,11 +304,9 @@ hd_keybd( key, keystate )
 	REG WORD	item;
 	WORD		msgbuff[8];
 	BYTE		buffer[14];
-	WORD		i,num_icon;
-	BYTE		*str;
+	WORD		i;
 	APP		*app;
 	WORD		x,y,w,h;
-	CICONBLK	**icn_ptr;
 	ICONBLK		*iblk;
 
 	switch( st_keybd )
@@ -412,14 +398,14 @@ hd_keybd( key, keystate )
 	  }
 	}
 
-#if 0
-/* commented out 2/17/93 by ERS, for 2 reasons: (1) to
- * save a bit of space, and (2) because using an ALT key
- * to select the current resolution produced a bogus
- * error message. We're concentrating on Falcon now,
- * and this code never did work on Falcon, so it isn't
- * worth the hassle to maintain it.
- */
+ #if 0
+ /* commented out 2/17/93 by ERS, for 2 reasons: (1) to
+  * save a bit of space, and (2) because using an ALT key
+  * to select the current resolution produced a bogus
+  * error message. We're concentrating on F
+  * and this code never did work on Falcon, so it isn't
+  * worth the hassle to maintain it.
+  */
 					/* 7/16/92 */
 	if ( ( gl_vdo & HIGHWORD ) <= TT )
 	{
@@ -486,7 +472,7 @@ hx_1:	  strcpy( wildext, buffer );
 
 	if ( key == 0x4700 )		/* clr home	*/
 	{
-	  form_dial( 3, 0, 0, 0, 0, full.x, full.y, full.w, full.h );	 
+	  form_dial( 3, 0, 0, 0, 0, full.g_x, full.g_y, full.g_w, full.g_h );	 
 	  return;
 	}
 
@@ -515,11 +501,11 @@ hx_1:	  strcpy( wildext, buffer );
 	  icn_whandle = wind_create( MOVE|CLOSE|NAME, 50, 50, 32, 32 );
 	  if ( icn_whandle != -1 )
 	  {	   	
-	    if ( save_inf( FALSE ) )	/* save the current environment */
+	    if ( save_inf( FALSE, (BYTE *) 0L ) )	/* save the current environment */
 	    {
 	      obj = get_tree( SMILEY );
 	      iblk = (ICONBLK*)obj[1].ob_spec;
-	      wind_calc( 0, MOVE|CLOSE, 2, full.y, iblk->ib_wtext, 
+	      wind_calc( 0, MOVE|CLOSE, 2, full.g_y, iblk->ib_wtext, 
 			 iblk->ib_hicon + iblk->ib_htext, &x, &y, &w, &h );
 /*	      wind_set( icn_whandle, WF_NAME, "NEWDESK", (BYTE*)0 );	*/
 	      wind_set( icn_whandle, WF_BEVENT, 0x1, 0, 0, 0 );	  
@@ -529,8 +515,9 @@ hx_1:	  strcpy( wildext, buffer );
 	      wind_set( icn_whandle, WF_BOTTOM, 0, 0, 0, 0 );
 	      wind_get( icn_whandle, WF_WORKXYWH, &obj->ob_x, &obj->ob_y, &obj->ob_width,
 		        &obj->ob_height );
-/*      form_dial( 2, obj->ob_x, obj->ob_y, 1, 1, full.x, full.y, full.w, full.h );*/
-	      shel_write( 11, 0, 0, (BYTE*)0, (BYTE*)0 );
+/*      form_dial( 2, obj->ob_x, obj->ob_y, 1, 1, full.g_x, full.g_y, full.g_w,
+			 full.g_h );*/
+	      shel_write( 11, 0, 0, 0L, 0L );
 	      return; 	
 	    }
 	  }
@@ -557,7 +544,7 @@ foption( win )
 	xinf_sset( obj, OPTNAME, buf2 );
 	if ( fmdodraw( FILEOPTI, 0 ) == OPTOK )
 	{
-	  inf_sget( obj, OPTNAME, buffer );
+	  inf_sget( (LONG) obj, OPTNAME, buffer );
 	  unfmt_str( buffer, buf2 );
 	  if ( !buf2[0] )
 	    strcpy( getall, buf2 );
@@ -632,12 +619,12 @@ do_scroll( msgbuff )
 do_opt( msgbuff )
 	WORD	msgbuff;
 {
-	REG OBJECT	*obj;
 	WORD		ret,button,handle;
 	BYTE		buffer[16];
 	BYTE		*str;
-	LONG		lsize;
 	BYTE		*afile;
+
+	ret = 0;	/* cjg 03/03/93 */
 
 	switch( msgbuff )
 	{
@@ -682,13 +669,13 @@ opt1:	      ins_icons();
 	    path1[0] = ( isdrive() & 0x04 ) ? 'C' : 'A';
 	    strcpy( &infpath[3], buffer );
  	
-	    fsel_exinput( path1, buffer, &button, get_fstring( SINF) );
+	    fsel_exinput( (LONG)path1,(LONG)buffer, &button, get_fstring( SINF) );
 
 	    if ( button )
 	    {
 	      desk_mice( HOURGLASS );
 	      rep_path( buffer, path1 );
-	      handle = Fopen( path1, 0x00 );
+	      handle = ( WORD )Fopen( path1, 0x00 );
 	      if ( handle > 0 )
 	      {
 		Fsetdta( &dtabuf );
@@ -701,7 +688,7 @@ opt1:	      ins_icons();
 		  {			/* copy to the aes buffer */
 	            shel_put( afile, (UWORD)(dtabuf.dirfile.d_size) );	
 	    	    d_exit = L_READINF;
-		    wait_msg( -1 );
+		    wait_msg( -1, (OBJECT *) 0L );
 		    strcpy( path1, inf_path );	/* new inf path	*/
 		  }
 		  else
@@ -731,7 +718,7 @@ opt1:	      ins_icons();
 	    path1[0] = ( isdrive() & 0x04 ) ? 'C' : 'A';
 	    strcpy( &infpath[3], buffer );
  	
-	    fsel_exinput( path1, buffer, &button, get_fstring( SAVEINF ) );
+	    fsel_exinput((LONG)path1,(LONG)buffer, &button, get_fstring( SAVEINF ) );
 
 	    if ( button )
 	    {
@@ -742,7 +729,7 @@ opt1:	      ins_icons();
 	    break;
 
 	  case PRINTITE:		/* print screen		*/
-	    if ( !( menu_addr[PRINTITE].ob_states & DISABLED ) )
+	    if ( !( menu_addr[PRINTITE].ob_state & DISABLED ) )
 	    {
 	      if ( do1_alert( PRINTTOP ) == 1 )
 	      {
@@ -845,7 +832,7 @@ v_4:
 
 /*	Do the file menu	*/
 
-	WORD
+	VOID
 do_file( msgbuff )
 	WORD	msgbuff;
 {
@@ -877,10 +864,10 @@ do_file( msgbuff )
 	    if ( ( x_status ) || ( w_gfirst() ) )
 	    {
 	      obj = get_tree( SEAFILE );
-	      inf_sset( obj, SFILE, Nostr );
+	      inf_sset( (LONG)obj, SFILE, Nostr );
 	      if ( fmdodraw( SEAFILE, SFILE ) == SEAOK )
 	      {
-	        inf_sget( obj, SFILE, buffer );
+	        inf_sget( (LONG)obj, SFILE, buffer );
 	        unfmt_str( buffer, buf2 );
 	        if ( buf2[0] )
 	          sea_file( buf2 );
@@ -890,7 +877,7 @@ do_file( msgbuff )
 	    break;
 
 	  case DELMENU:
-	    if ( !( menu_addr[DELMENU].ob_states & DISABLED ) )
+	    if ( !( menu_addr[DELMENU].ob_state & DISABLED ) )
 	    {
 	      if ( x_status )
 	      {
@@ -998,13 +985,13 @@ hd_menu( msgbuff )
 	    break; 	
 	}
 
-	menu_tnormal( menu_addr, msgbuff[3], 1 );
+	menu_tnormal( (LONG)menu_addr, msgbuff[3], 1 );
 }
 
 
 /*	Handle the special sleep window	*/ 
 
-	WORD
+	VOID
 hd_wicon( msgbuff )
 	WORD	msgbuff[];
 {
@@ -1020,14 +1007,14 @@ hd_wicon( msgbuff )
 	    break;
 	
 	  case WM_TOPPED:
-	    shel_write( 11, 1, 0, (BYTE*)0, (BYTE*)0 );
+	    shel_write( 11, 1, 0, 0L, 0L );
 	    wind_close( msgbuff[3] );
 	    wind_delete( msgbuff[3] );	
 	    icn_whandle = -1;	
 	    d_exit = L_WAKEUP;
 	    break;
 	
-	  case WM_CLOSED:
+	  case WM_CLOSE:
 	    d_exit = L_EXIT;
 	    break;
 
@@ -1043,14 +1030,14 @@ hd_wicon( msgbuff )
 
 /*	Handle all the different message	*/
 
-	WORD
+	VOID
 hd_window( msgbuff )
 	REG WORD	msgbuff[];
 {
 	REG WORD	handle;
 	REG WINDOW	*win;	
 	REG OBJECT	*obj;
-	WORD		shrink,x,y,w,h,dodraw;
+	WORD		shrink,x,dodraw;
 	GRECT		pt,px;
 	GRECT		*pc;
 
@@ -1065,7 +1052,7 @@ hd_window( msgbuff )
 
 	obj = win->w_obj;
 	handle = msgbuff[3];
-	pc = &msgbuff[4];	/* pc == msgbuff[4,5,6,7]	*/
+	pc = ( GRECT *)&msgbuff[4];	/* pc == msgbuff[4,5,6,7]	*/
 
 	wind_update(1);
 
@@ -1087,7 +1074,7 @@ hd_window( msgbuff )
 
 	      break;
 
-	    case WM_CLOSED:		/* close one path	*/
+	    case WM_CLOSE:		/* close one path	*/
 	      close_path( win );
               break;
 
@@ -1104,19 +1091,19 @@ hd_window( msgbuff )
 	      break;
 
 	    case WM_MOVED:		/* set the current x,y,w,h	*/
-	      do_xyfix( &msgbuff[4] );
+	      do_xyfix( (GRECT *)&msgbuff[4] );
 	      wind_set( handle, WF_CURRXYWH, msgbuff[4], msgbuff[5], 
 			msgbuff[6], msgbuff[7] );
 
 					/* set the position offset	*/
-	      obj[0].ob_x += msgbuff[4] - win->w_sizes.x;
-	      obj[0].ob_y += msgbuff[5] - win->w_sizes.y;
-	      rc_copy( pc, &win->w_sizes );
+	      obj[0].ob_x += msgbuff[4] - win->w_sizes.g_x;
+	      obj[0].ob_y += msgbuff[5] - win->w_sizes.g_y;
+	      rc_copy( (WORD *)pc, (WORD *)&win->w_sizes );
 
 	      wind_get( handle, WF_WORKXYWH, &msgbuff[4], &msgbuff[5], 
 			&msgbuff[6], &msgbuff[7] );
 
-	      rc_copy( pc, &win->w_work );
+	      rc_copy( (WORD *)pc, (WORD *)&win->w_work );
 	      break;	
 	
 	    case WM_FULLED:
@@ -1124,52 +1111,54 @@ hd_window( msgbuff )
 	                &msgbuff[6], &msgbuff[7] );
 
 					/* already in full size		*/
-	      if ( rc_equal( &msgbuff[4], &full ) )
+	      if ( rc_equal( (WORD *)&msgbuff[4], (WORD *)&full ) )
 	      {				/* so shrink it			*/
 	        wind_get( handle, WF_PREVXYWH, &msgbuff[4], &msgbuff[5],
 	                &msgbuff[6], &msgbuff[7] );
-		form_dial( 2, pc->x, pc->y, pc->w, pc->h,
-			      full.x, full.y, full.w, full.h );	 
+		form_dial( 2, pc->g_x, pc->g_y, pc->g_w, pc->g_h,
+			      full.g_x, full.g_y, full.g_w, full.g_h );	 
 	      }
 	      else
 	      {
-	        rc_copy( &full, pc );	/* calculate the center point	*/
-		rc_copy( &win->w_sizes, &pt );
+	        rc_copy( (WORD *)&full,(WORD *)pc );	/* calculate the center point	*/
+		rc_copy( (WORD *)&win->w_sizes,(WORD *) &pt );
 	        rc_center( &pt, &pt );	
 					/* form grow box		*/
-		form_dial( 1, pt.x, pt.y, pt.w, pt.h, pc->x, pc->y, pc->w, pc->h );	 
+		form_dial( 1, pt.g_x, pt.g_y, pt.g_w, pt.g_h, pc->g_x,
+			 pc->g_y, pc->g_w, pc->g_h );	 
 	      }
 	
             case WM_SIZED:
-	      do_xyfix( &msgbuff[4] );
+	      do_xyfix( (GRECT *)&msgbuff[4] );
 	      wind_set( handle, WF_CURRXYWH, msgbuff[4], msgbuff[5], 
 			msgbuff[6], msgbuff[7] );
 
-	      wind_get( handle, WF_PREVXYWH, &px.x, &px.y, &px.w, &px.h );	      	
+	      wind_get( handle, WF_PREVXYWH, &px.g_x, &px.g_y, &px.g_w,
+		 &px.g_h );	      	
 		
 	      dodraw = FALSE;
 				/* if same x and y the AES will not	*/
 				/* send redraw message 			*/
 				/* so we have to do it our own		*/		
-	      if ( ( msgbuff[4] == px.x ) && ( msgbuff[5] == px.y ) )
+	      if ( ( msgbuff[4] == px.g_x ) && ( msgbuff[5] == px.g_y ) )
 		dodraw = TRUE;
 
-	      rc_copy( pc, &win->w_sizes );
+	      rc_copy( (WORD *)pc, (WORD *)&win->w_sizes );
 
       	      wind_get( handle, WF_WORKXYWH, &obj->ob_x, &obj->ob_y,
 			&obj->ob_width, &obj->ob_height );
 
 	      shrink = FALSE;
 
-	      if ( ( obj->ob_width < win->w_work.w ) &&
-		   ( obj->ob_height <= win->w_work.h ) )
+	      if ( ( obj->ob_width < win->w_work.g_w ) &&
+		   ( obj->ob_height <= win->w_work.g_h ) )
 		shrink = TRUE;
 
-	      if ( ( obj->ob_height < win->w_work.h ) &&
-		   ( obj->ob_width <= win->w_work.w ) )
+	      if ( ( obj->ob_height < win->w_work.g_h ) &&
+		   ( obj->ob_width <= win->w_work.g_w ) )
 		shrink = TRUE;
  
-	      rc_copy( &obj->ob_x, &win->w_work );	
+	      rc_copy( (WORD *)&obj->ob_x, (WORD *)&win->w_work );	
 
 	      ch_path( win );
 
@@ -1265,7 +1254,7 @@ hd_msg( msgbuff )
 /*	Handle all the events		*/
 
 	VOID
-actions( )
+actions( VOID )
 {
 	WORD	event,kstate,kreturn,button,clicks;
 	WORD	mx,my;
@@ -1281,7 +1270,7 @@ actions( )
 	  event = evnt_multi( MU_MESAG|MU_BUTTON|MU_KEYBD,2,1,1,
 			      0,0,0,0,0,
 			      0,0,0,0,0,
-			      msgbuff,	/* mesaage buffer	*/
+			      (LONG)msgbuff,	/* mesaage buffer	*/
 			      0,0,	/* timer counter	*/
 			      &mx,&my,
 			      &button,
@@ -1324,7 +1313,7 @@ actions( )
 /*	Find out available memory	*/
 
 	LONG
-av_mem()
+av_mem( VOID )
 {
 #if 0
 	REG BYTE	*start;
@@ -1332,13 +1321,13 @@ av_mem()
 	REG BYTE	**new;
 	LONG		total,size;
 	
-	total = 0;
+	total = 0L;
 	start = (BYTE*)0;
 
 	while( TRUE )
 	{
 	  size = Mxalloc( 0xFFFFFFFFL, 3 );
-	  if ( size >= 4 )
+	  if ( size >= 4L )
 	  {
 	    addr = Mxalloc( size, 3 );
 	    total += size;
@@ -1394,8 +1383,8 @@ av_mem()
 
 #if 0
 /*	Find out available memory	*/
-
-av_desk()
+	VOID
+av_desk( VOID )
 {
 	REG OBJECT	*obj;
 	REG LONG	f;
@@ -1447,7 +1436,7 @@ av_desk()
 	app = (APP*)0;
 	which = SDDOWN;
 
- 	f = 0;
+ 	f = 0L;
 	dr_dial_w( SSYSTEM, FALSE );		/* save the string	*/
 	goto ad_2;
 

@@ -1,6 +1,9 @@
 /*	MESSAGE.H		9/21/92			Derek Mui		*/
 
-#define AP_MSG 		0
+#ifndef _MESSAGE_H_
+#define _MESSAGE_H_
+
+#define AP_MSG 			0
 #define WM_USER	    	0
 #define MN_SELECTED 	10
 
@@ -85,4 +88,6 @@
 #endif
 
 #define	CH_EXIT		90	/* child process exit		*/
+
+#endif
 

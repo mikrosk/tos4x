@@ -11,6 +11,8 @@
 /*	Make used_acc as global	7/16/90		D.Mui			*/
 /*	Start the process in to be suspended state 8/9/90	D.Mui	*/
 /*	Big change at ldaccs() sndcli()		9/25/90		D.Mui	*/
+/*	Convert to Lattice C 5.51		2/17/93		C.Gee	*/
+/*	Force the use of prototypes		2/24/93		C.Gee	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -27,22 +29,12 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
-
-EXTERN	BYTE	*sh_name();
-EXTERN	BYTE	*scasb();
-EXTERN	WORD	pgmld();
-EXTERN	WORD	isdrive();
-EXTERN	WORD	cart_init();
-EXTERN	WORD	ld_cartacc();
-EXTERN	PD	*get_pd();
+#include "machine.h"
+#include "dispvars.h"
+#include "aesmint.h"
 
 EXTERN	PD	*alr;
 EXTERN	BYTE	*runacc;
@@ -112,8 +104,8 @@ ps_rename( id, name, special )
 	    return;
 	  }
 	  Fcntl( handle, &flags, PGETFLAGS );
-	  flags &= ~0xf0;		/* clear out existing protection mode */
-	  flags |=  0x20;		/* write in new prot mode: Super */
+	  flags &= ~0xf0L;		/* clear out existing protection mode */
+	  flags |=  0x20L;		/* write in new prot mode: Super */
 	  flags |= 0x00008000L;	/* set the F_OS_SPECIAL bit */
 	  Fcntl( handle, &flags, PSETFLAGS );
 	  dos_close( handle );
@@ -155,10 +147,10 @@ ps_rename( id, name, special )
 	    if ( pgmld( ad_shcmd, &ldaddr, tail, envrn ) != -1 )	
 	    {
 /*	      p->p_state = PS_ALLRUN;*/	/* run until event wait		*/
-	      p->p_textaddr = ldaddr[2];/* real text segment		*/
-	      p->p_baseaddr = ldaddr;
-	      ldaddr[2] = runacc;
-	      if ( ( p->p_sysid = dos_pexec( 106, 0x0L, ldaddr, 0x0L ) ) >= 0 )
+	      p->p_textaddr = ( BYTE *)ldaddr[2];/* real text segment		*/
+	      p->p_baseaddr = ( BYTE *)ldaddr;
+	      ldaddr[2] = ( LONG )runacc;
+	      if ( ( p->p_sysid = dos_pexec( 106, 0x0L, ( BYTE *)ldaddr, 0x0L ) ) >= 0 )
 	      {				/* converts X.??? number into name.id */
 		Psetpgrp( p->p_sysid, p->p_sysid );
 		ps_rename( p->p_sysid, name, 0 );
@@ -190,7 +182,7 @@ ps_rename( id, name, special )
 
 
 	VOID
-ldaccs()
+ldaccs( VOID )
 {
 	WORD		ret,i;
 	WORD		defdrv;
@@ -199,7 +191,7 @@ ldaccs()
 
 	LSTCPY( rspath, STACCFULL );
 
-	dos_dta( name );	/* set the DMA address		*/
+	dos_dta( ( LONG )name );	/* set the DMA address		*/
 				/* get the boot device		*/
 	defdrv = *((WORD*)0x446L );
 #if 0	
@@ -226,7 +218,7 @@ ldaccs()
 	rspath[0] = defdrv + 'A';
 	dos_setdir( rspath, 0 );
 	strcpy( rspath, ad_shcmd );  
-	ret = dos_sfirst( rspath, 0 );
+	ret = dos_sfirst( ( LONG )rspath, 0 );
 	Debug1( "ACC first try to load from " );
 	Debug1( rspath );
 	Debug1( "\r\n" );
@@ -236,7 +228,7 @@ ldaccs()
 	{
 	  LSTCPY( rspath, STACC );
 
-	  if ( (ret = sh_find( rspath, NULLPTR, ACCPATH, TRUE ) ) )
+	  if ( (ret = sh_find( ( LONG )rspath, ( WORD(*)())NULLPTR, ACCPATH, TRUE ) ) )
 	  {
 /*	    dos_setdir( rspath, 0 );	*/
 	    Debug1( "ACC is loading from -> " ); 
@@ -248,7 +240,7 @@ ldaccs()
 	if ( ret )
 	{
 	  dos_setdir( rspath, 0 );
-	  ret = dos_sfirst( rspath, 0 );
+	  ret = dos_sfirst( ( LONG )rspath, 0 );
 	  i = 0;
 
 	  while( ( ret ) && ( i < ( mn_maxitem - 4 ) ) )
@@ -270,7 +262,7 @@ ldaccs()
 /*	Free the accessories	*/
 
 	VOID
-free_accs()
+free_accs( VOID )
 {
 	PD	*p;
 	LONG	*ptr;
@@ -279,11 +271,11 @@ free_accs()
 
 	while( p )
 	{
-	  if ( ptr = p->p_baseaddr )
+	  if ( ptr = ( LONG *)p->p_baseaddr )
 	  {				
 	    if ( ptr[11] )		/* free envr string	*/
 	      dos_free( ptr[11] );
-	    dos_free( p->p_baseaddr );	/* free progra, space	*/	
+	    dos_free( ( LONG )p->p_baseaddr );	/* free progra, space	*/	
 	  }
 
 	  p = p->p_thread;

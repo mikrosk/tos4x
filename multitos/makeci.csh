@@ -2,6 +2,7 @@
 # script to check in a new version
 # NOTE: this script works only under MultiTOS
 #
+echo "Last RCS version number was:" `cat lastvers`
 echo -n "Enter version number: "
 set vers=$<
 echo -n "Enter version message: "
@@ -18,4 +19,5 @@ cp $files rcs.bin\$vers
 #
 # all done
 #
+echo $vers >lastvers
 unset vers descr files

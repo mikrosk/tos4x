@@ -1,6 +1,9 @@
 /*	GEMDOS.H			9/23/92		D.Mui		*/
 
-#include	<portab.h>
+#ifndef _GEMDOS_H_
+#define _GEMDOS_H_
+
+#include	"portab.h"
 
 #define	X_TABOUT	0x02
 #define	X_PRTOUT	0x05
@@ -134,3 +137,6 @@ typedef struct over_blk
 	WORD		ob_seglod;
 	WORD		ob_relfac;
 } OVER_BLK;
+
+#endif
+

@@ -2,17 +2,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/deskshow.c,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/deskshow.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: deskshow.c,v $
-*  Revision 1.2  93/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.3  89/07/29  20:23:22  kbad
 * Removed error messages requiring keyboard input at the start of showfile.
 * Also added uikey() to allow mouse buttons to function like keys during
@@ -86,32 +89,20 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <deskusa.h>
-#include <gemdefs.h>
-#include <osbind.h>
-#include <extern.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
-extern	char	*get_fstring();
-extern	char	*malloc();
-extern	VOID	free();
 
 /* trap() is GEMDOS trap #1; trap13() is (obviously) trap 13. */
 
 extern long trap(), trap13();
-
-#define Fopen(f,m) trap(0x3d,f,m)
-#define Fread(handle,count,buf) trap(0x3f,handle,(long)count,buf)
-#define Fclose(handle) trap(0x3e,handle)
-#define Mxalloc(size,a) gemdos(0x44,(long)size,a)
-#define Mfree(size) trap(0x49,(long)size)
-
-#define Bconstat(d) trap13(1,d)
-#define Bconin(d) trap13(2,d)
-#define Bconout(d,c) trap13(3,d,c)
 
 #define BUFSIZ 4096	/* Malloc this much as a disk buffer */
 
@@ -130,26 +121,27 @@ extern long trap(), trap13();
 #define CTLS 19
 #define SPACE 32
 
+	WORD
 showfile(fname,mode)
-char *fname;
-int mode;
+	BYTE *fname;
+	WORD mode;
 {
-    int linecount,serial,status;
-    register int charcount;
-    register int handle;
-    char *buf;
-    register char *ptr;
-    register long len;
-    register int i;
-    long c;
-    int ch;
-    long  alert; 
+    WORD linecount,serial,status;
+    register WORD charcount;
+    register WORD handle;
+    BYTE *buf;
+    register BYTE *ptr;
+    register LONG len;
+    register WORD i;
+    LONG c;
+    WORD ch;
+    LONG  alert; 
 
     linecount = charcount = 0;
     handle = -1;
     status = TRUE;
 	
-    if (!(buf = malloc( (long)BUFSIZ))) 
+    if (!(buf = malloc( (LONG)BUFSIZ))) 
     {		
 	status = FALSE;
 	
@@ -163,15 +155,15 @@ int mode;
 	}
 	else		/* alpha mode	*/
 	{
-	  alert = get_fstring( NOMEM );
- 	  bconws( alert );
-	  bconws( Nextline );
+	  alert = (LONG) get_fstring( NOMEM );
+ 	  bconws( (BYTE *)alert );
+	  bconws( (BYTE *)Nextline );
 	}
 	goto allfin;
 #endif
     }
 
-    if ((handle = Fopen(fname,0)) < 0) 
+    if ((handle = (WORD) Fopen(fname,0)) < 0) 
     {
 	status = FALSE;
 
@@ -186,7 +178,7 @@ int mode;
 	else		/* aplha mode	*/
 	{
 	  alert = get_fstring( CANTOPEN );
- 	  bconws( alert );	/* Can not open	*/
+ 	  bconws( (BYTE *)alert );	/* Can not open	*/
 	  bconws( fname );	/* filename	*/
 	  bconws( Nextline );
 	}
@@ -203,7 +195,7 @@ int mode;
 
 	charcount = 0;
 
-	while ((len = Fread(handle,(long)BUFSIZ,buf)) > 0) {
+	while ((len = Fread(handle,(LONG)BUFSIZ,buf)) > 0) {
 	    for (ptr = buf,i=0; i<len; i++,ptr++) {
 		switch(*ptr) {
 		    case CR:
@@ -214,7 +206,7 @@ int mode;
 			break;
 		    default:
 			/* advance for printing chars only */
-			if (*ptr >= (unsigned)SPACE) charcount++;
+			if (*ptr >= (UWORD)SPACE) charcount++;
 		}
 doa2:		if ( !Bconout( serial,*ptr ) )/* device not present ?	*/
 		{				/* retry ?		*/
@@ -230,7 +222,7 @@ dontprint:
 		if (++linecount >= MAXCHAR) {
 		    linecount = 0;
 		    if (Bconstat(2)) {
-			ch = (int)(c = Bconin(2));
+			ch = (WORD)(c = Bconin(2));
 			if (ch == CTLC || ch == 'q' || ch == 'Q' ||
 			    (c & 0x00ff0000L) == 0x00610000) goto alldone;
 		    }
@@ -241,7 +233,7 @@ dontprint:
     }
 
     /* SCREEN MODE CODE */
-    while ((len = Fread(handle,(long)BUFSIZ,buf)) > 0) {
+    while ((len = Fread(handle,(LONG)BUFSIZ,buf)) > 0) {
 	for (ptr = buf, i = 0; i<len; i++, ptr++) {
 	    Bconout(2,*ptr);
 	    charcount++;
@@ -250,9 +242,9 @@ dontprint:
 		linecount++;
 		if (linecount >= d_nrows) 
 		{
-		    alert = get_fstring( MORE );
+		    alert = (LONG) get_fstring( MORE );
 		    bconws( "\r" );
-		    bconws( alert );
+		    bconws( (BYTE *)alert );
 		    if (doui(1,&linecount)) 
 		      goto alldone;
 		    bconws("\r\033K\r");
@@ -266,15 +258,15 @@ dontprint:
 
     if ( len < 0 )
     {
-	alert = get_fstring( READERROR );
+	alert = (LONG)get_fstring( READERRO );/* was READERRO, changed for LC */
 	bconws( Nextline );
-	bconws( alert );
+	bconws( (BYTE *)alert );
     }
     else
     {
-	 alert = get_fstring( ENDFILE );
+	 alert = (LONG) get_fstring( ENDFILE );
 	 bconws( Nextline );
-	 bconws( alert );
+	 bconws( (BYTE *)alert );
     }
 
 allfin:
@@ -300,10 +292,9 @@ allout:
  * state, and it shouldn't.  But it can't call graf_mkstate, because
  * that causes a dispatch, which causes the AES to buffer keystrokes.
  */
-extern gl_button;		/* changed 3/6/91	*/
+EXTERN WORD gl_button;		/* changed 3/6/91	*/
 
-long
-uikey()
+LONG uikey()
 {
     if( gl_button & 1 ) return SPACE;    /* left mouse button = next page    */
     if( gl_button & 2 ) return CTLC;     /* right mouse button quits         */
@@ -318,16 +309,16 @@ uikey()
  * screenful.
  */
 
-int 
+	WORD
 doui(mode,plinecount)
-int mode;
-int *plinecount;
+	WORD mode;
+	WORD *plinecount;
 {
-    long c;
-    int stop = 0;
+    LONG c;
+    WORD stop = 0;
 
     while( (c = uikey()) || mode || stop ) {
-	switch ((int)(c) & 0xff) {
+	switch ((WORD)(c) & 0xff) {
 	    /* ^D and d and D step 1/2 screen ahead */
 	    case CTLD:
 	    case 'd':
@@ -374,8 +365,9 @@ int *plinecount;
     return 0;
 }
 
-bconws(s)
-register char *s;
+
+VOID bconws(s)
+register BYTE *s;
 {
     while (*s) Bconout(2,*s++);
 }

@@ -2,17 +2,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/gemrslib.c,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemrslib.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: gemrslib.c,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.3  89/04/26  18:26:37  mui
 * TT
 * 
@@ -44,6 +47,8 @@
 /*	is zero				7/13/92		D.Mui		*/
 /*	Check the RT_VRSN make sure it is greater or equal to RS_SIZE	*/
 /*	Check the RT_VRSN make sure it is 0x0004 for extended type	*/
+/*	02/23/93	cjg	Convert to Lattice C 5.51		*/
+/*				Force the use of prototypes		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -60,15 +65,15 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <rslib.h>
-#include <gemlib.h>
-#include <gemdos.h>
+#include "machine.h"
+#include "objaddr.h"
+#include "rslib.h"
+#include "gemdos.h"
+
+
 
 #define RT_VRSN 	0		/* these must coincide w/ rshdr */
 #define RT_OB 		1
@@ -81,13 +86,9 @@
 #define	RT_FREEIMG 	8
 #define RT_TRINDEX 	9
 
-EXTERN	WORD	dos_open();		/* in DOS.C			*/
-EXTERN	LONG	dos_lseek();
-EXTERN	WORD	dos_read();
-EXTERN	WORD	dos_close();
-EXTERN	LONG	dos_xalloc();
-EXTERN	WORD	dos_free();
+
 EXTERN	LONG	trap();
+
 
 EXTERN	PD	*currpd;
 EXTERN 	LONG	ad_sysglo;
@@ -152,11 +153,12 @@ rs_obfix(tree, curob)
 
 	BYTE
 *rs_str(stnum)
+UWORD stnum;
 {
 	LONG		ad_string;
 
 	rs_gaddr(ad_sysglo, R_STRING, stnum, &ad_string);
-	LSTCPY(&D.g_loc1[0], ad_string);
+	LSTCPY( &D.g_loc1[0], ( BYTE *)ad_string);
 	return( &D.g_loc1[0] );
 }
 
@@ -192,7 +194,7 @@ get_addr(rstype, rsindex)
 	{
 	  case R_TREE:
 #if ALCYON
-		junk = LW(rsindex*4);
+		junk = ( UWORD )LW(rsindex*4);
 		return( LLGET( LLGET(APP_LOPNAME) + junk ) );
 #else
 		return( LLGET( LLGET(APP_LOPNAME) + LW(rsindex*4) ) );
@@ -278,12 +280,12 @@ fix_cicon()
 	LONG	*ctable;
 	UWORD	*header;	
 
-	header = rs_hdr;
+	header = ( UWORD *)rs_hdr;
 	if ( header[RT_VRSN] & 0x0004 )	/* if extended type */
 	{
-	  ctable = rs_hdr + (LONG)header[RS_SIZE];
+	  ctable = ( LONG *)( rs_hdr + (LONG)header[RS_SIZE]);
 	  if ( ctable[1] && ( ctable[1] != -1 ) )
-	    get_colo_rsc( ctable[1] + rs_hdr );
+	    get_color_rsc( ( BYTE *)( ctable[1] + rs_hdr) );
 	}
 }
 
@@ -299,12 +301,12 @@ fix_objects()
 	LONG			*ctable;	
 	UWORD			*header;
 
-	header = rs_hdr;
+	header = ( UWORD *)rs_hdr;
  
 	if ( header[RT_VRSN] & 0x0004 )
 	{
-	  ctable = rs_hdr + (LONG)header[RS_SIZE];    	
-	  ctable = ctable[1] + rs_hdr;
+	  ctable = ( LONG *)(rs_hdr + (LONG)header[RS_SIZE]);    	
+	  ctable = ( LONG *)( ctable[1] + rs_hdr );
 	}
 	else
 	  ctable = 0x0L; 
@@ -349,7 +351,7 @@ fix_tedinfo()
 	  for(i=0; i<2; i++)
 	  {
 	    if (tl[i])
-	      LWSET( tl[i], strlen( LLGET(ls[i]) ) + 1 );
+	      LWSET( tl[i], strlen( ( BYTE *)( LLGET(ls[i]) ) ) + 1 );
 	  }
 	  fix_ptr(R_TEPVALID, ii);
 	}
@@ -419,17 +421,17 @@ rs_free( pglobal )
 	LONG		*ctable;
 
 	rs_sglobe(pglobal);
-	header = rs_hdr;
+	header = ( UWORD *)rs_hdr;
 
 	if ( header )
 	{
 	  if ( header[RT_VRSN] & 0x0004 )	/* extended format */
 	  {
-	    ctable = rs_hdr + (LONG)header[RS_SIZE];    	
+	    ctable = ( LONG *)( rs_hdr + (LONG)header[RS_SIZE]);    	
 	    if ( ctable[1] && ( ctable[1] != -1 ) )
 	    {
-	      ctable = ctable[1] + rs_hdr;
-	      free_cicon( ctable );
+	      ctable = ( LONG *)( ctable[1] + rs_hdr );
+	      free_cicon( (CICONBLK **)ctable );
 	    }
 	  }
 
@@ -506,9 +508,9 @@ rs_readit( pglobal, rsfname )
 	REG WORD	fd;
 	LONG		rslsize;
 						/* make sure its there	*/
-	LSTCPY( rspath, rsfname );
+	LSTCPY( rspath, ( BYTE *)rsfname );
 
-	if ( !sh_find( rspath, NULLPTR, PATHEQUAL, TRUE ) )
+	if ( !sh_find( ( LONG )rspath, ( WORD(*)())NULLPTR, PATHEQUAL, TRUE ) )
 	  return(FALSE);
 						/* init global		*/
 	rs_global = pglobal;
@@ -518,7 +520,7 @@ rs_readit( pglobal, rsfname )
 
 	if ( ( fd = dos_open( rspath, RMODE_RD) ) >= 0 )
 	{
-	  if ( dos_read( fd, HDR_LENGTH, &hdr_buff[0] ) > 0 )
+	  if ( dos_read( fd, HDR_LENGTH, ( LONG )&hdr_buff[0] ) > 0 )
 	  {
 						/* get size of resource	*/
 
@@ -532,7 +534,7 @@ rs_readit( pglobal, rsfname )
 	         goto rs_end;
 	       }
 						/* read the size	*/
-	       if ( dos_read( fd, sizeof(LONG), &rslsize ) != sizeof(LONG) )
+	       if ( dos_read( fd, sizeof(LONG), ( LONG)&rslsize ) != sizeof(LONG) )
 	       {
 	         goto rs_end;
 	       }
@@ -613,7 +615,7 @@ rs_rcfix( pglobal, header )
 	BYTE		*header;
 {
 	rs_global = pglobal;	/* set the macro 	*/
-	rs_hdr = header;	/* set the address	*/
+	rs_hdr = ( LONG)header;	/* set the address	*/
 	do_rsfix( rs_hdr, header[17] );
 	rs_fixit( pglobal );
 }

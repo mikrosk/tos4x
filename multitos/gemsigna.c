@@ -15,24 +15,19 @@
 *	Serial No.  XXXX-0000-654321		  All Rights Reserved
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
+*
+*	02/12/93	cjg	Convert to Lattice C 5.51
+*	02/22/93	cjg	Force the use of prototypes
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <windlib.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "windlib.h"
+#include "aesmint.h"
 
-EXTERN	PD	*idtopd();
-EXTERN	WINDOW	*srchwp();
-EXTERN	LONG	newchkkbd();
-EXTERN	WORD	vdicode();
-EXTERN	WINDOW	*wm_top();
-EXTERN	WINDOW	*srchwp();
-EXTERN	VOID	drawrat();
 
 EXTERN	WORD	gl_topw;
 EXTERN	GRECT	gl_rmenu;
@@ -110,6 +105,7 @@ GLOBAL	WORD	gl_button;	/* current button state as reported by 	*/
 	PD		*m;
 	REG WORD	mx,my;
 	GRECT		t;
+	GRECT		temp;
 
 	m = idtopd( gl_smid );
 
@@ -124,7 +120,7 @@ GLOBAL	WORD	gl_button;	/* current button state as reported by 	*/
 	  {
 	    if ( ( wh = wm_find( mx, my ) ) != NIL ) /* inside a window	*/
 	    {
-	      wm_get( wh, WF_WORKXYWH, &t );
+	      wm_get( wh, WF_WORKXYWH, ( WORD *)&t, ( WORD *)&temp );
 			
 	      if ( inside( mx, my, &t ) )	/* inside the work area	*/
 	      {
@@ -149,7 +145,7 @@ mchange( mx, my )
 {
 	WORD		rx,ry;
 
-	gsx_ncode( MOUSE_ST, 0x0L );		/* get the real x,y	*/
+	gsx_ncode( MOUSE_ST, 0x0, 0x0 );	/* get the real x,y	*/
 
 	rx = ptsout[0];			
 	ry = ptsout[1];			
@@ -168,10 +164,12 @@ mchange( mx, my )
 	{ 
 	  intin[0] = 1;		
 	  intin[1] = 2;				/* set input sample mode*/
-	  gsx_ncode( 33,0x00000002L );
+/*	  gsx_ncode( 33,0x00000002L );*/
+	  gsx_ncode( 33,0x0000, 0x0002 );
 	  ptsin[0] = mx;
 	  ptsin[1] = my;			
-	  gsx_ncode( 28,0x00010000L );		/* draw the new mouse	*/
+/*	  gsx_ncode( 28, 0x00010000L );*/
+	  gsx_ncode( 28, 0x0001, 0x0000 );	/* draw the new mouse	*/
 	}
 
 	cu_xrat = mx;
@@ -181,7 +179,7 @@ mchange( mx, my )
 	/* there is an active menu and it will satisfy his event	*/
 						/* CHANGED LKW		*/
 	if ( ( !cu_button ) && ( gl_mntree ) && 
-	     ( gl_ctwait.m_out != inside( cu_xrat, cu_yrat, &gl_ctwait.m_x ) ) )
+	     ( gl_ctwait.m_out != inside( cu_xrat, cu_yrat, ( GRECT *)&gl_ctwait.m_x ) ) )
 	{
 	  gl_mowner = scr_pd;
 	}
@@ -333,7 +331,7 @@ post_button( p, button, clks, xrat, yrat )
 			/* decrement counting semaphore if one	*/
 			/* of the multi-click guys was satisfied*/
 
-	    clicks = LHIWD(e->e_parm) & 0x00ffL;	
+	    clicks = ( UWORD )( LHIWD(e->e_parm) & 0x00ffL );	
 	    if ( clicks > 1 )		
 	      gl_bpend--;		
 	    
@@ -357,6 +355,8 @@ post_button( p, button, clks, xrat, yrat )
 b_click( newstate )
 	REG WORD	newstate;
 {
+	LONG temp;
+
 	if ( newstate != gl_button )	/* ignore it unless there is a	*/
 	{				/* change			*/
 	  gl_button = newstate;		/* record the new button state	*/
@@ -384,8 +384,10 @@ b_click( newstate )
 				/* the button state that cause the event*/
 				/* to be satisfied			*/
 	    }
-	    else	/* tell the system that something happened	*/	
-	      forkq( bchange, newstate, 1 );
+	    else {	/* tell the system that something happened	*/	
+	      temp = ((LONG) newstate << 16L) & 0xFFFF0001L;
+	      forkq( ( WORD(*)())bchange, temp );
+	    }
 	  }
 
 	}/* if there is a change	*/
@@ -402,6 +404,8 @@ b_click( newstate )
 b_delay( amnt )
 	WORD	amnt;
 {
+	LONG temp;
+
 	if ( gl_bdelay )	/* see if we have a delay for mouse 	*/	
 	{			/* click in progress			*/
 
@@ -410,11 +414,14 @@ b_delay( amnt )
 	  if ( gl_bdelay <= 0 )	/* changed 3/6/91	*/
 	  {
 	    gl_bdelay = 0;	/* reset the delay	*/
-	    forkq( bchange, gl_bdesired, gl_bclick );
+	    temp = (((LONG) gl_bdesired << 16L) & 0xFFFF0000L) + (LONG)gl_bclick;
+	    forkq( ( WORD(*)())bchange, temp );
 				/* if there is another click coming in	*/
 				/* then report that one too		*/
-	    if ( gl_bdesired != gl_button )
-	      forkq( bchange, gl_button, 1 );
+	    if ( gl_bdesired != gl_button ) {
+	      temp = ((LONG) gl_button << 16L ) & 0xFFFF0001L;
+	      forkq( ( WORD(*)())bchange, temp);
+	    }
 	  }
 	}
 }
@@ -548,15 +555,19 @@ test_button( button, buparm )
 	WORD	button;
 	LONG	buparm;
 {
-	WORD	clicks,mask,updown,or,status;
+#if 0
+	WORD clicks, updown, or, status;
+#endif
+	WORD	 mask;
 
-	REG WORD		flag, val;
+	REG WORD flag, val;
 
-	flag = (buparm >> 24) & 0x00ffL;	/* clicks	*/
-	mask = (buparm >> 8) & 0x00ffL;		/* which button	*/
-	val = (buparm) & 0x00ffL;		/* up or down	*/
+	flag = ( WORD )( (buparm >> 24) & 0x00ffL );	/* clicks	*/
+	mask = ( WORD )( (buparm >> 8) & 0x00ffL );	/* which button	*/
+	val = ( WORD )( (buparm) & 0x00ffL );		/* up or down	*/
 	return( ((mask & (val ^ button)) == 0) != flag );
-
+#if 0
+WARNING ------CONTROL CANNOT REACH THESE STATEMENTS!!!!!
 	or = FALSE;
 	mask = (buparm >> 8) & 0x00ffL;		/* which button	*/
 	updown = buparm & 0x00ffL;		/* up or down	*/
@@ -570,7 +581,7 @@ test_button( button, buparm )
 	else
 	  clicks = clicks & 0x00ff;		/* clicks	*/
 
-	updown = ~( updown ^ button );
+	updown = ( WORD )( ~( updown ^ button ) );
 	status = mask & updown;
 	if ( !or )
 	  status = ( status == mask );
@@ -579,6 +590,7 @@ test_button( button, buparm )
 	  return( TRUE );
 
 	return( FALSE );
+#endif
 }
 
 
@@ -597,7 +609,7 @@ inorout( e, rx, ry )
 	mo.m_y = LLOWD(e->e_parm);
 	mo.m_w = LHIWD(e->e_return);
 	mo.m_h = LLOWD(e->e_return);
-	return( mo.m_out != inside(rx, ry, &mo.m_x) );
+	return( mo.m_out != inside(rx, ry, ( GRECT *)&mo.m_x) );
 }
 
 
@@ -605,7 +617,7 @@ inorout( e, rx, ry )
 /*	Check the current keyboard owner's key buffer	*/
 
 	VOID
-chkkbd()
+chkkbd( VOID )
 {
 	REG WORD		achar, kstat;
 /*	REG WORD		*pintin;*/
@@ -614,6 +626,7 @@ chkkbd()
 	PD			*kpd;
 	WORD			i;
 	LONG			lachar;
+	LONG			temp;
 	
 	EXTERN		WINDOW	*hashtbl[];
 
@@ -628,7 +641,8 @@ chkkbd()
 	if ( ( kpd->p_state == PS_DEAD ) || ( kpd->p_state == PS_ZOMBIE ) )
 	  return;
 
-   	gsx_ncode( KEY_SHST, 0x0L );
+/*   	gsx_ncode( KEY_SHST, 0x0L );*/
+   	gsx_ncode( KEY_SHST, 0x0, 0x0 );
 	kstat = intout[0];
 	achar = 0;
 
@@ -638,9 +652,11 @@ chkkbd()
 	  if ( ( lachar == 0xc0f0009L ) || ( lachar == 0xe0f0009L ) ||
 	       ( lachar == 0xe770037L ) )	
 	  {
-	    if ( scr_pd->p_cda.c_q.c_cnt < KBD_SIZE )
-	      forkq( syskeyin, LLOWD(lachar), LHIWD(lachar) );		
-
+	    if ( scr_pd->p_cda.c_q.c_cnt < KBD_SIZE ) {
+	      temp = (((LONG) LLOWD(lachar) << 16L) & 0xFFFF0000L)
+		 + (LONG) LHIWD(lachar);
+	      forkq( (WORD(*)())syskeyin, temp );		
+	    }
 	    return;
 	  }
 	}
@@ -721,6 +737,8 @@ chkkbd()
 #endif
 	}
 
-	if ( ( achar ) || ( kstat != kstate ) )
-	  forkq( kchange, achar, kstat );
+	if ( ( achar ) || ( kstat != kstate ) ) {
+	  temp = (((LONG) achar << 16L) & 0xFFFF0000L) + (LONG) kstat;
+	  forkq( ( WORD(*)())kchange, temp );
+	}
 }

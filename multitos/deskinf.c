@@ -7,6 +7,7 @@
 /*	Change all the iconblk to ciconblk	7/11/92	D.Mui		*/
 /*      Added another 0x00 to mkeys[] for VIDITEM obj  07/07/92 C.Gee   */
 /*	The #E will save 10 fields instead of 4	7/17/92	D.Mui		*/ 
+/*	Converted to Lattice C 5.51		2/18/93 C.Gee		*/
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -14,28 +15,17 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <compiler.h>
-#include <machine.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
-
-EXTERN	UWORD	rom_ram();
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
-EXTERN  BYTE	*scasb();
-EXTERN	BYTE	*r_slash();
-EXTERN	BYTE	*lp_fill();
-EXTERN	APP	*app_alloc();
-EXTERN	WORD	isdrive();
-EXTERN	WORD	cart_init();
-EXTERN	BYTE	*strcpy();
-EXTERN	WINDOW	*w_gfirst();
-EXTERN	WINDOW	*w_gnext();
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
+#include "pboth.h"
 
 EXTERN	BYTE	mentable[];
 EXTERN	APP	*applist;
@@ -165,6 +155,7 @@ uhex_dig(wd)
 	OBJECT		*obj;
 	WORD		x,y,i,type;
 	BYTE		buffer[14];
+	WORD		temp;
 
 	type = *pcurr++;
 
@@ -221,25 +212,26 @@ uhex_dig(wd)
 	cp_iblk( i, iblk );
 
 	pcurr += 3;		
-	iblk->monoblk.ib_char[1] = ( *pcurr == ' ' ) ? 0 : *pcurr;
+	temp = iblk->monoblk.ib_char & 0xFF00; /* preserve the upper byte */
+	iblk->monoblk.ib_char = temp | (( *pcurr == ' ' ) ? 0 : *pcurr);
 	pcurr += 2;		
 
 					/* for extended file or folder */
 	if ( ( type == 'X' ) || ( type == 'V' ) )
 	{
   	  pcurr = lp_fill( pcurr, &backid[id].i_path );
-	  pcurr = escan_str( pcurr, iblk->monoblk.ib_ptext );
+	  pcurr = escan_str( pcurr, (BYTE *)iblk->monoblk.ib_ptext );
 	  if ( ! *((BYTE*)(iblk->monoblk.ib_ptext) ) )
  	  {
 	    if ( type == 'X' )
-	      save_ext( backid[id].i_path, iblk->monoblk.ib_ptext );
+	      save_ext( backid[id].i_path, (BYTE *)iblk->monoblk.ib_ptext );
 	    else
-	      save_mid( backid[id].i_path, iblk->monoblk.ib_ptext );
+	      save_mid( backid[id].i_path, (BYTE *)iblk->monoblk.ib_ptext );
 	  }	
 	}
 	else
 	{
-	  pcurr = escan_str( pcurr, iblk->monoblk.ib_ptext );
+	  pcurr = escan_str( pcurr, (BYTE *)iblk->monoblk.ib_ptext );
 	  pcurr = escan_str( pcurr, buffer );
 	}
 
@@ -339,13 +331,10 @@ uhex_dig(wd)
 inf_scan( buffer )
 	BYTE	*buffer;
 {
-	REG WORD	i, tmp;
+	REG WORD	i;
 	REG WINDOW	*pws;
 	REG BYTE	*pcurr;
-	APP		*app;
-	BYTE		*ptmp;
 	WORD		envr,j;
-	LONG		stmp;
 	BYTE		temp;
 	BYTE		*ptr;
 	
@@ -408,37 +397,37 @@ inf_scan( buffer )
 		pcurr = scan_2( pcurr, &pws->w_rowi );
 
 						/* window's x position	*/
-		pcurr = scan_2( pcurr, &pws->w_sizes.x );
-		if ( pws->w_sizes.x >= gl_ncols )
-		  pws->w_sizes.x = gl_ncols - 4;
+		pcurr = scan_2( pcurr, &pws->w_sizes.g_x );
+		if ( pws->w_sizes.g_x >= gl_ncols )
+		  pws->w_sizes.g_x = gl_ncols - 4;
 
-		pws->w_sizes.x *= gl_wchar;
+		pws->w_sizes.g_x *= gl_wchar;
 
 						/* window's y position	*/
-		pcurr = scan_2( pcurr, &pws->w_sizes.y );
-		if ( pws->w_sizes.y >= gl_nrows )
-		  pws->w_sizes.y = gl_nrows - 1;
+		pcurr = scan_2( pcurr, &pws->w_sizes.g_y );
+		if ( pws->w_sizes.g_y >= gl_nrows )
+		  pws->w_sizes.g_y = gl_nrows - 1;
 		
-		pws->w_sizes.y *= gl_hchar;
+		pws->w_sizes.g_y *= gl_hchar;
 
 						/* window's width	*/
-		pcurr = scan_2( pcurr, &pws->w_sizes.w );
-		if ( pws->w_sizes.w > gl_ncols )
-		  pws->w_sizes.w /= 2;
-		pws->w_sizes.w *= gl_wchar;
-		if ( pws->w_sizes.w < ( 7 * gl_wbox ) )
-		  pws->w_sizes.w = 7 * gl_wbox;
+		pcurr = scan_2( pcurr, &pws->w_sizes.g_w );
+		if ( pws->w_sizes.g_w > gl_ncols )
+		  pws->w_sizes.g_w /= 2;
+		pws->w_sizes.g_w *= gl_wchar;
+		if ( pws->w_sizes.g_w < ( 7 * gl_wbox ) )
+		  pws->w_sizes.g_w = 7 * gl_wbox;
 			
 						/* window's height	*/
-		pcurr = scan_2( pcurr, &pws->w_sizes.h );
-		if ( pws->w_sizes.h >= gl_nrows )
-		  pws->w_sizes.h /= 2;
-		pws->w_sizes.h *= gl_hchar;
-		if ( pws->w_sizes.h < ( 7 * gl_hbox ) )
-		  pws->w_sizes.h = 7 * gl_hbox;
+		pcurr = scan_2( pcurr, &pws->w_sizes.g_h );
+		if ( pws->w_sizes.g_h >= gl_nrows )
+		  pws->w_sizes.g_h /= 2;
+		pws->w_sizes.g_h *= gl_hchar;
+		if ( pws->w_sizes.g_h < ( 7 * gl_hbox ) )
+		  pws->w_sizes.g_h = 7 * gl_hbox;
 
 		do_xyfix( &pws->w_sizes );
-	  	rc_copy( &pws->w_sizes, &pws->w_work );
+	  	rc_copy( (WORD *)&pws->w_sizes, (WORD *)&pws->w_work );
 
 		pcurr = scan_2( pcurr, &envr );
 
@@ -512,7 +501,7 @@ i_12:
  */
 
 	VOID
-read_inf( )
+read_inf( VOID )
 {
 	REG LONG	size1;
 	REG APP		*app;
@@ -538,10 +527,10 @@ read_inf( )
 	  if ( isdrive() )
 	  {
 	    m_infpath( buffer );	/* open newdesk.inf	*/
-	    if ( ( handle = Fopen( buffer, 0 ) ) < 0 )
+	    if ( ( handle = ( WORD )Fopen( buffer, 0 ) ) < 0 )
 	    {				/* try desktop.inf	*/
 	      strcpy( infdata, &buffer[3] );
-	      if ( ( handle = Fopen( buffer, 0 ) ) < 0 )
+	      if ( ( handle = ( WORD )Fopen( buffer, 0 ) ) < 0 )
 	        goto re_1;
 	    }
 
@@ -549,7 +538,7 @@ read_inf( )
 	    Fsfirst( buffer, 0x31 );	/* search the file	*/
 					/* get file size	*/
 	    size1 = dtabuf.dirfile.d_size;
-	    if ( !(afile = malloc( size1+1 )))
+	    if ( !(afile = malloc( size1+1L )))
 	    {
 	      Debug1( "Desktop has no inf memory\r\n" );
 	      return;	
@@ -563,11 +552,11 @@ read_inf( )
 	  {
 re_1:	    afile = malloc( (LONG)INFSIZE );
 	    bfill( INFSIZE, 0, afile );
-	    size1 = rom_ram( 3, afile );
+	    size1 = rom_ram( 3, (LONG)afile );
 	  }
 	}
 	else
-	  size1 = size;
+	  size1 = (LONG)size;
 
 	afile[size1] = 0;
 
@@ -597,7 +586,7 @@ re_1:	    afile = malloc( (LONG)INFSIZE );
 	      return;
 	  }
 
-	  app = app->a_next;
+	  app = ( APP *)app->a_next;
 	}
 
 	if ( app = app_alloc( ) )
@@ -642,10 +631,10 @@ hex_dig(achar)
 
 	pcurr = save_2( pcurr, win->w_coli );	/* horizontal slide bar  */
 	pcurr = save_2( pcurr, win->w_rowi );
-	pcurr = save_2( pcurr, win->w_sizes.x / gl_wchar );
-	pcurr = save_2( pcurr, win->w_sizes.y / gl_hchar );
-	pcurr = save_2( pcurr, win->w_sizes.w / gl_wchar );
-	pcurr = save_2( pcurr, win->w_sizes.h / gl_hchar );
+	pcurr = save_2( pcurr, win->w_sizes.g_x / gl_wchar );
+	pcurr = save_2( pcurr, win->w_sizes.g_y / gl_hchar );
+	pcurr = save_2( pcurr, win->w_sizes.g_w / gl_wchar );
+	pcurr = save_2( pcurr, win->w_sizes.g_h / gl_hchar );
 	pcurr = save_2( pcurr, 0 );
 
 	if ( win->w_id != -1 )
@@ -681,10 +670,10 @@ save_inf( todisk, path )
 	LONG		size;
 	BYTE		buf1[2];
 
-	afile = 0;
-	if ( size = malloc( 0x5000L ) )	/* get 20K memory	*/
+	afile = (BYTE *)0L;
+	if ( size = ( LONG )malloc( 0x5000L ) )	/* get 20K memory	*/
 	{
-	  buf = pcurr = size;
+	  buf = pcurr = ( BYTE *)size;
 /*
 	  if ( size < INFSIZE )
 	    goto if_1;
@@ -817,7 +806,7 @@ if_1:
 	  if ( win->w_id == -1 )
 	    pcurr = save_win( win, pcurr );
 
-	  win = win->w_next;
+	  win = ( WINDOW *)win->w_next;
 	}
 
 
@@ -828,7 +817,7 @@ if_1:
 	  if ( !start->a_next )
 	    break;
 
-	  start = start->a_next;
+	  start = ( APP *)start->a_next;
 	}
 
 	app = start;
@@ -886,12 +875,12 @@ if_1:
 
 	  while( start )
 	  {
-	    if ( start->a_next == app )
+	    if ( start->a_next == ( BYTE *)app )
 	    {
 	      app = start;
 	      break;
 	    }
-	    start = start->a_next;
+	    start = ( APP *)start->a_next;
 	  }
 	}
 
@@ -899,8 +888,8 @@ if_1:
 
 	obj = background;
 
-	w = r_dicon.w;
-	h = r_dicon.h;
+	w = r_dicon.g_w;
+	h = r_dicon.g_h;
 
 	for ( i = 1; i <= maxicon; i++ ) 
 	{
@@ -915,7 +904,7 @@ if_1:
 	       *pcurr++ = 'O';
 	       break;		
 	     case DISK:
-	       if ( backid[i].i_cicon.monoblk.ib_char[1] == 'c' )
+	       if ( (BYTE)(backid[i].i_cicon.monoblk.ib_char & 0x00FF) == 'c' )
 	         *pcurr++ = 'C';
 	       else
 	         *pcurr++ = 'M';
@@ -939,7 +928,7 @@ if_1:
 	   pcurr = save_2( pcurr, obj[i].ob_y / h );
 	   pcurr = save_2( pcurr, backid[i].i_icon );
 	   pcurr = save_2( pcurr, 0xFFFF );
-	   *pcurr = (CICONBLK*)(obj[i].ob_spec)->monoblk.ib_char[1];
+	   *pcurr = (BYTE)((CICONBLK*)(obj[i].ob_spec))->monoblk.ib_char;
 	   if ( !*pcurr )
 	     *pcurr = ' ';
 
@@ -950,7 +939,7 @@ if_1:
 	   if ( backid[i].i_path )
   	     pcurr = save_str( pcurr, backid[i].i_path );
 
-	   pcurr = save_str( pcurr, (CICONBLK*)(obj[i].ob_spec)->monoblk.ib_ptext );
+	   pcurr = save_str( pcurr, (BYTE *)((CICONBLK*)(obj[i].ob_spec))->monoblk.ib_ptext );
 
 	   if ( !backid[i].i_path )
   	     pcurr = save_str( pcurr, Nostr );
@@ -963,7 +952,7 @@ if_1:
 	*pcurr = 0;		/* end of string mark */
 
 	len = strlen( buf );
-	if (afile) free(afile);
+
 	afile = malloc( (LONG)((UWORD)len) );
 	bfill( len, 0, afile );		/* clean up buffer	*/
 	shel_put( buf, len );		/* copy to aes buffer	*/
@@ -973,7 +962,7 @@ if_1:
 	{
 /*	  m_infpath( infname );	*/	/* always write newdesk.inf	*/
 if_3:					/* create a file, read & write	*/
-	  handle = Fcreate( path, 0x0 );
+	  handle = ( WORD )Fcreate( path, 0x0 );
 
 	  if ( handle < 0 )
 	  {
@@ -990,7 +979,7 @@ if_3:					/* create a file, read & write	*/
 	  {
 	    buf1[0] = path[0];
 	    buf1[1] = 0;
-	    fill_string( buf1, STDISKFULL );
+	    fill_string( buf1, STDISKFU );
 	    Fdelete( path );
 	  }	            
 
@@ -1007,7 +996,7 @@ if_3:					/* create a file, read & write	*/
 	
 if_2:
 	free( buf );
-	if (afile) free(afile);
+	if (afile) free( afile );
 
 	if ( todisk )
 	  up_allwin( path, FALSE ); /* rebuild any window on the INF drive */
@@ -1026,10 +1015,10 @@ app_posicon( colx, coly, px, py )
 {
 	REG WORD	x, y, w, h;
 
-	w = r_dicon.w;
-	h = r_dicon.h;
-	x = colx * w + full.x;
-	y = coly * h + full.y;
+	w = r_dicon.g_w;
+	h = r_dicon.g_h;
+	x = colx * w + full.g_x;
+	y = coly * h + full.g_y;
 	app_mtoi( x, y, px, py );
 }
 
@@ -1045,10 +1034,10 @@ app_mtoi( newx, newy, px, py )
 	WORD		xm, ym;
 	WORD		maxx,maxy;
 	
-	w = r_dicon.w;
-	h = r_dicon.h;
+	w = r_dicon.g_w;
+	h = r_dicon.g_h;
 				/* maximum x coordinate	*/
-	maxx = ( full.w - dicon.w ) / w;
+	maxx = ( full.g_w - dicon.g_w ) / w;
 
 	x = newx / w;
 	xm = newx % w;
@@ -1060,12 +1049,12 @@ app_mtoi( newx, newy, px, py )
 
 	*px = x * w;		/* new x coordinate	*/
 
-	if ( newy < full.y )
-	  newy = full.y;
+	if ( newy < full.g_y )
+	  newy = full.g_y;
 
-	maxy = ( full.h - dicon.h ) / h;
+	maxy = ( full.g_h - dicon.g_h ) / h;
 
-	newy -= full.y;
+	newy -= full.g_y;
 
 	y = newy / h;
 	ym = newy % h;

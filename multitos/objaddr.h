@@ -8,6 +8,8 @@
 *	-----------------------------------------------------------
 */	
 
+#ifndef _OBJADDR_H_
+#define _OBJADDR_H_
 
 #define OB_NEXT(x) (tree + (x) * sizeof(OBJECT) + 0)
 #define OB_HEAD(x) (tree + (x) * sizeof(OBJECT) + 2)
@@ -20,3 +22,6 @@
 #define OB_Y(x) (tree + (x) * sizeof(OBJECT) + 18)
 #define OB_WIDTH(x) (tree + (x) * sizeof(OBJECT) + 20)
 #define OB_HEIGHT(x) (tree + (x) * sizeof(OBJECT) + 22)
+
+#endif
+

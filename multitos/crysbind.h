@@ -2,20 +2,14 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: /u2/MRS/osrevisions/aes/crysbind.h,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/crysbind.h,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: crysbind.h,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
- * Revision 1.3  1993/02/24  22:09:00  ersmith
- * 1 meg floppy MultiTOS release
- *
 * Revision 2.1  89/02/22  05:18:27  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
 * 
@@ -30,6 +24,9 @@
 /*	Include scan library		4/26/91		D.Mui		*/
 /*	Add shel_path			4/30/91		D.Mui		*/
 /*	Add ob_xtend definitons	7/7/92			D.Mui		*/
+
+#ifndef _CRYSBIND_H_
+#define _CRYSBIND_H_
 
 #define C_SIZE 	4
 #define G_SIZE 	15
@@ -478,3 +475,6 @@
 
 #define	SH_INPATH  addr_in[0]
 #define SH_OUTPATH addr_in[1]
+
+#endif
+

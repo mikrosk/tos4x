@@ -2,6 +2,8 @@
 /*	Reg Opt		03/09/85		Derek Mui		*/
 /*	Modify doq for acc wait	7/13/90		D.Mui			*/
 /*	Modify the doq and aqueue for multiple windows 10/28/90	D.Mui	*/
+/*	02/16/93	cjg	Convert to Lattice C 5.51		*/
+/*	02/23/93	cjg	Force the use of prototypes		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -18,15 +20,12 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "machine.h"
+#include "aesmint.h"
 						/* in PD88.C		*/
-EXTERN	PD	*idtopd();
 EXTERN	PD	*currpd;
 EXTERN	WORD	spdid;
 
@@ -163,7 +162,7 @@ q_1:	  if ( e1 = *ppe )
 
 	  if ( spdid != currpd->p_pid )
 	  {
-	    e->e_parm = lm;
+	    e->e_parm = ( LONG )lm;
 	    evinsert( e, ppe );
 	  }	
 	  else				/* to prevent dead lock		*/

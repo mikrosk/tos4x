@@ -12,6 +12,8 @@
 /*	Change in fm_keybd to use the stack to save the incoming value 	*/
 /*	and return them to their original pointer at the end of the 	*/
 /*	function				2/24/92		D.Mui	*/
+/*	Convert to Lattice C 5.51		2/17/93		C.Gee	*/
+/*	Force the use of prototypes		2/24/93		C.Gee	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -20,22 +22,20 @@
 *	All Rights Reserved
 *	-----------------------------------------------------------
 */	
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <aesmint.h>
-#include <gemusa.h>
+#include "machine.h"
+#include "objaddr.h"
+#include "aesmint.h"
+#include "gemusa.h"
+
 
 #define BACKSPACE 0x0E08			/* backspace		*/
 #define SPACE 0x3920				/* ASCII <space>	*/
 #define UP 0x4800				/* up arrow		*/
 #define DOWN 0x5000				/* down arrow		*/
-#define LEFT 0x4B00				/* left arrow		*/
-#define RIGHT 0x4D00				/* right arrow		*/
+
 #define DELETE 0x537f				/* keypad delete	*/
 #define TAB 0x0F09				/* tab			*/
 #define BACKTAB 0x0F00				/* backtab		*/
@@ -46,15 +46,17 @@
 #define BACKWARD 1
 #define DEFLT 2
 						/* in WMLIB.C		*/
-EXTERN	VOID	w_drawchange();
-EXTERN	BYTE	*rs_str();
-
 EXTERN	WORD	gl_mkind;
 EXTERN	GRECT	gl_rfull;
 EXTERN	GRECT	gl_rscreen;
 EXTERN	THEGLO	D;
 EXTERN	PD	*currpd;
 EXTERN	PD	*gl_mowner;
+
+
+EXTERN  LONG	trap();
+EXTERN  LONG	trap13();
+
 
 
 	WORD
@@ -230,7 +232,7 @@ fm_button(tree, new_obj, clks, pnew_obj)
 						/*   then wait for 	*/
 						/*   button up		*/
 	  if ( ( cont ) && ( flags & ( SELECTABLE | EDITABLE ) ) )
-	    ev_button(1, 0x00010000L, &rets[0]);
+	    ev_button(1, 0x0001, 0x0000L, &rets[0]);
 	}
 						/* see if this selection*/
 						/*   gets us out	*/
@@ -316,7 +318,7 @@ fm_do( tree, start_fld )
 
 
 						/* wait for mouse or key */
-	  which = ev_multi(MU_KEYBD | MU_BUTTON, NULLPTR, NULLPTR,
+	  which = ev_multi(MU_KEYBD | MU_BUTTON, ( MOBLK *)NULLPTR, ( MOBLK *)NULLPTR,
 			 0x0L, 0x0002ff01L, 0x0L, &rets[0]);
 						/* handle keyboard event*/
 
@@ -332,7 +334,7 @@ fm_do( tree, start_fld )
 	    next_obj = ob_find(tree, ROOT, MAX_DEPTH, rets[0], rets[1]);
  	    if (next_obj == NIL)
 	    {
-	      trap13( 0x00030002L, 7 );		/* Bconout(CON, 7)	*/
+	      trap13( 0x0003,0x0002, 7 );		/* Bconout(CON, 7)	*/
 	      next_obj = 0;
 	    }
 	    else
@@ -421,21 +423,21 @@ fm_show(string, pwd, level)
 	  merge_str(&D.g_loc2[0], alert, pwd);
 	  ad_alert = &D.g_loc2[0];
 	}
-	return( fm_alert( level, ad_alert ) );
+	return( fm_alert( level, ( LONG )ad_alert ) );
 }
 
 
 
 /*	Extended fm_do	*/
 
-	WORD
+	VOID
 fm_xdo( tree, start_fld )
 	OBJECT	*tree;
 	WORD	start_fld;
 {
 	GRECT	pt;
 
-	ob_center( tree, &pt );		/* get the x,y,w,h of the tree */
+	ob_center( ( LONG )tree, &pt );		/* get the x,y,w,h of the tree */
 
 
 }

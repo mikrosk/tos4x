@@ -7,14 +7,17 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "windlib.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
+
 
 EXTERN	WORD	desk_id;
 EXTERN	WINDOW	*get_win();
@@ -24,8 +27,8 @@ EXTERN	WINDOW	*x_win;
 
 /*	Find an empty icon	*/
 
-	WORD
-av_icon( )
+WORD
+av_icon( VOID )
 {
 	REG WORD	i,k;
 	REG OBJECT	*obj;
@@ -39,8 +42,8 @@ av_icon( )
 	  if ( obj[i].ob_flags & HIDETREE )
 	  {
 	    k = i;
-	    col = full.w / r_dicon.w;
-	    row = full.h / r_dicon.h;
+	    col = full.g_w / r_dicon.g_w;
+	    row = full.g_h / r_dicon.g_h;
 
 	    for ( xrow = 0; xrow < row; xrow++ )
 	    {
@@ -81,8 +84,8 @@ av_1:
 
 /*	Deselect all the disk and trash icons	*/
 
-	VOID
-clr_dicons( )
+VOID
+clr_dicons( VOID )
 {
 	GRECT		pt;
 	REG OBJECT	*obj;
@@ -103,9 +106,8 @@ clr_dicons( )
 
 /*	Handle the click event		*/
 
-	VOID
-hd_button( clicks, kstate, mx, my )
-	WORD	clicks, kstate, mx, my;
+VOID
+hd_button( WORD clicks, WORD kstate, WORD mx, WORD my )
 {
 	REG WORD	item;
 	WORD		xitem,type,keypress,state;
@@ -148,7 +150,7 @@ hd_button( clicks, kstate, mx, my )
 	     else			/* hit something	*/
 	     {
 	       obj = win->w_obj;	
-	       state = obj[item].ob_states;
+	       state = obj[item].ob_state;  /* JTT - changed from ob_states */
 
 	       if ( ( state & SELECTED ) && ( !keypress ) )
 	  	  goto a_1;
@@ -161,7 +163,7 @@ hd_button( clicks, kstate, mx, my )
 	       else
 	         state ^= SELECTED;
 
-	       obj[item].ob_states = state;
+	       obj[item].ob_state = state;
 	       get_dir( win, item )->d_state = state;
 	       do_redraw( win->w_id, &full, item );
 	       winfo( win );
@@ -195,7 +197,7 @@ hd_button( clicks, kstate, mx, my )
 	      else
 	        state ^= SELECTED;
 
-	      obj[item].ob_states = state; 
+	      obj[item].ob_state = state; 
 	      do_redraw( 0, &full, item );
 	    }
 	  }

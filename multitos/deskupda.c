@@ -6,23 +6,15 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
-
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
-EXTERN	BYTE	*scasb();
-EXTERN	BYTE	*r_slash();
-EXTERN	BYTE	*escan_str();
-EXTERN	BYTE	*strcpy();
-EXTERN	BYTE	*escan_str();
-EXTERN	BYTE	*save_str();
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 BYTE	*q_addr;	/* Inf file address	*/
 WORD	q_change;	/* Inf file is changed	*/
@@ -52,7 +44,7 @@ q_inf( )
 
 /*	Search the matching file and modify the inf file	*/
 
-	WORD
+	VOID
 q_sea( old, new )
 	BYTE	*old;
 	BYTE	*new;
@@ -60,7 +52,7 @@ q_sea( old, new )
 	REG BYTE	*ptr1,*copy1,*copy2;
 	BYTE		*end2,*p,*end,*sl;
 	REG BYTE	temp;
-	BYTE		save;
+	/* NOT USED: 	BYTE 	save; */
 	WORD		alloc,special,offset;
 	BYTE		buffer[16];
 	BYTE		argu[ARGULEN];
@@ -188,10 +180,10 @@ q_write( )
 	if ( q_change )
 	{
 /*	  desk_mice( HOURGLASS ); */	/* file exits?	*/
-	  if ( ( handle = Fopen( inf_path, 0 ) ) > 0 )
+	  if ( ( handle = (WORD) Fopen( inf_path, 0 ) ) > 0 )
 	  {
 	    Fclose( handle );	/* truncates it	*/
-	    if ( ( handle = Fcreate( inf_path, 0 ) ) > 0 )
+	    if ( ( handle = (WORD) Fcreate( inf_path, 0 ) ) > 0 )
 	    {
 	      Fwrite( handle, (LONG)strlen( q_addr ), q_addr );
 	      Fclose( handle );

@@ -1,6 +1,8 @@
 /*	GEMAINTS.C	1/27/84 - 01/18/85	Lee Jay Lorenzen	*/
 /*	Reg Opt		03/09/95		Derek Mui		*/
 /*	Changed at signal for acc wait	7/13/90	D.Mui			*/
+/*	Convert to Lattice C 5.51	2/17/93 C.Gee			*/
+/*	Force the use of prototypes	2/25/93 C.Gee			*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -17,11 +19,11 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
+#include "machine.h"
+#include "dispvars.h"
 
 
 /*	Signal a sleeping process that it is ready to wake up	*/ 

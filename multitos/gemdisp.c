@@ -11,6 +11,8 @@
 /*	Fix the accessory wait problem	7/13/90	D.Mui			*/
 /*	Block process when in critical error	8/1/90	D.Mui		*/
 /*	Massive change for Mint		10/1/91		D.Mui		*/
+/*	Convert to Lattice C 5.51	02/17/93	C.Gee		*/
+/*	Force the use of prototypes	02/24/93	C.Gee		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -27,27 +29,19 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <windlib.h>
-#include <message.h>
-#include <aesmint.h>
-#include <signal.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "windlib.h"
+#include "message.h"
+#include "aesmint.h"
+#include "signal.h"
 
 #define KEYSTOP 0x2b1c0000L		/* control backslash	*/
-
-EXTERN	WINDOW	*srchwp();
-EXTERN	PD	*get_pd();
-EXTERN	PD	*idtopd();
-EXTERN	WORD	tchange();
-EXTERN	WORD	kchange();
-EXTERN	WINDOW	*wm_top();
-EXTERN	BYTE	*scasb();
+EXTERN  LONG	trap();
+EXTERN  LONG	trap13();
 
 EXTERN	WORD	gl_mfid;
 EXTERN	WORD	reschid;
@@ -86,7 +80,7 @@ GLOBAL	WORD	gl_port;
 /*	Show all the current process on the screen	*/
 
 	VOID
-showall()
+showall( VOID )
 {
 	PD	*p;
 
@@ -152,7 +146,7 @@ showall()
 /*	Do nothing rouine	*/
 
 	VOID
-donothing()
+donothing( VOID )
 {
 
 }
@@ -302,17 +296,16 @@ pdterm( ret )
 /*	Process termination handler	*/
 
 	VOID
-sigchld()
+sigchld( VOID )
 {
-	WORD	id;
 	LONG	l;
 
 	while( ( l = Pwait3( 1, 0x0L ) ) )
 	{
-	  if ( l < 0 )
+	  if ( l < 0L )
 	    break;
 	  
-	  if ( !forkq( pdterm, l ) )
+	  if ( !forkq( ( WORD(*)())pdterm, l ) )
 	  {
 	    Debug1( "Fail to register terminate\r\n" );
 	    break;
@@ -367,7 +360,7 @@ send_ctrl( p, type )
 	{
 	  buffer[0] = type;
 	  buffer[1] = p->p_pid;		/* send message to control manager */
-	  ap_rdwr( AQWRT, scr_pd->p_pid, EV_BUFSIZE, buffer );
+	  ap_rdwr( AQWRT, scr_pd->p_pid, EV_BUFSIZE, ( BYTE *)buffer );
 	}
 }
 
@@ -436,7 +429,8 @@ swap_next( p, pterm )
 	  }
 
 	  if ( ( item = w_tophandle( newp ) ) != -1 )
-	    wmset( item, WF_TOP, (GRECT*)0 );
+/*	    wmset( item, WF_TOP, (GRECT*)0 ); CJG */
+	    wmset( item, WF_TOP, (WORD*)0 );
 	  else
 	    openphanwind( newp );
 
@@ -469,7 +463,7 @@ swap_next( p, pterm )
 /*	Get any ready process from Not Ready to Ready	*/
 
 	VOID
-make_ready()
+make_ready( VOID )
 {
 	REG PD	*p;
 
@@ -503,7 +497,7 @@ make_ready()
 	  if ( p->p_state != PS_DEAD )
 	  {
 	    scheduler( p );	/* link it to the ready list	*/
-	    switchto( p );
+	    switchto( ( LONG )p );
 	  }
 	}
 }
@@ -522,7 +516,7 @@ sendmsg( d1, d0 )
 
 	if ( cpdid ) 		/* if there is a critcial process */ 
 	{
-	  id = Pgetpid( );
+	  id = ( WORD )Pgetpid( );
 	  if ( p = systopd( id ) )
 	  {
 	    if ( !( p->p_type & AESSYSTEM ) )
@@ -722,7 +716,7 @@ again:
 /*	them one at a time				*/
 
 	VOID
-forker()
+forker( VOID )
 {
 	REG FPD		*f;
 /*	REG PD		*oldrl;*/
@@ -742,7 +736,7 @@ forker()
 	  if ( gl_recd )
 	  {
 					/* check for stop key	*/
-	    if ( (f->f_code == &kchange) &&
+	    if ( (f->f_code == ( WORD(*)())&kchange) &&
 	         ((f->f_data & 0xffff0000L) == KEYSTOP) )
 	      gl_recd = FALSE;
 						/* if still recording	*/
@@ -755,15 +749,15 @@ forker()
 						/*   then coalesce them	*/ 
 						/*   else record the	*/
 						/*   event		*/
-	      if ( (f->f_code == &tchange) &&
-	           (LLGET(gl_rbuf - sizeof(FPD)) == &tchange) )
+	      if ( (f->f_code == ( WORD(*)())&tchange) &&
+	           (LLGET(gl_rbuf - sizeof(FPD)) == ( LONG )&tchange) )
 	      {
 	        amt = f->f_data + LLGET(gl_rbuf-sizeof(LONG));
 	        LLSET(gl_rbuf - sizeof(LONG), amt);	      
 	      }
 	      else
 	      {
-	        LBCOPY(gl_rbuf, ADDR(f), sizeof(FPD));
+	        LBCOPY( ( BYTE *)gl_rbuf, ( BYTE *)f, sizeof(FPD));
 	        gl_rbuf += sizeof(FPD);
 	        gl_rlen--;
 		gl_recd = gl_rlen;
@@ -801,7 +795,7 @@ wake_up( wakeup )
 	    case PS_RUN:
 	      if ( wakeup )
 	      {
-	        temp = (UWORD)currpd->p_sysid;
+	        temp = (LONG)currpd->p_sysid;
 	        temp |= 0xFFFF0000L;
 	        Pmsg( 0x8001, temp, &msg );
 	      }
@@ -844,12 +838,12 @@ wake_up( wakeup )
 	if ( !( p = systopd( mintid ) ) )
 	{			/* if the operation is not 	*/
 				/* appl_init then ignore it	*/
-	   wptr = *((LONG*)(aesblk));
+	   wptr = ( WORD *)( *((LONG*)(aesblk)));
 	   if ( *wptr != 10 )
 	     goto g_2;
 		
-	   dos_dta( name );
-	   ret = dos_sfirst( "U:\\proc\\*.*" );
+	   dos_dta( ( LONG )name );
+	   ret = dos_sfirst( ( LONG )"U:\\proc\\*.*", 0 );
 	      
 	   while( ret )
 	   {
@@ -870,7 +864,7 @@ wake_up( wakeup )
 	   }
 	   else
 	   {
-g_2:	     value = mintid;
+g_2:	     value = (LONG)mintid;
 	     value |= 0xFFFF0000L;
 	     Pmsg( 0x8001, value, &msg );
 	     p = (PD*)0;
@@ -887,10 +881,9 @@ g_2:	     value = mintid;
 /*	ask for AES function service			*/
 
 	VOID
-disp()
+disp( VOID )
 {
 	AES		msg;
-	PD		*p;	
 
 	while( TRUE )		/* keep looking for AES requests */
 	{

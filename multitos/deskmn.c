@@ -61,6 +61,7 @@
  *		   - Used wrong object number..
  * 09/21/92  - cjg - Configuration Popup - Look for longest string first
  * 09/24/92  - cjg - Fixed bug with MKUP and MKDOWN pausing for a scroll.
+ * 02/17/93  - cjg - Converted to Lattice C 5.51
  */
 
 
@@ -68,33 +69,23 @@
  * ==================================================================
  */
 
-#include <compiler.h>
-#include <machine.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <osbind.h>
-#include <vdomode.h>
-#include <deskusa.h>
-#include <extern.h>
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "osbind.h"
+#include "vdomode.h"
+#include "deskusa.h"
+#include "extern.h"
+#include "mn_tools.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
 /* EXTERNS
  * ==================================================================
  */
-EXTERN	BYTE	*get_fstring();
-EXTERN	BYTE	*malloc();
-EXTERN	APP	*app_key();
-EXTERN	BYTE	*get_string();
-EXTERN	WINDOW	*get_win();
-EXTERN	WINDOW	*get_top();
-EXTERN	BYTE	*r_slash();
-EXTERN	BYTE	toupper();
-EXTERN	OBJECT	*get_tree();
-EXTERN	ICONBLK	*get_icon();
-EXTERN	WINDOW	*w_gfirst();
-EXTERN	WINDOW	*w_gnext();
-EXTERN	BYTE	*g_name();
+EXTERN	VOID	menu_icheck();
 
 EXTERN  WORD	gl_restype;
 EXTERN  WORD	gl_rschange;
@@ -123,7 +114,7 @@ EXTERN  WORD	tb3[];
 EXTERN  BYTE	mentable[];
 
 EXTERN  UWORD    d_rezword;	/* set_mode() value ( system ) */
-EXTERN  WORD XDeselect();
+EXTERN  VOID XDeselect();
 
 EXTERN  WORD	strlen();	/* cjg 09/21/92 */
 
@@ -134,25 +125,7 @@ EXTERN  WORD	strlen();	/* cjg 09/21/92 */
 #define VgetSize( a )   xbios( 91, a )
 
 
-/* Structure for passing menu data */
-typedef struct _menu
-{
-   OBJECT *mn_tree;		/* Object tree of the menu */
-   WORD   mn_menu;		/* Parent of the menu items*/
-   WORD   mn_item;		/* Starting menu item      */
-   WORD   mn_scroll;		/* scroll flag for the menu*/
-   WORD   mn_keystate;		/* Key State 		   */
-}MENU;
 
-
-/* Mouse Rectangle Structure...*/
-typedef struct _mrets
-{
-  WORD x;
-  WORD y;
-  WORD buttons;
-  WORD kstate;
-}MRETS;
 
 
 /* GLOBALS
@@ -177,7 +150,6 @@ WORD   button;
     MRETS mk;
     WORD  dummy; 
     WORD  obj;
-    GRECT rect;
 
     wind_update( BEG_MCTRL );
     XSelect( tree, button );			
@@ -215,7 +187,7 @@ WORD   button;
  * Desktop Configuration modified to include Pop-ups.
  */
 	VOID
-mv_desk()
+mv_desk( VOID )
 {
 	REG OBJECT	*obj;
 	REG LONG	f;
@@ -232,10 +204,6 @@ mv_desk()
 	OBJECT          *dtree;
 	WORD		dstart;
 	WORD		istart;
-	GRECT		brect;
-	WORD		flag;
-        GRECT		trect;
-	BYTE		dcolor;
 	MRETS		mk;
 	WORD		skip_flag;
 	LONG		old_f;		      /* cjg 09/24/92 */
@@ -251,10 +219,10 @@ mv_desk()
 	  temp[i] = mentable[i];	
 
 	/* Initialize the First Menu Item Keystroke */
-	(TEDINFO*)(obj[MKITEM].ob_spec)->te_ptext = obj1[tb3[0]].ob_spec;
+	((TEDINFO*)(obj[MKITEM].ob_spec))->te_ptext = obj1[tb3[0]].ob_spec;
 	buf[1] = 0;
 	buf[0] = mentable[0];
-	inf_sset( obj, MKKEYS, buf );
+	inf_sset( (LONG)obj, MKKEYS, buf );
 	menui = 0;
 
 	/* Initialize the Popup Menus - CheckMarks and Object States */
@@ -272,12 +240,12 @@ mv_desk()
 	if ( s_defdir )				/* set the full path	*/ 
         {
 	  dstart = SDAPP;			/* Application */
-          ( BYTE *)obj[SDBUTTON].ob_spec = get_fstring( FSAPP );
+          obj[SDBUTTON].ob_spec = ( LONG )get_fstring( FSAPP );
         }
 	else
         {
 	  dstart = SDTOP;			/* Top Window  */
-          ( BYTE *)obj[SDBUTTON].ob_spec = get_fstring( FSTOP );
+          obj[SDBUTTON].ob_spec = ( LONG )get_fstring( FSTOP );
         }
 	menu_icheck( dtree, dstart, 1 );
 
@@ -286,33 +254,33 @@ mv_desk()
 	if ( s_fullpath )			/* Set input parameter  */
         {
 	  istart = SIFULL;			/* Full Path   */
-          ( BYTE *)obj[SIBUTTON].ob_spec = get_fstring( FSFULL );
+          obj[SIBUTTON].ob_spec = ( LONG )get_fstring( FSFULL );
 	}
 	else
         {
 	  istart = SIFILE;			/* File Name   */
-          ( BYTE *)obj[SIBUTTON].ob_spec = get_fstring( FSFILE );
+          obj[SIBUTTON].ob_spec = ( LONG )get_fstring( FSFILE );
         }
 	menu_icheck( dtree, istart, 1 );
 
 
 	/* Initialize the Free Memory String */
 	f_str( obj, MKMEMORY, av_mem() );
-	*(BYTE*)((TEDINFO*)(obj[MFKEY].ob_spec)->te_ptext) = 0;
+	*(BYTE*)(((TEDINFO*)(obj[MFKEY].ob_spec))->te_ptext) = 0;
 
 	/* save the original pointer	*/
-	str = (TEDINFO*)(obj[MFFILE].ob_spec)->te_ptext;
+	str = ( BYTE *)((TEDINFO*)(obj[MFFILE].ob_spec))->te_ptext;
 	len = strlen( str );	
 	*str = 0;
 
 	app = (APP*)0;
 	which = MFDOWN;
 
- 	old_f = f = 0;
-	dr_dial_w( MNSYSTEM, FALSE );		/* save the string	*/
+ 	old_f = f = 0L;
+	dr_dial_w( MNSYSTEM, FALSE, 0 );		/* save the string	*/
 
 
-	for( f = 1; f <= 20; f++ )		/* cjg 09/24/92 */
+	for( f = 1L; f <= 20L; f++ )		/* cjg 09/24/92 */
 	{
           if( app_key( ftab[f] )  )		/* ALL THIS.... */
 	  {
@@ -320,7 +288,7 @@ mv_desk()
 	    break;
 	  }
 	}
-	f = 0;					/* cjg 09/24/92 */
+	f = 0L;					/* cjg 09/24/92 */
 
 	goto ad_2;
 
@@ -331,7 +299,7 @@ ad_5:	  which = form_do( obj, MKKEYS ) & 0x7fff;
 
 	  if ( ( which == MKUPS ) || ( which == MKDOWNS ) || ( which == MOK ) )
 	  {
-	      inf_sget( obj, MKKEYS, buf );
+	      inf_sget( (LONG)obj, MKKEYS, buf );
 	      buf[0] = toupper( buf[0] );
 	      if ( buf[0] )
 	      {
@@ -400,12 +368,12 @@ cg_3:
 		menui++;
 p_11:
 	        ch_key( menui );
-	        (TEDINFO*)(obj[MKITEM].ob_spec)->te_ptext = obj1[tb3[menui]].ob_spec;
+	        ((TEDINFO*)(obj[MKITEM].ob_spec))->te_ptext = obj1[tb3[menui]].ob_spec;
 	        draw_fld( obj, MKITEM );
 p_2:	
 	        buf[1] = 0;
 	        buf[0] = mentable[menui];
-	        inf_sset( obj, MKKEYS, buf );
+	        inf_sset( (LONG)obj, MKKEYS, buf );
 	        draw_fld( obj, MKKEYS );		
 		cl_delay();
 
@@ -470,7 +438,7 @@ cg_4:
 cg_5:
 
 	        f++;
-	        if ( f <= 20 )
+	        if ( f <= 20L )
 	        {
 ad_3:	          if ( !( xapp = app_key( ftab[f] ) ) )
 		  {
@@ -485,7 +453,7 @@ ad_3:	          if ( !( xapp = app_key( ftab[f] ) ) )
 		    }
 		    app = xapp;
 		    fi = 0;
-		    (TEDINFO*)(obj[MFFILE].ob_spec)->te_ptext = app->a_name;
+		    ((TEDINFO*)(obj[MFFILE].ob_spec))->te_ptext = ( LONG )app->a_name;
 		    draw_fld( obj, MFFILE );
 		    f_str( obj, MFKEY, f );
 		    draw_fld( obj, MFKEY );
@@ -560,7 +528,7 @@ cg_1:
 	      }
 ad_4:
 	      XSelect( obj, which );	/* cjg 08/06/92 */
-	      (TEDINFO*)(obj[MFFILE].ob_spec)->te_ptext = &app->a_name[fi];
+	      ((TEDINFO*)(obj[MFFILE].ob_spec))->te_ptext = ( LONG )&app->a_name[fi];
 	      draw_fld( obj, MFFILE );
 
 	      /* cjg 08/06/92 - Check if the buttons are still down */
@@ -579,7 +547,7 @@ ad_4:
 
 ad_1:				/* restore the pointer	*/
 	put_keys();
-	(TEDINFO*)(obj[MFFILE].ob_spec)->te_ptext = str;
+	((TEDINFO*)(obj[MFFILE].ob_spec))->te_ptext = ( LONG )str;
 	*str = 1;		
 	do_finish( MNSYSTEM );
 }
@@ -592,7 +560,7 @@ ad_1:				/* restore the pointer	*/
  * Install Application using Popups
  */
 	VOID
-mins_app()
+mins_app( VOID )
 {
 	REG OBJECT	*obj;
 	REG APP		*app;
@@ -605,11 +573,7 @@ mins_app()
 	LONG		l;
 
 
-	GRECT		rect;
 	OBJECT		*dtree;
-	GRECT		brect;
-        GRECT		trect;
-	WORD		flag;
 
 	WORD		istart;		/* Current obj - Install As */
 	WORD		bstart;		/* Current Obj - Boot Status*/
@@ -659,12 +623,12 @@ mins_app()
 	  if( ret )
 	  {
 	       bstart = MPBAUTO;
-               ( BYTE *)obj[MPBBUTTN].ob_spec = get_fstring( FSAUTO );	      
+               obj[MPBBUTTN].ob_spec = ( LONG )get_fstring( FSAUTO );	      
 	  }
 	  else
 	  {
 	       bstart = MPBNORML;
-               ( BYTE *)obj[MPBBUTTN].ob_spec = get_fstring( FSNORMAL );
+               obj[MPBBUTTN].ob_spec = ( LONG )get_fstring( FSNORMAL );
           }
 	  menu_icheck( dtree, bstart, TRUE );
 
@@ -697,12 +661,12 @@ mins_app()
 	  if( setdir )
 	  {  
 	      dstart = SDAPP;
-              ( BYTE *)obj[MPDBUTTN].ob_spec = get_fstring( FSAPP );
+              obj[MPDBUTTN].ob_spec = ( LONG )get_fstring( FSAPP );
 	  }
 	  else
 	  {
 	      dstart = SDTOP;
-              ( BYTE *)obj[MPDBUTTN].ob_spec = get_fstring( FSTOP );
+              obj[MPDBUTTN].ob_spec = ( LONG )get_fstring( FSTOP );
 	  }
 	  menu_icheck( dtree, dstart, TRUE );	  
 
@@ -716,24 +680,24 @@ mins_app()
 	  if ( dofull )
           {
 	    pstart = SIFULL;
-            ( BYTE *)obj[MPPBUTTN].ob_spec = get_fstring( FSFULL );
+            obj[MPPBUTTN].ob_spec = ( LONG )get_fstring( FSFULL );
           }
 	  else
           {
 	    pstart = SIFILE;
-            ( BYTE *)obj[MPPBUTTN].ob_spec = get_fstring( FSFILE );
+            obj[MPPBUTTN].ob_spec = ( LONG )get_fstring( FSFILE );
 	  }
 	  menu_icheck( dtree, pstart, TRUE );	
 
 
 	  /* Set the Document type */
-	  inf_sset( obj, MPDTYPE, ( newapp ) ? Nostr : &app->a_doc[2] );
+	  inf_sset( (LONG)obj, MPDTYPE, ( newapp ) ? Nostr : &app->a_doc[2] );
 
 	  /* Set the Application Name */
  	  xinf_sset( obj, MPFNAME, g_name( str ) );
 
 	  /* Set the Arguments */
-	  inf_sset( obj, MPARGS, ( newapp ) ? Nostr : app->a_argu );
+	  inf_sset( (LONG)obj, MPARGS, ( newapp ) ? Nostr : app->a_argu );
 	
 
 
@@ -748,22 +712,22 @@ mins_app()
 	    case PRG:	
 	    case APPS:
 	        ret = fstart = MPFGEM;
-                ( BYTE *)obj[MPFBUTTN].ob_spec = get_fstring( FSGEM );
+                obj[MPFBUTTN].ob_spec = ( LONG )get_fstring( FSGEM );
 	        break;
 	
             case TTP:		 	
 	        ret = fstart = MPFTTP;
-                ( BYTE *)obj[MPFBUTTN].ob_spec = get_fstring( FSTOSTTP );
+                obj[MPFBUTTN].ob_spec = ( LONG )get_fstring( FSTOSTTP );
 	        break;
 	
 	    case TOS:
 	        ret = fstart = MPFTOS;
-                ( BYTE *)obj[MPFBUTTN].ob_spec = get_fstring( FSTOS );
+                obj[MPFBUTTN].ob_spec = ( LONG )get_fstring( FSTOS );
 	        break;
 
 	    case PTP:	/* Gem takes parameters */
 	        ret = fstart = MPFGMTTP;
-                ( BYTE *)obj[MPFBUTTN].ob_spec = get_fstring( FSGEMTTP );
+                obj[MPFBUTTN].ob_spec = ( LONG )get_fstring( FSGEMTTP );
 	        break;
 
 	    default:
@@ -784,17 +748,17 @@ ins_1:	      	fill_string( str, NOTPRG );
 	    lbintoasc( (LONG)app->a_key, buffer );
 	    istart = MPIF1 + app->a_key - 1;
 	    
-            ( BYTE *)obj[MPIBUTTN].ob_spec = get_fstring( FSF1 + app->a_key-1);
+            obj[MPIBUTTN].ob_spec = ( LONG )get_fstring( FSF1 + app->a_key-1);
 	  }
 	  else
 	  {
 	    istart = MPINONE;
 	    buffer[0] = 0;
-            ( BYTE *)obj[MPIBUTTN].ob_spec = get_fstring( FSNONE );
+            obj[MPIBUTTN].ob_spec = ( LONG )get_fstring( FSNONE );
 	  }
 	  menu_icheck( dtree, istart, TRUE );
 		
-	  dr_dial_w( MNINSAPP, FALSE );
+	  dr_dial_w( MNINSAPP, FALSE, 0 );
 	  where = 0;
 ins_2:
 	  done = 0;
@@ -845,7 +809,7 @@ ins_2:
 				break;
 
 		case MPOK:  done = TRUE;  /*Install */
-	    		    l = (UWORD)(istart - MPINONE);	/* Get 1 - 20 */
+	    		    l = (LONG)(istart - MPINONE);	/* Get 1 - 20 */
 			    if( ( istart >= MPIF1 ) && ( istart <= MPIF20 ) )
 		  	    {
 			        sapp = applist;
@@ -874,13 +838,13 @@ ins_2:
 	  				{
 					   lbintoasc( (LONG)app->a_key, buffer );
 					   istart = MPIF1 + app->a_key - 1;
-				           ( BYTE *)obj[MPIBUTTN].ob_spec = get_fstring( FSF1 + app->a_key-1);
+				           obj[MPIBUTTN].ob_spec = ( LONG )get_fstring( FSF1 + app->a_key-1);
 					}
 					else
 					{
 					   istart = MPINONE;
 	    				   buffer[0] = 0;
-				           ( BYTE *)obj[MPIBUTTN].ob_spec = get_fstring( FSNONE );
+				           obj[MPIBUTTN].ob_spec = ( LONG )get_fstring( FSNONE );
 					}
 	             			menu_icheck( dtree, istart, TRUE );
 
@@ -896,7 +860,7 @@ ins_2:
 		    			sapp->a_key = 0;	/* Overwrite	*/
 				   }
 
-ins_4:				   sapp = sapp->a_next;
+ins_4:				   sapp = ( APP *)sapp->a_next;
 	      			}
 			    }/* check function key */
 
@@ -914,11 +878,11 @@ ins_4:				   sapp = sapp->a_next;
 
 				        /* get the doc icon type	*/
 	    		    strcpy( "*.", buffer );
-	    		    inf_sget( obj, MPDTYPE, &buffer[2] );
+	    		    inf_sget( (LONG)obj, MPDTYPE, &buffer[2] );
 	    		    app_icon( buffer, -1, &app->a_dicon );	      
 
 	    		    strcpy( buffer, app->a_doc );
-	    		    inf_sget( obj, MPARGS, app->a_argu );
+	    		    inf_sget( (LONG)obj, MPARGS, app->a_argu );
 	    		    graphic = 1;
 
 			    switch( fstart )
@@ -1010,12 +974,9 @@ ins_6:	if ( obj )
  * Desk Preferences using Pop-Ups
  */
 	VOID
-mdesk_pref()
+mdesk_pref( VOID )
 {
 	REG OBJECT		*obj;
-	REG WORD	cyes, i, flag;
-	    WORD	overwrite,font;
-
 	OBJECT          *dtree;
 	WORD		dstart;
 	WORD		cstart;
@@ -1028,37 +989,37 @@ mdesk_pref()
 	if( cdele_save )
 	{
 	   dstart = SPYES;
-           ( BYTE *)obj[SPDBUTTN].ob_spec = get_fstring( FSYES );
+           obj[SPDBUTTN].ob_spec = ( LONG )get_fstring( FSYES );
 	}
 	else
 	{
 	   dstart = SPNO;
-           ( BYTE *)obj[SPDBUTTN].ob_spec = get_fstring( FSNO );
+           obj[SPDBUTTN].ob_spec = ( LONG )get_fstring( FSNO );
 	}
 
 	if( !write_save )	/* Overwrite is backwards...*/
 	{
 	   ostart = SPYES;
-           ( BYTE *)obj[SPOBUTTN].ob_spec = get_fstring( FSYES );
+           obj[SPOBUTTN].ob_spec = ( LONG )get_fstring( FSYES );
 	}
 	else
 	{
 	   ostart = SPNO;
-           ( BYTE *)obj[SPOBUTTN].ob_spec = get_fstring( FSNO );
+           obj[SPOBUTTN].ob_spec = ( LONG )get_fstring( FSNO );
 	}
 
 	if( ccopy_save )
 	{
 	   cstart = SPYES;
-           ( BYTE *)obj[SPCBUTTN].ob_spec = get_fstring( FSYES );
+           obj[SPCBUTTN].ob_spec = ( LONG )get_fstring( FSYES );
 	}
 	else
 	{
 	   cstart = SPNO;
-           ( BYTE *)obj[SPCBUTTN].ob_spec = get_fstring( FSNO );
+           obj[SPCBUTTN].ob_spec = ( LONG )get_fstring( FSNO );
 	}
 
-        dr_dial_w( MNSETPREF, FALSE );
+        dr_dial_w( MNSETPRE, FALSE, 0 );
 	button = 0;
 	do
 	{
@@ -1097,7 +1058,7 @@ mdesk_pref()
 	   }
 	}while( ( button != MNSPOK ) && ( button != MNSPCAN ));
 
-	do_finish( MNSETPREF );
+	do_finish( MNSETPRE );
 } /* inf_pref */
 
 
@@ -1126,11 +1087,10 @@ mdesk_pref()
  *    resolution, Display the Sparrow Video Dialog Box FIRST still.
  */
 	WORD
-set_video()
+set_video( VOID )
 {
 	REG OBJECT		*obj;
-	REG WORD	cyes, i, flag;
-	    WORD	overwrite,font;
+	REG WORD	i, flag;
 
 	OBJECT		*dtree;
 	WORD		button;
@@ -1154,8 +1114,6 @@ set_video()
 	WORD		vertical_flag;
 	WORD		double_flag;	/* 1 = double, 0 = interlaced mode*/
 	WORD		do_falcon_dialog;
-	LONG		p_value;
-	BYTE		buffer[10];
 
 	obj   = get_tree( MNSETVID );
 	dtree = get_tree( MNMENU );
@@ -1223,7 +1181,7 @@ set_video()
 	/* Initialize the number of colors available */
 	cstart = color_flag + VID2;
 	
-        ( BYTE *)obj[SVCBUTTN].ob_spec = get_fstring( color_flag + FS2C );	
+        obj[SVCBUTTN].ob_spec = ( LONG )get_fstring( color_flag + FS2C );	
 	menu_icheck( dtree, cstart, TRUE );
 
 
@@ -1234,12 +1192,12 @@ set_video()
 	if( column_flag == COL80 )
         {
 	   lstart = SVL80;
-           ( BYTE *)obj[SVLBUTTN].ob_spec = get_fstring( FS80 );
+           obj[SVLBUTTN].ob_spec = ( LONG )get_fstring( FS80 );
 	}
 	else
 	{
 	   lstart = SVL40;
-           ( BYTE *)obj[SVLBUTTN].ob_spec = get_fstring( FS40 );
+           obj[SVLBUTTN].ob_spec = ( LONG )get_fstring( FS40 );
 	}
 	menu_icheck( dtree, lstart, TRUE );
 
@@ -1249,9 +1207,9 @@ set_video()
          * If we are on a Television, use Interlace
 	 */
 	if( double_flag )
-	    (TEDINFO*)(obj[SVDTITLE].ob_spec)->te_ptext = get_fstring( DLTEXT );
+	    ((TEDINFO*)(obj[SVDTITLE].ob_spec))->te_ptext = ( LONG )get_fstring( DLTEXT );
 	else
-	    (TEDINFO*)(obj[SVDTITLE].ob_spec)->te_ptext = get_fstring( ITEXT );
+	    ((TEDINFO*)(obj[SVDTITLE].ob_spec))->te_ptext = ( LONG )get_fstring( ITEXT );
 
 	/* Initialize the double/interlace to ON or OFF */
 	menu_icheck( dtree, SVION, FALSE );
@@ -1260,12 +1218,12 @@ set_video()
 	if( vertical_flag )
 	{
 	   dstart = SVION;
-           ( BYTE *)obj[SVDBUTTN].ob_spec = get_fstring( FSON );
+           obj[SVDBUTTN].ob_spec = ( LONG )get_fstring( FSON );
 	}
 	else
 	{
 	   dstart = SVIOFF;
-           ( BYTE *)obj[SVDBUTTN].ob_spec = get_fstring( FSOFF );
+           obj[SVDBUTTN].ob_spec = ( LONG )get_fstring( FSOFF );
 	}
 	menu_icheck( dtree, dstart, TRUE );
 
@@ -1281,7 +1239,7 @@ set_video()
 	if (!do_falcon_dialog)
 	  goto dialog1;
 
-        dr_dial_w( MNSETVID, FALSE );
+        dr_dial_w( MNSETVID, FALSE, 0 );
 	do
 	{
 	   button = form_do( obj, 0 ) & 0x7fff;
@@ -1345,7 +1303,7 @@ dialog1:
 		    mode_code = vga_flag | pal_flag | overscan_flag;
 
 		    vtree = get_tree( MNVIDEO );
-		    flag = inf_gindex( vtree, SVSTLOW, 6 );
+		    flag = inf_gindex( (LONG)vtree, SVSTLOW, 6 );
 
 		    if ( flag != -1 )
 		    {
@@ -1414,7 +1372,7 @@ dialog1:
 		    button = SVCANCEL;
 		    goto enddialog1;
 		  }
-	          dr_dial_w( MNSETVID, FALSE );
+	          dr_dial_w( MNSETVID, FALSE, 0 );
 	        }
 	        break;
 
@@ -1474,7 +1432,7 @@ enddialog1:
 	{		/* valid the mode code */	
 	  if ( ( gl_vdo & HIGHWORD ) == FALCON )
 	  {
-	    mode_code = trap14( 95, mode_code );
+	    mode_code = (WORD)trap14( 95, mode_code );
 	    ret = desk_chres( mode_code, 1 );	    		
 	  }
 	  else
@@ -1482,8 +1440,8 @@ enddialog1:
 	    if ( ( mode_code & 0x80 ) || ( flag != pref_save ) )	
 	    {
 	       ret = desk_chres( flag, 0 );
-	       if (ret)		
-	         pref_save = flag;
+ 	       if (ret)		
+ 	         pref_save = flag;
 	    }
 	  }	
 
@@ -1500,7 +1458,7 @@ enddialog1:
  * ==================================================================
  * Select an object and redraw
  */
-	WORD
+	VOID
 XSelect( tree, obj )
 OBJECT *tree;
 WORD   obj;
@@ -1513,12 +1471,12 @@ WORD   obj;
 
        tree[ obj ].ob_state |= SELECTED;
        trect = *(GRECT *)&tree[(obj)].ob_x;
-       objc_offset( tree, obj, &trect.x, &trect.y );
-       trect.x -= 2;	/* cjg 08/06/92 */
-       trect.y -= 2;
-       trect.w += 4;
-       trect.h += 4;
-       objc_draw( tree, obj, MAX_DEPTH, trect.x, trect.y, trect.w, trect.h );
+       objc_offset( tree, obj, &trect.g_x, &trect.g_y );
+       trect.g_x -= 2;	/* cjg 08/06/92 */
+       trect.g_y -= 2;
+       trect.g_w += 4;
+       trect.g_h += 4;
+       objc_draw((LONG)tree,obj,MAX_DEPTH,trect.g_x,trect.g_y,trect.g_w,trect.g_h );
 }
 
 
@@ -1527,7 +1485,7 @@ WORD   obj;
  * Deselect an object and redraw - use the flag to redraw in case
  * the area to redraw needs to be bigger.( ie: SHADOWED )
  */
-	WORD
+	VOID
 XDeselect( tree, obj )
 OBJECT *tree;
 WORD   obj;
@@ -1538,12 +1496,13 @@ WORD   obj;
        {
          tree[ obj ].ob_state &= ~SELECTED;
          trect = *(GRECT *)&tree[(obj)].ob_x;
-         objc_offset( tree, obj, &trect.x, &trect.y );
-         trect.x -= 2;	/* cjg 08/06/92 */
-         trect.y -= 2;
-         trect.w += 4;
-         trect.h += 4;
-         objc_draw( tree, obj, MAX_DEPTH, trect.x, trect.y, trect.w, trect.h );
+         objc_offset( (OBJECT *)tree, obj, &trect.g_x, &trect.g_y );
+         trect.g_x -= 2;	/* cjg 08/06/92 */
+         trect.g_y -= 2;
+         trect.g_w += 4;
+         trect.g_h += 4;
+         objc_draw( (LONG)tree, obj, MAX_DEPTH, trect.g_x, trect.g_y, 
+		trect.g_w, trect.g_h );
        }
 }
 
@@ -1555,7 +1514,7 @@ WORD   obj;
  * This routine will select the title and dispay the PopUp Menu
  * at the button location.
  */
-	WORD
+	VOID
 DoPopup( tree, button, title, Mtree, Mmenu, Mfirst, Mstart, Mscroll,
          FirstMenu, FirstText, Skip )
 OBJECT *tree;
@@ -1581,13 +1540,13 @@ WORD   Skip;
      draw_fld( tree, title );
 
 
-     objc_offset( tree, button, &brect.x, &brect.y );
+     objc_offset( tree, button, &brect.g_x, &brect.g_y );
 
      Menu.mn_tree   = Mtree;
      Menu.mn_menu   = Mmenu;
      Menu.mn_item   = Mfirst;
      Menu.mn_scroll = Mscroll;
-     flag = menu_popup( &Menu, brect.x, brect.y, &MData );
+     flag = menu_popup( &Menu, brect.g_x, brect.g_y, &MData );
      if( flag )
      {
         if( ( Mtree == MData.mn_tree ) &&
@@ -1600,7 +1559,7 @@ WORD   Skip;
 	    if( !Skip )
  	        menu_istart( 1, Mtree, Mmenu, *Mstart );
 
-           ( BYTE *)tree[ button ].ob_spec = get_fstring( *Mstart - FirstMenu + FirstText );
+           tree[ button ].ob_spec = ( LONG )get_fstring( *Mstart - FirstMenu + FirstText );
         }
      }
      /* Deselect the title */
@@ -1614,11 +1573,11 @@ WORD   Skip;
  * ====================================================================
  * Initialize the Video Dialog Box ( ST and TT Modes )
  */
-	WORD
-init_vtree()
+	VOID
+init_vtree( VOID )
 {
 	REG OBJECT	*vtree;
-	REG WORD	cyes, i, flag;
+	REG WORD	i;
 	WORD		monitor_type;
 	
 	vtree = get_tree( MNVIDEO );
@@ -1709,7 +1668,7 @@ WORD   *item;
     /* Get the length of the largest string */
     for( index = 1; index <= MAXMENU; index++ )
     {
-	temp = strlen( obj1[ tb3[ index - 1 ] ].ob_spec );
+	temp = strlen( (BYTE *)obj1[ tb3[ index - 1 ] ].ob_spec );
 	if( temp > length )
 	   length = temp;
     }
@@ -1761,13 +1720,13 @@ WORD   *item;
        mtree[ old_item + 1 ].ob_spec   = obj1[tb3[old_item]].ob_spec;     
      mtree[ start ].ob_spec   = obj1[tb3[*item]].ob_spec;     
 
-     objc_offset( dtree, button, &brect.x, &brect.y );
+     objc_offset( dtree, button, &brect.g_x, &brect.g_y );
 
      Menu.mn_tree   = tree;
      Menu.mn_menu   = ROOT;
      Menu.mn_item   = start;
      Menu.mn_scroll = TRUE;
-     flag = menu_popup( &Menu, brect.x, brect.y, &MData );
+     flag = menu_popup( &Menu, brect.g_x, brect.g_y, &MData );
      if( flag )
      {
         if( tree == MData.mn_tree )
@@ -1802,7 +1761,7 @@ WORD item;
 
      obj = get_tree( MNSYSTEM );	/* Get config tree */
 
-     inf_sget( obj, MKKEYS, buf );
+     inf_sget( (LONG)obj, MKKEYS, buf );
      buf[0] = toupper( buf[0] );
      if ( buf[0] )
      {
@@ -1826,7 +1785,7 @@ WORD item;
         }		  	
      }
      mentable[item] = buf[0]; 
-     inf_sset( obj, MKKEYS, buf );
+     inf_sset( (LONG)obj, MKKEYS, buf );
      draw_fld( obj, MKKEYS );		
      ch_key( item );
      return( flag );
@@ -1844,7 +1803,6 @@ get_that_size( newmode )
 	WORD IsVGA;
 	WORD IsVertFlag;
 	WORD Result;
-	WORD Bits;
 
 	if ( ( gl_vdo & HIGHWORD ) == FALCON )
 	{
@@ -1869,8 +1827,8 @@ get_that_size( newmode )
 
 
 
-	WORD
-wait_up()
+	VOID
+wait_up( VOID )
 {
   MRETS mk;
 

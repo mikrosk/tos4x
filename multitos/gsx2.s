@@ -1,17 +1,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: i:\multitos/RCS/gsx2.s,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gsx2.s,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: gsx2.s,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
-# Revision 1.1  1993/02/24  23:52:46  ersmith
-# 1 meg floppy MultiTOS
-#
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.2  89/04/26  18:27:45  mui
 * TT
 * 

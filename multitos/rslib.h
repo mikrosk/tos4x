@@ -1,5 +1,8 @@
 /*	RSLIB.H			9/21/92			D.Mui		*/
 
+#ifndef _RSLIB_H_
+#define _RSLIB_H_
+
 #define R_TREE 		0	/* These defines are used by rs_gaddr */
 #define R_OBJECT 	1
 #define R_TEDINFO 	2
@@ -74,4 +77,6 @@
 #define APP_LOPNAME 	(rs_global + 10)	/* tree index address		*/
 #define APP_RSCADDR 	(rs_global + 14)	/* resource address		*/
 #define APP_RSCSIZE 	(rs_global + 18)	/* resource size		*/
+
+#endif
 

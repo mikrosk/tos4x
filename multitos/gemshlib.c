@@ -30,6 +30,8 @@
 /*	Fix at sh_envrn for overshooting the buffer	3/13/92	D.Mui	*/ 
 /*	Shel_write will look for PATH if current file not found		*/
 /*	3/24/92						D.Mui		*/
+/*	Convert to Lattice C 5.51	02/12/93	C.Gee		*/
+/*	Force to use prototypes		02/22/93	C.Gee		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -46,53 +48,20 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <gemdos.h>
-#include <message.h>
-#include <aesmint.h>
-#include <gemlib.h>
-#include <rslib.h>
-#include <signal.h>
-#include <gemusa.h>
+#include "machine.h"
+#include "objaddr.h"
+#include "dispvars.h"
+#include "gemdos.h"
+#include "message.h"
+#include "aesmint.h"
+#include "rslib.h"
+#include "signal.h"
+#include "gemusa.h"
 
-EXTERN	PD	*idesk();
-EXTERN	BYTE	*strcpy();
-EXTERN	WINDOW	*wm_top();
-EXTERN	WORD	strcmp();
-EXTERN	BYTE	*scasb();
-EXTERN	WORD	dos_open();
-EXTERN	BYTE	*r_slash();
-EXTERN	PD	*sndcli();
-EXTERN	BYTE	*dos_xalloc();
-EXTERN	BYTE	*runaes();
-EXTERN	PD	*idtopd();
-EXTERN	VOID	desktop();
-EXTERN	VOID	rundesk();
-EXTERN	UWORD	strlen();
-EXTERN	WORD	fm_error();
-EXTERN	VOID	dos_exec();			/* in DOS.C		*/
 EXTERN	LONG	trap();
-EXTERN	VOID	dos_dta();
-EXTERN	WORD	dos_sfirst();
-EXTERN	WORD	cli();				/* in DOSIF.A86		*/
-EXTERN	WORD	sti();
-EXTERN	WORD	takeerr();
-EXTERN	WORD	giveerr();
-EXTERN	WORD	retake();
-EXTERN	WORD	gsx_graphic();
-EXTERN	WORD	gsx_wsclose();
-EXTERN	WORD	gsx_malloc();
-EXTERN	WORD	gsx_mfree();
-EXTERN	BYTE	*rs_str();
-EXTERN	BYTE	*fs_back();
-EXTERN	PD	*get_pd();
-EXTERN	WORD	runpgm();
 
 EXTERN	WORD	gl_rschange;
 EXTERN	UWORD	a_rezword;
@@ -217,7 +186,7 @@ sh_len( path )
 
 	len1 = sh_len( ad_envrn );
 
-	if ( addr = dos_xalloc( (LONG)( len + len1 + strlen( file ) 
+	if ( addr = ( BYTE *)dos_xalloc( (LONG)( len + len1 + strlen( file ) 
 				+ strlen( ARGV ) + 8 ), 3 ) ) 
 	{
 	  tail[0] = 0x7F;
@@ -434,12 +403,11 @@ sh_draw( lcmd )
 	BYTE	*lcmd;
 {
 	REG	LONG	tree;
-	WORD	c;
 
 	gsx_sclip( &gl_rscreen );
 	upperstr( lcmd );
 	tree = ad_stdesk;
-	LLSET( LLGET(OB_SPEC(TITLE)), lcmd );
+	LLSET( LLGET(OB_SPEC(TITLE)), ( LONG )lcmd );
 	ob_draw( tree, ASCREEN, MAX_DEPTH );
 }
 
@@ -540,7 +508,7 @@ sh_fork( program, tail, envrn )
 /*	Set the default shell background	*/
 
 	VOID
-sh_background()
+sh_background( VOID )
 {
 	WORD		i;
 	WORD		*wptr;
@@ -549,7 +517,7 @@ sh_background()
 						/* get st_desk ptr	*/
 	rs_gaddr(ad_sysglo, R_TREE, SCREEN, &ad_stdesk);
 
-	obj = ad_stdesk;
+	obj = ( OBJECT *)ad_stdesk;
 
 	for( i = 0; i < 3; i++ )
 	  obj[i].ob_width = gl_width;
@@ -561,10 +529,10 @@ sh_background()
 	if ( aesDDD )			/* user defined background	*/
     	{
 	  par = (PARMBLK*)aesDDD->ub_parm;
-	  wptr = &par->pb_parm;
+	  wptr = ( WORD *)&par->pb_parm;
 	  *wptr = gl_handle;	
       	  obj[0].ob_type = G_USERDEF;	
-      	  obj[0].ob_spec = aesDDD;		
+      	  obj[0].ob_spec = ( LONG )aesDDD;		
     	}	
 	else
 	{
@@ -589,8 +557,8 @@ sh_background()
 sh_read(pcmd, ptail)
 	LONG		pcmd, ptail;
 {
-	LBCOPY(pcmd, ad_shcmd, CMDLEN);
-	LBCOPY(ptail, ad_shtail, CMDLEN);
+	LBCOPY( ( BYTE *)pcmd, ad_shcmd, CMDLEN);
+	LBCOPY( ( BYTE *)ptail, ad_shtail, CMDLEN);
 	return(TRUE);
 }
 
@@ -615,8 +583,8 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 
 	if ( doex & 0xFF00 )	/* extended mode	*/
 	{
-	  ptr = pcmd;		/* This is the file name */
-	  pcmd = ptr[0];
+	  ptr = ( LONG *)pcmd;		/* This is the file name */
+	  pcmd = ( BYTE *)ptr[0];
 	}
 
 	/* We will allow the application caller to pass in command tail		*/
@@ -631,7 +599,7 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 	  if ( length = strlen( &ptail[1] ) )
 	  {
 	    length += 2;	/* two more for leading byte and NULL	*/		
-	    if ( newaddr = dos_xalloc( (LONG)length, 0x03 ) )
+	    if ( newaddr = ( BYTE *)dos_xalloc( (LONG)length, 0x03 ) )
 	      ad_shtail = newaddr; 	
 	    else
 	      return( FALSE );	
@@ -710,7 +678,7 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 	      Debug1( "1 Set default dir at " );
 	      Debug1( ptr[3] ); 	
 	      Debug1( "\r\n" );	
-	      dos_setdir( ptr[3], 1 );
+	      dos_setdir( ( BYTE *)ptr[3], 1 );
 	    }
 	    else
 	    {
@@ -722,7 +690,7 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 	  }
 
 	  if ( doex & 0x0800 )	/* set environment path	*/
-	    envrn = ptr[4];
+	    envrn = ( BYTE *)ptr[4];
 	}
 
 
@@ -770,7 +738,7 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 ss_3:		  D.g_loc2[0] = dos_gdrv();
 		  D.g_loc2[1] = ':';
 		  D.g_loc2[2] = '\\';
-		  dos_gdir( D.g_loc2[0] + 1, &D.g_loc2[2] );
+		  dos_gdir( D.g_loc2[0] + 1, ( LONG )&D.g_loc2[2] );
 		  D.g_loc2[0] += 'A';		  
 		  Debug1( "3 Set dir " );
 		  Debug1( &D.g_loc2[0] );
@@ -811,7 +779,7 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 	      }
 	      else
 	      {
-	        sh_envrn( &cptr, TOSRUN );	
+	        sh_envrn( ( LONG *)&cptr, TOSRUN );	
 	        if ( cptr )				
 	        {
 #if 1
@@ -821,11 +789,11 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
  * tail: ERS 12/10/92
  */
 		   length += strlen( ad_shcmd ) + 3;
-		   dptr = dos_xalloc( (LONG)length, 0x03 );
+		   dptr = ( BYTE *)dos_xalloc( (LONG)length, 0x03 );
 		   if (!dptr)
 		     return( FALSE );
 		   bfill( length, 0, dptr );
-		   dptr[0] = 0xFF;
+		   dptr[0] = ( BYTE )0xFF;
 		   strcpy( ad_shcmd, &dptr[1] );
 		   if ( ad_shtail[0] )
 		   {
@@ -834,15 +802,16 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 		   }
 		   ad_shtail = dptr;
 		   if ( newaddr )
-		     dos_free( newaddr );
+		     dos_free( ( LONG )newaddr );
 		   newaddr = dptr;
+
 		   if ( changed )
 		   {
-		     dos_free( envrn );
+		     dos_free( ( LONG )envrn );
 		     envrn = ad_envrn;
 		     changed = FALSE;
 		   }
-		   LBCOPY( ad_shcmd, cptr, CMDLEN );
+ 		   LBCOPY( ad_shcmd, cptr, CMDLEN );
 #endif
 		   if ( !changed )
 		   {
@@ -887,7 +856,7 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 	}
 
 	if ( changed )
-	  dos_free( envrn );
+	  dos_free( ( LONG )envrn );
 
 	if ( doex & 0x0100 )
 	  Psetlimit( 3, 0x0L );
@@ -901,7 +870,7 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 ex_exit:
 	if ( newaddr )
 	{
-	  dos_free( newaddr );	
+	  dos_free( ( LONG )newaddr );	
 	  ad_shtail = &D.s_tail[0];	/* reset the command tail buffer */	
 	}  	
 
@@ -910,7 +879,7 @@ ex_exit:
 /* Don't stay in the subdirectory, or else the kernel will think that
  * the directory is busy: ++ ERS 12/21/92
  */
-	dos_chdir("\\");
+	dos_chdir( (LONG)"\\");
 
 	return( ret );
 }
@@ -979,7 +948,6 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 	WORD		i;
 	WORD		*wptr;
 	WORD		buffer[8];
-	PD		*p;
 
 	switch( doex & 0x00FF )
 	{
@@ -1060,7 +1028,7 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 	    if ( isgem == 0 )	/* Inquire size */
 	    {
 	      i = sh_len( ad_envrn );
-	      lbintoasc( (LONG)i, buffer );
+	      lbintoasc( (LONG)i, ( BYTE *)buffer );
 	      Debug7( "Sh_len -> " );
 	      Debug7( buffer );
 	      Debug7( "\r\n" );	
@@ -1090,7 +1058,7 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 	    return( 1 );
 	
 	  case 10:		/* Pass message to AES	*/
-	    wptr = pcmd;
+	    wptr = ( WORD *)pcmd;
 				/* abort the termination sequence */
 	    if ( wptr[0] == AP_TFAIL )
 	    {
@@ -1187,9 +1155,9 @@ sh_put( pdata, len )
 	
 	if ( len > D.s_size )
 	{
-	  if ( addr = dos_xalloc( (LONG)len, 3 ) )
+	  if ( addr = ( BYTE *)dos_xalloc( (LONG)len, 3 ) )
 	  {
-	    dos_free( D.s_save );
+	    dos_free( ( LONG )D.s_save );
 	    D.s_save = addr;
 	    D.s_size = len;
 	  }
@@ -1208,7 +1176,7 @@ sh_put( pdata, len )
 */
 
 	WORD
-sh_tographic()
+sh_tographic( VOID )
 {
 	sh_graphic = TRUE;
 
@@ -1231,7 +1199,7 @@ sh_tographic()
 *	for the running of a DOS-based character application.
 */
 	WORD
-sh_toalpha()
+sh_toalpha( VOID )
 {
 	sh_graphic = FALSE;
 
@@ -1274,7 +1242,7 @@ REG	LONG		*ppath;		/* output pointer   */
 	  ;
 	  if( !(*byteptr) )			/* end of search string */
 	  {
-	    *ppath = chrptr;
+	    *ppath = ( LONG )chrptr;
 	    return;
 	  }
 	  else
@@ -1322,7 +1290,7 @@ sh_path( whichone, dp, pname, envrn )
 	if ( !temp )
 	  return( FALSE );
 
-	lp = temp;
+	lp = ( BYTE *)temp;
 
 /* This kludge, er, section of code maintains compatibility with
 *	the old style PATH=\0<path>\0, to support folks who run an auto-
@@ -1337,7 +1305,7 @@ sh_path( whichone, dp, pname, envrn )
 	      return( FALSE );			/* really null, so punt	*/
 	  }
 	  oldpath = TRUE;			/* it really is a path	*/
-	  lp = temp;				/* so munge the null	*/
+	  lp = ( BYTE *)temp;			/* so munge the null	*/
 	  *lp = ';';
         }
 /* end compatibility code ----------------				*/
@@ -1388,7 +1356,7 @@ sh_path( whichone, dp, pname, envrn )
 
 	WORD
 sh_search( routine )
-	REG	WORD	(*routine)();
+	REG	WORD	(*routine)( LONG );
 {
 	if ( routine )
 	  (*routine)( ad_path );
@@ -1418,9 +1386,9 @@ REG	BYTE		*pname;
 
 
 	savedta = trap( 0x2F );			/* Fgetdta()		*/
-	dos_dta( &D.g_dta[0] );			/* use this		*/
+	dos_dta( ( LONG )&D.g_dta[0] );		/* use this		*/
 
-	pname = sh_name( pspec );		/* get the file name	*/
+	pname = sh_name( ( BYTE *)pspec );	/* get the file name	*/
 	nstrcpy( pname, &tmpname[0], 13 );		/* copy it		*/
 
 	pname = sh_name( ad_shcmd );	/* first look in program's dir	*/
@@ -1428,25 +1396,25 @@ REG	BYTE		*pname;
 	pname = &tmpname[0];
 	if( path ) {  				/* if a path exists	*/
 
-	    LBCOPY( ad_path, ad_shcmd, path );	/* copy the path	*/
-	    LSTCPY( (ad_path+path), pname );	/* add the name		*/
+	    LBCOPY( ( BYTE *)ad_path, ad_shcmd, path );	/* copy the path	*/
+	    LSTCPY( ( BYTE *)(ad_path+path), pname );	/* add the name		*/
 	    found = sh_search( routine );	/* look for it		*/
 	}
 
 	if ( ( !found ) && ( pathsearch ) )
 	{				/* if not found there, look cwd	*/
 	    path = 0;
-	    strcpy( pspec, ad_path );
+	    strcpy( ( BYTE *)pspec, ( BYTE *)ad_path );
 	    do 
 	    {
 		found = sh_search( routine );
 		if( !found )
-		    path = sh_path( path, ad_path, pname, envrn );
+		    path = sh_path( path, ( BYTE *)ad_path, pname, envrn );
 	    } while( path && !found );	/* then in env paths		*/
 	}
 
 	if( found )				/* if file found	*/
-	  strcpy( ad_path, pspec );		/* return full filespec	*/
+	  strcpy( ( BYTE *)ad_path, ( BYTE *)pspec );	/* return full filespec	*/
 
 	dos_dta( savedta );			/* restore DTA		*/
 	return( found );
@@ -1468,7 +1436,7 @@ sh_spath( path )
 	BYTE		*dest,*new,*p1,*p2;
 	WORD		add;
 	UWORD		len;
-	int		size1,size,cursize;
+	int		size,cursize;
 	BYTE		temp;
 
 				/* Look for '=' */
@@ -1481,7 +1449,7 @@ sh_spath( path )
 	*(p1+1) = 0;
 
 	len = strlen( path );
-	sh_envrn( &p2, path );
+	sh_envrn( ( LONG *)&p2, path );
 
 	*(p1+1) = temp;		/* restore the path	*/
 
@@ -1531,7 +1499,7 @@ sh_spath( path )
 	{			/* not enough room */
 	  len = envsize + size + 1024;
 	  
-	  if ( !( new = dest = dos_xalloc( (long)len, 0x43 ) ) )
+	  if ( !( new = dest = ( BYTE *)(dos_xalloc( (long)len, 0x43 ) ) ))
 	    return( 0 );
 
 	  size = len;
@@ -1547,7 +1515,7 @@ sh_spath( path )
 	    start += len;
 	  }
 	
-	  dos_free( ad_envrn );
+	  dos_free( ( LONG )ad_envrn );
 	  ad_envrn = new; 
 	  envsize = size;
 	}
@@ -1608,7 +1576,7 @@ l_shell( buffer )
 	{
 	  if ( ( shellpd = get_pd( "NEWDESK", AESAPP|AESSHELL ) ) )
 	  {
-	    pstart( shellpd, &runaes, &desktop );
+	    pstart( shellpd, &runaes, ( BYTE *)&desktop );
 	    ps_rename( shellpd->p_sysid, "NEWDESK.", FALSE );
 	  }
 	  else
@@ -1635,7 +1603,7 @@ sh_pfind( file, envrn, search, pathname )
 	BYTE		*extptr;
 	WORD		ret,i,changed;
 
-	sh_envrn( &extptr, envrn );
+	sh_envrn( ( LONG *)&extptr, envrn );
 
 	if ( !extptr )		/* No environment	*/
 	  return( FALSE );
@@ -1689,7 +1657,7 @@ sh_pfind( file, envrn, search, pathname )
 	     Debug6( "Sh_pfind -> " );
 	     Debug6( file );
 	     Debug6( "\r\n" );
-	     ret = sh_find( file, (BYTE*)0, pathname, search );
+	     ret = sh_find( ( LONG )file, ( WORD(*)())0L, pathname, search );
 	   }
 
 	   if ( !ret )
@@ -1730,7 +1698,7 @@ sh_chktype( file, type )
 	while( ( exttable[j] ) && ( !ret ) )
 	{
 	  *type = j; 	
-	  sh_envrn( &temp, exttable[j++] );
+	  sh_envrn( ( LONG *)&temp, exttable[j++] );
 	  if ( !temp )
 	    return( FALSE );
 
@@ -1815,7 +1783,7 @@ sh_xfind( file, pathname )
 	  ptr++;
 	}
 
-	if ( !( ret = sh_find( file, (BYTE*)0, pathname, pathsearch ) ) )
+	if ( !( ret = sh_find( ( LONG )file, (WORD(*)())0L, pathname, pathsearch ) ) )
 	{
 	  i = 0;
 	  while( exttable[i] )

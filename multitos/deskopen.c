@@ -11,28 +11,16 @@
 /*	Copyright 1989,1990 	All Rights Reserved			*/
 /************************************************************************/
 
-#include <portab.h>
-#include <deskobde.h>
-#include <deskdefi.h>
-#include <deskwin.h>
-#include <gemdefs.h>
-#include <deskusa.h>
-#include <osbind.h>
-#include <extern.h>
+#include "portab.h"
+#include "obdefs.h"
+#include "deskdefi.h"
+#include "deskwin.h"
+#include "deskusa.h"
+#include "osbind.h"
+#include "extern.h"
+#include "pdesk.h"
+#include "pmisc.h"
 
-EXTERN	BYTE	*get_fstring();
-EXTERN	BYTE	*malloc();
-EXTERN	VOID	free();
-EXTERN	WINDOW	*w_gfirst();
-EXTERN	WINDOW	*get_win();
-EXTERN	WINDOW	*get_top();
-EXTERN	WORD	do_alert();
-EXTERN  WINDOW	*get_win();
-EXTERN	BYTE	*r_slash();
-EXTERN	OBJECT	*get_tree();
-EXTERN	DIR	*get_dir();
-EXTERN	BYTE	*put_name();
-EXTERN	APP	*app_xtype();
 
 EXTERN	WORD	numicon;
 EXTERN	WINDOW	*x_win;
@@ -42,8 +30,6 @@ EXTERN	WORD	back_update;
 
 EXTERN	WORD	contrl[];
 EXTERN	WORD	intout[];
-
-
 
 /*	open the default windows	*/
 
@@ -74,18 +60,21 @@ ch_path( win )
 	REG	WINDOW	*win;
 {
 	WORD	i,num,len;
+	WORD	temp1, temp2;
 
 	i = 0;
 	len = strlen( win->w_path );
 
-	if ( ( win->w_sizes.w >= full.w ) || ( len >= 127 ) )
+	if ( ( win->w_sizes.g_w >= full.g_w ) || ( len >= 127 ) )
 	{
-	  num = ( win->w_sizes.w - ( 2 * gl_wbox ) ) / gl_wchar;
+	  num = ( win->w_sizes.g_w - ( 2 * gl_wbox ) ) / gl_wchar;
 	  if ( len > num ) 
 	    i = len - num;	
 	}
 
-	wind_set( win->w_id, WF_NAME, &win->w_path[i], 0, 0 );	
+	temp1 = (WORD) ((LONG)&win->w_path[i] >> 16L );
+	temp2 = (WORD) ((LONG)&win->w_path[i] & 0x0000FFFFL );
+	wind_set( win->w_id, WF_NAME, temp1, temp2, 0, 0 );	
 }
 
 
@@ -98,9 +87,12 @@ open_subdir( win, icon, opendisk, init, redraw )
 	REG WINDOW	*win;
 	WORD	icon,opendisk,init,redraw;
 {
-	WORD	handle,num,len,i;
+	WORD	handle; 
 	WORD	status;
 	BYTE	*path;
+#if 0	/* NOT USED: */
+	WORD	num,len,i;
+#endif
 
 	desk_mice( HOURGLASS );
 	status = FALSE;
@@ -119,7 +111,7 @@ open_subdir( win, icon, opendisk, init, redraw )
 	    wind_set( handle, WF_VSLIDE, 0, 0, 0, 0 );
 	    win->w_coli = 0;
 	    win->w_rowi = 0;
-	    win->w_obj->ob_width = win->w_work.w;
+	    win->w_obj->ob_width = win->w_work.g_w;
 	  }
 
 	  ch_path( win );		/* check and set the path	*/
@@ -204,7 +196,7 @@ sh_sitems( )
 	}
 	else
 	{
-	  dir2 = x_win->w_memory;
+	  dir2 = (DIR *) x_win->w_memory;
 	  limit = x_win->w_items;
 	  curri = 0;
 	}
@@ -235,7 +227,9 @@ ss_2:
 	        goto ss_1;
 	      case DISK:
 		strcpy( wildext, buffer );
-		buffer[0] = (CICONBLK*)(background[curri++].ob_spec)->monoblk.ib_char[1];
+		buffer[0] = (BYTE) 
+		 ((CICONBLK*)(background[curri++].ob_spec))->monoblk.ib_char;
+
 	        if ( sh_disk( buffer ) )
 	          goto ss_1;
 		else
@@ -330,22 +324,24 @@ ss_3:
 	      goto ss_5;
 		
 	    *r_slash( newstr ) = 0; 	
-	    (TEDINFO*)(obj[INFTITLE].ob_spec)->te_ptext = get_fstring( FOLDINFO );
+	    ((TEDINFO*)(obj[INFTITLE].ob_spec))->te_ptext = (LONG)
+			get_fstring( FOLDINFO );
 	  }
 	  else
 	  {
-	    *(BYTE*)((TEDINFO*)(obj[FINFOLDS].ob_spec)->te_ptext) = 0;
-	    *(BYTE*)((TEDINFO*)(obj[FINFILES].ob_spec)->te_ptext) = 0;
+	    *(BYTE*)(((TEDINFO*)(obj[FINFOLDS].ob_spec))->te_ptext) = 0;
+	    *(BYTE*)(((TEDINFO*)(obj[FINFILES].ob_spec))->te_ptext) = 0;
 	    f_str( obj, FISIZE, dir->d_size );
-	    (TEDINFO*)(obj[INFTITLE].ob_spec)->te_ptext = get_fstring( FILEINFO );
+	    ((TEDINFO*)(obj[INFTITLE].ob_spec))->te_ptext = (LONG)
+			get_fstring( FILEINFO );
 	  }
 
 	  fmt_time( dir->d_time, buffer );	/* put in time	*/
-	  inf_sset( obj, FITIME, buffer );
+	  inf_sset( (LONG)obj, FITIME, buffer );
 	  fmt_date( dir->d_date, buffer );
-	  inf_sset( obj, FIDATE, buffer );
+	  inf_sset( (LONG)obj, FIDATE, buffer );
 
-	  savestr = (TEDINFO*)(obj[FIFILE].ob_spec)->te_ptext;
+	  savestr = (BYTE *) ((TEDINFO*)(obj[FIFILE].ob_spec))->te_ptext;
 	  len = strlen( savestr );
 sf_1:
 	  if ( !( dir->d_att & SUBDIR ) )
@@ -360,10 +356,10 @@ sf_1:
 	  }
 					/* put in name	*/
 	  xinf_sset( obj, FINAME, dir->d_name );
-	  (TEDINFO*)(obj[FIFILE].ob_spec)->te_ptext = oldstr;
+	  ((TEDINFO*)(obj[FIFILE].ob_spec))->te_ptext = (LONG) oldstr;
 	  pos = 0;			/* text position	*/
 
-	  dr_dial_w( ADFILEIN, FALSE );
+	  dr_dial_w( ADFILEIN, FALSE, 0 /* dummy */ );
 	  opened = TRUE;
 ss_7:	  which = xform_do( obj, 0 );
 
@@ -384,18 +380,18 @@ ss_7:	  which = xform_do( obj, 0 );
 	    if ( pos > 0 )
 	    {
 	      pos--;
-ss_8:	      (TEDINFO*)(obj[FIFILE].ob_spec)->te_ptext = &oldstr[pos];
+ss_8:	      ((TEDINFO*)(obj[FIFILE].ob_spec))->te_ptext = (LONG) &oldstr[pos];
 	      draw_fld( obj, FIFILE );
 	    }
 
 	    goto ss_7;	
 	  }
 
-	  (TEDINFO*)(obj[FIFILE].ob_spec)->te_ptext = savestr;
+	  ((TEDINFO*)(obj[FIFILE].ob_spec))->te_ptext = (LONG) savestr;
 	  
 	  if ( which == FIOK )		/* OK		*/
 	  {
-	    inf_sget( obj, FINAME, buffer );
+	    inf_sget( (LONG)obj, FINAME, buffer );
 	    unfmt_str( buffer, newname );
 	    rep_path( newname, newstr );
 						/* name changed ?	*/
@@ -497,7 +493,7 @@ sh_disk( buffer )
 	  return( TRUE );
 
 	obj = get_tree( ADDISKIN );
-	inf_sset( obj, DIDRIVE, buffer );
+	inf_sset( (LONG)obj, DIDRIVE, buffer );
 	buffer[1] = ':';
 	ndir = nfile = nsize = 0;
 	
@@ -518,7 +514,7 @@ sh_disk( buffer )
 	  else
 	    fmt_str( dtabuf.dirfile.d_name, newname );
 
-	  inf_sset( obj, DIVOLUME, newname );
+	  inf_sset( (LONG)obj, DIVOLUME, newname );
 	  desk_mice( ARROW );
 	  if ( fmdodraw( ADDISKIN, 0 ) == DIQUIT )
 	    return( FALSE );
@@ -537,6 +533,8 @@ close_path( win )
 	BYTE	*ptr;
 	WORD	item;
 	BYTE	buffer[14];
+
+	item = 0; /* item was not initalized, changed for LC */
 
 	save_mid( win->w_path, buffer );
 	if ( cut_path( win->w_path ) )		/* close a folder	*/
@@ -609,7 +607,7 @@ o_1:
 		  }
 	
 		  if ( ret == 2 )
-		    locate_item( item, &itype->i_path, 
+		    locate_item( item, (BYTE *)&itype->i_path, 
 				 ( itype->i_type == XFILE ) ? TRUE : FALSE );
 		}
 		else
@@ -619,7 +617,7 @@ o_1:
 
 	      case DISK:	/* open a disk		*/
 		strcpy( wildext, buffer );
-		buffer[0] = itype->i_cicon.monoblk.ib_char[1];
+		buffer[0] = (BYTE)itype->i_cicon.monoblk.ib_char;
       		open_disk( item, buffer, TRUE );
 	        break;
 
@@ -640,12 +638,12 @@ o_1:
 	  case WINICON:
 	    open_wfile( win, item, Nostr, (WINDOW*)0, 0 );
 	    break;
-	}
+	} 
 }
 
 
 #if 0
-/*	Open a file, it may be an executable file		*/
+ /*	Open a file, it may be an executable file		*/
 
 	VOID
 open_file( win, item, tail )
@@ -734,7 +732,7 @@ open_wfile( win, item, tail, swin, sitem )
 	  bptr = put_name( win, dir->d_name );	
 	  if ( win == swin )
 	  {
-	    i = strlen( bptr ) + 1;	/* +1 for trailing 0 */
+ 	    i = strlen( bptr ) + 1;	/* +1 for trailing 0 */
 	    if ( addr = malloc( (LONG)i ) )
 	      strcpy( bptr, addr );
 	    else
@@ -812,27 +810,27 @@ do_box( win, item, desk, open, openfull )
 	
 	obj = ( desk ) ? background : win->w_obj;
 
-	rc_copy( ( openfull ) ? &full : &win->w_work, &dc );
+	rc_copy( (WORD *)(( openfull ) ? &full : &win->w_work),(WORD *) &dc );
 
 	if ( ( obj[item].ob_flags & HIDETREE ) || ( !item ) )	
 	{
 	  if ( desk )
 	    rc_center( &full, &pc );  	
 	  else
-	    rc_copy( &win->w_work, &pc );
+	    rc_copy( (WORD *)&win->w_work, (WORD *)&pc );
 
-	  pc.w = 0;
-	  pc.h = 0;
+	  pc.g_w = 0;
+	  pc.g_h = 0;
 	}
 	else
 	{
-	  objc_offset( obj, item, &pc.x, &pc.y );
-	  pc.w = gl_wbox;
-	  pc.h = gl_hbox;
+	  objc_offset( obj, item, &pc.g_x, &pc.g_y );
+	  pc.g_w = gl_wbox;
+	  pc.g_h = gl_hbox;
 	}
 
-	form_dial( ( open ) ? FMD_GROW : FMD_SHRINK, pc.x, pc.y, pc.w, pc.h, 
-		  dc.x, dc.y, dc.w, dc.h );
+	form_dial( ( open ) ? FMD_GROW : FMD_SHRINK, pc.g_x, pc.g_y, pc.g_w,
+		pc.g_h, dc.g_x, dc.g_y, dc.g_w, dc.g_h );
 }
 
 /*	Does the drive exist?	*/
@@ -970,7 +968,7 @@ l_1:
 	strcpy( "C:\\*.*", path1 );
     	path1[0] = ( isdrive() & 0x04 ) ? 'C' : 'A';
     	strcpy( Nostr, buffer );
-    	fsel_exinput( path1, buffer, &button, get_fstring( LITEM ) );
+    	fsel_exinput( (LONG)path1,(LONG)buffer, &button, get_fstring( LITEM ) );
 
     	if ( button )
 	{
@@ -981,7 +979,7 @@ l_1:
 	    else
 	      goto l_1;		      
 	  }
-  	  lp_fill( path1, path );
+  	  lp_fill( (BYTE *)path1, (BYTE **)path );
 	  lp_collect();
 	}
 }

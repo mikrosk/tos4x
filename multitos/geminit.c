@@ -41,7 +41,11 @@
 /*	Modified the main			5/1/91		D.Mui	*/
 /*	Check control key for nodisk system at main 8/13/91	D.Mui	*/
 /*	Read the GEM.CNF for path stuff		3/17/92		D.Mui	*/
-
+/*	Convert to Lattice C 5.51		2/16/93		C.Gee	*/
+/*	Force the use of prototypes		2/23/93		C.Gee	*/
+/*	Copied over scan_2() and save_2() from deskinf.c and		*/
+/*	renamed them scan2_2() and save2_2().				*/
+/*	Copied over hex_dig() and uhex_dig() also.			*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -58,56 +62,32 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <objaddr.h>
-#include <aesmint.h>
-#include <rslib.h>
-#include <signal.h>
-#include <gemusa.h>
+#include "machine.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "aesmint.h"
+#include "rslib.h"
+#include "signal.h"
+#include "gemusa.h"
+
+
+BYTE	*scan2_2( REG BYTE *pcurr, REG UWORD *pwd );
+BYTE	*save2_2( REG BYTE *pcurr, UWORD wd );
+WORD	hex2_dig( REG BYTE achar );
+BYTE	uhex2_dig( REG WORD wd);
 
 #define CACHE_ON	0x00003919L
 #define CACHE_OFF	0x00000808L
 #define LONGFRAME	*(WORD *)(0x59eL)
 
-EXTERN	BYTE	*save_2();
-EXTERN	BYTE	*scasb();
-EXTERN	BYTE	*strscn();
-EXTERN	WINDOW	*srchwp();
-EXTERN	PD	*idesk();
-EXTERN	PD	*iscrmgr();
-EXTERN	PD	*idtopd();
 
-EXTERN	BYTE	*dos_xalloc();
-EXTERN	BYTE	*dos_super();
-EXTERN	VOID	sigchld();
-EXTERN	WORD	rundisp();
-EXTERN	WORD	dos_open();
-EXTERN	WORD	dos_read();
-EXTERN	WORD	dos_close();
-EXTERN	WORD	dos_sdrv();
-EXTERN	WORD	isdrive();
-EXTERN	WORD	sys_reschange();
-EXTERN	BYTE	*scan_2();
-EXTERN	BYTE	*escan_str();
-EXTERN	WORD	rom_ram();
-EXTERN	WORD	sh_get();
-EXTERN 	WORD	sh_put();
-EXTERN 	VOID	cli();
-EXTERN 	VOID	sti();
-EXTERN 	VOID	takecpm();
-EXTERN 	VOID	givecpm();
-EXTERN 	BYTE 	*strcpy();		/* optimize.s	*/
-EXTERN 	WORD 	do_cdir();		/* jdos.s	*/
-EXTERN	PD	*get_pd();
-EXTERN	PD	*xget_pd();
-EXTERN	WORD	strlen();
-EXTERN	BYTE	*sh_name();
+EXTERN  LONG	trap();
+EXTERN  LONG	trap13();
+EXTERN  LONG	trap14();
+
 
 EXTERN	WORD	pref_save;
 EXTERN	WORD	gl_mkind;
@@ -243,12 +223,11 @@ aescookie( cookie, p_value )
 	LONG	*p_value;
 {
 	LONG	*cookjar;
-	BYTE	*old;
 	WORD	status;
 
 	status = FALSE;	
 
-	if ( cookjar = *(LONG*)(0x5a0) )
+	if ( cookjar = ( LONG *)( *(LONG*)(0x5a0)) )
 	{
 	  while( *cookjar )
 	  {
@@ -270,7 +249,7 @@ aescookie( cookie, p_value )
 /*	Check to see if MiNT is there 	*/
 
 	WORD
-cMiNt()
+cMiNt( VOID )
 {
 	LONG	value;
 
@@ -351,13 +330,6 @@ s_env( buffer )
 ldaes( inbuffer )
 	BYTE	*inbuffer;
 {
-	WORD		id;
-	PD		*p;
-	LONG		*basepage;
-	LONG		size;
-	BYTE		*name;
-	BYTE		name2[60];
-	BYTE		buffer[30];
 	BYTE		*tail;
 
 	tail = scasb( inbuffer, ' ' );	/* find the tail */
@@ -386,14 +358,14 @@ ldaes( inbuffer )
 /*	Set up the initial stuff, do it only once */
 
 	BYTE
-*set_up()
+*set_up( VOID )
 {
 	PD	*p;
 	WORD	id,i;
 	BYTE	*bptr;
 	UWORD	size;
 
-	id = Pgetpid();
+	id = ( WORD )Pgetpid();
 	ps_rename( id, "AESSYS.", TRUE );
 	rlr = plr = (PD*)0;
 	gl_curpid = 0;
@@ -413,7 +385,7 @@ ldaes( inbuffer )
 
 	size += 1024;
 
-	if ( bptr = dos_xalloc( (LONG)size, 0x43 ) )
+	if ( bptr = ( BYTE *)dos_xalloc( (LONG)size, 0x43 ) )
 	{
 	  envsize = size;
 
@@ -428,7 +400,7 @@ ldaes( inbuffer )
 
 	  /* Get rid of the argv stuff	*/
 
-	  sh_envrn( &bptr, ARGV );
+	  sh_envrn( ( LONG *)&bptr, ARGV );
 
 	  if ( bptr )	/* find it	*/
 	  {
@@ -437,7 +409,7 @@ ldaes( inbuffer )
 	    *bptr = 0;
 	  }	
 				/* find the PATH=0C: */
-	  sh_envrn( &bptr, PATHEQUAL );
+	  sh_envrn( ( LONG *)&bptr, PATHEQUAL );
 	  
 	  if ( bptr )		/* yes, construct a new one	*/
 	  {	
@@ -465,17 +437,17 @@ ldaes( inbuffer )
 /*	Clean up the struct THEGLO	*/
 
 	VOID
-clr_theglo()
+clr_theglo( VOID )
 {
-	bfill( sizeof(THEGLO), 0, &D );
+	bfill( sizeof(THEGLO), 0, ( BYTE *)&D );
 }
 
 
 	VOID
-main( )
+main( VOID )
 {
 	REG WORD	i;
-	LONG		tree,lvalue;
+	LONG		tree;
 	REG THEGLO	*DGLO;
 	LONG		*ptr;
 	WORD		buffer[4];
@@ -487,12 +459,12 @@ main( )
 	ad_aescnf = (BYTE*)0;		/* GEM.CNF file buffer address	*/
 	ad_shcmd = &DGLO->s_cmd[0];
 	ad_shtail = &DGLO->s_tail[0];
-	ad_path = &DGLO->g_dir[0];
+	ad_path = ( LONG )&DGLO->g_dir[0];
 
-	ad_sysglo = &DGLO->g_sysglo[0];
+	ad_sysglo = ( LONG )&DGLO->g_sysglo[0];
 	al_center = TRUE;			/* center the alert box	*/
 
-	DGLO->s_save = dos_xalloc( (LONG)SIZE_AFILE, 3 );
+	DGLO->s_save = ( BYTE *)dos_xalloc( (LONG)SIZE_AFILE, 3 );
 	DGLO->s_size = SIZE_AFILE;
 
 	gl_recd = FALSE;			/* init event recorder	*/
@@ -535,7 +507,7 @@ main( )
 	ptr = * ((LONG **)0x4f2);	/* RAM header */
 	ptr = (LONG *) ptr[2];		/* ROM header */
 
-	st_lang = (ptr[7] & 0x7ffe0000L) >> 17L;
+	st_lang = ( WORD )((ptr[7] & 0x7ffe0000L) >> 17L);
 	if (st_lang == 8)		/* swiss german */
 		st_lang = 1;
 	else if (st_lang == 7)		/* swiss french */
@@ -579,13 +551,13 @@ main( )
 	/* X, X,  LANGUAGE, KEYBOARD	*/
 	if (aesAKP != -1L)
 	{
-	  st_lang = ( aesAKP >> 8 ) & 0x00ff;
+	  st_lang = ( WORD )(( aesAKP >> 8 ) & 0x00ff );
 	  if ( ( st_lang > 6 ) || ( st_lang < 0 ) || ( st_lang == 3 ) )
 	    st_lang = 0;
 	}
 
 	aesDDD = 0;
-	aescookie( 0x5F444444, &aesDDD );	/* _DDD */
+	aescookie( 0x5F444444, ( LONG *)&aesDDD );	/* _DDD */
 	if ( aesDDD )
 	{
 	  Debug1( "_DDD found draw routine at " );
@@ -593,20 +565,20 @@ main( )
 	}
 
 	aesOBD = 0;		  
-	aescookie( 0x5F4F4244, &aesOBD ); 	/* _OBD	*/
+	aescookie( 0x5F4F4244, ( LONG *)&aesOBD ); 	/* _OBD	*/
 	aesTR2 = 0;
-	aescookie( 0x5F545232, &aesTR2 );	/* _TR2	*/
+	aescookie( 0x5F545232, ( LONG *)&aesTR2 );	/* _TR2	*/
 
 	/* Read the GEM.CNF and extract any usual variables	*/
 	/* Do this before the rsc_read()			*/
 
 	r_aescnf();				
-	s_aescnf( SETENV, &s_env );		/* get all the env path	*/
-	s_aescnf( AE_DEBUG, &s_debug );		/* get the debug mode	*/
-	s_aescnf( AE_SREDRAW, &s_sredraw );	/* get the redraw mode	*/
-	s_aescnf( AE_TREDRAW, &s_tredraw );	/* get the terminate mode	*/
-	s_aescnf( AE_PORT, &s_sport );		/* get the debug port	*/
-	s_aescnf( AE_LANG, &s_lang );		/* get the language type	*/
+	s_aescnf( SETENV, ( WORD(*)())&s_env );		/* get all the env path	*/
+	s_aescnf( AE_DEBUG, (WORD(*)())&s_debug );	/* get the debug mode	*/
+	s_aescnf( AE_SREDRAW, (WORD(*)())&s_sredraw );	/* get the redraw mode	*/
+	s_aescnf( AE_TREDRAW, (WORD(*)())&s_tredraw );	/* get the terminate mode	*/
+	s_aescnf( AE_PORT, (WORD(*)())&s_sport );	/* get the debug port	*/
+	s_aescnf( AE_LANG, (WORD(*)())&s_lang );	/* get the language type	*/
 
 
 	if ( !rsc_read() )			/* read in resource	*/
@@ -646,7 +618,7 @@ main( )
 
 /* 	Init the current mouse form and ownership	*/
 
-	rs_gaddr(ad_sysglo, R_FRIMG, 0, &ptr);
+	rs_gaddr(ad_sysglo, R_FRIMG, 0, ( LONG *)&ptr);
 	ad_armice = LLGET(ptr[MICE0]);		/* get the arrow mouse	*/	
 	ad_hgmice = LLGET(ptr[MICE2]);		/* get the busy bee	*/
 	if ( gl_moff )
@@ -666,7 +638,7 @@ main( )
 	{
 	  gsx_moff();
 	  rs_gaddr( ad_sysglo, R_TREE, STARTUP, &tree );
-	  ob_center( tree, &buffer[0] );
+	  ob_center( tree, ( GRECT *)&buffer[0] );
 	  ob_draw( tree, 0, MAX_DEPTH );
 	  Fselect( 2000, 0x0L, 0x0L, 0x0L );
 	  ob_draw( ad_stdesk, 0, MAX_DEPTH );	/* clear the box	*/
@@ -674,9 +646,9 @@ main( )
 	  gsx_mon();
 	}
 
-				/* preget the critical error object */
+				/* preget the critcial error object */
 	for( i = 0; i < MAXERR; i++ )
-	  rs_gaddr( ad_sysglo, R_TREE, ml_alrt[i], &critobj[i] );
+	  rs_gaddr( ad_sysglo, R_TREE, ml_alrt[i], ( LONG *)&critobj[i] );
 
 	if ( !wm_init() )	/* start the window library	*/
 	  goto i_7;
@@ -691,14 +663,14 @@ main( )
 	ini_fsel();	/* initalize file selector	*/
 	
 					/* set file selector string	*/
-	rs_gaddr(ad_sysglo, R_STRING, FSTRING, &ad_fsel);
-	rs_gaddr(ad_sysglo, R_FRSTR, LOADAPP, &ptr);
-	loadapp = *ptr;
+	rs_gaddr(ad_sysglo, R_STRING, FSTRING, ( LONG *)&ad_fsel);
+	rs_gaddr(ad_sysglo, R_FRSTR, LOADAPP, ( LONG *)&ptr);
+	loadapp = ( BYTE *)*ptr;
 
 	/* get the alert strings that SCREEN will need */
 	/* ++ERS 12/16/92 */
-	rs_gaddr( ad_sysglo, R_STRING, STRTPROC, &a_strtproc );
-	rs_gaddr( ad_sysglo, R_STRING, FAILDESK, &a_faildesk );
+	rs_gaddr( ad_sysglo, R_STRING, STRTPROC, ( LONG *)&a_strtproc );
+	rs_gaddr( ad_sysglo, R_STRING, FAILDESK, ( LONG *)&a_faildesk );
 
 	cli();				/* take the critical err	*/
 	gl_ticktime = gsx_tick( tikaddr, &tiksav );
@@ -715,7 +687,7 @@ main( )
 	srchwp( phanwind )->cowner = scr_pd;
 
 					/* get the AES menu		*/
-	rs_gaddr( ad_sysglo, R_TREE, AESMENU, &scr_pd->p_mnaddr );
+	rs_gaddr( ad_sysglo, R_TREE, AESMENU, ( LONG *)&scr_pd->p_mnaddr );
 	set_desk( scr_pd );	/* set the background window to screen */
 					
 	if ( !idesk(1) )	/* allocate a desktop process	*/
@@ -740,13 +712,13 @@ main( )
 	if ( !ctldown )
 	{
 	  ldaccs();			/* load in accessory	*/
-	  s_aescnf( RUN, &ldaes );	/* load in files from autoaes */
+	  s_aescnf( RUN, (WORD(*)())&ldaes );	/* load in files from autoaes */
 	}
 
 	if ( ad_aescnf )
 	{
 	  Debug6( "Free aescnf buffer\r\n" );
-	  dos_free( ad_aescnf );
+	  dos_free( ( LONG )ad_aescnf );
 	  ad_aescnf = (BYTE*)0;
 	}
 
@@ -779,13 +751,13 @@ i_6:
 	{
 	  D.s_size = 0;
 	  Debug6( "Free shel_put memory\r\n" );
-	  dos_free( D.s_save );
+	  dos_free( ( LONG )D.s_save );
 	}
 
 	gsx_mfree();			/* free blt memory	*/
 	Debug6( "Free blt memory\r\n" );
 
-	dos_free( mn_addr );		/* menu bar address	*/		
+	dos_free( ( LONG )mn_addr );		/* menu bar address	*/		
 /*	free_accs(); 	*/		/* free up the acc's	*/
 /*	freepds();	*/		/* free the PD memory	*/
 
@@ -809,7 +781,7 @@ i_7:
 	Debug6( "Returns trap 2\r\n" );
 	givecpm();			/* return trap2 vector	*/
 	Debug6( "Free runacc memory\r\n" );
-	dos_free( runacc );
+	dos_free( ( LONG )runacc );
 	sti();
 
 	waitforaes();			/* get the semaphore */
@@ -818,7 +790,7 @@ i_7:
 
 	if ( ad_aescnf )
 	{
-	  dos_free( ad_aescnf );
+	  dos_free( ( LONG )ad_aescnf );
 	  ad_aescnf = (BYTE*)0;
 	}	  
 
@@ -836,8 +808,15 @@ i_7:
 set_cache( newcacr )
 	REG LONG newcacr;
 {
+#if 0
 	asm( ".dc.w $4e7a,$0002" );	/* movec.l cacr,d0	*/
 	asm( ".dc.w $4e7b,$7002" );	/* movec.l d7,cacr	*/
+#endif
+	#pragma inline asm_c1()	{ "$4e7a"; "0002"; }
+
+	#pragma inline asm_c2()	{ "$4e7b"; "$7002"; }
+
+	return( 0L );			/* Return a dummy LONG  */
 }
 
 
@@ -848,7 +827,7 @@ set_cache( newcacr )
 */
 
 	VOID
-r_aescnf()
+r_aescnf( VOID )
 {
 	WORD	handle,bsize;
 	BYTE	dta[60];
@@ -858,15 +837,15 @@ r_aescnf()
 	strcpy( AESCNF, name );
 	name[0] = *((WORD*)0x446L ) + 'A';	/* get the boot device	*/
 
-	dos_dta( dta );
+	dos_dta( ( LONG )dta );
 					/* search GEM.CNF	*/
-	if ( dos_sfirst( name, 0 ) )
+	if ( dos_sfirst( ( LONG )name, 0 ) )
 	{
-	  lptr = &dta[26];
-	  if ( ad_aescnf = dos_xalloc( (*lptr) + 1 , 3 ) )
+	  lptr = ( LONG *)&dta[26];
+	  if ( ad_aescnf = ( BYTE *)dos_xalloc( (*lptr) + 1 , 3 ) )
 	  {				/* read inf file	  */
 	    handle = dos_open( name, 0 );
-	    bsize = dos_read( handle, (WORD)(*lptr), ad_aescnf );
+	    bsize = dos_read( handle, (WORD)(*lptr), ( LONG )ad_aescnf );
 	    dos_close( handle );
 	    ad_aescnf[bsize] = 0;	/* end of file mark	*/
 	  }
@@ -880,13 +859,13 @@ r_aescnf()
 	name[0] = *((WORD*)0x446L ) + 'A';	/* get the boot device	*/
 
 					/* search GEM.CNF	*/
-	if ( dos_sfirst( name, 0 ) )
+	if ( dos_sfirst( ( LONG )name, 0 ) )
 	{
-	  lptr = &dta[26];
-	  if ( ad_aescnf = dos_xalloc( (*lptr) + 1 , 3 ) )
+	  lptr = ( LONG *)&dta[26];
+	  if ( ad_aescnf = ( BYTE *)dos_xalloc( (*lptr) + 1 , 3 ) )
 	  {				/* read inf file	  */
 	    handle = dos_open( name, 0 );
-	    bsize = dos_read( handle, (WORD)(*lptr), ad_aescnf );
+	    bsize = dos_read( handle, (WORD)(*lptr), ( LONG )ad_aescnf );
 	    dos_close( handle );
 	    ad_aescnf[bsize] = 0;	/* end of file mark	*/
 	  }
@@ -929,7 +908,7 @@ r_aescnf()
 	WORD
 s_aescnf( name, function )
 	BYTE	*name;
-	WORD	(*function)();
+	WORD	(*function)( BYTE * );
 {
 	BYTE	*addr;
 	BYTE	*dest;
@@ -969,7 +948,7 @@ s_aescnf( name, function )
 */
 
 	WORD
-pred_dinf()
+pred_dinf( VOID )
 {
 	WORD		i;
 	WORD		res;
@@ -986,10 +965,10 @@ pred_dinf()
 
 	bsize = sh_get( (BYTE*)0, -1 );	/* Inquire the size */
 
-	if ( !( pbuf = dos_xalloc( (LONG)((UWORD)bsize), 3 ) ) )
+	if ( !( pbuf = ( BYTE *)dos_xalloc( (LONG)((UWORD)bsize), 3 ) ) )
 	{
-	  fm_alert( 1, "[1][AES - No inf file memory][ OK ]" );
-	  return;
+	  fm_alert( 1, ( LONG )"[1][AES - No inf file memory][ OK ]" );
+	  return( 0 );
 	}
 
 #if 0
@@ -999,7 +978,7 @@ pred_dinf()
 #endif
 	sh_get( pbuf, bsize );
 
-        rom_ram( 3, pbuf );		/* res is default from ROM	*/
+        rom_ram( 3, ( LONG )pbuf );		/* res is default from ROM	*/
 
 /* set up defaults */
  	adeskp[0] = 0x41;	/* 4 = dithered, 1 = black */
@@ -1015,7 +994,7 @@ pred_dinf()
 	if ( isdrive() )		/* there is a disk	*/
 	{
 	  defdrv = dos_gdrv();		/* save default drive	*/
-	  dos_chdir("\\");		/* open newdesk.inf	*/
+	  dos_chdir( ( LONG )"\\");	/* open newdesk.inf	*/
 	  fh = dos_open( "NEWDESK.INF", 0x0 );
 	  if ( fh < 0 ) 		/* no file 		*/
 	  {				/* try desktop.inf	*/
@@ -1036,7 +1015,7 @@ pred_dinf()
 
 	  if ( fh >= 0 ) 		/* if no error then	*/
 	  {				/* read inf file	*/
-	    bsize = dos_read( fh, SIZE_AFILE, pbuf );
+	    bsize = dos_read( fh, SIZE_AFILE, ( LONG )pbuf );
 	    dos_close(fh);
 	    change = TRUE;
 	    dos_sdrv( defdrv );		/* set it back to default	*/
@@ -1064,7 +1043,7 @@ p_1:
 	          if ( autoexec )	
 	          {
 		    temp += 2;		/* get the flag		*/
-		    temp = scan_2( temp, &g_flag );
+		    temp = scan2_2( temp, &g_flag );
 		    temp = escan_str( temp, &g_autoboot[0] );
 	          }
 	          break;
@@ -1079,38 +1058,42 @@ p_1:
 		  temp += 2;
 		  for (i = 0; i < 3; i++)
 		  {
-		    temp = scan_2(temp, &adeskp[i]);
-		    temp = scan_2(temp, &awinp[i]);
+		    temp = scan2_2(temp, &adeskp[i]);
+		    temp = scan2_2(temp, &awinp[i]);
 		  }
 		  break;
 		case 'E':
+
 		  if ( LONGFRAME )
 		  {
-		    scan_2( temp+11, &cache );	/* fixed 6/26/90 Mui	*/
+		    scan2_2( temp+11, &cache );	/* fixed 6/26/90 Mui	*/
 						/* fixed 7/17/92	*/
 		    if ( cache & 2 )
 		      set_cache( CACHE_ON );
 		  }
 		  else
 		  {		/* turn on the bit ?		*/
+		    scan2_2( temp + 5, &res );		/* 02/16/93 ERS and CJG */
 		    trap14( ( ( res & 0xF0 ) >> 4 ) ?  0x00400001L : 0x00400000L );
 		  }
+
+
 					/* if sparrow mode 7/17/92	*/
 		  if ( ( gl_vdo & HIGHWORD ) == FALCON )	
 		  {			/* not an extended mode 	*/	
 		    if ( gl_rschange )	/* 7/21/92 */
 		    {
-		      temp = save_2( temp+14, a_rezword >> 8 ); 	
-		      save_2( temp, a_rezword );	
+		      temp = save2_2( temp+14, a_rezword >> 8 ); 	
+		      save2_2( temp, a_rezword );	
 		    }
 		    else
 		    {	
 		      if ( *(temp+14) != 0xD )
 		      {
 		        temp += 14;
-		        temp = scan_2( temp, &res );
+		        temp = scan2_2( temp, &res );
 		        a_rezword = res << 8;
-		        temp = scan_2( temp, &res ); 	
+		        temp = scan2_2( temp, &res ); 	
 		        a_rezword |= res;  	
 		      }
 		      else
@@ -1120,10 +1103,10 @@ p_1:
 	 	  else
 	 	  {
 		    temp += 5;		/* skip other envr stuff	*/
-		    scan_2(temp, &res);	/* don't get the return code	*/
+		    scan2_2(temp, &res);	/* don't get the return code	*/
 
 		    if ( gl_rschange )	/* if we've been here before	*/
-		      save_2( temp, (res & 0xF0 )|( res_type(gl_restype) ));
+		      save2_2( temp, (res & 0xF0 )|( res_type(gl_restype) ));
 		    else
 		    {
 		      res &= 0xF;
@@ -1145,7 +1128,7 @@ p_1:
 				/*  desk accessories			*/
 	autoexec = FALSE;
 	sh_put( pbuf, SIZE_AFILE );
-	dos_free( pbuf );
+	dos_free( ( LONG )pbuf );
 	return ( change );
 }
 
@@ -1163,4 +1146,80 @@ bailout( ptr )
 	trap( 9, ptr );
 	trap( 9, "Please reboot the machine!" );
 	while( !trap13( 1,2 ) );
+}
+
+
+
+
+
+
+/*	Scan off and convert the next two hex digits and return with
+	pcurr pointing one space past the end of the four hex digits
+*/
+
+	BYTE
+*scan2_2(pcurr, pwd)
+	REG BYTE		*pcurr;
+	REG UWORD		*pwd;
+{
+	REG UWORD		temp;
+	
+	temp = 0x0;
+	temp |= hex2_dig(*pcurr++) << 4;
+	temp |= hex2_dig(*pcurr++);
+	if (temp == 0x00ff)
+	  temp = NIL;
+	*pwd = temp;
+	pcurr++;
+	return(	pcurr );
+}
+
+
+/*	Reverse of scan2_2()	*/
+
+	BYTE
+*save2_2(pcurr, wd)
+	REG	BYTE		*pcurr;
+	UWORD		wd;
+{
+	*pcurr++ = uhex2_dig((wd >> 4) & 0x000f);
+	*pcurr++ = uhex2_dig(wd & 0x000f);
+	*pcurr++ = ' ';
+	return(	pcurr );
+}
+
+
+/*	Reverse of hex_dig()	*/
+
+	BYTE
+uhex2_dig(wd)
+	REG WORD		wd;
+{
+	if ( (wd >= 0) && (wd <= 9) )
+	  return(wd + '0');
+	
+	if ( (wd >= 0x0a) && (wd <= 0x0f) )
+	  return(wd + 'A' - 0x0a);
+
+	return(' ');
+}
+
+
+
+
+/*
+*	Convert a single hex ASCII digit to a number
+*/
+
+	WORD
+hex2_dig(achar)
+	REG BYTE		achar;
+{
+	if ( (achar >= '0') && (achar <= '9') )
+	  return(achar - '0');
+	
+	if ( (achar >= 'A') && (achar <= 'F') )
+	  return(achar - 'A' + 10);
+
+	return(0);
 }

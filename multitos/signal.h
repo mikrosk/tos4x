@@ -1,3 +1,5 @@
+#ifndef _SIGNAL_H_
+#define _SIGNAL_H_
 
 #define	NSIG		31		/* number of signals recognized */
 
@@ -41,3 +43,6 @@
 #define SIG_DFL	0x0L
 #define SIG_IGN	0x1L
 #define SIG_ERR	0xFFFFFFFFL
+
+#endif
+

@@ -11,7 +11,10 @@
 *	-------------------------------------------------------------
 */
 
-#include	<vdidefs.h>
+#ifndef _PDSTRUCT_H_
+#define _PDSTRUCT_H_
+
+#include	"vdidefs.h"
 
 #define PD	struct pd		/* process descriptor		*/
 #define UDA	struct uda		/* user stack data area		*/
@@ -291,3 +294,6 @@ FPD				/* forker structure	*/
 #define AMOUSE 		6
 #define ABUTTON 	7
 #define AXBUTTON	8
+
+#endif
+

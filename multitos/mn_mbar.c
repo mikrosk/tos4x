@@ -42,55 +42,67 @@
  *		     exit immediately.
  * 07/31/92  cjg   - Removed auto-initialized global variables
  * 09/22/92  cjg   - menu_down() - Clip to the menu for drawing...
+ *
+ * 02/11/93  cjg   - Convert to Lattice C 5.51
+ * 02/19/93  cjg   - Force the use of Prototypes
  */
 
 
 /* INCLUDE FILES
  * ================================================================
  */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <osbind.h>
-
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "osbind.h"
 #include "mn_tools.h"
 
-EXTERN	OBJECT	*mn_addr;
-EXTERN	WORD	gl_cdabox;	/* obj # of the acc menu box	*/
-EXTERN  WORD    gl_accid;	/* # of ACC ids */
+
 
 /* EXTERNS
  * ================================================================
  */
-
-/* MN_MENU.C */
-EXTERN WORD     Menu_Insert();
-EXTERN VOID     Menu_Delete();
-EXTERN MENU_PTR GetMenuPtr();
-EXTERN VOID	CheckMenuHeight();
-EXTERN VOID	RestoreMenu();
-
-
-/* MN_POPUP.C */
-EXTERN BOOLEAN	mn_popup();
-EXTERN VOID     AssignMenuData();
-
-
-/* in TOOLS.C */
-EXTERN VOID 	ObjcDraw();
-
-EXTERN	VOID	gsx_sclip();
-EXTERN	GRECT	gl_rzero;
+EXTERN	OBJECT	*mn_addr;
+EXTERN	WORD	gl_cdabox;	/* obj # of the acc menu box	*/
+EXTERN  WORD    gl_accid;	/* # of ACC ids */
 EXTERN	VOID	ob_actxywh();
 EXTERN	LONG	gl_mntree;
-EXTERN	WORD	mu_set();
-EXTERN	WORD	xdo_chg();
 EXTERN	GRECT	gl_rfull;
+EXTERN  GRECT   gl_rzero;
+
+
+
+
+
+/* GLOBALS
+ * ================================================================
+ */
+
+/* These are globals used by evnt_submenu() found in evntmenu.c
+ * The globals are used to help evnt_submenu() work for both popup menus
+ * and the menubar.
+ *
+ * These are set just by the 1st level dropdown just before entering
+ * menu_popup() in the routine mn_hdo().
+ */
+GRECT    ActiveRect;		/* GRECT for the Menubar ACTIVE area*/
+GRECT    TitleRect;		/* GRECT for the active Title       */
+BOOLEAN  MenuBar_Mode;		/* TRUE - Use code for the menubar  */
+OBJECT   *gl_mtree;		/* The menubar object tree ( ROOT ) */
+MENU_PTR gl_menuptr;		/* MENU_PTR for the drop-down menu  */
+WORD     buparm;
+
+
+
+/* FUNCTIONS
+ * ================================================================
+ */
+
+
 
 
 /*
@@ -104,7 +116,7 @@ rect_change( tree, prmob, iob, x )
 	WORD		iob;
 	WORD		x;
 {
-	objc_offset(tree, iob, &prmob->m_x, &prmob->m_y);
+	objc_offset( ( OBJECT *)tree, iob, &prmob->m_x, &prmob->m_y);
 	prmob->m_w = LWGET(OB_WIDTH(iob));	
 	prmob->m_h = LWGET(OB_HEIGHT(iob));	
 	prmob->m_out = x;
@@ -126,9 +138,7 @@ mu_save(saveit, tree, imenu)
 {
 	GRECT		t;
 
-/*	gsx_sclip(&gl_rzero);	*/
-
-	objc_offset(tree, imenu, &t.g_x, &t.g_y);
+	objc_offset( ( OBJECT *)tree, imenu, &t.g_x, &t.g_y);
 	t.g_w = LWGET( OB_WIDTH( imenu ) );	
 	t.g_h = LWGET( OB_HEIGHT( imenu ) );	
 
@@ -168,7 +178,7 @@ menu_down( tree, ititle, itree )
 	for ( i = ititle - THEACTIVE; i > 1; i-- )
 	  imenu = LWGET(OB_NEXT(imenu));
 
-	newtree = tree;
+	newtree = ( OBJECT *)tree;
 	newimenu = imenu;
 				/* save area underneath the menu */
 	if ( imenu == gl_cdabox )
@@ -177,10 +187,10 @@ menu_down( tree, ititle, itree )
 	  newimenu = 0;
 	}
 						/* draw title selected	*/
-	if ( xdo_chg(tree, ititle, SELECTED, TRUE, TRUE, TRUE) )
+	if ( xdo_chg( ( OBJECT *)tree, ititle, SELECTED, TRUE, TRUE, TRUE) )
 	{
-	  mu_save( TRUE, newtree, newimenu );	/* save the screen	*/
-	  objc_draw( newtree, newimenu, MAX_DEPTH, gl_rzero.g_x, 
+	  mu_save( TRUE, ( LONG )newtree, newimenu );	/* save the screen	*/
+	  objc_draw( ( LONG )newtree, newimenu, MAX_DEPTH, gl_rzero.g_x, 
 		     gl_rzero.g_y, 
 		     gl_rzero.g_w, 
 		     gl_rzero.g_h );
@@ -192,29 +202,6 @@ menu_down( tree, ititle, itree )
 }
 
 
-
-/* GLOBALS
- * ================================================================
- */
-
-/* These are globals used by evnt_submenu() found in evntmenu.c
- * The globals are used to help evnt_submenu() work for both popup menus
- * and the menubar.
- *
- * These are set just by the 1st level dropdown just before entering
- * menu_popup() in the routine mn_hdo().
- */
-GRECT    ActiveRect;		/* GRECT for the Menubar ACTIVE area*/
-GRECT    TitleRect;		/* GRECT for the active Title       */
-BOOLEAN  MenuBar_Mode;		/* TRUE - Use code for the menubar  */
-OBJECT   *gl_mtree;		/* The menubar object tree ( ROOT ) */
-MENU_PTR gl_menuptr;		/* MENU_PTR for the drop-down menu  */
-WORD     buparm;
-
-
-/* FUNCTIONS
- * ================================================================
- */
 
 
 /* mn_hdo()
@@ -256,7 +243,6 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
    WORD     menu_state, wall;
    WORD     cur_title, cur_state, cur_menu, cur_item;
    WORD     last_title, last_menu;
-   WORD     dummy;
 
    BOOLEAN  done;
    BOOLEAN  flag;
@@ -274,7 +260,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
    MOBLK    m1, m2;
    WORD     keycode, nclicks;
    MRETS    mk;
-   WORD     i,tail;
+   WORD     i;
    WORD     curobj;
 
    
@@ -292,7 +278,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
    MenuBar_Mode = FALSE;	/* TRUE - Use code for the menubar  */
 
 
-   tree       = gl_mntree;		/* global menu tree */
+   tree       = ( OBJECT *)gl_mntree;		/* global menu tree */
    newtree    = tree;
    buparm     = 0x01;
 
@@ -302,13 +288,13 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
    MValueNew.Speed   = -1;
    MValueNew.Height  = -1;
 
-   graf_mouse( M_ARROW|0xC000, (BYTE*)0 );	/* save mouse and change to arrow */
+   graf_mouse( M_ARROW|0xC000, 0L );	/* save mouse and change to arrow */
 
    wind_update( 3 );
 
    /* Setup  globals for evnt_submenu routine */
 
-   ob_actxywh( tree, THEACTIVE, &ActiveRect );
+   ob_actxywh( ( LONG )tree, THEACTIVE, &ActiveRect );
 
    /* Get the title that we are over. - we MUST be in the menu title area
     * in order to even get here.
@@ -321,10 +307,6 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
    if ( cur_title == NIL )		/* 6/11/92 D.Mui	*/
      goto m_hexit;
 		
-/*   cur_state = (( cur_title != NIL ) ? ( ObState( cur_title )):(0) ); 	*/
-
-/*   Deselect any the existing menus 	*/
-
    objs = tree;
 
    i = objs[THEACTIVE].ob_head;
@@ -394,7 +376,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 	       menu_settings( 1, &MValueNew );
 	   }
 
-	   menu_down( tree, cur_title, &newtree );
+	   menu_down( ( LONG )tree, cur_title, &newtree );
 
        }
    }
@@ -416,7 +398,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 			 {
 			   mflags = MU_BUTTON | MU_M1 | MU_M2;	
 				/* Look for enter this rectangle */
-		           rect_change( newtree, &m2, cur_menu, FALSE );
+		           rect_change( ( LONG )newtree, &m2, cur_menu, FALSE );
 			 }
 		         break;
 
@@ -425,11 +407,11 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 			 if( ( cur_title != NIL ) && !IsDisabled( cur_title))
 			 {
 			   mflags = MU_BUTTON | MU_M1 | MU_M2;
-		           rect_change( newtree, &m2, cur_menu, FALSE );
+		           rect_change( ( LONG )newtree, &m2, cur_menu, FALSE );
 			 }
 			 break;
         }
-        rect_change( tree, &m1, wall, flag );			
+        rect_change( ( LONG )tree, &m1, wall, flag );			
         ev_which = evnt_multi( mflags, 1, 1, buparm,
                                m1.m_out, m1.m_x, m1.m_y, m1.m_w, m1.m_h,
 			       m2.m_out, m2.m_x, m2.m_y, m2.m_w, m2.m_h,
@@ -462,7 +444,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 	   {
 	      if( NewMenuID )
 	      {
-	         ob_actxywh( tree, cur_title, &TitleRect );
+	         ob_actxywh( ( LONG )tree, cur_title, &TitleRect );
 
 	         MenuBar_Mode = TRUE;
 	         gl_mtree   = tree;
@@ -560,7 +542,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 	      {
 	          if( NewMenuID )
 	          {
-                     mu_save( FALSE, newtree, last_menu );
+                     mu_save( FALSE, ( LONG )newtree, last_menu );
  	             RestoreMenu( MenuPtr );
 	             Menu_Delete( NewMenuID );
 	             NewMenuID = 0;
@@ -617,7 +599,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 		     CheckMenuHeight( MenuPtr );    /* allow DA menu to scroll*/
 		     menu_settings( 1, &MValueNew );
 		  }
-	          menu_down( tree, cur_title, &newtree );
+	          menu_down( ( LONG )tree, cur_title, &newtree );
                 }
               }
 	   }	/* ev_which & MU_M1 */
@@ -631,7 +613,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
    {
       if( NewMenuID )
       {			/* 5/15/92	*/
-        mu_save( FALSE, newtree, cur_menu );
+        mu_save( FALSE, ( LONG )newtree, cur_menu );
         RestoreMenu( MenuPtr );
         Menu_Delete( NewMenuID );
         NewMenuID = 0;
@@ -654,7 +636,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 	/* If clicked on the ACC Menu, put the tree and menu back in */
 	if( *ptree == mn_addr )
 	{
-	   *ptree = gl_mntree;
+	   *ptree = ( OBJECT *)gl_mntree;
            *pmenu = ObHead( ObTail( ROOT ) );
    	   for( i = *ptitle - THEACTIVE; i > 1; i-- )
            *pmenu = ObNext( *pmenu );
@@ -667,7 +649,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 
 m_hexit:
 	
-   graf_mouse( M_RESTORE, (BYTE*)0 );
+   graf_mouse( M_RESTORE, 0L );
    wind_update( 2 );
    return( flag );
 }

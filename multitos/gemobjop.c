@@ -2,17 +2,20 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.2 $	$Source: f:\multitos/RCS/gemobjop.c,v $
+*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemobjop.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/08 20:07:02 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
 * =======================================================================
 *  $Log: gemobjop.c,v $
-*  Revision 1.2  1993/03/08  20:07:02  ersmith
-*  REAL MultiTOS 1.01
+*  Revision 1.3  1993/03/10  20:12:42  ersmith
+*  Lattice port
 *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
+* Revision 1.1  1993/02/24  23:52:46  ersmith
+* 1 meg floppy MultiTOS
+*
+* Revision 1.0  1993/02/03  21:26:46  ersmith
+* MultiTOS version 1.0
+*
 * Revision 2.2  89/04/26  18:25:38  mui
 * TT
 * 
@@ -41,6 +44,8 @@
 *	Reg Opt		03/08/85 - 03/09/85	Derek Mui
 *	Change at ob_sst for extended type	7/7/92	Minna Lai
 *	Remove extended type stuff	1/12/93 Eric Smith
+*	02/16/93	cjg	Converted to Lattice C 5.51
+*	02/23/93	cjg	Force the use of prototypes 
 */
 
 /*	-----------------------------------------------------------
@@ -50,12 +55,12 @@
 *	All Rights Reserved
 *	-----------------------------------------------------------
 */	
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <vdidefs.h>
+#include "machine.h"
+#include "objaddr.h"
+#include "vdidefs.h"
 
 #define	TED_THICKNESS	22
 
@@ -74,7 +79,7 @@ ob_sst(tree, obj, pspec, pstate, ptype, pflags, pt, pth)
 	LONG		tree;
 	WORD		obj;
 	REG LONG	*pspec;
-	WORD		*pstate, *pxtype, *ptype;
+	WORD		*pstate, *ptype;
 	REG WORD	*pflags;
 	GRECT		*pt;
 	WORD		*pth;
@@ -82,7 +87,7 @@ ob_sst(tree, obj, pspec, pstate, ptype, pflags, pt, pth)
 	REG WORD	th;
 	REG OBJECT	*tmp;
 
-	tmp = OB_NEXT(obj);
+	tmp = ( OBJECT *)OB_NEXT(obj);
 
 	pt->g_w = tmp->ob_width;	/* set user grect width */
 	pt->g_h = tmp->ob_height;	/* set user grect height */
@@ -140,7 +145,7 @@ ob_sst(tree, obj, pspec, pstate, ptype, pflags, pt, pth)
 everyobj(tree, this, last, routine, startx, starty, maxdep)
 	REG LONG		tree;
 	REG WORD		this, last;
-	WORD		(*routine)();
+	WORD		(*routine)( LONG, WORD, WORD, WORD );
 	WORD		startx, starty;
 	WORD		maxdep;
 {

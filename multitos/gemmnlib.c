@@ -7,6 +7,8 @@
 /*	Fix at mn_bar again so it won't lose click 6/25/90	D.Mui	*/
 /*	Change at mn_clsda			10/2/90		D.Mui	*/
 /*	Change at mn_bar and new routine mn_iadd 2/22/91	D.Mui	*/
+/*	Convert to Lattice C 5.51		02/16/93	C.Gee   */
+/*	Force the use of prototypes		02/23/93	C.Gee	*/
 
 /*	Sub menu and pop-up menu is written by Cary Gee
 *	-----------------------------------------------------------
@@ -24,29 +26,15 @@
 *	Copyright (C) 1985			Digital Research Inc.
 *	-------------------------------------------------------------
 */
+#include "pgem.h"
+#include "pmisc.h"
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <windlib.h>
-#include <gemlib.h>
-#include <aesmint.h>
-#include <signal.h>
-
-EXTERN	WINDOW	*wm_top();
-EXTERN	WORD	set_desk();
-EXTERN	BYTE	*dos_xalloc();
-EXTERN	VOID	bb_restore();
-EXTERN	VOID	bb_save();
-EXTERN	WORD	ev_multi();
-EXTERN	WORD	ob_find();
-EXTERN	VOID	ob_draw();
-EXTERN	VOID	ob_change();
-EXTERN	VOID	ob_actxywh();
-EXTERN 	PD	*idtopd();
+#include "machine.h"
+#include "dispvars.h"
+#include "objaddr.h"
+#include "windlib.h"
+#include "aesmint.h"
+#include "signal.h"
 
 EXTERN	WORD	deskwind;
 EXTERN	GRECT	gl_rfull;
@@ -74,7 +62,7 @@ GLOBAL	WORD	gl_accid;	/* accessory id number count	*/
 
 
 OBJECT  w_b1[] = { -1, -1, -1, G_BOX, NONE, NORMAL, 0xFF1100L, 2, 0, 20, 8 };
-OBJECT	w_b2[] = { -1, -1, -1, G_STRING, NONE, NORMAL, "--------------------",
+OBJECT	w_b2[] = { -1, -1, -1, G_STRING, NONE, NORMAL, ( LONG )"--------------------",
 		    0,  1, 20, 1 };
 
 
@@ -99,12 +87,12 @@ mn_iadd( string, state )
 	if ( item > mn_maxitem )	/* too many item	*/
 	  return( -1 );
 
-	LBCOPY( &obj[item], w_b2, sizeof( OBJECT ) );
-	rs_obfix( obj, item );
-	ob_add( mn_addr, 0, item );		/* link the object	*/
+	LBCOPY( ( BYTE *)&obj[item], ( BYTE *)w_b2, sizeof( OBJECT ) );
+	rs_obfix( ( LONG )obj, item );
+	ob_add( ( LONG )mn_addr, 0, item );		/* link the object	*/
 	obj[item].ob_y = gl_hchar * ( item - 1 );
 	obj[item].ob_width = obj[0].ob_width;	/* set the correct width*/
-	obj[item].ob_spec = string;		/* set the pointer	*/
+	obj[item].ob_spec = (LONG)string;	/* set the pointer	*/
 	obj[item].ob_state = state;
 	obj[0].ob_height = item * gl_hchar;	/* set the box height	*/
 	return( item );
@@ -115,22 +103,23 @@ mn_iadd( string, state )
 /*	Allocate memory and patch the current menu	*/
 
 	VOID
-mn_create()
+mn_create( VOID )
 {
 	GRECT		pc;
+	GRECT		temp;
 
 	gl_mnpid = 0;
 					
-	wm_get( 0, WF_WXYWH, &pc );	/* get the working size	*/
+	wm_get( 0, WF_WXYWH, ( WORD *)&pc, ( WORD *)&temp );	/* get the working size	*/
 					/* max obj item		*/	
 	mn_maxitem = pc.g_h / gl_hchar;	
 				/* total memory needs including box	*/
-	mn_addr = dos_xalloc( (LONG)( ( mn_maxitem + 1 ) * sizeof( OBJECT ) ), 3 );
+	mn_addr = ( OBJECT *)dos_xalloc( (LONG)( ( mn_maxitem + 1 ) * sizeof( OBJECT ) ), 3 );
 
-	LBCOPY( mn_addr, w_b1, sizeof ( OBJECT ) );/* outside box	*/
+	LBCOPY( ( BYTE *)mn_addr, ( BYTE *)w_b1, sizeof ( OBJECT ) );/* outside box	*/
 
 				/* clear the menu area		*/	
-	rc_copy( &gl_rmenu, &gl_ctwait.m_x );
+	rc_copy( ( WORD *)&gl_rmenu, &gl_ctwait.m_x );
 	gl_ctwait.m_out = FALSE;
 
 }
@@ -166,7 +155,7 @@ mn_bar( tree, showit )
 
 	if ( showit == 1 )	/* showit == 1 ? */
 	{			/* don't update if you don't own the top window */
-	  currpd->p_mnaddr = tree;	
+	  currpd->p_mnaddr = ( BYTE *)tree;	
 	  if ( win = wm_top() )
 	  {
 	    if ( ( win->cowner != currpd ) && ( win->handle != deskwind ) )
@@ -190,14 +179,14 @@ mn_bar( tree, showit )
 	  if ( !gl_mnpid ) 
 	    return( FALSE );
 	  p1 = idtopd( gl_mnpid );
-	  tree = p1->p_mnaddr;		
+	  tree = ( LONG )p1->p_mnaddr;		
 	  showit &= ~0x0200;	
 	}
 
 	if ( showit & 0x0100 )	/* set a new menu bar	*/
 	{
 	  p1 = (PD*)tree;
-	  tree = p1->p_mnaddr;
+	  tree = ( LONG )p1->p_mnaddr;
 	  showit &= ~0x0100;
 	}
 
@@ -215,7 +204,12 @@ mn_bar( tree, showit )
 	  gl_mnpid = p1->p_pid;
 	  obj = mn_addr;		/* patch object pointer		*/
 
-	  p1->p_mnaddr = temp = gl_mntree = tree;
+	  p1->p_mnaddr = ( BYTE *)tree;
+	  temp	       = ( OBJECT *)tree;
+	  gl_mntree    = ( LONG )tree;
+/*
+	  p1->p_mnaddr = ( BYTE *)temp = ( OBJECT *)gl_mntree = ( LONG )tree;
+ */
 
 	  Debug1( p1->p_name );
 	  Debug1( "set menu bar at MN_BAR\r\n" );
@@ -224,9 +218,9 @@ mn_bar( tree, showit )
 	  				/* change the waiting rectangle	*/
 
 	  ob_actxywh(tree, THEACTIVE, &gl_rmnactv);
-	  ch_wrect( &gl_ctwait.m_x, &gl_rmnactv );
+	  ch_wrect( ( GRECT *)&gl_ctwait.m_x, &gl_rmnactv );
 	  				/* copy into AES wait rectangle	*/
-	  rc_copy( &gl_rmnactv, &gl_ctwait.m_x );
+	  rc_copy( ( WORD *)&gl_rmnactv, &gl_ctwait.m_x );
 					/* old menu box obj number	*/
 	  gl_cdabox = LWGET(OB_HEAD(THEMENUS));
 					/* copy into the new menu	*/
@@ -235,11 +229,11 @@ mn_bar( tree, showit )
 					/* into the new menu		*/
 	  obj[0].ob_width = temp[gl_cdabox].ob_width;
 					/* add the program info line	*/
-	  mn_iadd( temp[gl_cdabox+1].ob_spec, temp[gl_cdabox+1].ob_state );
+	  mn_iadd( ( BYTE *)temp[gl_cdabox+1].ob_spec, temp[gl_cdabox+1].ob_state );
 					/* if there is accessory then	*/
 	  if ( gl_dacnt )		/* add disabled line		*/
 	  {
-	    i = mn_iadd( temp[gl_cdabox+2].ob_spec, DISABLED );
+	    i = mn_iadd( ( BYTE *)temp[gl_cdabox+2].ob_spec, DISABLED );
 	    obj[i].ob_type = temp[gl_cdabox+2].ob_type;
  	  }
 
@@ -267,7 +261,7 @@ mn_bar( tree, showit )
 		if ( !addline )
 		{
 		  addline = TRUE;
-	  	  i = mn_iadd( temp[gl_cdabox+2].ob_spec, DISABLED );
+	  	  i = mn_iadd( ( BYTE *)temp[gl_cdabox+2].ob_spec, DISABLED );
 	  	  obj[i].ob_type = temp[gl_cdabox+2].ob_type;
 	        }
 	        p1->p_mobj = mn_iadd( p1->p_prgname, NORMAL );
@@ -289,7 +283,7 @@ mn_bar( tree, showit )
 	  
 	  p = idtopd( gl_mnpid );
 
-	  if ( ( change ) || ( p->p_newdesk != gl_newdesk ) )
+	  if ( ( change ) || ( p->p_newdesk != ( BYTE *)gl_newdesk ) )
 	  {
 	    if ( set_desk( p ) )
 	      dk_redraw( gl_newdesk, gl_newroot, &gl_rfull );
@@ -300,9 +294,9 @@ mn_bar( tree, showit )
 	  if ( p1->p_pid == gl_mnpid ) 	/* if it owns the menu */
 	  {	
 	    gl_mntree = 0x0L;			/* change the waiting rect */
-	    ch_wrect( &gl_ctwait.m_x, &gl_rmenu );
+	    ch_wrect( ( GRECT *)&gl_ctwait.m_x, ( GRECT *)&gl_rmenu );
 						/* wait for no menu bar	*/
-	    rc_copy( &gl_rmenu, &gl_ctwait.m_x );
+	    rc_copy( ( WORD *)&gl_rmenu, &gl_ctwait.m_x );
 	    gl_mnpid = 0;
 	    Debug1( currpd->p_name );
 	    Debug1( " mn_bar 0\r\n" );
@@ -367,8 +361,8 @@ ch_wrect( r, n )
 
 	for ( e = p->p_cda.c_msleep; e ; e = e->e_link )
 	{
-	  p1 = &e->e_parm;
-	  p2 = &e->e_return;
+	  p1 = ( WORD *)&e->e_parm;
+	  p2 = ( WORD *)&e->e_return;
 
 	  if ( ( r->g_x == p1[0] ) && 
 	       ( r->g_y == p1[1] ) && 

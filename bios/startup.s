@@ -4,19 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/11/14 20:33:10 $
+* $Date: 1992/02/12 01:31:40 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.88  1992/02/12  01:31:40  apratt
+* ci -u startup.s <slog
+* ci -u '-mMuch Sparrow stuff. Also fixed a bug in slow ACSI devices.' dmaread.s
+* ci -u '-mAdded SPARROW, removed STPLUS.' mkswitch.e
+* ci -u '-mAdded loops .if SPARROW to check the SDMA status bit.' flop.s
+* ci -u '-mFixed an RTS/CTS bug in SCC code. See scc_sender.' bios.s
+*
+* ci -u '-mAdded loops .if SPARROW to check the SDMA status bit.' flop.s
+* ci -u '-mFixed an RTS/CTS bug in SCC code. See scc_sender.' bios.s
+*
 * Revision 2.87  1991/11/14  20:33:10  apratt
 * Fixed an oops: the ROM CRC check should be done if you have NOT
 * been up for 80 seconds yet; instead it was done only if you HAVE
-* been up that long.  This version (11/14/91) is the "real" 2.06
-* (knock wood!).
-*
 * been up that long.  This version (11/14/91) is the "real" 2.06
 * (knock wood!).
 *
@@ -256,13 +263,13 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.87 $
+* $Revision: 2.88 $
 * =======================================================================
 *
-* $Source: e:/tos/bios\RCS\startup.s,v $
+* $Source: d:/tos/bios\rcs\startup.s,v $
 * =======================================================================
 *
-* $Source: e:/tos/bios\RCS\startup.s,v $
+* $Source: d:/tos/bios\rcs\startup.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -320,7 +327,7 @@ ONLY_LONGFRAME	equ	TT
 * analog hardware outside the sound shifter to actually make sound.
 
 * set the high byte of the version number based on the machine type
-verslo		equ	$06
+
 .if TT
 vershi		equ	$03
 .else
@@ -552,7 +559,15 @@ ca_name		equ	$14		; application name (NNNNNNNN.EEE\0)
 bank1		equ $200000		; address of 2Mb second	bank
 twomb		equ 1024*2048		; two megabytes
 one28		equ $20000		; 128K
-memconf		equ	$ffff8001	; memory controller
+
+
+
+*--------------	Hardware Equates
+
+cartbase	equ $fa0000		; start	of cartridge ROM
+cartsize	equ $20000		; size of cartridge (128K)
+
+*--- Memory controller
 memconf		equ	$ffff8001	; memory controller
 
 *--- SPARROW memory configuration
@@ -1172,20 +1187,98 @@ sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 *+
 *  [ROM only]
 *  Put the screen (temporarily)
-*         (get memory controller conf. from RAM; if valid, goto reset4)
-*	  if STPAD
-*	    (write memconf, d6, d5; fall through)
+*  at $10000, so the icon-drawing routines won't
+*  blow away any system variables.
+*-
+	move.b	#$01,dbaseh	; set high ptr
+	clr.b	dbasel		; set low ptr
 * On STe and TT, low byte is cleared automatically when others are written.
-*	    (size memory for ST/STe, write memconf, fall through)
-*         endif
+
+*+
+*  [still ROM based system]
+*  Determine how much memory there is, and initialize
+*  the memory controller configuration register.
+*
+*  Algorithm from Jim Tittsler, Art Morgan, et al.
 *  but shamelessly modified for the hell of it.
 *
 *  The bottom 1K of memory is only touched on the first RESET,
 *  to size memory and setup the memory controller.  The first 1K
 *  is never cleared.
+*
+*  If not TT, this uses val_memval to check for cold/warm boot.
+*  If TT, uses that but also the low bit of SCU general register 1.
+*
+* The assembly-time conditionals here go as follows:
+*
+*	if !TT
+*	  if SPARROW
+*	    (read config switches to auto-config mem controller)
+*	    (check for warm/cold; if warm, goto reset4)
+*	    (size memory from switches into d5)
 *	    (goto mem_sized)
+*	  else
+*           (get memory controller conf. from RAM; if valid, goto reset4)
+*	    if STPAD
+*	      (write memconf, d6, d5; fall through)
+*	    else
+*	      (size memory for ST/STe, write memconf, fall through)
+*           endif
+*	  endif
+*       else
+*	  (size memory for TT, write memconf, fall through)
+*       endif
+*       (lea $8000,sp)
+*       (size memory by probing)
+*     mem_sized:
+*	(clear from $400 to d5)
+*	(set memcntrlr from d6 (if not sparrow), phystop from d5)
+*	(set memvalid etc. to indicate warm boot)
+*       if TT
+*	  (size TT RAM)
+*	  (write d5 to _ramtop, validate ramvalid, set bit in ttscu1)
+*	else
+*	  (set _ramtop to "none", validate ramvalid)
+*	endif
+*
+*     reset4:
+*
+* SPARROW: a read from $FFFF8006 (byte or word) auto-configs the memory 
 * controller, and tells other things besides: the byte at 8006 (or the high
 * byte of the word there) yields:
+*
+* vvmm rrbf
+*         f  # DRAM wait states
+*        b-  16(0) or 32(1) bit video bus
+*      rr--  # ROM wait states (0-2, 3 resvd)
+*   mm ----  DRAM size
+*   00 = 256K parts
+*   01 = 1M parts
+*   10 = 4M parts
+*   11 (reserved)
+* vv-- ----  monitor type
+* 00 = ST mono
+* 01 = ST color
+* 10 = VGA
+* 11 = TV
+*
+* vv is not used by the memory configuration, but is used to set the
+* master video control register.  Taking mmb as a three-bit number,
+* you get memory size in bytes using ((512*1024) << mmb), but clamp
+* to 14MB max.
+*
+*-
+
+
+.if (TT == 0)
+
+.if SPARROW
+	move.w	SPAR_CONF,d0		; read to auto-config mem cntrlr
+	bset.b	#6,$ffff8007		; test and set power-fail bit
+	beq	sp_cold			; yes, cold-boot
+	cmp.l	#memmagic,memvalid.w	; check first magic number
+	bne	sp_cold			; no - this is a cold boot
+	cmp.l	#memmag2,memval2.w	; check again (for paranoia)
 	bne	sp_cold			; no - this is a cold boot
 	cmp.l	#memmag3,memval3.w	; check again
 	beq	reset4			; ok - warm boot.
@@ -1296,7 +1389,10 @@ fmem1:	move.w	d0,(a0)+		; write	to bank 0
 
 	move.l	#$40000,d7		; set shadow to $40000 for STe
 	bra	gotshadow
+
 memST:	move.l	#$200,d7		; set shadow to $200 for ST
+
+gotshadow:
 
 	move.l	#bank1,d1		; d1 = bank offset (start with bank 1)
 mem1:	lsr.w	#2,d6			; (shift bank1's size into position)
@@ -1406,7 +1502,7 @@ mt_done:
 *  SPARROW also doesn't need this.
 *-
 	lea	$8000,sp		; initialize SP just this once
-* end of ifeq STPAD
+.if (STPAD == 0)
 	move.l	8,a4			; a4 = old BUS ERROR vector
 	lea	mt_q(pc),a0		; steal BUS ERROR vector
 	move.l	a0,8			; to catch non-existant controllers
@@ -1417,6 +1513,7 @@ mt_done:
 mt_1:	move.l	a0,a1			; a1 -> end of RAM (as we know it)
 	move.w	d0,d2			; d2 = copy of random #
 	moveq	#42,d1			; d1 = # words to stuff
+mt_2:	move.w	d2,-(a1)		; stuff a word (or get a BUS ERROR)
 	add.w	d3,d2			; generate new random #
 	dbra	d1,mt_2			; (stuff more words)
 
@@ -1433,7 +1530,9 @@ mt_3:	cmp.w	-(a1),d0		; compare word in RAM with ours
 
 mt_q:	sub.l	d7,a0			; drop down to last successful probe
 	move.l	a0,d5			; d5 -> end of RAM (as we know it)
+	move.l	a4,8			; restore BUS ERROR vector
 
+* end of if (STPAD == 0)
 .endif
 
 *+
@@ -1534,9 +1633,26 @@ mt_pr:
 
 * not TT: set the fast-RAM system variables to indicate "no fast RAM"
 .endif
+
+*
+* end of .if systype == rom for memory sizing
+*
+
+.endif
+
+*
+* reset4 is the target when memory has already been sized and the memory
+* controller programmed.  This can happen on a warm boot or on startup
+* of a RAM-loaded system.  On TT, getting here means fast RAM is good,
+* too.
+*
+* SSP is set here, because on a warm boot this might be the first time.
+*
+* We set bus error, address error, and illegal instruction to vector
+* to coldboot, because these are the most likely things to have happen
 * if some system variable is garbage in an otherwise-warmbooting
 * machine.  The hope is that the cold boot will wipe out the offending
-* here instead of anywhere earlier: you need goot RAM for catching the bus
+* system variable and get you back on the air. Especially important
 * for ST BOOK, where you can't just turn off the power.
 *
 
@@ -1544,8 +1660,13 @@ reset4:
 	move.l	#_supstk+supsiz,sp	; setup SSP now
 	move.l	#coldboot,$8		; bus error during boot -> coldboot
 	move.l	#coldboot,$c		; addr error - same thing
+	move.l	#coldboot,$10		; illegal instruction - same thing
+
+.if SPARROW
+*
 * Transfer the sparrow config value to the corresponding bits in VMC (video
 * master control): VVmmrrBf goes into BhvcesVV in VMC.
+* 
 * Also, touch ST color palette because that puts us in ST video mode.
 *
 	move.b	SPAR_CONF,d0	; d0=vvmmrrbf
@@ -1556,7 +1677,8 @@ reset4:
 	or.b	d0,d1		; d1=b00000vv
 	move.w	d1,SPAR_VMC	; write to VMC.
 	tst.w	color0
-	move.w	(a0)+,mwmask
+.endif
+
 * Zap the DMA sound controller, if you have DMA sound in this machine.  You
 * can't tell that without probing for it, though, which is why we do it
 * here instead of anywhere earlier: you need good RAM for catching the bus
@@ -1572,11 +1694,30 @@ reset4:
 * initialization isn't.
 *
 
+	clr.b	_hasdmasnd	; pre-clear the variable
+
+.if (STPAD == 0)
+    	move.l	sp,a6		; save away the stack pointer
+	move.l	$8,a5		; and bus error vector
+	move.l	#nodmasnd,$8	; set bus error vector
+	clr.w	dmasndc		; reset sound chip, bus error if missing
+	st	_hasdmasnd	; no bus error; set the flag
+
+.if SPARROW
+vtloop:	move.w	d0,mwdata
+vtl1:	cmp.w	mwmask,d1		; wait for the mask to change
+	beq	vtl1
+vtl2:	cmp.w	mwmask,d1		; wait for it to be the init. value
+	bne	vtl2
+vtend:	move.w	(a0)+,d0
+	bne	vtloop
+.else
 * program the volume/tone controller for a sane volume & tone, and
 * mix the GI sound in with the DMA sound so it comes out the speaker.
 
 	lea.l	vtpgm(pc),a0
 	move.w	(a0)+,d1	; get into a reg for sparrow
+.endif
 	move.w	d1,mwmask
 	bra	vtend
 
@@ -1753,12 +1894,19 @@ usem:	move.l	4(a0),end_os.w		; init end-of-OS pointer
 	move.l	#savend,savptr.w	; register-save pointer for traps 13&14
 	move.l	#_rts,swv_vec.w		; ignore monitor changes for now
 	clr.l	_drvbits.w		; clobber "drive-alive" bits
-*		00010000 	STe
+.if systype == ram
 	clr.w	_bootdev.w		; clear bootdev
-*		    0008	STe/AT (.if STPLUS and IDE bus exists)
-*		    0010	Mega STe (.if STPLUS and SCU exists)
+.endif
+*
+* clear of bootdev backed out 11/2/88 AKP because it prevents tricks
 * like bootable RAMdisks.  The no-change lobby wins this time.
 *
+* Ah, but put back in for RAM TOSes, because otherwise the floppy's
+* AUTO folder isn't run when you warm boot with a RAM TOS.
+*
+	move.l	#def_bell,bell_hook.w	; init def bell handler
+	move.l	#def_click,kcl_hook.w	; init def keyclick handler
+
 .if systype == rom
 	bsr	copy_header		; kludge OS ROM header
 .endif
@@ -1810,6 +1958,12 @@ usem:	move.l	4(a0),end_os.w		; init end-of-OS pointer
 	move.l	#ill_1,(a2)	; game's over after first exception
 	move	ccr,d0		; illegal on 68000
 	moveq.l	#10,d1		; no exception; 68010 at least
+	extb.l	d0		; illegal on 68010
+	moveq.l	#20,d1		; no exception; 68020 at least
+	movec	cacr,d0		; see if the data cache exists
+	bset	#9,d0		; set freeze bit for data cache
+	movec	d0,cacr
+	movec	cacr,d0		; read it back
 	bclr	#9,d0		; test and clear - bit still set?
 	beq	cpunot30	; no - it's a 20
 	moveq.l	#30,d1		; was still set - it's a 30
@@ -1853,6 +2007,7 @@ ill_1:	move.l	a1,a7		; restore old ssp
 pickste:
 * OK, not an ST; definitely STe video then.
 	move.l	#"_VDO",(a0)+
+	move.l	#$00010000,(a0)+	; STE video
 
 * distinguish STPLUS from Mega STe by using ttscu1: if bus error,
 * it's STPLUS, else it's Mega STe.
@@ -2166,13 +2321,18 @@ sei3:	move.l	#_rte,(a1)+		; point interrupt at RTE
 
 *+
 *  Setup the vblank deferred vector list.
+*  (This data structure is ugly,
+*   but we seem to be stuck with it).
 *
 *-
 	lea	_vbl_list.w,a0		; a0 -> default list of vbl locs
 	move.l	a0,_vblqueue.w		; install ptr to them
 	move.w	#dnvbls-1,d0		; clear vbl vectors
+avbl:	clr.l	(a0)+			;	one at a time
 	dbra	d0,avbl
 
+*+
+*  Initialize soft vectors for character devices.  The
 *  vectors have been moved into RAM to make it possible
 *  to efficiently intercept them later on.
 *
@@ -2871,6 +3031,16 @@ crcdone:
 *  Then find packages and execute 'em.
 *
 * But first... If you're on TT and the ALT key is down, go into ST LOW rez.
+* The TT (now) boots into TT MED rez so it doesn't look like a toy. The
+* ALT key defeats hard-disk booting, and now it also sends you into ST LOW
+* so auto-boot and auto-folder games come up in the rez they're used to.
+* New as of 5/14/91.
+*
+* Also, turn off the cache, for maximal ST compatibility during boot.
+*
+* For M68030 that isn't TT, we just turn off the cache if ALT is down
+* at this point.
+	add.w	#12,sp
 .endif
 
 	move.l	#$0808,d0
@@ -3293,19 +3463,18 @@ dmab_ns:
 * this is the end of the memory-test/shrinking bar sequence.  We check
 * to see if we're actually done (gasp!) and also for user interruption.
 
-* Begin scanning DMA devices for a bootable one.  The place in the
-* sequence where you start scanning varies from machine to machine,
-* and is described in dmarfail where the device number is updated.
+	cmp.w	#0,a5
+	beq	dmab_notime		; if mt not done don't check time
+	cmp.l	_hz_200,d7
+	bls	dmab_todone		; timeout done
 
 dmab_notime:
 * Check the keyboard for a user aborting the timeout
-	moveq.l	#8,d4			; start with SCSI device 0
-.else
-	moveq.l	#16,d4			; start with IDE device 0
 
 .if STPAD
+* on STPAD, check the STylus button for aborting the delay, too.
+* STBOOK doesn't really have buttons; we're relying on getting $FF
 * from there as a floating bus.
-
 
 	move.w	$d00004,d0
 	not.w	d0			; make the value one-is-down
@@ -3334,11 +3503,13 @@ dmab_todone:
 	move.l	d7,_hz_200		; you broke out: write 80 sec
 	move.w	#13,-(sp)
 	move.l	#$00030002,-(sp)
-	move.w	d4,-(sp)		; device number
-	move.l	_dskbufp.w,-(sp)	; buffer
-	move.w	#1,-(sp)		; count of one
-	clr.l	-(sp)			; sector zero
-	jsr	_dmaread
+	trap	#$d			; Bconout(2,cr);
+	move.w	#27,4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d			; Bconout(2,esc);
+	move.w	#'K',4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d			; Bconout(2,'K'); (clear to eol)
 	addq.l	#6,sp
 
 dmab_skip:
@@ -3364,9 +3535,9 @@ dmab_skip:
 	and.w	#$f8,d0
 	move.w	d0,_upref.w	; move ttscu1 to _upref, usually zero.
 	bne	gotpref
-*  ST: 		0-7		(ACSI only)
 
 	pea	_upref.w
+	move.w	#2,-(sp)
 	clr.l	-(sp)
 	jsr	NVMaccess	; NVMaccess(op=0,start=0,count=2,buf=_upref)
 	add.w	#$a,sp
@@ -3375,28 +3546,38 @@ dmab_skip:
 	clr.w	_upref.w	; NVM was invalid: zero the preference.
 gotpref:
 
-* The sequencing is taken care of by adding one to the device number, then
-* aborting if it's 8, and setting it to zero if it ends in 8 or 0.  If the
-* TT ever gets an IDE bus this'll have to change.
+.else
+	clr.w	_upref.w	; no way to get pref w/o NVM & SCU.
+.endif
 
 dmaloop:
 	move.w	#DMAB_RETRIES-1,d1	; retry count (usually 2 total)
-	addq.w	#1,d4			; read failed or no exec or no boot
-	move.w	d4,d0			; try next dev
-	and.w	#7,d0			; if d4 hasn't wrapped (modulo 8)...
-	bne	dmaloop			; carry on
-	cmp.w	#$8,d4			; at dev 8?
-	beq	dmafail			; yes, total failure
-	moveq.l	#0,d4			; no, try ACSI bus
-	bra	dmaloop
+dmaretry:
+	move.w	d1,-(sp)		; save retry count
+	move.w	the_env,d4		; set d4 to the device to try
+	move.b	boot_dev_tab(PC,d4.w),d4
+	move.w	d4,-(sp)		; put device number on stack
 	move.l	_dskbufp.w,-(sp)	;  "  buffer		"
 	move.w	#1,-(sp)		;  "  count of one	"
 	clr.l	-(sp)			;  "  sector zero	"
 	jsr	_dmaread		; read the sector
-* We get here if the _dmaread call worked and gave an executable sector.
-* We load up the registers and jsr to that sector.  If it returns,
-* we check hdv_rw for a change; if it changed, we rts to go on booting
-* TOS.  If it didn't change, we try the next device.
+	add.w	#12,sp
+	move.w	(sp)+,d1		; restore retry count
+	tst.l	d0
+	beq	dmaok			; zero is success
+	addq.l	#1,d0			; add one so -1 becomes 1
+	dbeq	d1,dmaretry		; retry while ne (not -1) and
+
+* Get here if not zero and not -1, or even if it was -1 but d1 expired.
+	bra	dmarfail		; fail when count expires or
+*					; some other error happens
+
+* read won; checksum the sector, look for $1234 (bootmagic)
+dmaok:	move.l	_dskbufp.w,a0
+	move.w	#$ff,d0			; checksum $100 words
+	moveq.l	#0,d1
+dmachk:	add.w	(a0)+,d1
+	dbra	d0,dmachk
 	cmp.w	#bootmagic,d1
 	beq	dmafound		; success!
 
@@ -3404,25 +3585,14 @@ dmaloop:
 * dmarfail:  DMAread failed or sector isn't bootable ($1234) or didn't
 * change hdv_rw; try the next device.
 *
-	move.l	d4,-(sp)		; save d4
 * The device sequence (in hex) is:
 *  STPLUS:	10-17, 0-7	(IDE first, then ACSI)
 *  TT:		8-f, 0-7	(SCSI first, then ACSI)
-	move.l	(sp)+,d4		; restore d4
 *  SPARROW:	10-17, 8-F	(IDE, then SCSI; sigh)
 *
 * STPAD and STe-PLUS have IDE busses.  On other STPLUSes (Mega STe and
-.else
-* this is the RAM-loaded version of dmaboot, for testing.
-* All it does is test RAM.  (or it doesn't...)
-*.globl	mem_test_next
-*.globl	mem_abort
 * STe), the IDEbus doesn't exist, and the reads from those devices will all
-dmaboot:
-*dmab_loop:
-*	bsr	mem_test_next
-*	beq	dmab_loop
-	rts
+* fail quickly.
 *
 * Note 9/91: since ST and STPLUS are now the same ROM, we start at IDE in
 * all non-TT systems.  It will fail fast for all machines with no IDEbus.
@@ -3603,8 +3773,10 @@ colors:
 hbl:	move.w	d0,-(sp)		; save d0
 	move.w	2(sp),d0		; get pushed SR
 	and.w	#$0700,d0		; strip crufty bits
+	bne	hbl_r			; not IPL 0, so punt
+	or.w	#$0300,2(sp)		; force caller to IPL 3
 hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
-.if (STPAD == 0)
+	rte
 
 
 *+
@@ -4295,7 +4467,9 @@ nottram:
 *		convienience -- they could really be located anywhere.
 *
 * Returns:	D0.L = original vector value
-.if STPAD
+*
+*-
+_setexc:
 	move.w	4(sp),d0		; d0 = vector#
 	lsl.w	#2,d0			; turn into longword index
 	clr.l	a0
@@ -4605,7 +4779,8 @@ fast1:	move.b	(a0)+,(a1)+		; copy 8 bytes at a time
 	move.b	(a0)+,(a1)+
 	move.b	(a0)+,(a1)+
 	move.b	(a0)+,(a1)+
-	beq	autoq			; (no -- so punt)
+	dbra	d0,fast1
+	rts
 
 
 *+
@@ -5155,6 +5330,9 @@ clks1:	jmp	(a3)			; jump to handler
 .if systype == rom
 *----------------
 *
+*  Make copy of ROM header
+*  and patch it up so AHDI works right.
+*
 copy_header:
 	lea	ostext(pc),a0		; a0 -> ROM header
 	lea	hdrcopy,a1		; a1 -> RAM destination
@@ -5528,6 +5706,17 @@ clr4:	movem.l	(sp)+,d3-d7/a3		; restore registers
 * granularity of 1MB.
 * 
 * There is only one root pointer, and we don't use the function code
+* bits.
+* 
+* This is not a zero-cost solution, since the ATC uses the address (less
+* the bits which make up the byte index into the page) as the tag: each
+* different 32K you touch needs an entry in the ATC, and there are only
+* 22 entries in the ATC.  The 23rd page you touch will require four
+* memory accesses: three for the table walk and one for the physical
+* access.
+* 
+* This situation can be improved using the Transparent Translation
+* Registers. They are set up in a way which is redundant (they do the
 * same mapping as the full table) but quicker and without touching the
 * ATC. TT0 is set up to map %0xxx xxx1 addresses with cache enabled, and
 * TT1 transparently maps %1xxx xxx0 addresses with cache inhibited. 
@@ -5568,21 +5757,21 @@ tte	equ	1	; enable for TT registers
 
 * NOTE: these tables are copied into RAM at the labels levelA,
 * levelB1, levelB2, levelC.  These labels are found just after
-	dc.l	$00000000+%01000001	; $f0 - inhibit
-	dc.l	$01000000+%01000001	; $f1 - inhibit
-	dc.l	$02000000+%01000001	; $f2 - inhibit
-	dc.l	$03000000+%01000001	; $f3 - inhibit
-	dc.l	$04000000+%01000001	; $f4 - inhibit
-	dc.l	$05000000+%01000001	; $f5 - inhibit
-	dc.l	$06000000+%01000001	; $f6 - inhibit
-	dc.l	$07000000+%01000001	; $f7 - inhibit
-	dc.l	$08000000+%01000001	; $f8 - inhibit
-	dc.l	$09000000+%01000001	; $f9 - inhibit
-	dc.l	$0a000000+%01000001	; $fa - inhibit
-	dc.l	$0b000000+%01000001	; $fb - inhibit
-	dc.l	$0c000000+%01000001	; $fc - inhibit
-	dc.l	$0d000000+%01000001	; $fd - inhibit
-	dc.l	$0e000000+%01000001	; $fe - inhibit
+* the system variables: $100 bytes starting at $700
+*
+* The tables must be in RAM because the dirty bits get written,
+* and you can't write to ROM.  They must be on 16-byte boundaries.
+* Hmm - if the dirty and modified bits of every entry were ALREADY
+* set, then the CPU would never attempt to write them, would it?
+* Then these could be in ROM!  That would increase compatibility
+* by a little.
+*
+* There used to be a bug here (in 3.06 and older): the levelB2 entries
+* were (for instance) $01000000 instead of $f1000000.  This bug was
+* masked by the fact that a transparent translation register was used
+* to map anything with a high byte of %1xxxxxx0 as non-cacheable, and
+* that covered VME space on the TT.
+*
 
 .data
 

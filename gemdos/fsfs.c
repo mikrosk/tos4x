@@ -1,12 +1,16 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
+* $Revision: 2.20 $	$Source: d:/tos/dos\rcs\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 17:14:06 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/25 13:16:22 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.20  1991/06/25  13:16:22  apratt
+* Changed FN_NORM etc for SCAN_NORM _DIR and _EARLY
+* and added handling for Fcreate of volume labels.
+*
 * Revision 2.19  1991/06/20  17:14:06  apratt
 * changes for new newcl/Getfat code
 *
@@ -99,6 +103,8 @@ DIR *dir;
     long err;
     FCB *fcb;
     int i;
+    DMD *dmd;
+    DIR dir2;			/* used only for creating volume labels */
 
     /*
      *  Find path;
@@ -106,10 +112,12 @@ DIR *dir;
      */
 
     namepart = name;
-    err = fn2dir(&namepart,dir,FN_NORM);
+    err = fn2dir(&namepart,dir,SCAN_NORM);
 
     /* Any error but EFILNF fails now */
     if (err && err != EFILNF) return err;
+
+    dmd = &drvtbl[dir->dir_dev];
 
     /*
      * Special case for volume label here: only works in RD, and deletes
@@ -117,9 +125,32 @@ DIR *dir;
      */
 
     if (attr & FA_LABEL) {
-	/* Not coded up yet */
-	DBCMD(-1,"print Dont know much about volume labels");
+	/*
+	 * Create of a volume label.  First make sure FA_LABEL is the only
+	 * bit that's set.  Then make sure we're in the root directory
+	 * (i.e. dir->dir_clust == 0).   Then find and delete any existing
+	 * volume label.  Then goto makeit, which is where the new file is
+	 * added to the directory.
+	 */
+	if (attr != FA_LABEL || dir->dir_clust != 0) return EACCDN;
+	dir2.dir_dev = dir->dir_dev;
+	dir2.dir_clust = 0;
+
+	err = dirfirst(&dir2,dmd);
+
+	while (1) {
+	    if ((err) || (dir2.dir_fcb->f_name[0] == 0)) break;
+	    if ((dir2.dir_fcb->f_name[0] != ERASED)  && 
+		(dir2.dir_fcb->f_attrib & FA_LABEL)) {
+		    /* found one */
+		    if (err = ixdel(&dir2)) return err;
+	    }
+	    err = dirnext(&dir2,dmd);
+	}
+	if (err && err != EFILNF) return err;
+	goto makeit;
     }
+    else attr |= FA_ARCHIVE;
 
     /*
      * If the file exists, remove it, unless it's open. Don't remove if
@@ -140,7 +171,12 @@ DIR *dir;
 	if (err = ixdel(dir)) return err;
     }
 
-    /* The file doesn't exist (any more). */
+    /*
+     * The file doesn't exist (any more).
+     * We also get here to make volume labels.
+     */
+
+makeit:
 
     /*
      * Scan for empty space in the directory file (find an empty slot); 
@@ -155,7 +191,7 @@ DIR *dir;
 
     if (err = name2fcb(namepart,NULL,fcb)) return err;
 
-    fcb->f_attrib = attr | FA_ARCHIVE;
+    fcb->f_attrib = attr;
     for (i=10; i; fcb->f_fill[--i] = 0) ;
     fcb->f_time = realtime;
     swp68(fcb->f_time);
@@ -196,8 +232,7 @@ int attr;			/* attribute byte */
 
     attr &= 0xff;
 
-    /* Will match anything but a label (incl. "." or ".."); return any error */
-    if (err = fn2dir(&p,&dir,FN_DOTSOK)) return err;
+    if (err = fn2dir(&p,&dir,SCAN_NORM)) return err;
 
     oattr = dir.dir_fcb->f_attrib;
     if (!wrt) return (ulong)oattr;	/* reading */
@@ -236,7 +271,7 @@ char *name;
     DBCMD(1,"print xdelete -s (lpeek (`a6 + 8));_c");
 
     /* return any error (file not found, bad request, etc.) */
-    if (err = fn2dir(&name,&dir,FN_NORM)) return err;
+    if (err = fn2dir(&name,&dir,SCAN_NORM)) return err;
 
     /*
      *  Refuse if file is read-only or a directory
@@ -380,13 +415,13 @@ char *p2;			/* new name */
 
     /* try to find the old file, return any error. */
 
-    if (err = fn2dir(&p1,&dir1,FN_NORM)) return err;
+    if (err = fn2dir(&p1,&dir1,SCAN_NORM)) return err;
     fcbhold = *dir1.dir_fcb;		    /* structure copy of FCB */
     attr = fcbhold.f_attrib;
     if (attr & FA_RO) return EACCDN;
 
     /* try to find the new file; return any error but EFILNF */
-    if ((err = fn2dir(&p2,&dir2,FN_NORM)) && err != EFILNF) return err;
+    if ((err = fn2dir(&p2,&dir2,SCAN_NORM)) && err != EFILNF) return err;
 
     /* if there was NO error in the fn2dir above, the dest file exists! */
     if (!err) return EACCDN;

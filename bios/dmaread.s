@@ -1,25 +1,35 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: minna $
 * =======================================================================
 *
-* $Date: 91/03/27 12:36:36 $
+* $Date: 91/07/29 12:37:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.13  91/07/29  12:37:45  minna
+* _atread() and _atwrite modified to not use the
+* ATSC (sector count register) to count down on
+* multiple sectors read or write.  Some vendors
+* decrement the register too early.
+*
+* To test if the IDE interface exists, instead of
+* reading from bAT (the data register), read from
+* ATASR (the alternate status register.)
+*
 * Revision 1.12  91/03/27  12:36:36  apratt
 * Base address of IDE has moved to $F00000.  This code assumes that the base
 * address is on a longword boundary.  Added guards against missing IDE bus,
 * and against missing ACSI (bus error when accessing DMA chip).  This is
 * for prototype PADs only, and may go away soon.
-*
+* 
 * Changed switches to SCSI and IDE_AT, which are set based on TT and STPAD at
 * the top of the file.
-*
+* 
 * Revision 1.11  91/02/26  17:58:37  minna
 * Base address of IDE bus has been moved to $F00000.  Note that this code
 * relies on the base address of the IDE bus being on a longword boundary.
@@ -62,7 +72,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.12 $
+* $Revision: 1.13 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -115,6 +125,20 @@ IDE_AT		=	STPAD
 ;			$C00040 (long word boundary).
 ; Feb-22-1991	ml.	Base address of the IDE bus has been moved to
 ;			$F00000 (long word boundary).
+; Jul-29-91	ml.	Do not use the IDE Sector Count Register 
+;			to count down mulitiple sectors read or
+;			write.  Some vendors (e.g. Conner and 
+;			Seagate) seem to update this register 
+;			too early, and every now and then, the
+;			last sector of data would remain in the
+;			internal sector buffer.  
+;			
+;			Code in atread() and atwrite() are modified
+;			not to use the IDE Sector Count Register.
+;
+;			To check if the IDE bus is there, read from
+;			the alternate status register instead of the
+;			data register.
 ;-
 
 .globl	_dmaread
@@ -161,7 +185,7 @@ rwflag:		ds.b	1	; 0: read	1: write
 .even
 
 .ifne IDE_AT
-sbuf:		ds.l	128	; scratch buffer (must be on long word
+sbuf:		ds.l	129	; scratch buffer (must be on long word
 				;	boundary)
 .endc
 
@@ -245,7 +269,7 @@ rw0:	bsr	_dowcmd			; send a write data command
 * (The label noide is before at just because it fits better.)
 *
 
-noide:	move.l	a1,sp			; got the bus error on bAT;
+noide:	move.l	a1,sp			; got the bus error on ATASR;
 	move.l	a0,$8			; restore vector & sp, return EUNDEV
 	moveq.l	#EUNDEV,d0
 	bra	rwend			; branch to rts
@@ -253,7 +277,7 @@ noide:	move.l	a1,sp			; got the bus error on bAT;
 at:	move.l	$8,a0
 	move.l	sp,a1
 	move.l	#noide,$8
-	tst.b	bAT			; read a register to probe for IDE bus
+	tst.b	ATASR			; read a register to probe for IDE bus
 	move.l	a1,sp			; hey! no bus error!
 	move.l	a0,$8			; restore vector & sp and continue.
 
@@ -1068,8 +1092,10 @@ wi3:	rts			; return status or error code
 _atread:
 	bsr	set_dhcs	; set physical address
 	move.l	$e(sp),a0	; a0 -> buffer to read into
-	lea	ATSC,a2		; a2 -> sector count register
-	move.b	$d(sp),(a2)	; set sector count
+	move.b	$d(sp),ATSC	; set sector count
+
+	move.w	$c(sp),d1	; d1.w = # of sectors to read
+	subq	#1,d1		; dbra likes one less
 
 	move.b	#0,ATDOR	; enable interrupt
 	move.b	#ATREAD,ATCR	; set command code
@@ -1080,8 +1106,7 @@ atr0:	bsr	w4int		; wait for interrupt
 	beq.b	atr1		; if not, return
 
 	bsr	readbuf		; fill sector buffer
-	tst.b	(a2)		; more to read?
-	bne.b	atr0		; if so, continue
+	dbra	d1,atr0		; more to read?
 	moveq	#0,d0		; everything's fine
 atr1:	rts
 
@@ -1107,8 +1132,10 @@ atr1:	rts
 _atwrite:	
 	bsr	set_dhcs	; set physical address
 	move.l	$e(sp),a0	; a0 -> buffer to write from
-	lea	ATSC,a2		; a2 -> sector count register
-	move.b	$d(sp),(a2)	; set sector count
+	move.b	$d(sp),ATSC	; set sector count
+
+	move.w	$c(sp),d1	; d1.w = # of sectors to read
+	subq	#1,d1		; dbra likes one less
 
 	move.b	#0,ATDOR	; enable interrupt
 	move.b	#ATWRITE,ATCR	; set command code
@@ -1120,8 +1147,7 @@ atw1:	bsr	wrtbuf		; fill sector buffer
 	bmi.b	atw2		; if timed-out, return
 	btst	#3,d0		; DRQ?
 	beq.b	atw2		; if not, return
-	tst.b	(a2)		; more to write?
-	bne.b	atw1		; if so, continue
+	dbra	d1,atw1		; else go transfer data
 	moveq	#0,d0		; everything's fine
 atw2:	rts
 

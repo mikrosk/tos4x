@@ -33,6 +33,7 @@
 *	remove obaddr	06/10/85		Mike Schmal
 *	Reg Opt		03/08/85 - 03/09/85	Derek Mui
 *	Change at ob_sst for extended type	7/7/92	Minna Lai
+*	Remove extended type stuff	1/12/93	Eric Smith
 */
 
 #include <portab.h>
@@ -52,15 +53,14 @@ EXTERN	WS	gl_ws;
 *		returns object border/text color or the 3byte of the pointer
 *		to a tedinfo structure (isn't this help full).
 *
-* June 28 1992 - ml.  Added pxtype for extended object type.
 */
 
 	BYTE
-ob_sst(tree, obj, pspec, pstate, pxtype, ptype, pflags, pt, pth)
+ob_sst(tree, obj, pspec, pstate, ptype, pflags, pt, pth)
 	LONG		tree;
 	WORD		obj;
 	REG LONG	*pspec;
-	WORD		*pstate, *pxtype, *ptype;
+	WORD		*pstate, *ptype;
 	REG WORD	*pflags;
 	GRECT		*pt;
 	WORD		*pth;
@@ -76,13 +76,6 @@ ob_sst(tree, obj, pspec, pstate, pxtype, ptype, pflags, pt, pth)
 	*pspec = tmp->ob_spec;		/* set user spec variable */
 	*pstate = tmp->ob_state;	/* set user state variable */
 
-	/* June 28  1992 - ml.  Returns extended ob_type also */
-	*pxtype = tmp->ob_type >> 8;	/* set user extended type variable */
-/*
-	if ( ( gl_ws.ws_yres < 398 ) 
-		&& ( ( *pxtype == X_3DIND ) || ( *pxtype == X_3DACT) ) )
-	  *pxtype = 0;	  	
-*/
 	*ptype = tmp->ob_type & 0x00ff;	/* set user type variable */
 
 					/* IF indirect then get pointer */

@@ -697,6 +697,9 @@ DMD *dmd;
 	}
 
 	/* AND out the old, OR in the new */
+	/* NOTE: fatword is initialized through *fptr; you can ignore
+	 * the compiler warning about "uninitialized auto"
+	 */
 	fatword = (fatword & mask) | link;
 
 	/* fatword is still in 68000 format; write it backwards  */

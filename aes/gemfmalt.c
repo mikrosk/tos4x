@@ -274,14 +274,14 @@ fm_build(tree, haveicon, nummsg, mlenmsg, numbut, mlenbut)
 
 	for(i=0; i<numbut; i++)
 	{
-	  LWSET(OB_FLAGS(BUT_OFF+i), SELECTABLE | EXIT );
+	  LWSET(OB_FLAGS(BUT_OFF+i), SELECTABLE | EXIT | IS3DOBJ | IS3DACT );
 	  LWSET(OB_STATE(BUT_OFF+i), NORMAL);
 	  ob_setxywh(tree, BUT_OFF+i, &bt);
 	  bt.g_x += mlenbut + 2 ;
 	  ob_add(tree, ROOT, BUT_OFF+i);
 	}
 						/* set last object flag	*/
-	LWSET(OB_FLAGS(BUT_OFF+numbut-1), SELECTABLE | EXIT | LASTOB );
+	LWSET(OB_FLAGS(BUT_OFF+numbut-1), SELECTABLE | EXIT | LASTOB | IS3DOBJ | IS3DACT );
 }
 
 
@@ -308,7 +308,7 @@ fm_alert(defbut, palstr)
 
 	spec = LLGET( OB_SPEC(ROOT) );
 	spec &= 0xFFFFFF80L;
-	spec |= 0x40L;		/* 70 means "solid" (was 0x40L, "dithered") */
+	spec |= 0x70L;		/* 70 means "solid" (was 0x40L, "dithered") */
 
 	if ( gl_alrtcol >= gl_ws.ws_ncolors )
 	  color = WHITE;

@@ -185,10 +185,12 @@ typedef struct _menu_node
 
 	WORD	TopObject;	 /* Top object in Scroll Menu...  */
 	UWORD   TopState;   	 /* Top item's object state.      */
+	UWORD	TopFlag;	 /* Top items object flag	  */
 	BYTE    TopText[ 128 ];	 /* Top item's ObString()	  */
 
 	WORD    BObject;    	 /* Bottom object in Scroll Menu  */
 	UWORD   BState;	 	 /* Bottom item's object state    */
+	UWORD   BFlag;		 /* Bottom item's object flag     */
 	BYTE    BText[128]; 	 /* Bottom item's ObString()      */
 
 	LONG    *buffer;	 /* Pointer to redraw buffer...   */
@@ -225,10 +227,12 @@ typedef struct _menu_node
 
 #define MTOP_OBJ( ptr )	     ptr->TopObject
 #define MTOP_STATE( ptr )    ptr->TopState
+#define MTOP_FLAG( ptr )     ptr->TopFlag
 #define MTOP_TXT( ptr )	     ptr->TopText
 
 #define MB_OBJ( ptr )        ptr->BObject
 #define MB_STATE( ptr )      ptr->BState
+#define MB_FLAG( ptr )	     ptr->BFlag
 #define MB_TXT( ptr )        ptr->BText
 
 #define MBUFFER( ptr )	     ptr->buffer
@@ -323,6 +327,7 @@ typedef struct _menu_node
 #define IsHidden(obj)		( ObFlags(obj) & HIDETREE )
 #define IsVisible(obj)		( !IsHidden(obj) )
 #define IsIndirect(obj) 	( ObFlags(obj) & INDIRECT )
+#define IsSubMenu(obj)		( ObFlags(obj) & SUBMENU )
 
 #define IsSelected(obj) 	( ObState(obj) & SELECTED )
 #define IsCrossed(obj)		( ObState(obj) & CROSSED )
@@ -357,6 +362,7 @@ typedef struct _menu_node
 #define MakeHidden(obj) 	HideObj(obj)
 #define MakeHidetree(obj)	HideObj(obj)
 #define MakeIndirect(obj)	( ObFlags(obj) |= INDIRECT )
+#define MakeSubMenu(obj)	( ObFlags(obj) |= SUBMENU )
 
 #define NoSelect(obj)		( ObFlags(obj) &= ~SELECTABLE )
 #define NoDefault(obj)		( ObFlags(obj) &= ~DEFAULT )
@@ -370,6 +376,7 @@ typedef struct _menu_node
 #define ShowObj(obj)		( ObFlags(obj) &= ~HIDETREE )
 #define NoHidetree(obj) 	ShowObj(obj)
 #define NoIndirect(obj) 	( ObFlags(obj) &= ~INDIRECT )
+#define NoSubMenu(obj)		( ObFlags(obj) &= ~SUBMENU )
 
 #define SelectObj(obj)		( ObState(obj) |= SELECTED )
 #define CrossObj(obj)		( ObState(obj) |= CROSSED )

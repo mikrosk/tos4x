@@ -38,6 +38,12 @@
  *			  the Scroll Flag
  * 07/30/92   cjg       - Removed auto-initialization of global variables
  * 8/3/92     cjg	- mn_init init MenuBar_Mode 	
+ * 01/13/93   cjg	- Changed ObFlag() calls for LASTOB to
+ *			  MakeLast() and NoLast()
+ *			- Added MTOP_FLAG() and MB_FLAG().
+ *			- SUBMENU ( BIT 11 ) SET in ObFlag() signifies
+ *			  that a submenu is attached. The menu id is
+ *			  in the extend object type.
  */
 
 
@@ -257,10 +263,12 @@ REG MENU_PTR	MenuPtr;		/* ptr to the Menu Node */
 
      MTOP_OBJ( MenuPtr )     = NIL;
      MTOP_STATE( MenuPtr )   = NORMAL;
+     MTOP_FLAG( MenuPtr )    = NONE;
      MTOP_TXT( MenuPtr )[0]  = '\0';
 
      MB_OBJ( MenuPtr )    = NIL;
      MB_STATE( MenuPtr )  = NORMAL;
+     MB_FLAG( MenuPtr )   = NONE;
      MB_TXT( MenuPtr )[0] = '\0';
 
      MBUFFER( MenuPtr )      = NULLPTR;
@@ -581,7 +589,7 @@ BOOLEAN		adjust_flag;		/* see above...            */
     }
 
     if( MLASTFLAG( MenuPtr ) )		/* CJG 01/13/92 */
-      ObFlags( MB_OBJ( MenuPtr )) = LASTOB;
+      MTREE( MenuPtr )[ MB_OBJ( MenuPtr ) ].ob_flags |= LASTOB;
     PushArrowText( MenuPtr );
 
     MOFFSET( MenuPtr ) = max( offset_obj, MSCROLL( MenuPtr ) );
@@ -653,13 +661,13 @@ REG MENU_PTR	MenuPtr;	/* ptr to the menu node... */
        if( IsSelected( obj ) )
            Deselect( obj );
        ObH( parent ) += gl_hchar;
-       ObFlags( obj ) = NONE;
+       NoLast( obj );
        ObY(obj) = (obj-MFIRST_CHILD( MenuPtr ))*ObH( MFIRST_CHILD( MenuPtr ));
     }
 
     /* Refix the LASTOB pointer in the REAL tree format */
     if( MLASTFLAG( MenuPtr ) )		/* CJG 01/13/92 */
-       ObFlags( MLAST_CHILD( MenuPtr ) ) = LASTOB;
+       MTREE( MenuPtr )[ MLAST_CHILD( MenuPtr ) ].ob_flags |= LASTOB;
 
     /* Adjust the height of the GRECT to be set to new adjusted height */
     MHEIGHT( MenuPtr ) = ObH( parent );
@@ -827,12 +835,12 @@ WORD		start_obj;	/* the menu item that we want on top*/
                                       ( MSCROLL( MenuPtr ) - MFIRST_CHILD( MenuPtr ) )  )
 			              * MTREE( MenuPtr )[ MTOP_OBJ( MenuPtr ) ].ob_height;
 
-       MTREE( MenuPtr )[obj].ob_flags = NONE;
+       MTREE( MenuPtr )[obj].ob_flags &= ~LASTOB;
     }
 
     /* Set the LASTOB only if the menu started out that way. */
     if( MLASTFLAG( MenuPtr ) )	/* CJG 01/13/92 */
-        MTREE( MenuPtr )[ MB_OBJ( MenuPtr ) ].ob_flags = LASTOB;
+        MTREE( MenuPtr )[ MB_OBJ( MenuPtr ) ].ob_flags |= LASTOB;
 
     PushArrowText( MenuPtr );			/* Save the text under */
 						/* the arrows...       */
@@ -859,9 +867,13 @@ REG MENU_PTR	MenuPtr;	/* ptr to the menu node in question */
     /* Set the Up ARROW if the first object is not the FIRST_CHILD */
     obj = MTOP_OBJ( MenuPtr );
     MTOP_STATE( MenuPtr ) = MTREE( MenuPtr )[obj].ob_state;
+    MTOP_FLAG( MenuPtr )  = MTREE( MenuPtr )[obj].ob_flags;
+    
     if( obj != MSCROLL( MenuPtr ) )
     {
       MTREE( MenuPtr )[ obj ].ob_state = NORMAL;
+      MTREE( MenuPtr )[ obj ].ob_flags &= ~SUBMENU;
+  
       /* AES version - src,dst */
       strcpy( ( BYTE *)MTREE( MenuPtr )[obj].ob_spec, &MTOP_TXT( MenuPtr )[0] );
       strcpy( &UpText[0], ( BYTE *)MTREE( MenuPtr )[obj].ob_spec );
@@ -870,11 +882,15 @@ REG MENU_PTR	MenuPtr;	/* ptr to the menu node in question */
     /* Set the down ARROW if the last object is not MLAST_CHILD */
     obj = MB_OBJ( MenuPtr );
     MB_STATE( MenuPtr ) = MTREE( MenuPtr )[obj].ob_state;
+    MB_FLAG( MenuPtr )  = MTREE( MenuPtr )[obj].ob_flags;
+
     if( obj != MLAST_CHILD( MenuPtr ) )
     {
-	 MTREE( MenuPtr )[ MB_OBJ( MenuPtr  ) ].ob_state = NORMAL;
+       MTREE( MenuPtr )[ MB_OBJ( MenuPtr  ) ].ob_state = NORMAL;
+       MTREE( MenuPtr )[ MB_OBJ( MenuPtr ) ].ob_flags &= ~SUBMENU;
+	
        if( MLASTFLAG( MenuPtr ) )	/* CJG 01/13/92 */
-             MTREE( MenuPtr )[obj].ob_flags = LASTOB;
+             MTREE( MenuPtr )[obj].ob_flags |= LASTOB;
        /* AES version - src,dst */
        strcpy( ( BYTE *)MTREE( MenuPtr )[obj].ob_spec, &MB_TXT( MenuPtr )[0] );
        strcpy( &DownText[0], ( BYTE *)MTREE( MenuPtr )[obj].ob_spec );
@@ -902,6 +918,7 @@ REG MENU_PTR	MenuPtr;		/* ptr to the menu node */
    {
        strcpy( &MTOP_TXT( MenuPtr )[0], ( BYTE *)MTREE( MenuPtr )[ obj ].ob_spec );
        MTREE( MenuPtr )[ obj ].ob_state = MTOP_STATE( MenuPtr );
+       MTREE( MenuPtr )[ obj ].ob_flags = MTOP_FLAG( MenuPtr );
    }
 
    /* Restore the text underneath the BOTTOM ARROW */
@@ -910,6 +927,7 @@ REG MENU_PTR	MenuPtr;		/* ptr to the menu node */
        MTREE( MenuPtr )[ obj ].ob_flags = NONE;
        strcpy( &MB_TXT( MenuPtr )[0], ( BYTE *)MTREE( MenuPtr )[obj].ob_spec );
        MTREE( MenuPtr )[ obj ].ob_state = MB_STATE( MenuPtr );
+       MTREE( MenuPtr )[ obj ].ob_flags = MB_FLAG( MenuPtr );
    }
 }
 

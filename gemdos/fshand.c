@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
+* $Revision: 2.18 $	$Source: d:/tos/dos\rcs\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
+* $Author: unknown $ 	$Date: 1991/12/11 20:16:44 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.18  1991/12/11  20:16:44  unknown
+* Changed FN_NORM to SCAN_NORM in one place
+*
 * Revision 2.17  1991/06/18  17:52:02  apratt
 * Updated to DB release 3 (new print)
 *
@@ -582,7 +585,7 @@ int mod;
     if ((err = ttyopen(name)) != -1) return err;
 
     /* find the file */
-    err = fn2dir(&name,&dir,FN_NORM);
+    err = fn2dir(&name,&dir,SCAN_NORM);
     if (err) return err;
     else if (dir.dir_fcb->f_attrib & FA_SUBDIR) return EACCDN;
 

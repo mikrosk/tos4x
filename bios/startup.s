@@ -4,13 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/29 21:24:18 $
+* $Date: 1992/03/11 01:24:22 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.93  1992/03/11  01:24:22  apratt
+* Clear the high byte of d0.w before writing into SPAR_VMC.  This wasn't in
+* the first one, the one before the cartridge-port check.  In the first
+* write, also, write ff8260 to set ST shift mode.
+*
+* Added comments for meanings of PSG output bits in the place where they're
+* set.
+*
+* Commented out the new code for FPU probe .if STPAD, because I'm building
+* STPAD ROMs and the code isn't tested.
+*
+* Fixed a bug in the code that points "coldboot" vectors to "term."
+*
 * Revision 2.92  1992/02/29  21:24:18  apratt
 * Moved and improved FPU probe and Frestore.  Haven't really tested it.
 *
@@ -318,7 +331,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.92 $
+* $Revision: 2.93 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -1007,6 +1020,7 @@ reseth:
 .endif
 
 .if SPARROW
+	moveq	#0,d1
 	move.b	SPAR_CONF,d0	; d0=vvmmrrbf
 	move.b	d0,d1		; d1=vvmmrrbf
 	lsl.b	#6,d1		; d1=bf000000
@@ -1014,7 +1028,16 @@ reseth:
 	lsr.b	#6,d0		; d0=000000vv
 	or.b	d0,d1		; d1=b00000vv
 	move.w	d1,SPAR_VMC	; write to VMC.
-	tst.w	color0
+	moveq	#0,d1
+	cmp.b	#1,d0
+	beq	spar_set
+	moveq	#2,d1
+	tst.b	d0
+	bne	spar_nos
+spar_set:
+	move.w	d1,$ffff8260	; write 0 to set shift mode
+spar_nos:
+
 .endif
 
 *+
@@ -1154,6 +1177,15 @@ reset3:
 *  Make ports A and B output-only;
 *  initialize floppy select lines (so
 *  that none are selected).
+*
+* bit 0: *side
+* bit 1: *sel0
+* bit 2: *sel1
+* bit 3: *rts
+* bit 4: *dtr
+* bit 5: *strobe
+* bit 6: *SPKR_DIS (TT), *IDERESET (STPAD, SPARROW)
+* bit 7: *LAN (TT), FDD_HIDEN (STPAD)
 *
 * Note: The floppy side and selects are inverted, so writing 1 disables them.
 * Other outputs are initialized to zero here: *DTR, *RTS, STROBE,
@@ -2337,6 +2369,10 @@ nofdc:
 
 	move.l	#"_FPU",(a0)+		; always install SOME cookie
 
+* we have to ship STPAD ROMs *now* and I haven't tested this code,
+* so I am taking it out .if STPAD.
+.if STPAD
+
 * Frestore a null state to zap that FPU.  This involves catching all the
 * possible exceptions that can cause:
 *
@@ -2345,12 +2381,12 @@ nofdc:
 *	$c0-$d8	misc. exceptions caused by previous FPU instruction
 
 	moveq.l	#0,d7		; pre-clear d7, which will be the _FPU value
-	sub.w	#10*3,sp	; get some local variable space
+	sub.w	#9*4,sp		; get some local variable space
 	move.l	$2c,(sp)
 	move.l	$34,4(sp)
 	move.l	#nofpu,$2c
 	move.l	#nofpu,$34
-	lea.l	4(sp),a1
+	lea.l	8(sp),a1
 	move.l	#$c0,a2
 	move.l	#yesfpu,d0
 	move.l	(a2),(a1)+
@@ -2376,8 +2412,8 @@ yesfpu:
 nofpu:
 	move.l	a2,sp		; clean off exception stack (if any)
 	addq	#4,sp		; get rid of that "quick zero"
-	move.l	(sp)+,$34	; restore "cp violation exception"
-	move.l	(sp)+,$2c	; restore "line-F exception"
+	move.l	(sp)+,$2c	; restore "cp violation exception"
+	move.l	(sp)+,$34	; restore "line-F exception"
 	move.l	(sp)+,$c0	; restore the seven FPU exceptions
 	move.l	(sp)+,$c4
 	move.l	(sp)+,$c8
@@ -2387,6 +2423,10 @@ nofpu:
 	move.l	(sp)+,$c8
 
 	move.l	d7,(a0)+	; write d7 as _FPU cookie's value
+
+.else
+	clr.l	(a0)+		; STPAD: never an FPU (for now)
+.endif
 
 * Probe for SFP004 (always)
 
@@ -3179,11 +3219,12 @@ norezchg:
 	add.l	d1,a0			; (twice: first ex number is 02)
 	lea.l	$8,a1			; start of places to check
 	move.w	#64-1,d0		; count
+	move.l	#coldboot,d2
 bloop:
-	cmp.l	#coldboot,(a1)+
-	bne	bloop1
-	move.l	a0,(a1)
-bloop1:	add.l	d1,a0
+	cmp.l	(a1)+,d2		; still vectored to coldboot?
+	bne	bloop1			; no, don't touch
+	move.l	a0,-4(a1)		; yes, fix up (a1 already incremented)
+bloop1:	add.l	d1,a0			; increment exception number (!030)
 	dbra	d0,bloop
 
 ****************************************************************************
@@ -4012,7 +4053,7 @@ swmon2:	move.b	d0,sshiftmd.w
 	jsr	(a0)
 swmon3:
 
-* end of monitor-change stuff, ALL MISSING IF STPAD!
+* end of monitor-change stuff, ALL MISSING IF STPAD or SPARROW!
 .endif
 
 	jsr	blink			; blink cursor

@@ -4,16 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/04/11 12:12:05 $
+* $Date: 91/04/24 17:23:15 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.24  91/04/24  17:23:15  apratt
+* Added a new type of return from flopcmds, used only by go2track
+* and hence by its callers:  if you return with carry set, it means
+* the command timed out, and this usually means there's no disk in
+* the drive.  In that case we go directly to flopfail, do not pass
+* go, do not retry at the other density.  This works WONDERS for
+* the "feel" of a system with no disk in the drive at boot time or
+* any other time.
+*
 * Revision 2.23  91/04/11  12:12:05  apratt
 * Changed MAXACSI for TT to 10MB, not 4MB.  Should it be 10 for STe?
-*
+* 
 * Revision 2.22  91/03/27  12:36:54  apratt
 * Added a check for the dma chip and the 1772 if STPAD.  The missing-ACSI-chip
 * test is only necessary for prototype PADs, and may go away soon.
@@ -169,7 +178,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.23 $
+* $Revision: 2.24 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -234,13 +243,33 @@
 
 .include "switches.s"
 
-*
+* nominal in HD and QD mode (resulting in 6 or 3).  It's really just for
+* test and shouldn't be used in general.
+
+QD	equ	0
+
+*************************************************************************
+*									*
+* There's a new feature here as of 4/24/91: in go2track we distinguish	*
+* between  a missing disk and a disk you can't read by returning NE in	*
+* both cases, but CS when the operation times out, and CC when the 1772	*
+* returns some error The only caller of flopcmds which cares is		*
+* go2track and it returns right away (preserving flags) when it sees	*
+* CS. go2track's callers (which is everybody but flopfmt) bail out	*
+* right away on CS.							*
+*									*
+* Old discussion of timeouts:  the 1772 returns record-not-found	*
+* after 5 index pulses; we need need to have a longer timeout than	*
+* that to differentiate it from the "no-index-pulses" error.  5 index	*
+* pulses is one second, plus latency to the first pulse, plus ~1.5	*
+* second motor startup if motor was off -- call it 1.5 sec for motor	*
+* on, 3 sec for motor off.  (This was broken in TOS 1.6: it was too	*
+* verify, the fact that the read-data line is masked means you can't	*
 * Set SLOWACSI to 1 to introduce delays after (possibly) changing
 * the direction bit in the DMA chip; changing the bit resets the
 * chip, and you can't talk to it for 16 clocks (at 16MHz) after
 * resetting it.  Four non-cacheable reads should be 16 clocks, at
 * least.
-*
 
 SLOWACSI	equ	TT+STPLUS	; set to 1 for TT(?) @check@
 
@@ -252,17 +281,6 @@ HI_DEN		equ	1		; always enable this code
 
 denselect	equ	$ffff860e	; density bits (WRITE ONLY)
 					; (and don't touch at all if _iamanst)
-* timeouts:
-* The 1772 returns record-not-found after 5 index pulses; we need
-* need to have a longer timeout than that to differentiate it from
-* the "no-index-pulses" error.  5 index pulses is one second,
-* plus latency to the first pulse, plus ~1.5 second motor startup
-* if motor was off -- call it 1.5 sec for motor on, 3 sec for
-* motor off.  (This was broken in TOS 1.6: it was too short, so
-* you got timeout errors (meaning no index pulses, ergo no disk)
-* rather than sector-not-found errors, which might be deliberate
-* for copy protection.
-
 
 *------ Tunable values (subject to tweaking):
 retries		equ	2	; default # of retries - 1
@@ -497,6 +515,7 @@ fdcprobe:
 	move.w	#secreg,(a6)
 	bsr	rdiskctl		; read secreg back
 	subq.w	#1,flock.w		; un-lock the bus
+	tst.b	d1			; was trkreg still 00?
 	bne	noflop			; no - no floppies
 	cmp.b	#$ff,d0			; still $ff?
 					; (leave ccr set)
@@ -635,6 +654,7 @@ eb1:	move.w	d1,curr_err.w		; set current error number & return
 
 
 *+
+* flopwr - write sector	to floppy
 * Passed (on the stack):
 *	$14(sp) count
 .ifeq SLOWACSI
@@ -979,6 +999,8 @@ use_skewtbl:
 	move.w	(a3,d6.w),d4		; d4 = a skew table entry
 	addq.w	#1,d3			; inc skew table index in this case
 	bra	ot1			; write next track to buffer
+
+*--- see if the write-track won:
 otw2:	move.w	#$190,(a6)		; check	DMA status bit
 	move.w	(a6),d0
 	btst	#0,d0			; if its zero, there was a DMA error
@@ -1320,6 +1342,8 @@ hseek1:	move.w	#e_seek,curr_err	; possible error = "seek error"
 
 *+
 * reseek - home	head, then reseek track
+* Returns:	EQ/NE on success/failure
+* Falls-into:	go2track
 .ifeq HI_DEN
 *-
 reseek:
@@ -1435,7 +1459,8 @@ flopcmds:
 	beq	nomap
 	lea	rtmap,a0		; (MAS has PC-relative bugs)
 	move.b	(a0,d0.w),d0		; remap the rate
-	moveq	#1,d6			; and return NE
+nomap:
+.endif
 
 	or.b	d0,d6			; OR the rate into the command
 	move.w	#cmdreg,(a6)		; select 1770 command register

@@ -1,25 +1,29 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: lozben $
 * =======================================================================
 *
-* $Date: 89/08/18 13:44:47 $
+* $Date: 89/08/24 16:54:58 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.19  89/08/24  16:54:58  lozben
+* Added EgetShift() and EsetShft() xbios function calls. Deleted
+* EsetRez() and EsetPhysBase() xbios function calls.
+*
 * Revision 2.18  89/08/18  13:44:47  apratt
 * All changes are TT only:  added _FRB cookie pointing to a 64K buffer
 * in slow RAM for ACSI transfers to/from fast RAM.  Only present if there
 * is any fast RAM.
-*
+* 
 * Changed bomb handler to get the exception number from the stack frame.
-*
+* 
 * Changed Setcolor and Setpalette so, to the caller, the RGB values
 * are like STe (hi-order bit is least significant).
-*
+* 
 * Revision 2.17  89/07/31  12:08:51  apratt
 * Added .globl clrcache directive.
 * 
@@ -277,7 +281,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.18 $
+* $Revision: 2.19 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -3102,13 +3106,13 @@ trp13tab:
 	dc.l	unimpl			; 40: COOK THIS!  Kbad's cookie call
 	dc.l	_floprate		; 41: get/set floppy seek rate
 
-	dc.l	_EsetRez		; 80: TT shifter stuff
-	dc.l	_EsetPhysbase		; 81
+	dc.l	_dmaread		; 42: _dmaread call
+	dc.l	_dmawrite		; 43: _dmawrite call
 	dc.l	_bconmap		; 44: _bconmap call
 	dc.l	unimpl			; 45: bconctl (when ready)
 .if TT
 	dc.l	NVMaccess		; 46: nvmaccess
-	dc.l	_EsetMono		; 86
+.else
 	dc.l	unimpl
 .endif
 .if (TT == 0)
@@ -4217,65 +4221,32 @@ twait1:	btst.b	#MFPBIT,TT_mfp+TT_ipra	; while not pending
 crctab:
 	dc.w	$0000,$1021,$2042,$3063,$4084,$50a5,$60c6,$70e7
 	dc.w	$8108,$9129,$a14a,$b16b,$c18c,$d1ad,$e1ce,$f1ef
-* _EsetRez: - Set low three bits of the high byte of the EST Shift Mode reg.
-*             Old rezolution is returned in d0.w
+	dc.w	$1231,$0210,$3273,$2252,$52b5,$4294,$72f7,$62d6
 	dc.w	$9339,$8318,$b37b,$a35a,$d3bd,$c39c,$f3ff,$e3de
-* Synopsis:	_EsetRez
-*		WORD _EsetRez(rez)
-*		WORD rez;
+	dc.w	$2462,$3443,$0420,$1401,$64e6,$74c7,$44a4,$5485
+	dc.w	$a56a,$b54b,$8528,$9509,$e5ee,$f5cf,$c5ac,$d58d
+	dc.w	$3653,$2672,$1611,$0630,$76d7,$66f6,$5695,$46b4
 	dc.w	$b75b,$a77a,$9719,$8738,$f7df,$e7fe,$d79d,$c7bc
-_EsetRez:
-        move.b  ESHIFTMD,d0		; move old rez into d0.
-	move.b	d0,d2			; 
-        and.w	#7,d0			; d0 = old rez mode (return value)
-        move.w	4(sp),d1		; move new rez value into d1
-        bmi	strz			; if rez is negative do nothing
-        and.b	#7,d1			; keep new mode bits
-	move.b	d1,sshiftmd(a5)		; set software shadow
-        and.b   #$f8,d2			; keep everything except mode bits
-        or.b    d1,d2			; give d2 new mode bits
-        move.w  d0,-(sp)		; wvbl clobbers d0 only
+	dc.w	$48c4,$58e5,$6886,$78a7,$0840,$1861,$2802,$3823
 	bsr	wvbl			; wait for start of vertical-blank
-	move.b	d2,ESHIFTMD		; set hardware reg to new resolution
+	move.w	4(sp),shiftmd(a5)	; set shift mode register
 	clr.w	vblsem(a5)		; disable vblank processing
 	dc.w	$1080,$00a1,$30c2,$20e3,$5004,$4025,$7046,$6067
-	move.w	#1,vblsem(a5)		; re-enable vblanks
-        move.w	(sp)+,d0		; d0 has old rez value
-strz:	rts	
+	move.w	#1,vblsem(a5)		; re-enable vblank
+	dc.w	$b5ea,$a5cb,$95a8,$8589,$f56e,$e54f,$d52c,$c50d
 	dc.w	$34e2,$24c3,$14a0,$0481,$7466,$6447,$5424,$4405
 	dc.w	$a7db,$b7fa,$8799,$97b8,$e75f,$f77e,$c71d,$d73c
 	dc.w	$26d3,$36f2,$0691,$16b0,$6657,$7676,$4615,$5634
 	dc.w	$d94c,$c96d,$f90e,$e92f,$99c8,$89e9,$b98a,$a9ab
+	dc.w	$5844,$4865,$7806,$6827,$18c0,$08e1,$3882,$28a3
 	dc.w	$cb7d,$db5c,$eb3f,$fb1e,$8bf9,$9bd8,$abbb,$bb9a
-* _EsetPhysBase - Set the physical screen location.
-*                 Old screen location is returned in d0.l
-*
-* Synopsis:	_EsetPhysBase
-*		LONG _EsetPhysBase(physLoc)
-*		LONG physLoc;
+	dc.w	$4a75,$5a54,$6a37,$7a16,$0af1,$1ad0,$2ab3,$3a92
+	dc.w	$fd2e,$ed0f,$dd6c,$cd4d,$bdaa,$ad8b,$9de8,$8dc9
 	dc.w	$7c26,$6c07,$5c64,$4c45,$3ca2,$2c83,$1ce0,$0cc1
-_EsetPhysbase:
+	dc.w	$ef1f,$ff3e,$cf5d,$df7c,$af9b,$bfba,$8fd9,$9ff8
+	move.w	shiftmd(a5),d0		; d0 <- shift mode register value
+
 .endif
-*--- Get Est physical display base
- 
-	moveq.l	#0,d0			; cleanup pointer-to-be
-	move.b	ESTVBH,d0		; load and shift bits 16..23
-	swap	d0
-	move.b	ESTVBM,d0		; load and shift bits 8..15
-	lsl.w	#8,d0
-        move.b	ESTVBL,d0		; load bits 0..7
-
-*--- Set Est physical display base, bits 0..2 are ignored by hardware reg
-        
-	tst.b   4(sp)			; see if new phys loc is neg
-	bmi	estpb			; if(physloc < 0) then ignore it
-	move.b	5(sp),ESTVBH		; set bits 16..23 of hardware pointer
-	move.b	6(sp),ESTVBM		; set bits 8..15 of hardware pointer
-	move.b	7(sp),ESTVBL		; set bits 0..7 of hardware pointer
-
-estpb:	rts
-        
-
 
 .if TT
 **********************************************************************
@@ -4384,20 +4355,20 @@ stclr:	rts
 *		WORD colorNum, count;
 *		LONG palettePtr;
 *-
-	dbra	d1,eset_loop		; do untill count = -1
+_EsetPalette:
 	move.w	4(sp),d0		; d0 <- colorNum
 	and.w	#$ff,d0			; colorNum  must be < 256
 	move.w	d0,a0			; a0 becomes index for dest.
 	adda.w	a0,a0			; make a0 a word index
 	sub.w	#256,d0			; d0 = colorNum - 256
-* _EsetMono - Turn EST hardware shift register, hyper mono bit on/off.
+	neg.w	d0			; d0 <- maxCount
 	move.w	6(sp),d1		; d1 <- count (set by the user)
 	cmp.w	d0,d1			; check to see if count > maxCount
-* Synopsis:	_EsetMono
+	ble	eset_ok			; branch if count is ok
 	move.w	d0,d1			; count <- maxCount
 
 eset_ok:
-_EsetMono:
+	move.l	8(sp),a1		; a1 <- palettePtr (source)
 	bra	eset_dec
 
 eset_loop:

@@ -4,13 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/12 19:41:34 $
+* $Date: 1991/09/17 21:48:52 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.14  1991/09/17  21:48:52  apratt
+* For TT TOS, we have stored "year since 1970" in the RTC.
+* This is wrong: if you do that then leap years are off by two years.
+* We did this originally for the UNIX group's sake, so they could
+* represent 1970.  To preserve that (no skin off my nose) the RTC
+* for TT now holds "year since 1968."
+*
 * Revision 2.13  1991/09/12  19:41:34  apratt
 * Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
 * So we use (TT == 0) instead.  Sigh.
@@ -82,7 +89,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.13 $
+* $Revision: 2.14 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\clock.s,v $
@@ -602,7 +609,7 @@ gwait:*	move.w	d2,sr		; allow interrupts
 	bfins	d1,d0{7:4}
 	move.b	#YEAR,RTCA
 	move.b	RTCD,d1
-	sub.b	#10,d1		; subtract 10 for yr since 1980, not 1970
+	sub.b	#12,d1		; subtract 12 for yr since 1980, not 1968
 	bfins	d1,d0{0:7}
 	move.w	d2,sr		; restore original IPL
 
@@ -670,7 +677,7 @@ _setclock:
 
 	move.b	#YEAR,RTCA
 	bfextu	d0{0:7},d1
-	add.b	#10,d1		; add 10 for years since 1970, not 1980
+	add.b	#12,d1		; add 12 for years since 1968, not 1980
 	move.b	d1,RTCD
 
 	move.b	#REGB,RTCA

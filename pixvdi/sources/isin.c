@@ -20,6 +20,7 @@
 */
 
 #include "portab.h"
+#include "proto.h"
 
 #define    HALFPI    900 
 #define    PI	     1800
@@ -48,8 +49,8 @@ MLOCAL WORD sin_tbl[92] = {
  * lookup table sintable^[]. Expects angle in tenths of degree 0 - 3600.
  * Assumes positive angles only.
  */
-WORD Isin(angle)
-REG WORD angle;
+WORD Isin(ang)
+REG WORD ang;
 {
   	REG WORD 	index, remainder, tmpsin, *ptr;
   	REG WORD  	quadrant;		/* 0-3 = 1st, 2nd, 3rd, 4th. */
@@ -57,34 +58,34 @@ REG WORD angle;
 
 	ptr = sin_tbl;
 
-	while (angle > 3600)
-    		angle -= 3600;
+	while (ang > 3600)
+    		ang -= 3600;
 
-  	quadrant = angle / HALFPI;
+  	quadrant = ang / HALFPI;
  
  	switch (quadrant) {
 		case 0:
         	  	break;
 
       		case 1:
-		  	angle = PI - angle;
+		  	ang = PI - ang;
 		  	break;
       
       		case 2:
-		  	angle -= PI;
+		  	ang -= PI;
 		  	break;
 
 		case 3:
-        	  	angle = TWOPI - angle;
+        	  	ang = TWOPI - ang;
 		  	break;
 
       		case 4:
-        	  	angle -= TWOPI;
+        	  	ang -= TWOPI;
 		  	break;
     	};
 
-    	index = angle / 10;
-    	remainder = angle % 10;
+    	index = ang / 10;
+    	remainder = ang % 10;
     	tmpsin = ptr[index];
 
    	/* add interpolation. */
@@ -101,14 +102,14 @@ REG WORD angle;
 /*
  * return integer cos between -32767 and 32767.
  */
-WORD Icos(angle) 
-WORD angle;
+WORD Icos(ang) 
+WORD ang;
 {
-  	angle += HALFPI ;
+  	ang += HALFPI ;
 
-  	if (angle > TWOPI)
-    	  	angle -= TWOPI ;
+  	if (ang > TWOPI)
+    	  	ang -= TWOPI ;
 
-  	return (Isin(angle)) ;
+  	return (Isin(ang)) ;
 }
 /*---------------------------------------------------------------------------*/

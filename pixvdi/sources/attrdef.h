@@ -22,6 +22,9 @@
 *******************************************************************************
 */
 
+#ifndef _ATTRDEF_H_
+#define _ATTRDEF_H_
+
 /* Structure to hold data for a virtual workstation */
 typedef struct attribute {
     WORD chup;			    /* Character Up vector 		    */
@@ -67,3 +70,5 @@ typedef struct attribute {
     WORD ymn_clip;		    /* Low y point of clipping rectangle    */
     WORD ymx_clip;		    /* High y point of clipping rectangle   */
 } ATTRIBUTE;
+
+#endif

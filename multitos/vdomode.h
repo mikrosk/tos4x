@@ -18,6 +18,7 @@
 #define setmode(a)	(int)xbios(88,a)
 #define mon_type(a)	(int)xbios(89)
 #define ext_sync(a)	(void)xbios(90,a)
+#define Validmode(a)	(int)xbios(95, a)
 
 #define VERTFLAG	0x100
 #define STMODES		0x80

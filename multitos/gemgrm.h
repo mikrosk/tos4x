@@ -49,23 +49,23 @@
 #define TITLE    2   /* TEXT in Baum SCREEN */
 
 #define ALRT00CR 3   /* Formular/Dialog */
-#define A00      2   /* FTEXT in Baum ALRT00CR */
+#define A00      1   /* FTEXT in Baum ALRT00CR */
 
 #define ALRT01CR 4   /* Formular/Dialog */
-#define A01      2   /* FTEXT in Baum ALRT01CR */
+#define A01      1   /* FTEXT in Baum ALRT01CR */
 
 #define ALRT02CR 5   /* Formular/Dialog */
-#define A02      3   /* FTEXT in Baum ALRT02CR */
+#define A02      2   /* FTEXT in Baum ALRT02CR */
 
 #define ALRT03CR 6   /* Formular/Dialog */
-#define A03      4   /* FTEXT in Baum ALRT03CR */
+#define A03      3   /* FTEXT in Baum ALRT03CR */
 
 #define ALRT04CR 7   /* Formular/Dialog */
 
 #define ALRT05CR 8   /* Formular/Dialog */
 
 #define ALRTDSWA 9   /* Formular/Dialog */
-#define A06      2   /* FTEXT in Baum ALRTDSWA */
+#define A06      1   /* FTEXT in Baum ALRTDSWA */
 
 #define STARTUP  10  /* Formular/Dialog */
 
@@ -73,6 +73,13 @@
 #define AESTITLE 3   /* TITLE in Baum AESMENU */
 
 #define ALRTINSS 12  /* Formular/Dialog */
+
+#define CICONS   13  /* Formular/Dialog */
+#define NOTECC   1   /* USERDEF in Baum CICONS */
+#define QUESCC   2   /* USERDEF in Baum CICONS */
+#define STOPCC   3   /* USERDEF in Baum CICONS */
+#define INFOCC   4   /* USERDEF in Baum CICONS */
+#define DISKCC   5   /* USERDEF in Baum CICONS */
 
 #define STPATH   0   /* Freier String */
 
@@ -118,24 +125,20 @@
 
 #define FAILDESK 21  /* Alert String */
 
-#define IMAGE1   0   /* Freies Icon */
+#define ALRT35ER 22  /* Alert String */
 
-#define IMAGE2   1   /* Freies Icon */
+#define MICE0    0   /* Freies Icon */
 
-#define IMAGE3   2   /* Freies Icon */
+#define MICE1    1   /* Freies Icon */
 
-#define IMAGE4   3   /* Freies Icon */
+#define MICE2    2   /* Freies Icon */
 
-#define IMAGE5   4   /* Freies Icon */
+#define MICE3    3   /* Freies Icon */
 
-#define IMAGE6   5   /* Freies Icon */
+#define MICE4    4   /* Freies Icon */
 
-#define IMAGE7   6   /* Freies Icon */
+#define MICE5    5   /* Freies Icon */
 
-#define IMAGE8   7   /* Freies Icon */
+#define MICE6    6   /* Freies Icon */
 
-#define IMAGE9   8   /* Freies Icon */
-
-#define IMAGE10  9   /* Freies Icon */
-
-#define IMAGE11  10  /* Freies Icon */
+#define MICE7    7   /* Freies Icon */

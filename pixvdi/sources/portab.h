@@ -16,6 +16,9 @@
 *******************************************************************************
 */
 
+#ifndef _PORTAB_H_
+#define _PORTAB_H_
+
 /*
  *	Standard type definitions
  */
@@ -50,3 +53,4 @@
 #define	TRUE	(1)			/*	Function TRUE  value	    */
 #define	FALSE	(0)			/*	Function FALSE value	    */
 
+#endif

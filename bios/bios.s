@@ -1,19 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 88/08/08 17:56:44 $
+* $Date: 88/09/06 11:32:32 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.14  88/09/06  11:32:32  kbad
+* Added DENMARK key table and driver, and fixed SWEDEN '|' on capslock.
+*
 * Revision 1.13  88/08/08  17:56:44  apratt
 * Removed 32K limit on serial input/output buffers.  Limit
 * is now 64K (actually 64K-1 for AUX, MIDI and 64K-4 for KB).
-*
+* 
 * Revision 1.12  88/07/25  18:21:00  apratt
 * Got rid of the damn '.w' after 8 in coldboot code.  Gremlins.
 * 
@@ -62,7 +65,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.13 $
+* $Revision: 1.14 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -107,6 +110,7 @@ SWISSGER	equ	8 ***DON'T  CHANGE*** german text swis/ger keyboard
 TURKEY		equ     9 ***DON'T  CHANGE***
 FINLAND		equ     5 ***DON'T  CHANGE*** same as swedish keyboard
 NORWAY		equ    11 ***DON'T  CHANGE***
+DENMARK		equ    12
 
 COUNTRY	equ	USA	;set country of origin
 
@@ -3075,6 +3079,44 @@ altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
+	move.b	#$7c,d0		;put in |', instead...it's a alt-shift umlaut!
+	ifeq	COUNTRY-DENMARK
+
+.endif
+
+
+	move.b	kbshift(a5),d2	;grab current setting
+
+	beq	conin25		;process it as unshifted
+	bne.b	altden1		;no...
+	bra	conin25		;process it
+altden1	cmpi.b	#$1b,d1		;is it a ALT-$?
+	beq	conin25a		;process it as unshifted
+	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift ^
+	move.b	kbshift(a5),d2	;grab current setting
+altden1:
+	beq	conin25		;process it as unshifted
+	bne.b	altden2		;no...
+	bra	conin25		;process it
+altden2	cmpi.b	#$28,d1		;is it a ALT-
+	beq	conin25a		;process it as unshifted
+	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift $
+	move.b	kbshift(a5),d2	;grab current setting
+altden2:
+	beq	conin25		;process it as unshifted
+	bne.b	altden3		;no...
+	bra	conin25		;process it
+altden3	cmpi.b	#$2b,d1		;is it a ALT-#?
+	beq	conin25a		;process it as unshifted
+	move.b	#$7c,d0		;put in '|',instead...it's a alt-shift
+	move.b	kbshift(a5),d2	;grab current setting
+altden3:
+	beq	conin25		;process it as unshifted
+	bne.b	outside		;no...
+	bra	conin25		;process it
+	move.b	kbshift.w,d2	;grab current setting
+	endc
+	beq	conin25a		;process it as unshifted
 outside	cmpi.b	#$62,d1		;is it an "alt help" signal to dump the screen?
 
 	addq.w	#1,_dumpflg(a5)	;yes...switch the signal flag on!...
@@ -4314,7 +4356,7 @@ keycl:
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
-	.dc.b	"ASDFGHJKL",$99,$8e,"'",0,'|ZXCVBNM,.-',0,0,0,space,0
+.endif
 
 .if country == sweden
 
@@ -4346,7 +4388,7 @@ keycl:
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 
 .endif
-	.dc.b	"ASDFGHJKL",$b2,$92,"'",0,'|ZXCVBNM,.-',0,0,0,space,0
+	.dc.b	"ASDFGHJKL",$b2,$92,"'",0,$5c'ZXCVBNM,.-',0,0,0,space,0
 
 .if country == norway
 
@@ -4450,6 +4492,37 @@ keytran:
         dc.b    0,esc,'1234567890',"'",'^',bs,tab,'qwertzuiop',$8a,$B9,cr,0
         dc.b    "asdfghjkl",$82,$85,$DD,0,"$yxcvbnm,.-",0,0,0,space,0
 	.endc
+        dc.b    '-',0,0,0,'+',0,0,0,0,del
+	ifeq	COUNTRY-DENMARK
+        dc.b    '<',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+keyshif:
+        dc.b    0,esc,'+"*',$87,'%&/()=?`',bs,tab,'QWERTZUIOP',$81,'!',cr,0
+        dc.b    'ASDFGHJKL',$94,$84,$f8,0,$9c,'YXCVBNM;:_',0,0,0,space,0
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '78',0,'-4',0,'6+',0,'2',0,'0',del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '>',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+keycl:
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '-',0,0,0,'+',0,0,0,0,del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '<',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+.endif
+
+.if country == denmark
+
+keytran:
+	.dc.b   0,esc,"1234567890+",$ba,bs,tab,'qwertyuiop',$86,'*',cr,0
+	.dc.b	"asdfghjkl",$91,$b3,$82,0,'#','zxcvbnm,.-',0,0,0,space,0
+	endc
 	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
 	.dc.b	'<',0,0,'()/*7894561230.',cr

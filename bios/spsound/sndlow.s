@@ -393,7 +393,9 @@ micpsg:
 	and.w	#$0FFF,src_pathclk
 	btst	#0,devc_sclk+1(sp)
 	beq	intclk
-	or.w	#$2000,src_pathclk
+	or.w	#$6000,src_pathclk	; BUG FIX: documentation says
+					; $2000 necessary, but in fact
+					; both bits need to be '1'
 	bra	extclk
 
 extinp:

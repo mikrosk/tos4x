@@ -4,18 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/06/20 14:09:52 $
+* $Date: 91/08/05 15:15:33 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.7  91/08/05  15:15:33  apratt
+* Added code to compute checksums on the first N sectors of a disk
+* and compare with the old values, improving media-change detection
+* by comparing FATs.  In addition, the serial number written by
+* MSDOS versions 5.0 (4.0?) and newer is checked.  (This is all moot
+* if your GEMDOS discards cached information when there are no open
+* files and the media-change state is "maybe.")
+*
 * Revision 2.6  91/06/20  14:09:52  apratt
 * Added another bit in the flags word of the BPB: set flags & 2 when
 * the floppy claims to have fewer than two FATs.  New GEMDOSes
 * should check this and not write two FATs when this is set.
-*
+* 
 * Revision 2.5  91/06/13  16:29:42  apratt
 * Added a check of the four-byte serial number that MSDOS 5.0 puts at offset
 * $27 in the boot sector.  For non-MSDOS 5.0 disks, this is just another four
@@ -68,7 +76,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.6 $
+* $Revision: 2.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -274,6 +282,17 @@ int curflop;			/* current floppy# inserted */
 #define	CHANGED	2		/* media has definitely changed */
 
 
+/*
+ * New media-change code.  Set CKSECTS to zero to disable this code. Eight
+ * is a good number to avoid the risk that a wierd format doesn't have nine
+ * sectors per track.
+ */
+
+#define CKSECTS 8		/* check first 8 sectors */
+
+#if CKSECTS
+WORD cksum[CKSECTS*2];		/* One word per sector per drive */
+#endif
 
 /*
  * dskinit - initialize floppy drives
@@ -321,6 +340,9 @@ WORD dev;
     register int i, j;
     char *s, *d;
     LONG ret, floprd(), critic();
+#if CKSECTS
+    char *ckptr;
+#endif
 
     if (dev >= 2)			/* only floppies here */
 	return NULL;			/* can't do much ... */
@@ -334,7 +356,11 @@ WORD dev;
      * Compute the DOS BPB from the MSDOS one.
      */
     do {
+#if CKSECTS
+	ret = floprd(diskbuf, 0L, dev, 1, 0, 0, CKSECTS);
+#else
 	ret = floprd(diskbuf, 0L, dev, 1, 0, 0, 1);
+#endif
 	if (ret < 0) ret = critic((WORD)ret, dev);
     } while (ret == CRITICAL_RETRY);
     if (ret < 0) return NULL;
@@ -377,6 +403,15 @@ WORD dev;
     for (i = 0; i < 4; ++i)
 	q->dmsd5_ser[i] = diskbuf[MSDOS5_SER + i];
 
+
+#if CKSECTS
+    /* compute checksums */
+    ckptr = diskbuf;
+    for (i=0; i<CKSECTS; i++) {
+	cksum[i] = checksum(ckptr,0x100);
+	ckptr += 0x200;
+    }
+#endif
 							/* make safe/unsure */
     diskmode[dev] = (wplatch[dev] = wpstatus[dev]) ? UNSURE : SAFE;
 
@@ -417,6 +452,76 @@ WORD dev;
  * this may involve a disk access.
  *
  */
+
+#if CKSECTS
+/*
+ * This is the #if branch of the CKSECTS media-change code, where we
+ * run a checksum on the first N sectors of the disk and compare them
+ * with the checksums of the disk we got via Getbpb.  In floprw(), each
+ * time one of the important sectors is written its checksum is updated.
+ */
+
+WORD chkmedia(dev)
+WORD dev;
+{
+    register struct dsb *p;
+    register char *ckptr;
+    register char *ptr2;
+    register int i;
+    register LONG ret;
+    WORD *ckval;
+    WORD mediach();
+    LONG floprw();
+
+    p = &dsbtab[dev];
+    i = mediach(dev);
+    if (i == CHANGED) return i;
+    else if (i == UNSURE) {
+	/* read the first CKSECTS sectors and check serial # & cksum */
+	do {
+	    ret = floprd(diskbuf,0L,dev,1,0,0,CKSECTS);
+	    if (ret < 0) ret = critic((WORD)ret,dev);
+	} while (ret == CRITICAL_RETRY);
+	if (ret < 0) return ret;
+
+	/* check old-style 3-byte serial number first */
+	ckptr = &diskbuf[VOL_SERIAL];
+	ptr2 = &p->dserial[0];
+	if (*ckptr != *ptr2 ||
+	    *(ckptr+1) != *(ptr2+1) ||
+	    *(ckptr+2) != *(ptr2+2))
+		return CHANGED;
+
+	/* check 4-byte MSDOS serial number */
+	ckptr = &diskbuf[MSDOS5_SER];
+	ptr2 = &p->dmsd5_ser[0];
+	if (*ckptr != *ptr2 ||
+	    *(ckptr+1) != *(ptr2+1) ||
+	    *(ckptr+2) != *(ptr2+2) ||
+	    *(ckptr+3) != *(ptr2+3))
+		return CHANGED;
+
+	/* for each sector, perform a checksum & compare */
+	ckptr = diskbuf;
+	ckval = &cksum[dev ? CKSECTS : 0];
+	for (i=0; i<CKSECTS; i++) {
+	    if (checksum(ckptr,0x100) != ckval[i]) return CHANGED;
+	    ckptr += 0x200;
+	}
+
+	/* reset the write-protect latch */
+	if (!(wplatch[dev] = wpstatus[dev]))
+	    diskmode[dev] = SAFE;
+    }
+    return SAFE;
+}
+#else
+/*
+ * This is the old media-change detection code, included #if !CKSECTS.  It
+ * checks the three-byte serial number in the boot sector, along with the
+ * 4-byte serial number introduced with MSDOS 5.0.
+ */
+
 WORD chkmedia(dev)
 WORD dev;
 {
@@ -464,7 +569,7 @@ WORD dev;
 
     return SAFE;
 }
-
+#endif
 
 /*
  * rwabs - read multiple sectors from dev, into a buffer:
@@ -529,7 +634,10 @@ WORD recno, dev, count;
     register WORD track, side, sect, cnt;
     WORD oddflag;
     LONG bf;
-
+#if CKSECTS
+    char *ckptr;
+    register int i;
+#endif
 
     p = &dsbtab[dev];
     oddflag = ((buf & 1) == 1);
@@ -558,12 +666,26 @@ WORD recno, dev, count;
 	     cnt = p->dspt - sect;		/* rest of track */
 	else cnt = count;			/* part of track */
 
-	++sect;					/* physical sector number */
+	if (bf != buf) fastcpy(buf, bf);	/* copy buf to bf if nec. */
+
+#if CKSECTS
+	/* if you're writing to track 0 side 0 sector < CKSECTS, redo cksum */
+	/* (note: sector numbers are still 0-based until ++sect below) */
+
+	if ((rw & 1) && (!(track | side)) && (sect < CKSECTS)) {
+	    ckptr = bf;
+	    for (i=0; i<cnt; i++) {
+		cksum[sect+i] = checksum(ckptr,0x100);
+		ckptr += 0x200;
+	    }
+	}
+#endif
+
+	++sect;		/* make sect a 1-based physical sector number */
 
 	do {
 	    if (rw & 1)					/* write */
 	    {
-		if (bf != buf) fastcpy(buf, bf);
 		ret = flopwr(bf, 0L, dev, sect, track, side, cnt);
 
 		if (!ret && fverify)			/* verify */
@@ -708,7 +830,6 @@ char proto_tab[] =
 		/* 80 tracks single sided */
  /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
 	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0x70,0x00, 0xd0,0x02,
-
  /*      MD    sec/fat   sec/track  nsides      N hidden */
 	0xf9, 0x05,0x00, 0x09,0x00, 0x01,0x00, 0x00,0x00,
  /* was 0xf8 -- AKP 2/88 */
@@ -723,13 +844,14 @@ char proto_tab[] =
  /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
 	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0xe0,0x00, 0x40,0x0b,
  /*      MD    sec/fat   sec/track  nsides      N hidden */
-	0xf9, 0x05,0x00, 0x12,0x00, 0x02,0x00, 0x00,0x00,
+	0xf0, 0x05,0x00, 0x12,0x00, 0x02,0x00, 0x00,0x00,
+ /* MSDOS 5.0 uses f0 as the media descriptor.  The 3.3 docs read "other." */
 
  /* AKP: Added type 5: 80 tracks double sided 2.88MB (quad density) */
  /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
 	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0xe0,0x00, 0x80,0x16,
  /*      MD    sec/fat   sec/track  nsides      N hidden */
-	0xf9, 0x0a,0x00, 0x24,0x00, 0x02,0x00, 0x00,0x00
+	0xf0, 0x0a,0x00, 0x24,0x00, 0x02,0x00, 0x00,0x00
 /* 10 sectors/fat means you can use this prototype for 40 sectors per track */
 
 };
@@ -812,11 +934,16 @@ WORD dsksiz, execflg;
 /*
  * Compute checksum of a number of 16-bit words.
  */
-WORD checksum(p, cnt)
-WORD *p;
-int cnt;
+WORD checksum(xp, xcnt)
+WORD *xp;
+int xcnt;
 {
     register WORD i;
+    register WORD cnt;
+    register WORD *p;
+
+    cnt = xcnt;
+    p = xp;
 
     for (i = 0; cnt--;)
 	i += *p++;

@@ -4,15 +4,37 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/28 02:00:06 $
+* $Date: 1992/02/28 08:24:44 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.90  1992/02/28  02:00:06  apratt
-* Added .globl coldboot to import it.
+* Revision 2.91  1992/02/28  08:24:44  apratt
+* Changed TT to M68030 in some places, where it's really CPU dependency we're
+* talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
+* in any other way. (Well, it has the same clock chip.)
+*
+* The Sparrow people in Dallas want the SPAR_CONF register to be read
+* and the appropriate bits written to VMC even before the diag cart is
+* checked, so I moved the code.
+*
+* I added test-and-set of the Sparrow power-fail bit for cold-boot detection.
+*
+* I added a hit on color0 to throw Sparrow video more completely into ST mode.
+* Hmm, maybe reading isn't enough?
+*
+* Clear _iamanst if you're on Sparrow.
+*
+* I made Rwabs go through the tt_rw code (now called m030_rw). It was
+* supposed to all along but it didn't.
+*
+* There is still a bug: if you are a TT and you don't have an FPU you will
+* die. The FPU reset code and the FPU probe code need to agree better, and
+* need to work when (A) there is no FPU, and (B) the FPU is signalling an
+* exception, or will as a result of the probe instruction, and exceptions
+* are enabled.
 *
 * Revision 2.90  1992/02/28  02:00:06  apratt
 * Added .globl coldboot to import it.
@@ -285,7 +307,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.90 $
+* $Revision: 2.91 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $

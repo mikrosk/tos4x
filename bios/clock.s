@@ -4,18 +4,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/22 16:42:45 $
+* $Date: 89/12/08 15:40:49 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.5  89/12/08  15:40:49  apratt
+* Changed TT clock code to use bitfield instructions.
+* Also fixes a bug: the minutes were set to half the correct value.
+*
 * Revision 2.4  89/09/22  16:42:45  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
 * require Alcyon's AS68 assembler.
-*
+* 
 * Revision 2.3  89/08/29  15:13:19  apratt
 * Fixed TT clock code (I hope).
 * 
@@ -42,7 +46,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.4 $
+* $Revision: 2.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -513,9 +517,17 @@ _getclock:
 	btst.b	#7,RTCD
 	beq	gclfail
 
-* I don't know if you have to reload RTCA each time or not. Can't hurt.
+* You have to reload REGA every time, even if you're reading the same
+* register over and over.
 
-gwait:	move.b	#REGA,RTCA
+	move.w	sr,d2
+	move.w	d2,d0
+	or.w	#$0700,d0	; d0 is IPL 7 sr, d2 is old sr.
+
+gwait:*	move.w	d2,sr		; allow interrupts
+*	nop			; (BRIEFLY!)
+*	move.w	d0,sr		; now IPL 7
+	move.b	#REGA,RTCA
 	btst.b	#7,RTCD	; test UIP bit
 	bne	gwait		; wait until it's clear
 
@@ -526,32 +538,22 @@ gwait:	move.b	#REGA,RTCA
 	asr.w	#1,d0		; GEMDOS tells times in pairs of seconds
 	move.b	#MIN,RTCA
 	move.b	RTCD,d1
-	asl.w	#4,d1
-	or.w	d1,d0
+	bfins	d1,d0{21:6}	; hooray for BF instructions!
 	move.b	#HOUR,RTCA
-	moveq.l	#0,d1
 	move.b	RTCD,d1
-	asl.w	#8,d1
-	asl.w	#3,d1
-	or.w	d1,d0		; d0 is now complete GEMDOS time
-	swap	d0
-
-	moveq.l	#0,d1
+	bfins	d1,d0{16:5}
 
 	move.b	#DAY,RTCA
-	move.b	RTCD,d0
+	move.b	RTCD,d1
+	bfins	d1,d0{11:5}
 	move.b	#MONTH,RTCA
 	move.b	RTCD,d1
-	asl.w	#5,d1
-	or.w	d1,d0
-	moveq.l	#0,d1
+	bfins	d1,d0{7:4}
 	move.b	#YEAR,RTCA
 	move.b	RTCD,d1
-	sub.w	#$a,d1		; subtract 10 for years since 1980
-	asl.w	#8,d1
-	asl.w	#1,d1
-	or.w	d1,d0		; d0 is now complete GEMDOS date
-	swap	d0
+	sub.b	#10,d1		; subtract 10 for yr since 1980, not 1970
+	bfins	d1,d0{0:7}
+	move.w	d2,sr		; restore original IPL
 	rts
 
 gclfail:
@@ -578,30 +580,6 @@ _setclock:
 	bsr	clktest
 	bcs	iclkfail	; use a handy error return (above)
 	move.l	4(sp),d0
-	subq.l	#6,sp		; get some stack space
-	move.w	d0,d1
-	and.w	#%11111,d1
-	asl.w	#1,d1
-	move.b	d1,5(sp)	; write seconds
-	lsr.l	#5,d0
-	move.w	d0,d1
-	and.w	#%111111,d1
-	move.b	d1,4(sp)	; write minutes
-	lsr.l	#6,d0
-	move.w	d0,d1
-	and.w	#%11111,d1
-	move.b	d1,3(sp)	; write hours
-	lsr.l	#5,d0
-	move.w	d0,d1
-	and.w	#%11111,d1
-	move.b	d1,2(sp)	; write day
-	lsr.w	#5,d0
-	move.w	d0,d1
-	and.w	#%1111,d1
-	move.b	d1,1(sp)	; write month
-	lsr.w	#4,d0
-	add.w	#10,d0		; add 10 to get year since 1970
-	move.b	d0,(sp)		; write year
 
 	move.b	#REGB,RTCA
 	move.b	#$80,RTCD	; set the SET bit and clear all else
@@ -611,21 +589,33 @@ _setclock:
 	move.b	#%10001110,RTCD	; SET, enable SQWE, DM=binary, 24hr
 
 	move.b	#SEC,RTCA
-	move.b	5(sp),RTCD	; set seconds
+	bfextu	d0{27:5},d1
+	add.b	d1,d1
+	move.b	d1,RTCD
+
 	move.b	#MIN,RTCA
-	move.b	4(sp),RTCD
+	bfextu	d0{21:6},d1
+	move.b	d1,RTCD
+
 	move.b	#HOUR,RTCA
-	move.b	3(sp),RTCD
+	bfextu	d0{16:5},d1
+	move.b	d1,RTCD
+
 	move.b	#DAY,RTCA
-	move.b	2(sp),RTCD
+	bfextu	d0{11:5},d1
+	move.b	d1,RTCD
+
 	move.b	#MONTH,RTCA
-	move.b	1(sp),RTCD
+	bfextu	d0{7:4},d1
+	move.b	d1,RTCD
+
 	move.b	#YEAR,RTCA
-	move.b	(sp),RTCD
+	bfextu	d0{0:7},d1
+	add.b	#10,d1		; add 10 for years since 1970, not 1980
+	move.b	d1,RTCD
 
 	move.b	#REGB,RTCA
 	move.b	#%00001110,RTCD	; clear SET, leave others
-	add.w	#6,sp		; clean off stack space
 	rts
 
 *

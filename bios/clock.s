@@ -1,18 +1,24 @@
+.super
 ******************* Revision Control System *****************************
 *
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/29 15:13:19 $
+* $Date: 89/09/22 16:42:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.4  89/09/22  16:42:45  apratt
+* THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+* No functional changes from previous revision, which is the last to
+* require Alcyon's AS68 assembler.
+*
 * Revision 2.3  89/08/29  15:13:19  apratt
 * Fixed TT clock code (I hope).
-*
+* 
 * Revision 2.2  89/08/18  14:28:59  apratt
 * Added TT clock code. Not extensively tested. Includes switch for TT,
 * set to zero for not TT.
@@ -36,7 +42,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.3 $
+* $Revision: 2.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -59,7 +65,9 @@
 *									:
 *------------------------------------------------------------------------
 
-TT	equ	1
+* TT equate moved to switches.s
+
+.include "switches.s"
 
 	.globl	clktest		; test for clock chip (returns CC/CS)
 	.globl	_iclock		; clock setup
@@ -127,7 +135,7 @@ RD10YR	equ	$0
 *
 _iclock:
 	bsr	clktest			; test for clock chip
-	bcs.s	iclfai			; (not around)
+	bcs	iclfai			; (not around)
 
 *
 *  Get clock chip's time
@@ -135,11 +143,11 @@ _iclock:
 *
 	bsr	_getclock		; get chip's idea of the time
 	cmp.l	#-1,d0			; bad time?
-	beq.s	iclfai			; yes --- punt
+	beq	iclfai			; yes --- punt
 
-	move.w	d0,_time		; set GEMDOS time
+	move.w	d0,_time.w		; set GEMDOS time
 	swap	d0
-	move.w	d0,_date		; set GEMDOS date
+	move.w	d0,_date.w		; set GEMDOS date
 
 	moveq	#0,d0			; return "Ok fine"
 	rts
@@ -177,7 +185,7 @@ clktest:
 	movep.w	RT01MIN(a0),d1		;   and read them back
 	and.w	#$0f0f,d1		; clobber crufty bits
 	cmp.w	d0,d1			; compare?
-	bne.s	clkfai			; (no --- fail)
+	bne	clkfai			; (no --- fail)
 	move.b	#%0001,RT01SEC(a0)	; set 16.384Khz CKOUT mode
 	move.b	#%1000,RTMODE(a0)	; set "normal" bank
 	move.b	#0,RTTEST(a0)		; clobber test register
@@ -210,8 +218,8 @@ clkfai:	or	#1,ccr			; set carry
 _getclock:
 	bsr	clktest			; test for clock-there
 	bcs	gclfai			; punt on failure
-	lea	read1,a1		; a1 -> clock data buffer
-	lea	read2,a2		; a2 -> alternate clock data buffer
+	lea	read1.w,a1		; a1 -> clock data buffer
+	lea	read2.w,a2		; a2 -> alternate clock data buffer
 	bsr	readclk			; read clock into &a1
 
 rdagn:	exg	a1,a2			; swap buffer pointers
@@ -220,7 +228,7 @@ rdagn:	exg	a1,a2			; swap buffer pointers
 	moveq	#READS-1,d0		; d0 = DBRA #bytes to compare
 cmplup:	move.b	(a1,d0.w),d1		; get first byte
 	cmp.b	(a2,d0.w),d1		; ... compare
-	bne.s	rdagn			; re-read clock on mismatch
+	bne	rdagn			; re-read clock on mismatch
 	dbra	d0,cmplup		; (compare all bytes)
 
 *
@@ -320,7 +328,7 @@ gclfai:	moveq	#-1,d0			; return -1L on failure
 _setclock:
 	bsr	clktest			; test for clock chip
 	bcs	sclerr			; punt if chip doesn't exist
-	lea	read1,a1		; a1 -> buffer for clock data to write
+	lea	read1.w,a1		; a1 -> buffer for clock data to write
 
 *
 *  Convert time to chip format
@@ -456,15 +464,15 @@ REGD	equ	$d
 *
 
 _iclock:
-	bsr	clktest		; chip present? (this clears a2 for zeropage)
+	bsr	clktest		; chip present?
 	bcs.b	iclkfail	; missing; give up.
 
 * chip is present; test VRT bit (Valid RAM and Time)
 
-	move.b	#REGD,RTCA(a2)
-	move.b	RTCD(a2),d0
+	move.b	#REGD,RTCA
+	move.b	RTCD,d0
 	btst	#7,d0		; VRT bit set?
-	bne.s	timeok		; yes - it's fine
+	bne	timeok		; yes - it's fine
 
 * VRT is clear - set a sane time & date & initialize the chip
 *
@@ -476,10 +484,10 @@ _iclock:
 timeok:
 	bsr	_getclock
 	cmp.l	#-1,d0
-	beq.s	iclkfail
-	move.w	d0,_time
+	beq	iclkfail
+	move.w	d0,_time.w
 	swap	d0
-	move.w	d0,_date
+	move.w	d0,_date.w
 
 	moveq.l	#0,d0
 	rts
@@ -499,30 +507,30 @@ iclkfail:
 *
 
 _getclock:
-	bsr	clktest		; (this also clears a2 for zeropage)
+	bsr	clktest
 	bcs	iclkfail	; use a handy error return (above)
-	move.b	#REGD,RTCA(a2)
-	btst.b	#7,RTCD(a2)
-	beq.s	gclfail
+	move.b	#REGD,RTCA
+	btst.b	#7,RTCD
+	beq	gclfail
 
 * I don't know if you have to reload RTCA each time or not. Can't hurt.
 
-gwait:	move.b	#REGA,RTCA(a2)
-	btst.b	#7,RTCD(a2)	; test UIP bit
+gwait:	move.b	#REGA,RTCA
+	btst.b	#7,RTCD	; test UIP bit
 	bne	gwait		; wait until it's clear
 
 	moveq.l	#0,d0
 	move.l	d0,d1
-	move.b	#SEC,RTCA(a2)
-	move.b	RTCD(a2),d0
+	move.b	#SEC,RTCA
+	move.b	RTCD,d0
 	asr.w	#1,d0		; GEMDOS tells times in pairs of seconds
-	move.b	#MIN,RTCA(a2)
-	move.b	RTCD(a2),d1
+	move.b	#MIN,RTCA
+	move.b	RTCD,d1
 	asl.w	#4,d1
 	or.w	d1,d0
-	move.b	#HOUR,RTCA(a2)
+	move.b	#HOUR,RTCA
 	moveq.l	#0,d1
-	move.b	RTCD(a2),d1
+	move.b	RTCD,d1
 	asl.w	#8,d1
 	asl.w	#3,d1
 	or.w	d1,d0		; d0 is now complete GEMDOS time
@@ -530,15 +538,15 @@ gwait:	move.b	#REGA,RTCA(a2)
 
 	moveq.l	#0,d1
 
-	move.b	#DAY,RTCA(a2)
-	move.b	RTCD(a2),d0
-	move.b	#MONTH,RTCA(a2)
-	move.b	RTCD(a2),d1
+	move.b	#DAY,RTCA
+	move.b	RTCD,d0
+	move.b	#MONTH,RTCA
+	move.b	RTCD,d1
 	asl.w	#5,d1
 	or.w	d1,d0
 	moveq.l	#0,d1
-	move.b	#YEAR,RTCA(a2)
-	move.b	RTCD(a2),d1
+	move.b	#YEAR,RTCA
+	move.b	RTCD,d1
 	sub.w	#$a,d1		; subtract 10 for years since 1980
 	asl.w	#8,d1
 	asl.w	#1,d1
@@ -567,7 +575,7 @@ gclfail:
 *
 
 _setclock:
-	bsr	clktest		; (this also clears a2 for zeropage)
+	bsr	clktest
 	bcs	iclkfail	; use a handy error return (above)
 	move.l	4(sp),d0
 	subq.l	#6,sp		; get some stack space
@@ -595,28 +603,28 @@ _setclock:
 	add.w	#10,d0		; add 10 to get year since 1970
 	move.b	d0,(sp)		; write year
 
-	move.b	#REGB,RTCA(a2)
-	move.b	#$80,RTCD(a2)	; set the SET bit and clear all else
-	move.b	#REGA,RTCA(a2)
-	move.b	#$2a,RTCD(a2)	; set 32KHz input, 64Hz periodic
-	move.b	#REGB,RTCA(a2)
-	move.b	#%10001110,RTCD(a2)	; SET, enable SQWE, DM=binary, 24hr
+	move.b	#REGB,RTCA
+	move.b	#$80,RTCD	; set the SET bit and clear all else
+	move.b	#REGA,RTCA
+	move.b	#$2a,RTCD	; set 32KHz input, 64Hz periodic
+	move.b	#REGB,RTCA
+	move.b	#%10001110,RTCD	; SET, enable SQWE, DM=binary, 24hr
 
-	move.b	#SEC,RTCA(a2)
-	move.b	5(sp),RTCD(a2)	; set seconds
-	move.b	#MIN,RTCA(a2)
-	move.b	4(sp),RTCD(a2)
-	move.b	#HOUR,RTCA(a2)
-	move.b	3(sp),RTCD(a2)
-	move.b	#DAY,RTCA(a2)
-	move.b	2(sp),RTCD(a2)
-	move.b	#MONTH,RTCA(a2)
-	move.b	1(sp),RTCD(a2)
-	move.b	#YEAR,RTCA(a2)
-	move.b	(sp),RTCD(a2)
+	move.b	#SEC,RTCA
+	move.b	5(sp),RTCD	; set seconds
+	move.b	#MIN,RTCA
+	move.b	4(sp),RTCD
+	move.b	#HOUR,RTCA
+	move.b	3(sp),RTCD
+	move.b	#DAY,RTCA
+	move.b	2(sp),RTCD
+	move.b	#MONTH,RTCA
+	move.b	1(sp),RTCD
+	move.b	#YEAR,RTCA
+	move.b	(sp),RTCD
 
-	move.b	#REGB,RTCA(a2)
-	move.b	#%00001110,RTCD(a2)	; clear SET, leave others
+	move.b	#REGB,RTCA
+	move.b	#%00001110,RTCD	; clear SET, leave others
 	add.w	#6,sp		; clean off stack space
 	rts
 
@@ -625,16 +633,15 @@ _setclock:
 *
 
 clktest:
-	clr.l	a2		; handy zeropage (don't use a5!)
 	move.l	sp,a0
 	move.l	$8,a1
 	move.l	#berr,$8
 
-	move.b	#0,RTCA(a2)
-	move.b	RTCD(a2),d0	; read seconds register
+	move.b	#0,RTCA
+	move.b	RTCD,d0		; read seconds register
 
 	move.l	a1,$8		; restore bus error vector
-	and.w	#$fe,ccr	; clear carry bit
+	and	#$fe,ccr	; clear carry bit
 	rts			; and return
 
 berr:	move.l	a0,sp		; restore SP after bus error

@@ -1,21 +1,27 @@
+.super
 ******************* Revision Control System *****************************
 *
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/12 12:57:08 $
+* $Date: 89/09/22 16:39:12 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.7  89/09/22  16:39:12  apratt
+* THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+* No functional changes from previous revision, which is the last to
+* require Alcyon's AS68 assembler.
+*
 * Revision 2.6  89/09/12  12:57:08  apratt
 * Fixed bad initialization of serial port; added dummy read of TSR
 * at end of txerror as 68901 book suggests; changed use of bclr
 * when clearing ISR into move with all bits 1 except the one to clear:
 * this is also required by the 68901 book.
-*
+* 
 * Revision 2.5  89/07/27  18:01:56  apratt
 * Added kcl_hook and bell_hook usage here (usu. they're def_click
 * and def_bell).
@@ -54,7 +60,7 @@
 * nearby.  Big deal.
 * 
 * Revision 1.18  88/12/13  16:12:13  apratt
-* Added (a5) to lots of otherwise-long accesses, both to low RAM and
+* Added .w to lots of otherwise-long accesses, both to low RAM and
 * high I/O space.
 * 
 * Revision 1.17  88/11/18  11:04:15  apratt
@@ -128,7 +134,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.6 $
+* $Revision: 2.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -161,22 +167,26 @@
 *		general equates for the rbp system rom			*
 *									*
 *************************************************************************
-USA		equ	0 ***DON'T  CHANGE***
-UK		equ	1 ***DON'T  CHANGE***
-GERMANY		equ	2 ***DON'T  CHANGE***
-FRANCE		equ	3 ***DON'T  CHANGE***
-SPAIN		equ	4 ***DON'T  CHANGE***
-ITALY		equ	6 ***DON'T  CHANGE***
-SWEDEN		equ	5 ***DON'T  CHANGE***
-SWISSFRA	equ	7 ***DON'T  CHANGE*** French text swiss/fra keyboard
-SWISSGER	equ	8 ***DON'T  CHANGE*** german text swis/ger keyboard
-TURKEY		equ     9 ***DON'T  CHANGE***
-FINLAND		equ     5 ***DON'T  CHANGE*** same as swedish keyboard
-NORWAY		equ    11 ***DON'T  CHANGE***
-DENMARK		equ    12
+usa		equ	0 ***DON'T  CHANGE***
+uk		equ	1 ***DON'T  CHANGE***
+germany		equ	2 ***DON'T  CHANGE***
+france		equ	3 ***DON'T  CHANGE***
+spain		equ	4 ***DON'T  CHANGE***
+italy		equ	6 ***DON'T  CHANGE***
+sweden		equ	5 ***DON'T  CHANGE***
+swissfra	equ	7 ***DON'T  CHANGE*** French text swiss/fra keyboard
+swissger	equ	8 ***DON'T  CHANGE*** german text swis/ger keyboard
+turkey		equ     9 ***DON'T  CHANGE***
+finland		equ     5 ***DON'T  CHANGE*** same as swedish keyboard
+norway		equ    11 ***DON'T  CHANGE***
+denmark		equ    12
 
-COUNTRY	equ	USA	;set country of origin @check@
-TT	equ	1	; set to 1 for TT, zero for ST and STE @check@
+*
+* TT and country equates moved to switches.s, which is normally a 
+* copy of one of the canned switches files.
+* 
+
+.include "switches.s"
 
 
 *	Revision B Upgrades:
@@ -529,67 +539,67 @@ minsize		equ	$80
 *		operating system memory space				*
 *	Baud rate shadow variable -- returned by Rsconf(-2)
 *
-baudrate	ds.w	1
+baudrate:	ds.w	1
 
 *
 *************************************************************************
 
-ribuffer	ds.b	rbufsize	;rs-232 input buffer
-robuffer	ds.b	rbufsize	;rs-232 output buffer
+	.bss
+
 *
 *	MFP RS-232 Buffers and I/O Buffer Record
 *
 ribuffer:	ds.b	rbufsize	;rs-232 input buffer
-ribufptr	ds.l	1		* Input Buffer Record
-ribufsiz	ds.w	1
-ribufhead	ds.w	1
-ribuftail	ds.w	1
-ribuflow	ds.w	1
-ribufhigh	ds.w	1
+robuffer:	ds.b	rbufsize	;rs-232 output buffer
+
+*
+*	RS-232 I/O Buffer Record
+*
+ribufptr:	ds.l	1		* Input Buffer Record
 ribufsiz:	ds.w	1
 ribufhead:	ds.w	1
 ribuftail:	ds.w	1
 ribuflow:	ds.w	1
-robufptr	ds.l	1		* Output Buffer Record
-robufsiz	ds.w	1
-robufhead	ds.w	1
-robuftail	ds.w	1
-robuflow	ds.w	1
-robufhigh	ds.w	1
+ribufhigh:	ds.w	1
+*
+*	NOTE: THESE TWO BUFFERS MUST REMAIN CONTIGUOUS
+*		(Don't Thank Me, Thank Dave!)
+*
+robufptr:	ds.l	1		* Output Buffer Record
 robufsiz:	ds.w	1
-rsrbyte		ds.b	1		* Other Associated Variables
-tsrbyte		ds.b	1
-rirxoff		ds.b	1
-ritxoff		ds.b	1
-rirsmode	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
+robufhead:	ds.w	1
+robuftail:	ds.w	1
+robuflow:	ds.w	1
+robufhigh:	ds.w	1
+
 *					* Bit 1 = Handshake (0=Disabled)
-risendnow	ds.b	1
+risendnow:	ds.b	1
 ritxoff:	ds.b	1
 risendnow:	ds.b	1		* flag/char to send NOW
 auxbrate:	ds.b	1		* saved brate value for Rsconf(-2)
 auxmask:	ds.b	1		* unused
-kibufptr	ds.l	1
-kibufsiz	ds.w	1
-kibufhead	ds.w	1
-kibuftail	ds.w	1
-kibuflow	ds.w	1
-kibufhigh	ds.w	1
+
+
+*
+*	keyboard rs232 port routines variable space
+*
+kibufptr:	ds.l	1
 kibufsiz:	ds.w	1
 kibufhead:	ds.w	1
-kibuffer	ds.b	kinsize		;keyboard input buffer
+kibuftail:	ds.w	1
 kibuflow:	ds.w	1
 kibufhigh:	ds.w	1
 kbufrec		equ	kibufptr
 
-mibufptr	ds.l	1
-mibufsiz	ds.w	1
-mibufhead	ds.w	1
-mibuftail	ds.w	1
-mibuflow	ds.w	1
-mibufhigh	ds.w	1
+kibuffer:	ds.b	kinsize		;keyboard input buffer
+
+*
+*	midi rs232 port routines variable space
+*
+mibufptr:	ds.l	1
 mibufsiz:	ds.w	1
 mibufhead:	ds.w	1
-mibuffer	ds.b	minsize		;midi input buffer
+mibuftail:	ds.w	1
 mibuflow:	ds.w	1
 mibufhigh:	ds.w	1
 mbufrec		equ	mibufptr
@@ -599,17 +609,17 @@ mibuffer:	ds.b	minsize		;midi input buffer
 
 *	Acia error handler vectors -- init'ed to point to 'rte' unless
 *
-midivec		ds.l	1	;midi interrupt handler vector
-vkbderr		ds.l	1	;keyboard error handler address
-vmiderr		ds.l	1	;midi error handler address
-statintvec	ds.l	1	;general ikbd status record interrupt vector
-msintvec	ds.l	1	;mouse interrupt vector
-clkintvec	ds.l	1	;ikbd real-time clock interrupt vector
-joyintvec	ds.l	1	;general joystick interrupt vector
-midisys		ds.l	1	;midi system interrupt handler
-ikbdsys		ds.l	1	;ikbd system interrupt handler
-kstate		ds.b	1	;present state of ikbd reception routine
-kindex		ds.b	1	;index used to count down bytes left to
+
+ikbdkey:	ds.l	1	;this is Kbdvbase()-4 (see above)
+
+* Kbdvbase returns a pointer to midivec.
+
+midivec:	ds.l	1	;midi interrupt handler vector
+vkbderr:	ds.l	1	;keyboard error handler address
+vmiderr:	ds.l	1	;midi error handler address
+statintvec:	ds.l	1	;general ikbd status record interrupt vector
+msintvec:	ds.l	1	;mouse interrupt vector
+clkintvec:	ds.l	1	;ikbd real-time clock interrupt vector
 joyintvec:	ds.l	1	;general joystick interrupt vector
 
 kstate:		ds.b	1	;present state of ikbd reception routine
@@ -656,18 +666,18 @@ joy1	equ	7
 
 statdex	equ	7
 amdex	equ	5
-statrec		ds.b	statdex
-amrec		ds.b	amdex
-mousebuf	ds.b	rmdex
-clkrec		ds.b	clkdex
-joyrec		ds.b	joyadex
+rmdex	equ	3
+clkdex	equ	6
+joyadex	equ	3
+joydex	equ	1
+
 statrec:	ds.b	statdex
-datetime	ds.l	1	;jdos variable
-newtime		ds.l	1	;jdos variable
-oclkrec		ds.b	clkdex	;used to assemble and send a new t.o.d. record
+amrec:		ds.b	amdex
+mousebuf:	ds.b	rmdex
+clkrec:		ds.b	clkdex
 joyrec:		ds.b	joyadex
 
-kmbuf		ds.b	3	;key-emulating mouse buffer
+datetime:	ds.l	1	;jdos variable
 newtime:	ds.l	1	;jdos variable
 oclkrec:	ds.b	clkdex	;used to assemble and send a new t.o.d. record
 *				;to the ikbd
@@ -679,43 +689,43 @@ kmbuf:		ds.b	3	;key-emulating mouse buffer
 KBRSH	EQU	0		* right shift
 KBLSH	EQU	1		* left shift
 KBCTL	EQU	2		* control key
-kbshift		ds.b	1
+KBALT	EQU	3		* alternate key
 KBCL	EQU	4		* caps lock
 KBMRB	EQU	5		* right mouse button (clr/home)
 KBMLB	EQU	6		* left mouse button (insert)
-skeytran	ds.l	1	;contains address for unshifted key translation
-skeyshif	ds.l	1	;contains address for shifted key translation
-skeycl		ds.l	1	;contains address for caps-lock key translation
+
+kbshift:	ds.b	1
+
 initsize	equ	kbshift-kstate-1	;area to be inited to zero!
 
 skeytran:	ds.l	1	;contains address for unshifted key translation
-transbuf	ds.b	17	;temporary string buffer for mouse init's
+skeyshif:	ds.l	1	;contains address for shifted key translation
 skeycl:		ds.l	1	;contains address for caps-lock key translation
 
 *	mouse init transfer string buffer
 
 transbuf:	ds.b	17	;temporary string buffer for mouse init's
-keyrep		ds.b	1
-kdelay1		ds.b	1	;must start on word boundary
-kdelay2		ds.b	1
-cdelay1		ds.b	1	;must start on word boundary
-cdelay2		ds.b	1
+
+*	keyrepeat variables
+
+timerate	equ	200	;timer c rate in Hz.
+
 keyrep:		ds.b	1
 kdelay1:	ds.b	1	;must start on word boundary
 kdelay2:	ds.b	1
 cdelay1:	ds.b	1	;must start on word boundary
 cdelay2:	ds.b	1
 tdelay1		equ	15	;delay before key repeat engages
-prt_to		ds.l	1
+tdelay2		equ	2	;delay before key repeats after
 *				;key repeat is activated
-tc_rot		ds.w	1	;divisor byte for timer c interrupt
+
 *	parallel timeout counter
 
 prt_to:		ds.l	1
 
-cursnd		ds.l	1
-timer		ds.b	1
-auxd		ds.b	1
+tc_rot:		ds.w	1	;divisor byte for timer c interrupt
+
+*
 *	Dave Staugas' Sound Driver variables
 *
 cursnd:		ds.l	1
@@ -732,7 +742,7 @@ auxd:		ds.b	1
 *	bit 3	-	style of output (_DRAFT/FINAL)
 *	bit 2	-	type of printer (_DOT MATRIX/DAISY WHEEL)
 *	bit 1	-	type of ink (_MONOCHROME/COLOR)
-pconfig		ds.w	1
+*	bit 0	-	manufacturer (_ATARI/EPSON COMPATIBLE)
 *
 *	note all underscored settings are the default and are represented
 *	by their corresponding bit set to "0"
@@ -743,7 +753,7 @@ pconfig:	ds.w	1
 *	console and terminal flag bits
 *	bit 0 - keyclick enabled
 *	bit 1 - repeat key function enabled
-newtod	ds.b	1	;handshaking flag for get time of day function
+*	bit 2 - keyboard "^g" bell feature enabled
 *	bit 3 - concatenate KBSHIFT to high byte/high word of buffered
 *		long word keystroke enable
 
@@ -770,8 +780,7 @@ newtod:	ds.b	1	;handshaking flag for get time of day function
 *************************************************************************
 *************************************************************************
 *									*
-	lea	$0,a5		;address pointer to address base
-	lea	clkrec(a5),a0
+*	convert ikbd real-time clock format to jdos format		*
 *									*
 *************************************************************************
 
@@ -796,8 +805,8 @@ jdostime:
 
 	bsr	bcdbin
 	add.b	d0,d2
-	move.l	d2,datetime(a5)
-	move.b	#$0,newtod(a5)	;clear handshaking flag
+	asl.l	#5,d2
+
 	bsr	bcdbin
 	lsr.b	d0		;adjust to provide two second increments...
 	add.b	d0,d2		;...another @!#%@#$% kludge, thank you !
@@ -813,17 +822,17 @@ jdostime:
 *									*
 *	long	gettime()						*
 *									*
-	move.b	#$-1,newtod(a5)	;set handshaking flag
+*************************************************************************
 
 	.globl	gettime
-	move.l	_hz_200(a5),a0	; use an A register for
+
 gettime:
 	move.b	#-1,newtod.w	;set handshaking flag
-gtod1:	cmp.l	_hz_200(a5),a0	; has 1 sec elapsed?
+	move.b	#gettod,d1	;send get time of day command
 	bsr	ikbdput
-	tst.b	newtod(a5)	;see if the new time of day is in yet...
+	move.l	_hz_200.w,a0	; use an A register for
 	add.w	#200,a0		; cheap sign-extension (1 sec timeout)
-	move.l	datetime(a5),d0
+	moveq.l	#0,d0		; return 0.l if we time out
 gtod1:	cmp.l	_hz_200.w,a0	; has 1 sec elapsed?
 	bcs	gtod2		; give up: no time is coming
 	tst.b	newtod.w	;see if the new time of day is in yet...
@@ -840,7 +849,7 @@ gtod2:	rts
 *	void	settime(newtime)					*
 *	long	newtime							*
 *									*
-	move.l	4(sp),newtime(a5)
+*************************************************************************
 
 	.globl	settime
 
@@ -852,7 +861,7 @@ settime:
 *	convert jdos format to ikbd real-time clock format		*
 *									*
 *************************************************************************
-	move.l	newtime(a5),d2	;get time to convert
+
 	.globl	ikbdtime
 
 ikbdtime:
@@ -951,8 +960,8 @@ bcdbin:
 *									*
 *	returns true/okay to send = -1,  false/not ready = 0		*
 *									*
-	moveq	#$-1,d0		;pre-set to true
-	move.b	comstat+midi(a5),d2	;grab midi status
+*************************************************************************
+
 	.globl	midiost
 
 midiost:
@@ -974,7 +983,7 @@ midiox:	rts
 *									*
 *************************************************************************
 
-	lea	midi(a5),a1	;point to midi register base
+	.globl	midiwc
 
 midiwc:
 	move.w	6(sp),d1
@@ -1022,9 +1031,9 @@ midp1:
 *									*
 *	-1 signifies true/okay  0 - signifies false/no characters	*
 *									*
-	lea	mbufrec(a5),a0	;point to midi i/o bufrec
-	lea	midi(a5),a1	;point to midi register base
-	moveq	#$-1,d0		;set result to true
+*************************************************************************
+
+	.globl	midstat
 
 midstat:
 	lea	mbufrec.w,a0	;point to midi i/o bufrec
@@ -1074,11 +1083,11 @@ midin:
 	beq.b	mwi2		;yes
 
 *	check for wrap of pointer
-mwi1	move.l	bufptr(a0),a1	;get base address of buffer
+
 	addq.w	#1,d1		;i=h+1
 	bcs.b	mwi1		;no...
 	moveq	#$0,d1		;wrap pointer
-mwi2	move	(sp)+,sr
+mwi1:	move.l	bufptr(a0),a1	;get base address of buffer
 	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
 	moveq.l	#0,d0		;pre-clear return value (10/91)
 	move.b	0(a1,d1.l),d0	;get character
@@ -1101,40 +1110,40 @@ mwi2:	move	(sp)+,sr
 *************************************************************************
 
 	.globl	_lstout
-	btst	#4,pconfig(a5)	;check for I/O redirection of users output
+
 _lstout:
 *
 *	redirection code added 9/11/85 to take advantage of redirection bit
-	move.l	_hz_200(a5),d2	; d2 = hz_200 - prt_to
-	sub.l	prt_to(a5),d2	; (compute time since last timeout)
+*
+	btst	#4,pconfig.w	;check for I/O redirection of users output
 	bne	_auxout		;bit was set, so send output to rs-232 port
 *
 *
-	move.l	_hz_200(a5),d2	; d2 = starting time for this char
-pt0	bsr.b	_lstostat	;go get parallel port status
+	move.l	_hz_200.w,d2	; d2 = hz_200 - prt_to
+	sub.l	prt_to.w,d2	; (compute time since last timeout)
 	cmpi.l	#5*200,d2	; do "fake" timeout if we timed out within
 	bcs.b	lperr		; the last five seconds
 
-	move.l	_hz_200(a5),d3	; d3 = hz_200 - d2
+	move.l	_hz_200.w,d2	; d2 = starting time for this char
 pt0:	bsr	_lstostat	;go get parallel port status
 	tst.w	d0		;...and check for high (busy)
 	bne.b	pt1		; port is ready -- print the char
 
-lperr	moveq	#$0,d0		; return value of 0 indicates timeout
-	move.l	_hz_200(a5),prt_to(a5)	; record time of last timeout
+	move.l	_hz_200.w,d3	; d3 = hz_200 - d2
+	sub.l	d2,d3
 	cmpi.l	#30*200,d3	; check for 30 second delta
 	blt.b	pt0		; continue if no timeout
-pt1	move.w	sr,d3		;save status register
+
 lperr:	moveq	#$0,d0		; return value of 0 indicates timeout
 	move.l	_hz_200.w,prt_to.w	; record time of last timeout
 	rts
 
-	moveq	#mixer+$80,d1	;set to write to io enable
+pt1:	move.w	sr,d3		;save status register
 	ori.w	#$700,sr	;protect upcoming switching of the port setting
 	moveq	#mixer,d1	;get current io enable register contents
 	bsr	gientry
 	ori.b	#$80,d0	 	;set port b for output
-	moveq	#portb+$80,d1	;write out byte to parallel port
+	move.b	#mixer+$80,d1	;set to write to io enable ;;q
 	bsr	gientry
 	move.w	d3,sr		;restore status register
 
@@ -1146,15 +1155,15 @@ lperr:	moveq	#$0,d0		; return value of 0 indicates timeout
 * added 11/2/88 AKP
 	move.w	sr,-(sp)
 	or.w	#$700,sr
-	moveq	#$-1,d0		;set d0=-1 for good transfer status
-lexit	rts
+	bsr.b	strobeon
+	bsr.b	strobeon	;9/11/85 added second call just to satisfy
 *				;timing requirements of some off brand printer
-strobeoff
+	bsr.b	strobeoff
 	move.w	(sp)+,sr
 	moveq	#-1,d0		;set d0=-1 for good transfer status
 lexit:	rts
-strobeon
-	moveq	#%11011111,d2	;set strobe on
+
+strobeoff:
 	moveq	#%00100000,d2	;set strobe off
 	bra	onbit	 	;go set it!!
 
@@ -1164,11 +1173,11 @@ strobeon:
 
 
 	.globl	_lstin
-	moveq	#mixer+$80,d1	;set to write to io enable
+
 _lstin:
 	moveq	#mixer,d1	;get current io enable register contents
 	bsr	gientry
-lstibusy
+	andi.b	#$7f,d0	 	;set port b for input
 	move.b	#mixer+$80,d1	;set to write to io enable ;;q
 	bsr	gientry
 
@@ -1187,11 +1196,11 @@ lstibusy:
 *									*
 *		parallel port status routine				*
 *									*
-	moveq	#$-1,d0		;pre-init to true (parallel port ready)
+*************************************************************************
 	.globl	_lstostat
 
 _lstostat:
-lst1	rts
+	lea	mfp,a0	 	;point to mfp register base
 	moveq	#-1,d0		;pre-init to true (parallel port ready)
 	btst.b	#$0,gpip(a0)
 	beq.b	lst1
@@ -1327,7 +1336,7 @@ kikxit:	rts
 *									*
 *	returns true/okay to send = -1,  false/not ready = 0		*
 *									*
-	moveq	#$-1,d0		;pre-set to true
+*************************************************************************
 
 	.globl	ikbdost
 
@@ -1404,8 +1413,8 @@ ikbdstr:
 	bsr.b	ikbdput
 	dbra	d3,ikbdstr
 	rts
-	lea	kbufrec(a5),a0	;point to ikbd buffer record
-	moveq	#$-1,d0		;set result to true
+
+
 	.globl	constat
 
 constat:
@@ -1435,11 +1444,11 @@ conin:
 	beq.b	cwi2		;yes
 
 *	check for wrap of pointer
-cwi1	move.l	bufptr(a0),a1	;get base address of buffer
+
 	addq.w	#4,d1		;i=h+4
 	cmp.w	bufsize(a0),d1	;? i>= current bufsiz?
 	bcs.b	cwi1		;no...
-cwi2	move	(sp)+,sr
+	moveq	#$0,d1		;wrap pointer
 cwi1:	move.l	bufptr(a0),a1	;get base address of buffer
 	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
 	move.l	0(a1,d1.l),d0	;get character
@@ -1497,8 +1506,8 @@ TT_mfp	equ	$fffffa81
 * This must be initialized with a value other than one, so noblank
 * and noblank1 don't wait forever.  God help you if you program the
 * timer to a one, then call something which calls noblank!
-	move.w	#$1111,tc_rot(a5)	;setup bitstream for /4 on timer c interrupt
-	move.w	#20,_timr_ms(a5)	;set timer calibration value
+
+	clr.b	tbdr		; any value but one is ok here.
 
 *	init the "c" timer
 
@@ -1531,24 +1540,24 @@ TT_mfp	equ	$fffffa81
 
 *	initialize the default rs-232 control line settings
 
-	lea	ribufptr(a5),a0
+	bsr	dtron
 	bsr	rtson
 
 	bsr	lbmove		;do block move and return
 
 	lea	ttrs232init,a1
 	moveq	#rssize,d0
-	lea	mbufrec(a5),a0
+	bsr	lbmove
 .endif
 
 *	initialize the midi buffer record structure
 
 	move.l	#aciaexit,d0	;init to ikbd and midi error handler address
-	move.l	d0,vkbderr(a5)	;init keyboard error handler address
-	move.l	d0,vmiderr(a5)	;init midi error handler address
-	move.l	#sysmidi,midivec(a5)	;point to user midi interrupt vector
-	move.l	#vecmidi,midisys(a5)	;point to system midi interrupt vector
-	move.l	#vecikbd,ikbdsys(a5)	;point to system ikbd interrupt vector
+
+*	mark the altkp accumulator as invalid
+	move.w	#-1,altkp
+
+	move.l	#aciaexit,d0
 	move.l	d0,vmiderr.w	;init midi error handler address
 	move.l	#sysmidi,midivec.w	;point to user midi interrupt vector
 	move.l	#vecmidi,midisys.w	;point to system midi interrupt vector
@@ -1561,32 +1570,32 @@ TT_mfp	equ	$fffffa81
 
 * init the acia to divide by 16x clock, 8 bit data, 1 stop bit, no parity,
 * rts low, transmitting interrupt disabled, receiving interrupt enabled
-	move.b	#%00000111,conterm(a5)	;enable keyclick,repeat key,bell functions, disable the KBSHIFT concatenation.
+
 	move.b	#div16+protocol+rtsld+intron,comstat+midi
-	move.l	#jdostime,clkintvec(a5)
+
 *	initialize the keyboard acia interrupt vector exception address
-	move.l	d0,statintvec(a5)
-	move.l	d0,msintvec(a5)	;init user mouse interrupt adr to rts
-	move.l	d0,joyintvec(a5)
+
+	move.b	#%00000111,conterm.w	;enable keyclick,repeat key,bell functions, disable the KBSHIFT concatenation.
+
 	move.l	d0,joyintvec.w
 *  Sound routine initialization - uses the pre-init'ed d0.l=0000 !!
 * init the Bconmap system
 	bsr	mapinit
 
-	move.l	d0,cursnd(a5)		;clear sound ptr
-	move.b	d0,timer(a5)		;clear delay timer
-	move.b	d0,auxd(a5)		;clear temp value
-	move.l	d0,prt_to(a5)		;init printer timout to 0
+*
+*  Sound routine initialization
+*
+*initsnd:
 	moveq	#$0,d0			;init 'd0' to clear sound variables
 	move.l	d0,cursnd.w		;clear sound ptr
-	move.b	#tdelay1,cdelay1(a5)	;init system default key repeat values
-	move.b	#tdelay2,cdelay2(a5)
+	move.b	d0,timer.w		;clear delay timer
+	move.b	d0,auxd.w		;clear temp value
 	move.l	d0,prt_to.w		;init printer timout to 0
 
 	bsr	strobeoff		;init strobe to off (line high!)
 	move.b	#tdelay1,cdelay1.w	;init system default key repeat values
 	move.b	#tdelay2,cdelay2.w
-	lea	kbufrec(a5),a0
+
 * within the mouse relative routine
 
 *	initialize the ikbd buffer record structure
@@ -1606,7 +1615,7 @@ TT_mfp	equ	$fffffa81
 * now that the vector is initialized, we can allow interrupts to occur!
 * init the acia to divide by 64 clock, 8 bit data, 1 stop bit, no parity,
 * rts low, transmitting interrupt disabled, receiving interrupt enabled
-st1     move.l  d1,d2
+
 	move.b	#div64+protocol+rtsld+intron,comstat+keyboard
 
         move.l  #mfpvectr,a3    ;point to initializing array of exception vec's
@@ -1621,7 +1630,7 @@ st1:     move.l  d1,d2
 	lea	midikey,a2
         moveq   #$6,d0          ;load in interrupt # to setup
         bsr     initint         ;go to service routine
-genrts	rts
+
 	or.b	#%00011110,ttmfp+iera	; enable RS232 ints
 	or.b	#%00011110,ttmfp+imra	; and unmask them
 .endif
@@ -1799,19 +1808,19 @@ getmask:
 	adda	d0,a3		;have got pointer to mfp register now
 	move.b	(a3),d3		;now have the address offset to mfp
 	add.l	a0,d3
-iert	dc.b	$6,$6,$8,$8
-iprt	dc.b	$A,$A,$C,$C
-isrt	dc.b	$E,$E,$10,$10
-imrt	dc.b	$12,$12,$14,$14
+	movea.l d3,a3		;now have address pointing to desired mfp reg.
+*				;now we get the mask to turn off interrupt
+	adda	d0,a2		;have got pointer to mask now
+	rts
 
-iermt	dc.b	$df,$fe,$df,$ef
+iert:	dc.b	$6,$6,$8,$8
 iprt:	dc.b	$A,$A,$C,$C
 isrt:	dc.b	$E,$E,$10,$10
 imrt:	dc.b	$12,$12,$14,$14
 
-tcrtab	dc.b	$18,$1a,$1c,$1c
-tcrmsk	dc.b	$0,$0,$8f,$f8
-tdrtab	dc.b	$1e,$20,$22,$24
+iermt:	dc.b	$df,$fe,$df,$ef
+imrmt	equ	iermt
+iprmt	equ	iermt
 isrmt	equ	iermt
 
 tcrtab:	dc.b	$18,$1a,$1c,$1c
@@ -1830,7 +1839,7 @@ tdrtab:	dc.b	$1e,$20,$22,$24
 *	word	numint							*
 *	long	intvec							*
 *									*
-mfpint
+*									*
 *************************************************************************
 
 	.globl	mfpint
@@ -1905,7 +1914,7 @@ disint:
 	bsr.b	bselect
 	bclr	d1,(a1)		;and clear the bit...
 
-	moveq	#%11111110,d0
+	bsr.b	bselect		;get proper a/b version...
 	asl.b	d1,d0
 * Changed 9/89 to write all 1's except d1's bit.
 * Fixed 9/91: we were clearing the bit we wanted and all the lower ones
@@ -2016,7 +2025,7 @@ rcvr2:	cmp.w	bufhigh(a0),d0
 	blt	rcvrxit
 	tst.b	rxoff(a0)
 	bne	rcvrxit		* IF (High-Water AND (Rx ON)) THEN Control Flow
-rcvxof	move.b	#xoff,sendnow(a0)	* ELSE Send "Xoff"
+	move.b	#-1,rxoff(a0)
 	btst.b	#0,rsmode(a0)
 	bne	rcvxof		* IF (RTS/CTS Flow Control)
 	bsr	rtsoff		* THEN Withdraw RTS (NOT Ready to Receive)
@@ -2367,7 +2376,7 @@ devtab:
 * is called rsconf.
 *
 * RETURNS: see above for rsconf return values
-	bne.s	auxnorm		;no: act normally
+*
 	move.w	baudrate,d0
 rscommon:
 	moveq.l	#0,d0		;pre-clear hi word of return value
@@ -2396,8 +2405,8 @@ auxnorm:
 * guaranteed no-op, though.
 *
 * Enabling tx and rx now means setting only the enable bit, not the whole
-	bhi.s	auxc1		; if d0 unsigned greater than 3 then no-op.
-	bne.s	auxc0		; if d0 not equal to 3 then set mode to d0.
+* byte.  This preserves the status of the other mode bits.
+*
 
 auxc0:	move.b	d0,rsmode(a0)
 	bhi	auxc1		; if d0 unsigned greater than 3 then no-op.
@@ -2431,19 +2440,19 @@ auxc1:
 *
 *	finally we re-enable the receiver and transmitter enable bits
 *
-auxc2	tst.w	$8(sp)		;if -1 then don't change
+	bset.b	#0,rsr(a2)	;enable the receiver
 	bset.b	#0,tsr(a2)	;enable the transmitter
 	move.b	$9(sp),ucr(a1)
-auxc3	tst.w	$a(sp)		;if -1 then don't change
+*	set rs-232 registers
 
 	move.b	$b(sp),rsr(a1)
-auxc4	tst.w	$c(sp)		;if -1 then don't change
+	bmi.b	auxc3
 	move.b	$9(sp),ucr(a2)
 	move.b	$d(sp),tsr(a1)
-auxc5	tst.w	$e(sp)		;if -1 then don't change
+	bmi.b	auxc4
 	move.b	$b(sp),rsr(a2)
 	move.b	$f(sp),scr(a1)
-auxc6
+	bmi.b	auxc5
 	move.b	$d(sp),tsr(a2)
 auxc5:	tst.w	$e(sp)		;if -1 then don't change
 	bmi.b	auxc6
@@ -2500,30 +2509,29 @@ bauddata:
 *************************************************************************
 *************************************************************************
 *	this code handles the midi/keyboard interrupt exception		*
-	movem.l d0-d3/a0-a3/a5,-(sp)	;save all registers (8/16/85 dbg)
-	clr.l	a5
+*************************************************************************
 
-	movea.l	midisys(a5),a2	;load in system midi handler
+	.globl	midikey
 
-	movea.l	ikbdsys(a5),a2	;load in system ikbd handler
+midikey:
 	movem.l d0-d3/a0-a3,-(sp)	;save all registers (8/16/85 dbg)
-	btst.b	#$4,gpip+mfp(a5) ;check for pending interrupt occurance
+keymidi:
 	movea.l	midisys.w,a2	;load in system midi handler
-*	bclr.b	#$6,isrb+mfp(a5) ;clear in-service bit
-	move.b	#%10111111,isrb+mfp(a5) ; was bclr but that's wrong
-	movem.l (sp)+,d0-d3/a0-a3/a5	;restore all registers
+	jsr	(a2)		;do it...
+	movea.l	ikbdsys.w,a2	;load in system ikbd handler
+	jsr	(a2)		;do it...
 	btst.b	#$4,gpip+mfp.w ;check for pending interrupt occurance
 	beq.b	keymidi		;repeat this interrupt processing
 *	bclr.b	#$6,isrb+mfp.w ;clear in-service bit
-	lea	mbufrec(a5),a0	;point to midi buffer record
-	lea	midi(a5),a1	;point to midi register base
-	movea.l vmiderr(a5),a2	;load in the jump vector
+	move.b	#%10111111,isrb+mfp.w ; was bclr but that's wrong
+	movem.l (sp)+,d0-d3/a0-a3	;restore all registers
+	rte			;go back to what was happening!
 
 vecmidi:
 	lea	mbufrec.w,a0	;point to midi buffer record
-	lea	kbufrec(a5),a0	;point to ikbd buffer record
+	lea	midi.w,a1	;point to midi register base
 	movea.l vmiderr.w,a2	;load in the jump vector
-	movea.l vkbderr(a5),a2	;load in the jump vector
+	bra	astatus		;goto general acia status check routine
 
 vecikbd:
 	lea	kbufrec.w,a0	;point to ikbd buffer record
@@ -2555,7 +2563,7 @@ aciaexit:
 
 	.globl	arcvrint
 
-	tst.b	kstate(a5)
+arcvrint:
 	move.b	iodata(a1),d0	;grab data byte from acia data register
 	cmpa.l	#kbufrec,a0
 	bne.b	ML3
@@ -2563,15 +2571,15 @@ aciaexit:
 
 	move.l	ikbdkey.w,-(sp)	;jmp without using any regs
 	rts			;(because I don't know what's safe)
-	move.b	0(a3,d0),kstate(a5)	;set ikbd state
+
 kbheader:
-	move.b	0(a3,d0),kindex(a5)	;set ikbd device index counter
+	subi.b	#$f6,d0		;generate true index into tables now
 	andi.l	#$ff,d0		;clear high 3 bytes for indexing
 	lea	ikbdev,a3	;point to ikbd device state codes
 	move.b	0(a3,d0),kstate.w	;set ikbd state
 	lea	ikbdlen,a3	;point to ikbd device buffer length table
 	move.b	0(a3,d0),kindex.w	;set ikbd device index counter
-	move.b	d0,mousebuf(a5)
+	addi.w	#$f6,d0		;re-constitute original value
 	cmpi.b	#$f8,d0
 	blt.b	ML8
 	cmpi.b	#$fb,d0
@@ -2581,7 +2589,7 @@ kbheader:
 
 *
 *	added the compare below to correct for incorrect indexing into the
-	move.b	d0,joyrec(a5)
+*	joystick record buffer array
 *
 *****
 ML8:	cmpi.b	#$fd,d0		;>=joystick record header?
@@ -2599,15 +2607,15 @@ ikbdlen:
 *	indexing into the joystick record buffer array
 *
 *****
-	cmpi.b	#joy0,kstate(a5)
+	dc.b	clkdex,joyadex-1,joydex,joydex
 *****
 
 	.even
-	move.b	kstate(a5),d2	;load to generate longword offset
-	subq.b	#$1,d2		;kstate(a5)=1 to 5/ table index is 0 to 4
+ML3:
+	cmpi.b	#joy0,kstate.w
 	bcc	ML35		;a joystick 0/1 record byte, not both!
-	add.b	kstate(a5),d2	; +1
-	subq.b	#$1,d2		;kstate(a5)=1 to 5/ table index is 0 to 4
+	lea	ikbdparams,a2	;point to ikbd subsystem parameters table
+	moveq	#$0,d2
 	move.b	kstate.w,d2	;load to generate longword offset
 	subq.b	#$1,d2		;kstate.w=1 to 5/ table index is 0 to 4
 	asl	d2		; x2
@@ -2617,17 +2625,18 @@ ikbdlen:
 
 	movea.l	0(a2,d2),a0	;load in subsystem's record pointer
 	movea.l	4(a2,d2),a1	;load in subsystem's index base+record pointer
-	move.b	kindex(a5),d2
+	movea.l	8(a2,d2),a2	;load in subsystem's pointer variable that
 *				;contains the pointer to the subsystem's
 *				;interrupt routine...
-	sub.b	#1,kindex(a5)
-	tst.b	kindex(a5)
+	movea.l	(a2),a2
+	moveq	#$0,d2		;clear out 'd2' for address manipulation
 	move.b	kindex.w,d2
-ikserve	move.l	a0,-(sp)	;stuff buffer pointer to stack
+	suba.l	d2,a1
+	move.b	d0,(a1)
 	sub.b	#1,kindex.w
 	tst.b	kindex.w
-	clr.b	kstate(a5)	;reset ikbd state
-ML1	rts
+	bne.b	ML1
+ikserve:
 	move.l	a0,-(sp)	;stuff buffer pointer to stack
 	jsr	(a2)		;go service the subsystem interrupt routine
 	addq	#$4,sp		;re-adjust stack
@@ -2671,61 +2680,61 @@ ikbdparams:
 *	indexing into the appropriate joystick record byte during
 *	"joystick event reporting mode".
 *	move.l	#joyrec,d1
-ML35
+*	move.l	#joyrec+1,d1
 *
-	add.b	kstate(a5),d1	;kstate(a5) reflects joy0 or joy1 state
+*	the previous change noted above was not necessary.
 *
 
 ML35:
-	movea.l	joyintvec(a5),a2	;get user's joystick interrupt routine adr
-	lea	joyrec(a5),a0	;send along address of joystick data
+	move.l	#joyrec+1,d1
+	add.b	kstate.w,d1	;kstate.w reflects joy0 or joy1 state
 	subi.b	#joy0,d1
 	move.l	d1,a2		;create index to joyrec table for record byte
 	move.b	d0,(a2)
-	move.b	kbshift(a5),d1	;load in kbshift(a5) for manipulation...
+	movea.l	joyintvec.w,a2	;get user's joystick interrupt routine adr
 	lea	joyrec.w,a0	;send along address of joystick data
 	bra.b	ikserve
 
 itsakey:
 	bra.b	ari10
-ari2	cmpi.b	#$AA,d0
+* check the special keys
 	cmpi.b	#$2A,d0		;left shift?
 	bne.b	ari2
 	bra.b	ari10
-ari3	cmpi.b	#$36,d0		;right shift
+	bra	ari10
 ari2:	cmpi.b	#$AA,d0
 	bne.b	ari3
 	bclr	#KBLSH,d1
-ari4	cmpi.b	#$B6,d0
+	bra	ari10
 ari3:	cmpi.b	#$36,d0		;right shift
 	bne.b	ari4
 	bset	#KBRSH,d1
-ari5	cmpi.b	#$1D,d0		;CTRL
+	bra.b	ari10
 ari4:	cmpi.b	#$B6,d0
 	bne.b	ari5
 	bclr	#KBRSH,d1
-ari6	cmpi.b	#$9D,d0
+	bra.b	ari10
 ari5:	cmpi.b	#$1D,d0		;CTRL
 	bne.b	ari6
 	bset	#KBCTL,d1
-ari7	cmpi.b	#$38,d0		;ALT
+	bra.b	ari10
 ari6:	cmpi.b	#$9D,d0
 	bne.b	ari7
 	bclr	#KBCTL,d1
-ari8	cmpi.b	#$B8,d0
+	bra.b	ari10
 ari7:	cmpi.b	#$38,d0		;ALT
 	bset	#KBALT,d1
 	bra.b	ari10
-ari9	cmpi.b	#$3A,d0		;CAPS LOCK
+ari9:	cmpi.b	#$3A,d0		;CAPS LOCK
 	move.b	altkp+1,d0	; get the accumulated value,
-	btst.b	#0,conterm(a5)
+	move.w	#-1,altkp	; mark as invalid for next time
 	bra	conin25		; and put it on the keyboard queue.
-	move.l	#keyclk,cursnd(a5)
-	move.b	#0,timer(a5)
-ari9a	bchg	#KBCL,d1	;toggle CAPS LOCK state
-ari10	move.b	d1,kbshift(a5)	;restore new kbshift(a5) value
+	move.l	#keyclk,cursnd.w
+	move.b	#0,timer.w
+	movem.l	d0-d2/a0-a2,-(sp)
+	move.l	kcl_hook.w,a0
 	jsr	(a0)
-ari11	btst.l	#7,d0		;make or break?
+	movem.l	(sp)+,d0-d2/a0-a2
 
 ari9a:	bchg	#KBCL,d1	;toggle CAPS LOCK state
 ari10:	move.b	d1,kbshift.w	;restore new kbshift.w value
@@ -2733,95 +2742,98 @@ ari10:	move.b	d1,kbshift.w	;restore new kbshift.w value
 ari11:	btst.l	#7,d0		;make or break?
 	bne.b	ari12		;break
 
-	move.b	d0,keyrep(a5)	;save for repeat purpose
-	move.b	cdelay1,kdelay1(a5)
-	move.b	cdelay2,kdelay2(a5)
+* key make code: Set up key repeat
+* If already some key repeating, stop only when THAT KEY comes up.
+* When any key goes down, start the cdelay1/cdelay2 repeat cycle over for it.
 * (This is a change from 11/20 and 4/22: they didn't repeat that second key.)
 
-ari12	move.b	d0,d1		; d1 = make code corresponding to d0
+	move.b	d0,keyrep.w	;save for repeat purpose
 	move.b	cdelay1,kdelay1.w
-	cmp.b	keyrep(a5),d1	; is this break code for the repeating key?
+	move.b	cdelay2,kdelay2.w
 	bra.b	ari16
 
 ari12:	move.b	d0,d1		; d1 = make code corresponding to d0
-	move.b	d1,keyrep(a5)
-	move.b	d1,kdelay1(a5)
-	move.b	d1,kdelay2(a5)
+	bclr.l	#7,d1
+	cmp.b	keyrep.w,d1	; is this break code for the repeating key?
+	bne.b	ari18		; no - don't stop the repeating key.
 
-ari18	cmpi.b	#$c7,d0		;is it a "home" break-code?
+	moveq	#0,d1		; keyrep just came up: stop the repeat.
 	move.b	d1,keyrep.w
 	move.b	d1,kdelay1.w
 	move.b	d1,kdelay2.w
-ari18a	btst.b	#KBALT,kbshift(a5) ;early "ALT" test to prevent double "nulls"
+
 ari18:	cmpi.b	#$c7,d0		;is it a "home" break-code?
 	beq.b	ari18a		;yes...allow it to pass
-ari16	btst.b	#0,conterm(a5)
+	cmpi.b	#$d2,d0		;is it a "insert" break-code?
 	bne	ari14		;no...regular break junk...
 ari18a:	btst.b	#KBALT,kbshift.w ;early "ALT" test to prevent double "nulls"
 	beq	ari14		;no ALT...so exit now...
 
-	move.l	kcl_hook(a5),a1
+ari16:	btst.b	#0,conterm.w
 	beq.b	ari16a		;no click please!
 
 * key click: go through the hook (as of 7/89); normally def_click.
-ari16a	move.l	a0,-(sp)	;store kbufrec pointer
+	movem.l	d0-d2/a0-a2,-(sp)
 	move.l	kcl_hook.w,a1
 	jsr	(a1)
 	movem.l	(sp)+,d0-d2/a0-a2
 
-	movea.l skeytran(a5),a0
+ari16a:	move.l	a0,-(sp)	;store kbufrec pointer
 
-	btst.b	#KBCL,kbshift(a5)
+	moveq	#$0,d1
 	move.b	d0,d1
-	movea.l skeycl(a5),a0
-conin21 btst.b	#KBRSH,kbshift(a5)
+
+	movea.l skeytran.w,a0
+	andi.w	#$7F,d0
 	btst.b	#KBCL,kbshift.w
-	btst.b	#KBLSH,kbshift(a5)
+	beq.b	conin21
 	movea.l skeycl.w,a0
-conin22	cmpi.b	#$3b,d0		;see if a possible function key
+conin21:
+	btst.b	#KBRSH,kbshift.w
 	bne.b	conin22
 	btst.b	#KBLSH,kbshift.w
 	beq.b	conin23
 conin22:
 	cmpi.b	#$3b,d0		;see if a possible function key
 	bcs.b	conin22a	;unsigned less than lowest function scancode
-conin22a
-	movea.l skeyshif(a5),a0
-conin23	move.b	(a0,d0.w),d0
-	btst.b	#KBCTL,kbshift(a5)	;is the control key down?
+	cmpi.b	#$44,d0		;see if a possible function key
+	bhi.b	conin22a	;unsigned greater than highest function scan
+	addi.w	#$19,d1		;add to change to GSX standard
+	moveq	#$0,d0		;change to GSX standard
+	bra	conin25
 conin22a:
 	movea.l skeyshif.w,a0
 conin23:
 	move.b	(a0,d0.w),d0
 	btst.b	#KBCTL,kbshift.w	;is the control key down?
-conin23a
+	beq.b	conin24a
 	cmpi.b	#cr,d0		;is it a carriage return?
 	bne.b	conin23a
 	moveq	#lf,d0		;change to a linefeed according to GSX spec...
 	beq.b	conin24
-conin23b
+conin23a:
 	cmpi.b	#$47,d1		;convert CONTROL-home to gsx standard
 	bne.b	conin23b	;by adding #$30...
 	addi.w	#$30,d1
 	bra	conin25
 conin23b:
-conin23c
+	cmpi.b	#$4b,d1		;convert CONTROL-left arrow to gsx standard
 	bne.b	conin23c
 	moveq	#$73,d1		;change according to gsx spec
 	moveq	#$0,d0
 	bra	conin25
 conin23c:
-conin24
+	cmpi.b	#$4d,d1		;convert CONTROL-right arrow to gsx standard
 	bne.b	conin24
 	moveq	#$74,d1		;change according to gsx spec
 	moveq	#$0,d0
 	bra	conin25
-conin24b
+conin24:
 	cmpi.b	#$32,d0		;convert CONTROL-2 to gsx standard
 	bne.b	conin24b
 	moveq	#$00,d0		;change according to gsx spec
 	bra	conin25
-conin24c
+conin24b:
 	cmpi.b	#$36,d0		;convert CONTROL-6 to gsx standard
 	bne.b	conin24c
 	moveq	#$1e,d0		;change according to gsx spec
@@ -2830,32 +2842,34 @@ conin24c:
 	cmpi.b	#$2d,d0		;convert CONTROL-'-' to gsx standard
 	bne.b	conin24a
 	moveq	#$1f,d0		;change according to gsx spec
-conin24a
-	btst.b	#KBALT,kbshift(a5)	;is the alt key down?
+	bra	conin25
+*
 * DON'T control-ize other keys just yet... wait until after the int'l munge.
 *
-	ifeq	COUNTRY-GERMANY
+	ifeq	country-germany
 * no, it wasn't ALT plus a keypad number key
 
 notaltkp:
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == germany
 
 	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altger1		;no...
 	move.b	#$40,d0		;put in '@', then check the shift keys
-altger1	cmpi.b	#$27,d1		;is it a ALT-
+	move.b	kbshift.w,d2	;grab current setting
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$5c,d0		;put in '\', instead...it's a alt-shift umlaut!
-	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
 altger1:
 	cmpi.b	#$27,d1		;is it a ALT-
 	bne.b	altger2		;no...
 	move.b	#$5b,d0		;put in '[', then check the shift keys
-altger2	cmpi.b	#$28,d1		;is it a ALT-
+	move.b	kbshift.w,d2	;grab current setting
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift umlaut!
-	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
 altger2:
 	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	outside		;no...
@@ -2863,12 +2877,12 @@ altger2:
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
-	ifeq	COUNTRY-SPAIN
+	ifeq	country-spain
 	bra	conin25a		;process it
 
 .endif
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == spain
 
 	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altspa1		;no...
@@ -2877,7 +2891,7 @@ altger2:
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift '
-	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
 altspa1:
 	cmpi.b	#$1b,d1		;is it a ALT-`
 	bne.b	altspa2		;no...
@@ -2886,7 +2900,7 @@ altspa1:
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift `
-	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
 altspa2:
 	cmpi.b	#$2b,d1		;is it a ALT-\
 	bne.b	altspa3		;no...
@@ -2895,7 +2909,7 @@ altspa2:
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$40,d0		;put in '@', instead...it's a alt-shift \
-	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
 altspa3:
 	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altspa4		;no...
@@ -2908,36 +2922,36 @@ altspa3:
 altspa4:
 	endc
 	bne.b	outside		;no...
-	ifeq	COUNTRY-FRANCE
+	ifeq	country-france
 	bra	conin25a		;process it
 
 .endif
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == france
 
 	cmpi.b	#$1a,d1		;is it a ALT-^?
 	bne.b	altfr1		;no...
 	move.b	#$5b,d0		;put in '[', then check the shift keys
-altfr1	cmpi.b	#$1b,d1		;is it a ALT-$?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift ^
 	bra	conin25a		;process it
 altfr1:	cmpi.b	#$1b,d1		;is it a ALT-$?
 	bne.b	altfr2		;no...
 	move.b	#$5d,d0		;put in ']', then check the shift keys
-altfr2	cmpi.b	#$28,d1		;is it a ALT-
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift $
 	bra	conin25a		;process it
 altfr2:	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altfr3		;no...
 	move.b	#$5c,d0		;put in '\', then check the shift keys
-altfr3	cmpi.b	#$2b,d1		;is it a ALT-#?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#nul,d0		;put in 'NUL',instead...it's a alt-shift
 	bra	conin25a		;process it
 altfr3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
@@ -2946,36 +2960,36 @@ altfr3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	endc
 	beq	conin25a		;process it as unshifted
 	move.b	#$7e,d0		;put in '|', instead...it's a alt-shift #
-	ifeq	COUNTRY-SWEDEN
+	ifeq	country-sweden
 
 .endif
 
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == sweden
 
 	cmpi.b	#$1a,d1		;is it a ALT-^?
 	bne.b	altsw1		;no...
 	move.b	#$5b,d0		;put in '[', then check the shift keys
-altsw1	cmpi.b	#$1b,d1		;is it a ALT-$?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift ^
 	bra	conin25a		;process it
 altsw1:	cmpi.b	#$1b,d1		;is it a ALT-$?
 	bne.b	altsw2		;no...
 	move.b	#$5d,d0		;put in ']', then check the shift keys
-altsw2	cmpi.b	#$28,d1		;is it a ALT-
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift $
 	bra	conin25a		;process it
 altsw2:	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altsw3		;no...
 	move.b	#$60,d0		;put in '`', then check the shift keys
-altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7e,d0		;put in '~',instead...it's a alt-shift
 	bra	conin25a		;process it
 altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
@@ -2984,36 +2998,36 @@ altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	endc
 	beq	conin25a		;process it as unshifted
 	move.b	#$40,d0		;put in '@', instead...it's a alt-shift #
-	ifeq	COUNTRY-NORWAY
+	ifeq	country-norway
 
 .endif
 
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == norway
 
 	cmpi.b	#$1a,d1		;is it a ALT-^?
 	bne.b	altsw1		;no...
 	move.b	#$5b,d0		;put in '[', then check the shift keys
-altsw1	cmpi.b	#$1b,d1		;is it a ALT-$?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift ^
 	bra	conin25a		;process it
 altsw1:	cmpi.b	#$1b,d1		;is it a ALT-$?
 	bne.b	altsw2		;no...
 	move.b	#$5d,d0		;put in ']', then check the shift keys
-altsw2	cmpi.b	#$28,d1		;is it a ALT-
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift $
 	bra	conin25a		;process it
 altsw2:	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altsw3		;no...
 	move.b	#$60,d0		;put in '`', then check the shift keys
-altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7e,d0		;put in '~',instead...it's a alt-shift
 	bra	conin25a		;process it
 altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
@@ -3023,33 +3037,33 @@ altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	beq	conin25a		;process it as unshifted
 	move.b	#$40,d0		;put in '@', instead...it's a alt-shift #
 	bra	conin25a		;process it
-	ifeq	COUNTRY-ITALY
+	ifeq	country-italy
 .endif
 
 
  
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == italy
 
 	cmpi.b	#$1a,d1		;is it a ALT-`e ?
 	bne.b	altsw1		;no...
 	move.b	#'[',d0		;put in '[', then check the shift keys
-altsw1	cmpi.b	#$1b,d1		;is it a ALT-+ ?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a	;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#'{',d0		;put in '{', instead...it's a alt-shift-`e
 	bra	conin25a	;process it
 altsw1:	cmpi.b	#$1b,d1		;is it a ALT-+ ?
 	bne.b	altsw2		;no...
 	move.b	#']',d0		;put in ']', then check the shift keys
-altsw2	cmpi.b	#$2b,d1		;is it a ALT-\ ?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a	;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#'}',d0		;put in '}', instead...it's a alt-shift $
 	bra	conin25a	;process it
 altsw2:	cmpi.b	#$2b,d1		;is it a ALT-\ ?
 	bne.b	altsw3		;no...
 	move.b	#$f8,d0		;put in bullet, then check the shift keys
-altsw3	cmpi.b	#$60,d1		;is it a ALT-ISO?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a	;process it as unshifted
 	move.b	#'~',d0		;put in '~',instead...it's a alt-shift-\
@@ -3058,40 +3072,40 @@ altsw3	cmpi.b	#$60,d1		;is it a ALT-ISO?
 	bne.b	outside		;no...
 	move.b	#'`',d0		;put in '`'; shifted value is also '`'
 	bra	conin25a		;process it
-	ifeq	COUNTRY-SWISSGER
+	ifeq	country-swissger
 .endif
 
 
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == swissger
 
 	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altsw1		;no...
 	move.b	#$40,d0		;put in '@', then check the shift keys
-altsw1	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$5c,d0		;put in '\', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw1:	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	bne.b	altsw2		;no...
 	move.b	#$5b,d0		;put in '[', then check the shift keys
-altsw2	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw2:	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	bne.b	altsw3		;no...
 	move.b	#$5d,d0		;put in ']', then check the shift keys
-altsw3	cmpi.b	#$1b,d1		;is it a ALT-!
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift umlaut!
-altsw4	cmpi.b	#$2b,d1		;is it a ALT-$?
+	bra	conin25a		;process it
 altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 	bne.b	altsw4		;no...
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$23,d0		;put in '#', then check the shift keys
 	bra	conin25a		;process it
 altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	bne.b	outside		;no...
@@ -3100,52 +3114,52 @@ altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	endc
 	beq	conin25a		;process it as unshifted
 	move.b	#$7c,d0		;put in |', instead...it's a alt-shift umlaut!
-	ifeq	COUNTRY-TURKEY
+	ifeq	country-turkey
 
 .endif
 
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == turkey
 
 	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altsw1		;no...
 	move.b	#$5b,d0		;put in '[', then check the shift keys
-altsw1	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw1:	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	bne.b	altsw2		;no...
 	move.b	#$23,d0		;put in '#', then check the shift keys
-altsw2	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$26,d0		;put in '&', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw2:	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	bne.b	altsw3		;no...
 	move.b	#$40,d0		;put in '@', then check the shift keys
-altsw3	cmpi.b	#$1b,d1		;is it a ALT-!
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7e,d0		;put in '~', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 	bne.b	altsw4		;no...
 	move.b	#$5d,d0		;put in ']', then check the shift keys
-altsw4	cmpi.b	#$2b,d1		;is it a ALT-$?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	bne.b	altsw5		;no...
 	move.b	#$5c,d0		;put in '\', then check the shift keys
-altsw5	cmpi.b	#$35,d1		;is it a ALT-$?
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7c,d0		;put in '|', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw5:	cmpi.b	#$35,d1		;is it a ALT-$?
 	bne.b	outside		;no...
@@ -3155,40 +3169,40 @@ altsw5:	cmpi.b	#$35,d1		;is it a ALT-$?
 	beq	conin25a		;process it as unshifted
 	move.b	#$3e,d0		;put in '>', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
-	ifeq	COUNTRY-SWISSFRA
+	ifeq	country-swissfra
 .endif
 
 
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == swissfra
 
 	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altsw1		;no...
 	move.b	#$40,d0		;put in '@', then check the shift keys
-altsw1	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$5c,d0		;put in '\', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw1:	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	bne.b	altsw2		;no...
 	move.b	#$5b,d0		;put in '[', then check the shift keys
-altsw2	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift umlaut!
 	bra	conin25a		;process it
 altsw2:	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	bne.b	altsw3		;no...
 	move.b	#$5d,d0		;put in ']', then check the shift keys
-altsw3	cmpi.b	#$1b,d1		;is it a ALT-!
+	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift umlaut!
-altsw4	cmpi.b	#$2b,d1		;is it a ALT-$?
+	bra	conin25a		;process it
 altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 	bne.b	altsw4		;no...
-	move.b	kbshift(a5),d2	;grab current setting
+	move.b	#$23,d0		;put in '#', then check the shift keys
 	bra	conin25a		;process it
 altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	bne.b	outside		;no...
@@ -3197,36 +3211,39 @@ altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	endc
 	beq	conin25a		;process it as unshifted
 	move.b	#$7c,d0		;put in |', instead...it's a alt-shift umlaut!
-	ifeq	COUNTRY-DENMARK
+	ifeq	country-denmark
 
 .endif
 
 
-	move.b	kbshift(a5),d2	;grab current setting
+.if country == denmark
 
 	cmpi.b	#$1a,d1		;is it a ALT-^?
 	bne.b	altden1		;no...
 	move.b	#$5b,d0		;put in '[', then check the shift keys
-altden1	cmpi.b	#$1b,d1		;is it a ALT-$?
+	move.b	kbshift.w,d2	;grab current setting
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift ^
-	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
 altden1:
 	cmpi.b	#$1b,d1		;is it a ALT-$?
 	bne.b	altden2		;no...
 	move.b	#$5d,d0		;put in ']', then check the shift keys
-altden2	cmpi.b	#$28,d1		;is it a ALT-
+	move.b	kbshift.w,d2	;grab current setting
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift $
-	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
 altden2:
 	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altden3		;no...
 	move.b	#$5c,d0		;put in '\', then check the shift keys
-altden3	cmpi.b	#$2b,d1		;is it a ALT-#?
+	move.b	kbshift.w,d2	;grab current setting
+	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7c,d0		;put in '|',instead...it's a alt-shift
-	move.b	kbshift(a5),d2	;grab current setting
+	bra	conin25a		;process it
 altden3:
 	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
@@ -3234,58 +3251,60 @@ altden3:
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
-outside	cmpi.b	#$62,d1		;is it an "alt help" signal to dump the screen?
+	move.b	#$27,d0		;put in <'>, instead...it's a alt-shift #
+	bra	conin25a		;process it
 
-	addq.w	#1,_dumpflg(a5)	;yes...switch the signal flag on!...
+.endif
 
 outside:
 	cmpi.b	#$62,d1		;is it an "alt help" signal to dump the screen?
 	bne.b	alt15a		;no...
 	addq.w	#1,_dumpflg.w	;yes...switch the signal flag on!...
-alt15a	lea	mauskey1,a2	;get pointer to first alt. mouse scancode table
+	movea.l	(sp)+,a0	;restore kbufrec pointer
 	bra	ari14		;...and exit
-mkloop1	cmp.b	0(a2,d2),d1	;is table's scancode value = current value?
+*
+*	check the alt-insert/alt-home key make/break combinations, first
 *
 alt15a:	lea	mauskey1,a2	;get pointer to first alt. mouse scancode table
 	moveq	#3,d2		;create countdown
 mkloop1:
 	cmp.b	0(a2,d2),d1	;is table's scancode value = current value?
 	beq	keymaus1	;yes...go preprocess it...
-	move.b	#$-8,d2		;y value for up arrow
-	move.b	kbshift(a5),d0	;grab current setting
+	dbra	d2,mkloop1	;no...loop back to check next table value
+
 	cmpi.b	#$48,d1		;is it an up arrow?
 	bne.b	alt11
-	move.b	#$-1,d2		;y value for up arrow
+	move.b	#$0,d1		;x value for up arrow
 	move.b	#-8,d2		;y value for up arrow
-alt11	cmpi.b	#$4b,d1		;is it an left arrow?
+	move.b	kbshift.w,d0	;grab current setting
 	andi.b	#$3,d0		;KBRSH+KBLSH bits
 	beq	keymaus
-	move.b	#$-8,d1		;x value for left arrow
-	move.b	kbshift(a5),d0	;grab current setting
+	move.b	#-1,d2		;y value for up arrow
+	bra	keymaus
 alt11:	cmpi.b	#$4b,d1		;is it an left arrow?
 	bne.b	alt12
-	move.b	#$-1,d1		;x value for left arrow
+	move.b	#$0,d2		;y value for left arrow
 	move.b	#-8,d1		;x value for left arrow
-alt12	cmpi.b	#$4d,d1		;is it an right arrow?
+	move.b	kbshift.w,d0	;grab current setting
 	andi.b	#$3,d0		;KBRSH+KBLSH bits
 	beq	keymaus
 	move.b	#-1,d1		;x value for left arrow
-	move.b	kbshift(a5),d0	;grab current setting
+	bra	keymaus
 alt12:	cmpi.b	#$4d,d1		;is it an right arrow?
 	bne.b	alt13
 	move.b	#$8,d1		;x value for right arrow
 	move.b	#$0,d2		;y value for right arrow
-alt13	cmpi.b	#$50,d1		;is it an down arrow?
+	move.b	kbshift.w,d0	;grab current setting
 	andi.b	#$3,d0		;KBRSH+KBLSH bits
 	beq	keymaus
 	move.b	#$1,d1		;x value for right arrow
-	move.b	kbshift(a5),d0	;grab current setting
+	bra	keymaus
 alt13:	cmpi.b	#$50,d1		;is it an down arrow?
 	bne.b	alt14
 	move.b	#$0,d1		;x value for down arrow
 	move.b	#$8,d2		;y value for down arrow
 	move.b	kbshift.w,d0	;grab current setting
-alt14	btst.b	#KBCTL,kbshift(a5) ; control key?
+	andi.b	#$3,d0		;KBRSH+KBLSH bits
 	beq	keymaus
 	move.b	#$1,d2		;y value for down arrow
 	bra	keymaus
@@ -3293,24 +3312,25 @@ alt14	btst.b	#KBCTL,kbshift(a5) ; control key?
 alt14:	btst.b	#KBCTL,kbshift.w ; control key?
 	bne.b	conin25b	; yup, it gets a control code, not an alt code
 	cmpi.b	#$2,d1		; ALT-ize the rest of the keys
-alt1	cmpi.b	#$41,d0		;is the key an ascii 'A' or greater?
+	bcs.b	alt1		;not >= the '1' key scancode
 	cmpi.b	#$d,d1
 	bhi.b	alt1		;not <= the '=' key scancode
 	addi.b	#$76,d1		;scancode is a key between '1' key and '=' key
-alt2	moveq	#$0,d0
+	bra.b	alt2
 alt1:	cmpi.b	#$41,d0		;is the key an ascii 'A' or greater?
-alt3	cmpi.b	#$61,d0		;is the key an ascii 'a' or greater?
+	bcs.b	alt3		;no...skip to check if 'a'-'z'...
 	cmpi.b	#$5a,d0		;is the key an ascii 'Z' or less?
 	bhi.b	alt3		;no...skip to check if 'a'-'z'...
 alt2:	moveq	#$0,d0
 	bra.b	conin25
-conin25a
-	btst.b	#KBCTL,kbshift(a5) ; control key?
+alt3:	cmpi.b	#$61,d0		;is the key an ascii 'a' or greater?
+	bcs.b	conin25		;no...skip to finish normal processing
 	cmpi.b	#$7a,d0		;is the key an ascii 'z' or less?
-conin25b
+	bhi.b	conin25		;no...skip to finish normal processing
 	bra.b	alt2
 conin25a:
-conin25	asl.w	#$8,d1		;shift the scan code to the word's high byte
+	btst.b	#KBCTL,kbshift.w ; control key?
+	beq.b	conin25		; nope, process the key normally
 conin25b:
 	andi.w	#$01F,d0	;CTRLize the key
 
@@ -3320,13 +3340,13 @@ conin25:
 
 	movea.l	(sp)+,a0	;restore kbufrec pointer
 
-ari13	cmp.w	bufhead(a0),d1 ;head=tail?
+	move.w	buftail(a0),d1 ;get current tail pointer offset
 	addq	#4,d1		;index = tail + 4
 	cmp.w	bufsize(a0),d1	;check to see if buffer should wrap
 	bcs.b	ari13		;no...
 	moveq	#$0,d1		;wrap pointer
 	move.w	#$0,d0		;clear out low word
-	move.b	kbshift(a5),d0	;bring in the kbshift data (ctrl/alt/shift)
+	beq.b	ari14		;yes
 	move.l	bufptr(a0),a2	;get buffer pointer
 
 	swap	d0		;put scan/ascii in high word
@@ -3347,18 +3367,18 @@ ari13	cmp.w	bufhead(a0),d1 ;head=tail?
 	beq	reseth
 	cmp.w	#$0d53,d2	;ctl-alt-rshft plus delete's scan-code
 	beq	coldboot
-	btst.b	#$3,conterm(a5)
-	bne.s	ari14z		;set, so store this pig!
+
+*
 *	now we test the kludge bit (#3) of conterm to see if we really
-ari14z	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
+*	want the kbshift value in the high byte of the high word.
 *
 	btst.b	#$3,conterm.w
-ari14	rts
+	bne	ari14z		;set, so store this pig!
 	andi.l	#$00ffffff,d0	;mask off KBSHIFT byte portion..."sigh"
 ari14z:	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
 	move.l	d0,0(a2,d1.l)	;store the data
-	move.l	#keyclk,cursnd(a5)
-	move.b	#0,timer(a5)
+	move.w	d1,buftail(a0) ;store the new buftail pointer
+ari14:	rts
 
 	.globl	def_click
 def_click:
@@ -3380,7 +3400,7 @@ def_click:
 *	 ||||---ALT key
 *	 |||---CAPS lock key
 *	 ||---clr/home key -- right mouse button
-	movea.l	midivec(a5),a2	;get contents of midivec for indirect branch
+*	 |---insert key -- left mouse button
 *	 |---always zero (reserved)
 *
 
@@ -3389,35 +3409,35 @@ midibyte:
 	jmp	(a2)		;jump to midi interrupt handler
 
 sysmidi:
-mi13	cmp.w	bufhead(a0),d1 ;head=tail?
+	move.w	buftail(a0),d1 ;get current tail pointer offset
 	addq	#1,d1		;index = tail + 1
 	cmp.w	bufsize(a0),d1	;check to see if buffer should wrap
 	bcs.b	mi13		;no...
 	moveq	#$0,d1		;wrap pointer
 mi13:	cmp.w	bufhead(a0),d1 ;head=tail?
-mi14	rts
+	beq.b	mi14		;yes
 	move.l	bufptr(a0),a2	;get buffer pointer
 	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
 	move.b	d0,0(a2,d1.l)	;store the data
 	move.w	d1,buftail(a0) ;store the new buftail pointer
 mi14:	rts
 
-kym1	btst	#7,d1		;see if it is a make or break action
+keymaus1:
 	moveq	#KBMRB,d3	;pre-init to "keyboard" right mouse button
-	bclr	d3,kbshift(a5)	;it's a clear button action (break code)
+	btst	#4,d1		;see if it is a left or right button...
 	beq.b	kym1		;it's a right button ($47/$c7)
-kym2	bset	d3,kbshift(a5)	;it's a set button action (set code)
-kym3	moveq	#$0,d1
+	moveq	#KBMLB,d3	;it's a left button ($52/$d2)
+kym1:	btst	#7,d1		;see if it is a make or break action
 	beq.b	kym2		;it's a set button action (make code)
 	bclr	d3,kbshift.w	;it's a clear button action (break code)
 	bra.b	kym3		;go to further pre-init action...
 kym2:	bset	d3,kbshift.w	;it's a set button action (set code)
 kym3:	moveq	#$0,d1
 	moveq	#$0,d2
-	lea	kmbuf(a5),a0	;point to key-emulating mouse buffer
-	movea.l	msintvec(a5),a2	;grab mouse interrupt vector
 *
-	move.b	kbshift(a5),d0	;get current button status
+*	finish up at the actual pseudo mouse routine
+*
+
 keymaus:
 	lea	kmbuf.w,a0	;point to key-emulating mouse buffer
 	movea.l	msintvec.w,a2	;grab mouse interrupt vector
@@ -3448,18 +3468,17 @@ mauskey1:
 	move.w	#$8,a1
 rloop:	move.l	(a0)+,(a1)+
 	dbra	d0,rloop
-	clr.l	a5
-	jmp	$8(a5)
+	jmp	$8.w
 .text
-* this code is copied to address $8, and jumped to with a5 == 0.
-* it runs at IPL 7.  It sets the bus error vector and clears RAM
+* this code is copied to address $8, and jumped to
+* at IPL 7.  It sets the bus error vector and clears RAM
 * until it gets a bus error, then jumps to the reset vector,
 * found at address $4.  If it's more than 64 bytes long, you'll
 * have to change d0 above.
 .endif
 cstart:
 	lea.l	berr(PC),a0
-	move.l	a0,$8(a5)
+	move.l	a0,$8.w
 	lea.l	cend(PC),a0
 	moveq.l	#0,d0
 	move.l	d0,d1
@@ -3476,7 +3495,7 @@ cloop:	movem.l	d0-d7,(a0)
 	add.w	#(4*8),a0
 	bra	cloop
 	move.l	#$c,a1
-berr:	move.l	$4(a5),a0
+berr:	move.l	$4.w,a0
 	jmp	(a0)
 cend:	dc.w	0
 
@@ -3524,8 +3543,8 @@ coldend:
 *		d1 = #$80 .or .xx	;selects write xx to register	*
 *		example write to portb - $80 .or. $0f = $8f		*
 *									*
-giwrit	move.b	d0,2(a0)	;init the memory location
-giread	moveq	#$0,d0		;clear out register
+*	exit								*
+*	read operations							*
 *	d0.b -- data register contains byte of date			*
 *	write operations						*
 *	d0.b -- data register contains a verification of written data	*
@@ -3537,7 +3556,7 @@ giread	moveq	#$0,d0		;clear out register
 
 giaccess:
 	move.w	4(sp),d0
-	moveq	#%11101111,d2
+	move.w	6(sp),d1
 gientry:
 	move	sr,-(a7)
 	ori	#$0700,sr
@@ -3558,7 +3577,7 @@ giread:	moveq	#$0,d0		;clear out register
 
 *************************************************************************
 *		routine to turn on the dtr signal			*
-onbit	movem.l d0-d2,-(a7)
+*************************************************************************
 	.globl	dtron
 dtron:
 	move.b	#%11101111,d2	;;q
@@ -3566,7 +3585,7 @@ dtron:
 
 *************************************************************************
 *									*
-	moveq	#porta+$80,d1	;setup to write to port a
+*	routine to set any bit in the gi port a area			*
 *									*
 *	entry								*
 *									*
@@ -3590,7 +3609,7 @@ onbit:	movem.l d0-d2,-(a7)
 	bsr.b	gientry		;go get it...
 	move.l	(a7)+,d2
 	or.b	d2,d0		;set bit(s) on
-offbit	movem.l d0-d2,-(a7)
+	move.b	#porta+$80,d1	;setup to write to port a ;;q
 	bsr.b	gientry		;go set it and return
 	move	(a7)+,sr
 	movem.l (a7)+,d0-d2
@@ -3598,7 +3617,7 @@ offbit	movem.l d0-d2,-(a7)
 
 *************************************************************************
 *									*
-	moveq	#porta+$80,d1	;setup to write to port a
+*	routine to clear any bit in the gi port a area			*
 *									*
 *	entry								*
 *									*
@@ -3650,7 +3669,7 @@ offbit:	movem.l d0-d2,-(a7)
 *	byte 0 - y=0 at top/bottom; if non-zero then y=0 at bottom	*
 *		otherwise y=0 at top					*
 *	byte 1 - parameter for set mouse buttons command		*
-	move.l	$a(sp),msintvec(a5)	;init the mouse interrupt vector
+*	byte 2 - x threshold/scale/delta parameter			*
 *	byte 3 - y threshold/scale/delta parameter			*
 *									*
 *	the following bytes are required for the absolute mouse only	*
@@ -3660,21 +3679,21 @@ offbit:	movem.l d0-d2,-(a7)
 *	byte 6 - ymsb for absolute mouse maximum position		*
 *	byte 7 - ylsb for absolute mouse maximum position		*
 *	byte 8 - xmsb for absolute mouse initial position		*
-im1	moveq	#$12,d1		;disable mouse
+*	byte 9 - xlsb for absolute mouse initial position		*
 *	byte a - ymsb for absolute mouse initial position		*
-	move.l	#xbtexit,msintvec(a5)	;re-init the mouse interrupt vector
+*	byte b - ylsb for absolute mouse initial position		*
 *									*
-im2
-	lea	transbuf(a5),a2	;set transfer buffer pointer
+*************************************************************************
+
 	.globl	initmouse
 
 initmouse:
 *	first we determine if the init is for a absolute, relative, or keycode
-	lea	transbuf(a5),a2	;set transfer buffer pointer
+*	mouse action.
 
 	tst.w	$4(sp)		;turn mouse off?
-im3
-	lea	transbuf(a5),a2	;set transfer buffer pointer
+	beq.b	im1		;yes...disable mouse
+	move.l	$a(sp),msintvec.w	;init the mouse interrupt vector
 	move.l	$6(sp),a3
 	cmpi.w	#$1,$4(sp)	;relative mouse request?
 	beq.b	im2		;yes...
@@ -3689,17 +3708,17 @@ im1:	moveq	#$12,d1		;disable mouse
 	move.l	#xbtexit,msintvec.w	;re-init the mouse interrupt vector
 	bra.b	imexit
 im2:
-	lea	transbuf(a5),a2	;set transfer buffer pointer
+	lea	transbuf.w,a2	;set transfer buffer pointer
 	move.b	#$8,(a2)+	;set to relative mouse
 	move.b	#$b,(a2)+	;set relative mouse threshold x,y
-im4
-	lea	transbuf(a5),a2	;set transfer buffer pointer
+	bsr.b	setmouse
+	moveq	#7-1,d3		;set length of string -1 to transfer
 	lea	transbuf.w,a2	;set transfer buffer pointer
 	bsr	ikbdstr		;do transfer to ikbd
 	bra.b	imexit
-	lea	transbuf(a5),a2	;set transfer buffer pointer
+im3:
 	lea	transbuf.w,a2	;set transfer buffer pointer
-imexit	moveq	#$-1,d0		;set to true to indicate good init
+	move.b	#$9,(a2)+	;set to absolute mouse
 	move.b	4(a3),(a2)+	;set xmsb max
 	move.b	5(a3),(a2)+	;set xlsb max
 	move.b	6(a3),(a2)+	;set ymsb max
@@ -3765,7 +3784,8 @@ setmouse:
 *									*
 *	Timer A - Reserved for end-users and stand-alone applications.	*
 *	Timer B - Reserved for screen graphics, primarily.		*
-xbtexit rts
+*	Timer C - Reserved for system timing (GSX,GEM,DESKTOP,ET.AL).	*
+*	Timer D - Reserved for baud rate control of RS-232 port,	*
 *		 the interrupt vector is available to anyone.		*
 *									*
 *************************************************************************
@@ -3795,14 +3815,14 @@ xbtim:	dc.b	$d,$8,$5,$4
 	.even
 
 *************************************************************************
-	move.l	$4(sp),skeytran(a5)
-kt1	tst.l	$8(sp)
 *									*
-	move.l	$8(sp),skeyshif(a5)
-kt2	tst.l	$c(sp)
+*		KEYBOARD TRANSLATION TABLE CHANGE CALL			*
+*									*
+*	entry:								*
+*									*
 *	long	keytrans(unshift,shift,capslock)			*
-	move.l	$c(sp),skeycl(a5)
-kt3	move.l	#skeytran,d0
+*	long	unshift,shift,capslock					*
+*									*
 *		-1 signifies no change to vector			*
 *									*
 *	exit:								*
@@ -3818,9 +3838,9 @@ kt3	move.l	#skeytran,d0
 
 keytrans:
 	tst.l	$4(sp)
-	move.l	#keytran,skeytran(a5)
-	move.l	#keyshif,skeyshif(a5)
-	move.l	#keycl,skeycl(a5)
+	bmi.b	kt1
+	move.l	$4(sp),skeytran.w
+kt1:	tst.l	$8(sp)
 	move.l	$8(sp),skeyshif.w
 kt2:	tst.l	$c(sp)
 	bmi.b	kt3
@@ -3838,12 +3858,12 @@ kt3:	move.l	#skeytran,d0
 *									*
 *************************************************************************
 
-	move.l	cursnd(a5),d0		; return current status in D0.L
+	.globl	bioskeys
 
 bioskeys:
-	move.l	d1,cursnd(a5)		; setup new sound ptr
-	clr.b	timer(a5)		; zap sound timer register
-ds_r	rts
+	move.l	#keytran,skeytran.w
+	move.l	#keyshif,skeyshif.w
+	move.l	#keycl,skeycl.w
 	clr.b	keyrep.w		; also nuke key repeat
 	rts
 
@@ -3860,11 +3880,11 @@ ds_r	rts
 *************************************************************************
 
 	.globl	dosound
-	move.w	pconfig(a5),d0	;get current config word before we change it
+
 dosound:
 	move.l	cursnd.w,d0		; return current status in D0.L
-	move.w	4(sp),pconfig(a5)	;set printer config word
-nosetp	rts
+	move.l	4(sp),d1		; if new ptr < 0, then just return
+	bmi	ds_r			; (invalid ptr, so return)
 	move.l	d1,cursnd.w		; setup new sound ptr
 	clr.b	timer.w		; zap sound timer register
 ds_r:	rts
@@ -3884,16 +3904,17 @@ ds_r:	rts
 	.globl	setprt
 
 setprt:
-	move.w	cdelay1(a5),d0	;get current initial/repeat values
+	move.w	pconfig.w,d0	;get current config word before we change it
 	tst.w	4(sp)		;see if we don't change the word
 	bmi.b	nosetp		;don't set printer word
 	move.w	4(sp),pconfig.w	;set printer config word
-	move.b	d1,cdelay1(a5)	;set initial delay
+nosetp:	rts
 
 *************************************************************************
 *									*
-	move.b	d1,cdelay2(a5)	;set subsequent delay
-kbrate1	rts
+*		SET/RETURN KEY REPEAT VALUES				*
+*									*
+*	entry:								*
 *									*
 *	word	kbrate(initial,repeat)					*
 *	word	initial,repeat						*
@@ -3958,27 +3979,25 @@ ikbdvecs:
 
 *************************************************************************
 *									*
-	clr.l	a5
-
 *	C Timer interrupt routine to process the PSG sound table	*
 *									*
-	btst.b	#$1,conterm(a5)	;check for key repeat enabled
+*************************************************************************
 *+ (lmd)
 * timercint - timer c interrupt handler
 * divide 200 Hz interrupt frequency to 50 hz, and do:
 *	sound handler processing
 *	key-repeat processing;
-	tst.b	keyrep(a5)
+*	control-g bell and keyclick if enabled via sound handler
 *	system timer-tick handoff.
-	tst.b	kdelay1(a5)
+*	updates:	tc_rot (every tick)
 *
-	subi.b	#1,kdelay1(a5)
+*	imports:	etv_timer (timer handoff vector)
 *			_timr_ms (timer calibration value)
-kr1	subi.b	#1,kdelay2(a5)
+*
 *-
-	move.b	cdelay2(a5),kdelay2(a5)
-	move.b	keyrep(a5),d0
-	lea	kbufrec(a5),a0
+
+timercint:
+	add.l	#1,_hz_200	;increment raw tick counter
 	rol.w	tc_rot		;rotate divisor bits
 	bpl.b	t_punt		;if not 4th interrupt, then return
 
@@ -3987,8 +4006,8 @@ kr1	subi.b	#1,kdelay2(a5)
 	bsr.b	sndirq		;process sounds...
 
 	btst.b	#$1,conterm.w	;check for key repeat enabled
-	move.w	_timr_ms(a5),-(sp)	;push #ms/tick
-	move.l	etv_timer(a5),a0	; get vector
+	beq.b	krexit		;not enabled
+
 *	process for repeat key function first because it can affect the sound
 *	table if enabled and the user is 'using'...
 
@@ -4015,32 +4034,32 @@ krexit:
 	move.l	etv_timer.w,a0	; get vector
 	jsr	(a0)		; call it
 	addq	#2,sp		; cleanup stack
-	move.l	cursnd(a5),d0		;get current sound ptr
+
 tick1:	movem.l	(sp)+,d0-d7/a0-a6
 t_punt:
-	move.b	timer(a5),d0		;check delay timer
+*	bclr.b	#5,isrb+mfp	;clear the interrupt channel
 	move.b	#%11011111,isrb+mfp	; was bclr but that's wrong
 	rte
 
-	move.b	d0,timer(a5)		;save new
+********************************************
 *
 *  Quick & dirty sound stuff
 *
 *
 *  Programmed by Dave Staugas
-	move.b	d0,giselect(a5)		;else, register load command--select this reg
+*		 14 Mar 1985
 *
 *  To start a sound, load the 32-bit address of the
 *			byte stream for that sound in 32-bit
 *			"cursnd", & zero the 8-bit "timer"
 *
-	move.b	rddata(a5),d0		;get mixer contents
+*   Sound interrupt routine
 *   Called from timer C irq
 *
-	move.b	d0,wrdata(a5)		;write data
+sndirq:
 	movem.l	a0/d0-d1,-(sp)
 	move.l	cursnd.w,d0		;get current sound ptr
-	move.b	(a0)+,wrdata(a5)	;write next byte as data directly to reg
+	beq	snd1			;br to exit if zero, inactive
 	movea.l	d0,a0			;ptr to a0
 	move.b	timer.w,d0		;check delay timer
 	beq.b	snd3			;br over delay timer update if not on
@@ -4054,7 +4073,7 @@ snd3:
 *
 	move.b	d0,giselect.w		;else, register load command--select this reg
 	cmpi.b	#7,d0			;reg. 7 selected?
-	move.b	(a0)+,auxd(a5)		;128--set aux data from next byte in stream
+	bne.b	sn1			;br if no
 *
 	move.b	(a0)+,d1		;get data to write to reg 7
 	andi.b	#$3f,d1			;always leave i/o port settings alone
@@ -4065,12 +4084,12 @@ snd3:
 	bra.b	snd3			;go for next command
 sn1:
 	move.b	(a0)+,wrdata.w	;write next byte as data directly to reg
-	move.b	(a0)+,giselect(a5)	;129--select register
+	bra.b	snd3			;go for next command
 *
-	add.b	d0,auxd(a5)		;add to aux data
+*  special case command
 *
-	move.b	auxd(a5),wrdata(a5)	;load reg from data in auxd
-	cmp.b	auxd(a5),d0		;reached end of cycle?
+snd2:
+	addq.b	#1,d0			;was command 255?
 	bpl.b	snd5			;br if yes--set delay timer
 *
 	cmpi.b	#129,d0			;was command 128 (before increment)
@@ -4081,11 +4100,11 @@ sn1:
 	move.b	(a0)+,auxd.w		;128--set aux data from next byte in stream
 	bra.b	snd3			;go for next command
 *
-	move.b	(a0)+,timer(a5)		;set delay timer from next byter in stream
+*  command > 128
 *
 snd6:
 	cmpi.b	#130,d0			;command greater than 129
-	move.l	a0,cursnd(a5)		;update sound ptr
+	bne.b	snd5			;br if yes--must be set timer
 *
 *  command 129
 *
@@ -4098,7 +4117,7 @@ snd6:
 	beq.b	snd4			;br if so
 *
 *  still within loop, reset sound pointer to iterate for next irq
-	btst.b	#$2,conterm(a5)
+*
 	subq	#4,a0			;back up sound ptr to repeat this command
 	bra.b	snd4			;update ptr & exit
 *
@@ -4106,8 +4125,8 @@ snd6:
 *
 snd5:
 	move.b	(a0)+,timer.w		;set delay timer from next byter in stream
-	move.l	#bellsnd,cursnd(a5)
-	move.b	#0,timer(a5)
+	bne.b	snd4			;if non-zero, real delay here
+	movea.w	#0,a0			;else, sound terminator--set ptr to null
 snd4:
 	move.l	a0,cursnd.w		;update sound ptr
 snd1:
@@ -4124,7 +4143,7 @@ snd1:
 ringbel:
 	btst.b	#$2,conterm.w
 	beq.b	rgbel
-	ifeq	COUNTRY-USA
+	ifeq	country-usa
 	jsr	(a0)
 	rts
 
@@ -4186,7 +4205,7 @@ keyshif:
 	.endc
 	dc.b	'8','9','4','5','6','1','2','3'
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	ifeq	COUNTRY-TURKEY
+	ifeq	country-turkey
 
 keycl:
 	dc.b	$00,$1b,'1','2','3','4','5','6'
@@ -4249,7 +4268,7 @@ keyshif:
 	dc.b	'8','9','4','5','6','1','2','3'
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	ifeq	COUNTRY-UK
+	ifeq	country-uk
 keycl:
 	dc.b	$00,$1b,'+','1','2','3','4','5'
 	dc.b	'6','7','8','9','0','-',$08,$09
@@ -4312,7 +4331,7 @@ keyshif:
 	.endc
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	ifeq	COUNTRY-GERMANY
+	ifeq	country-germany
 keycl:
 	dc.b	$00,$1b,'1','2','3','4','5','6'
 	dc.b	'7','8','9','0','-','=',$08,$09
@@ -4373,7 +4392,7 @@ keyshif:
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 	.endc
 	dc.b	'8','9','4','5','6','1','2','3'
-	ifeq	COUNTRY-SPAIN
+	ifeq	country-spain
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
 keycl:
@@ -4435,7 +4454,7 @@ keyshif:
 	.endc
 	dc.b	'8','9','4','5','6','1','2','3'
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	ifeq	COUNTRY-FRANCE
+	ifeq	country-france
 
 keycl:
 	dc.b	$00,$1b,'1','2','3','4','5','6'
@@ -4496,7 +4515,7 @@ keyshif:
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 	.endc
 	dc.b	'8','9','4','5','6','1','2','3'
-	ifeq	COUNTRY-SWEDEN
+	ifeq	country-sweden
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
 keycl:
@@ -4528,7 +4547,7 @@ keytran:
 	.endc
 	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	ifeq	COUNTRY-NORWAY
+	ifeq	country-norway
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 
 keyshif:
@@ -4560,43 +4579,43 @@ keytran:
 	.endc
 	.dc.b	'-',0,0,0,'+',0,0,0,0,del
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	ifeq	COUNTRY-ITALY
+	ifeq	country-italy
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 
 keyshif:
-	dc.b	nul,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
-	dc.b	'q','w','e','r','t','y','u','i','o','p',$8a,'+', cr,nul,'a','s'
-	dc.b	'd','f','g','h','j','k','l',$95,$85,$97,nul,'\','z','x','c','v'
-	dc.b	'b','n','m',',','.','-',nul,nul,nul,' ',nul,nul,nul,nul,nul,nul
-	dc.b	nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,'-',nul,nul,nul,'+',nul
-	dc.b	nul,nul,nul,del,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
-	dc.b	'<',nul,nul,'(',')','/','*','7','8','9','4','5','6','1','2','3'
-	dc.b	'0','.', cr,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
+	.dc.b	0,esc,'!"#$%&/()=?',$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
+	.dc.b	'ASDFGHJKL',$b2,$92,'*',0,'|ZXCVBNM;:_',0,0,0,space,0
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,$37,$38,0
+	.dc.b	'-',$34,0,$36,'+',0,$32,0,$30,del
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'>',0,0,'()/*7894561230.',cr
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+
 keycl:
 	.dc.b	0,esc,"1234567890+",$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
-	dc.b	nul,esc,'!','"',$9c,'$','%','&','/','(',')','=','?','^', bs,tab
-	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$82,'*', cr,nul,'A','S'
-	dc.b	'D','F','G','H','J','K','L','@','#',$dd,nul,'|','Z','X','C','V'
-	dc.b	'B','N','M',';',':','_',nul,nul,nul,' ',nul,nul,nul,nul,nul,nul
-	dc.b	nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,'-',nul,nul,nul,'+',nul
-	dc.b	nul,nul,nul,del,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
-	dc.b	'>',nul,nul,'(',')','/','*','7','8','9','4','5','6','1','2','3'
-	dc.b	'0','.', cr,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
+	.dc.b	"ASDFGHJKL",$b2,$92,"'",0,$5c,'ZXCVBNM,.-',0,0,0,space,0
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
+	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
+	dc.b	0,0,0,del,0,0,0,0,0,0,0,0,0,0,0,0
+
+.endif
 
 
-	dc.b	nul,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
-	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$8a,'+', cr,nul,'A','S'
-	dc.b	'D','F','G','H','J','K','L',$95,$85,$97,nul,'\','Z','X','C','V'
-	dc.b	'B','N','M',',','.','-',nul,nul,nul,' ',nul,nul,nul,nul,nul,nul
-	dc.b	nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,'-',nul,nul,nul,'+',nul
-	dc.b	nul,nul,nul,del,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
-	dc.b	'<',nul,nul,'(',')','/','*','7','8','9','4','5','6','1','2','3'
-	dc.b	'0','.', cr,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul,nul
+.if country == italy
+
+*		 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  a,  b,  c,  d,  e,  f
+keytran:
+	dc.b	0,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
+	dc.b	'q','w','e','r','t','y','u','i','o','p',$8a,'+', cr,0,'a','s'
+	dc.b	'd','f','g','h','j','k','l',$95,$85,$97,0,'\','z','x','c','v'
+	dc.b	'b','n','m',',','.','-',0,0,0,' ',0,0,0,0,0,0
 	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
 	endc
 	dc.b	'<',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
 	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
-	ifeq	COUNTRY-SWISSGER
+	ifeq	country-swissger
 keyshif:
 	dc.b	0,esc,'!','"',$9c,'$','%','&','/','(',')','=','?','^', bs,tab
 	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$82,'*', cr,0,'A','S'
@@ -4628,7 +4647,7 @@ keytran:
 	.endc
         dc.b    '-',0,0,0,'+',0,0,0,0,del
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-	ifeq	COUNTRY-SWISSFRA
+	ifeq	country-swissfra
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
 
 keyshif:
@@ -4659,7 +4678,7 @@ keytran:
         dc.b    "asdfghjkl",$82,$85,$DD,0,"$yxcvbnm,.-",0,0,0,space,0
 	.endc
         dc.b    '-',0,0,0,'+',0,0,0,0,del
-	ifeq	COUNTRY-DENMARK
+	ifeq	country-denmark
         dc.b    '<',0,0,'()/*7894561230.',cr
         dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
 

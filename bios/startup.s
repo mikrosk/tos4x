@@ -1,20 +1,26 @@
-******************* Revision Control System *****************************
+.super
+****************** Revision Control System *****************************
 *
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/21 13:40:41 $
+* $Date: 89/09/22 16:43:29 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.32  89/09/22  16:43:29  apratt
+* THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+* No functional changes from previous revision, which is the last to
+* require Alcyon's AS68 assembler.
+*
 * Revision 2.31  89/09/21  13:40:41  apratt
 * The vbl part of Setscreen() copied the new palette to TT regs
 * rather than ST regs -- now it copies to the ST regs always.
 * This was a vestige of bit-shifting in software, now unnecessary.
-*
+* 
 * Revision 2.30  89/09/18  13:35:33  apratt
 * Removed LONGFRAME conditional assembly: now LONGFRAME is all there is.
 * Removed code which emulated STE color registers; it turns out
@@ -330,7 +336,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.31 $
+* $Revision: 2.32 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -342,7 +348,7 @@
 *-
 * =======================================================================
 rom		=	0 ***DON'T  CHANGE***	; system in 192K ROM
-ram		=	1 ***DON'T  CHANGE***	; system loaded (in RAM) from floppy
+ram		=	1 ***DON'T  CHANGE***	; system loaded in RAM
 
 usa		=	0 ***DON'T  CHANGE***
 germany		=	1 ***DON'T  CHANGE***
@@ -390,33 +396,24 @@ denmark		=      13 ***DON'T  CHANGE***
 * reading RAM address >3fffff).
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
-* set TT to 1 to assemble for Atari TT (68030).  Some of this
-* code is stopgap, such as programming the memory controller for 2Meg
-* and short-circuiting the RTC.  Caveat programmer.
+*
+*-
+
 * The switches TT, STPLUS, systype, and country
-TT		=	1	; @check@
+* are all moved to the file "switches.s" which is normally a copy
 * of one of the canned switch settings files.
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
 * the chip actually exists (so clearing the control register will
 * not cause a bus error) and that MONOMON is XORed with the sound chip's
 * IRQ line.
 
-DMASND		=	1	; @check@
+.ifne TT+STPLUS
+DMASND		equ	1
+.endc
+.ifeq TT+STPLUS
+DMASND		equ	0
+.endc
 * have a short-frame processor (68000).  Currently that's only TT.
-* set DMAINV to 1 if the machine you're building ROMs for inverts
-* monomon when DMA sound chip is idle.  Older STPLUS and TT machine
-* do this, newer ones have the idle state noninverting.
-
-DMAINV		=	0	; @check@
-
-* set STPLUS to 1 for ST PLUS specific things like memory layout
-* and video (four bits per gun, any-word alignment).
-
-STPLUS		=	0	; @check@
-
-systype		=	ram	; 'rom' or 'ram' @check@
-country		=	usa     ; 'usa', etc.... @check@
-
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
 
 .ifeq TT
@@ -860,10 +857,10 @@ memconf		equ	$ffff8001	; memory controller
 *--- SPARROW memory configuration
 SPAR_CONF	equ	$ffff8006	; read here to auto-config
 
-shiftmd		equ	$ffff8260	; video	shift mode (resolution)
+*--- SPARROW video master control register
 SPAR_VMC	equ	$ffff82c0	; video master control
 .ifne TT
-shiftmd		equ	$ffff8262	; TT shift mode (overrides above equ)
+syncmode	equ	$ffff820a	; video	sync mode
 .endc
 dbaseh		equ	$ffff8201	; display base high
 .ifne STPLUS+TT
@@ -1033,7 +1030,7 @@ _____md:	ds.w	2	; (49e)  (more MD)
 _nflops:	ds.w	1	; (4a6)	 number of disks attached (0, 1+)
 con_state:	ds.l	1	; (4a8)  state of conout() parser
 save_row:	ds.w	1	; (4ac)  saved row# for cursor X-Y addressing
-_prtcnt:			* (4ee)  screen-dump flag alias
+sav_context:	ds.l	1	; (4ae)  pointer to saved processor context
 _bufl:		ds.l	2	; (4b2)  two buffer-list headers
 _hz_200:	ds.l	1	; (4ba)  200hz raw system timer tick
 		ds.l	1	; (4be)  [unused, reserved]
@@ -1113,12 +1110,12 @@ user_vars:	ds.b	64		; 64 bytes for carts and things
 *	will change in future		:
 * They are not clobbered across reset.	:
 *----------------------------------------
-savend:					* end of register sav area
+
 .if STPAD
 padmagic:	ds.l	1		; $01241960 for STPAD touch driver
 padstuff:	ds.l	10*4		; other pad variables (total 40 bytes)
 def_frb:	ds.l	1		; copy of value of _FRB cookie
-endosbss:				* end of "base" BSS
+_upref:		ds.w	1		; boot pref for _dmaboot
 .if TT
 ttmd:		ds.l	4		; the TT MD for fast RAM (see getmpb)
 
@@ -1136,7 +1133,7 @@ endosbss:				; end of "base" BSS
 	.text
 *+
 * System startup parameters
-ostext:		bra.s	reseth		;($0)  branch to reset handler
+*
 * In ROM, these are found at $FC0000.
 * In any event, they are found at *(_st_begos).
 *
@@ -1194,9 +1191,6 @@ reseth:
  endc
 
 
-* because dumb as68 doesn't use the .w addressing form when it could...
-	clr.l	a5			; quick zeropage
-
  ifeq systype-rom
 *+
 *  [ROM based system]
@@ -1225,7 +1219,7 @@ reset1:
 .endif
 
 ret_1:	bne	reset2			; (invalid -- don't set anything up)
-	move.b	memcntlr(a5),memconf(a5)	; initialize memory controller
+*  [ROM only]
  endc
 *  controller configuration register so that
  ifeq systype-rom
@@ -1250,10 +1244,10 @@ ret_1:	bne	reset2			; (invalid -- don't set anything up)
 reset2:
 
 *+
-reset2:	cmp.l	#resmagic,resvalid(a5)	; is resvalid the magic	number?
+reset2:	cmp.l	#resmagic,resvalid.w	; is resvalid the magic	number?
 * if STPAD, read the switches register to learn the state of top closed &
-	move.l	resvector(a5),d0	; d0 = reset bailout vector
-	tst.b	resvector(a5)		; bits 24..31 must be zero
+* power on.  Clobber resvalid if they are BOTH down, which is a state that
+* power and wait for RAM to decay.  Note that other things (modem wake,
 * alarm wake, extern wake) can bring the power bit down besides the button;
 *
 * Also read the STylus button register & don't jump through resvector
@@ -1269,8 +1263,7 @@ reset2:	cmp.l	#resmagic,resvalid(a5)	; is resvalid the magic	number?
 	and.b	#%00000110,d0		; test for both STylus buttons
 	bne	resv1			; if either is up, don't clobber
 	cmp.l	#resmagic,resvalid.w	; is resvalid the magic	number?
-reset3:	clr.l	a5			; reset handler might have hit a5
-	lea	giselect(a5),a0		; a0 -> giselect, giwrite-2
+reset3:	lea	giselect,a0		; a0 -> giselect, giwrite-2
 	move.l	resvector.w,d0		; d0 = reset bailout vector
 .if (M68030 == 0)
 	move.b	#$e,(a0)		; deselect disks
@@ -1292,10 +1285,10 @@ reset3:	clr.l	a5			; reset handler might have hit a5
 	lea	giselect,a0		; a0 -> giselect, giwrite-2
 	move.b	#7,(a0)			; set porta & portb to output
 	bra	vwait			; wait for vblank start
-pal_r:	move.b	#$02,syncmode(a5)	; then twiddle to 50hz
+	move.b	#$e,(a0)		; select port A
 .endc
 .ifne TT
-	move.b	#$01,syncmode(a5)	; set external sync mode always
+	move.b	#$01,syncmode		; set external sync mode always
 .endc
  endc
 .endif
@@ -1305,7 +1298,7 @@ pal_r:	move.b	#$02,syncmode(a5)	; then twiddle to 50hz
 
 
 
-notpal:	lea	color0(a5),a1		; a1 ->	hardware reg
+notpal:	lea	color0,a1		; a1 ->	hardware reg
 
 .if STPAD
 *
@@ -1319,10 +1312,10 @@ notpal:	lea	color0(a5),a1		; a1 ->	hardware reg
 *
 * We also read from $d00000, to clear the "conversion done" interrupt
 * from the STylus touch-screen hardware.  This is as good a place to
-	move.b	#$01,dbaseh(a5)		; set high ptr
-	clr.b	dbasel(a5)		; set low ptr
+* put that as any...
+*
 .ifne STPLUS+TT
-	clr.b	dbasell(a5)		; set lo byte ptr
+	clr.b	dbasell		; set lo byte ptr
 .endc
 	move.b	#$80,$ffff827f		; write LCD and power control
 	tst.w	$d00000			; clear "conversion done" int.
@@ -1339,15 +1332,15 @@ sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 	dbra	d0,sysic1		; (loop for more colors)
 * controller, and tells other things besides: the byte at 8006 (or the high
 .ifeq TT
-	move.b	memcntlr(a5),d6		; d6 = memory controller configuration
-	move.l	phystop(a5),d5		; d5 ->	(possible) top of physical mem
+	bne	sp_cold			; no - this is a cold boot
+
 * On Sparrow, detected cold boot.  So determine memory size.
 * Take mmb as a number; phystop is 512KB << mmb clamped to 14MB maximum.
 sp_cold:
 	move.w	SPAR_CONF,d0	; read again just for fun
 	lea	ret_2(pc),a6		; load return address
 	bra	val_memval		; get memory controller validation
-	move.b	#$0a,memconf(a5)	; setup	controller for 2Mb/2Mb
+ret_2:	beq	reset4			; already sized -- don't size or test
 
 .if STPAD
 
@@ -1380,23 +1373,22 @@ shadow	equ	$40000			; look for first shadow at 128K
 * to be an assembly-time constant, now it's in d7.
 *
 	move.l	#shadow+8,a0		; pattern matches at first shadow loc?
-	lea	memr1(pc),a5		; a5 ->	return addr
+*
 
 	move.b	#$5a,dbasell		; see if dbasell is RAM
 	move.l	#shadow*2+8,a0		; pattern matches at second shadow loc?
-	lea	memr2(pc),a5		; a5 ->	return addr
+					; would put $5a on the bus.
 	cmp.b	#$5a,d0			; NOW cmp.b
 	bne	memST
 
-	lea	memr3(pc),a5		; a5 ->	return addr
+	clr.b	dbasell			; try the test again using zero
 	tst.w	color0			; color0 is $FFF
 	tst.b	dbasell			; read back - should be zero.
 	bne	memST
 
 ; OK, dbasell holds its value: you're an STe.
 
-cold3:	clr.l	a5
-	move.b	d6,memconf(a5)		; setup	memory controller
+cold3:	move.b	d6,memconf		; setup	memory controller
 .endc
 	bra	gotshadow
 .ifne TT
@@ -1432,29 +1424,29 @@ mem4:	sub.l	#bank1,d1		; decrement bank number
 *	(256Kx4 (=2M) onboard)
 *	(256Kx4 onboard) plus (256Kx4 add-on)
 *	(256Kx4 onboard strapped at 8M) plus (1Mx4 (=8M) add-on at 0)
-	move.b	memcntlr(a5),d6
-	move.l	phystop(a5),d5
+	move.b	memcntlr.w,d6
+* The algorithm used to set the TT MCU configuration is similar in
 * concept to the one used in the ST series, but different in details.
 *
 * The TT master MCU can be configured to use either 256K or 1M deep
 * parts.  To figure out which are actually installed on your board, you
 * 	1) consult a calendar  (1Mx4 DRAMs are not expected in
-	move.b	#$a,memconf(a5)		; but mem cntlr for big
+* 	   production for at _least_ a year  :-)
 * 	2) a) set the memory controller for 1M parts
-	move.l	d0,$1008(a5)		; clear space first so pattern
-	move.l	d0,$100c(a5)		; doesn't "happen" to be there
+* 	      (i.e. write 0x000a to 0xFFFF8000)
+*            b) write a known pattern to RAM
 *            c) look for the pattern to be repeated in RAM as though
-	move.l	d0,$8(a5)		; write pattern
-	cmp.l	$1008(a5),d0		; shadowed here?
-	bne.s	mt_big			; no, definitely big parts
+*               A12 were a don't care:
+*               (e.g. write a pattern starting at address 0x00000008,
+* 		see if it can be read back from 0x00001008)
 * 	      IF there is a repeat
-	move.l	d0,$c(a5)		; try a different pattern & addr
-	cmp.l	$100c(a5),d0		; shadowed here?
-	beq.s	mt_done			; yes - definitely small parts
+*               THEN you have 256K parts; reset the memory controller
+*                 (i.e. write 0x0005 to 0xFFFF8000)
+*               ELSE you really do have 1M parts
 *
 * Routine notes: at the .endif, d5 must hold phystop, and d6 must hold
 * the value to put in memconf and memcntlr.
-	move.b	d6,memconf(a5)
+*
 
 .endc
 	beq	mt_cold			; definitely a cold boot
@@ -1525,11 +1517,11 @@ mt_3:	cmp.w	-(a1),d0		; compare word in RAM with ours
 *  to magic values ...
 *
 	move.l	a0,d5			; d5 -> end of RAM (as we know it)
-	move.b	d6,memcntlr(a5)		; save configuration byte
-	move.l	d5,phystop(a5)		; save physical top-of-memory
-	move.l	#memmagic,memvalid(a5)	; indicate memory was configured
-	move.l	#memmag2,memval2(a5)	; ditto (paranoia variable)
-	move.l	#memmag3,memval3(a5)	; ditto (paranoia extraordinaria)
+
+.endif
+*+
+*  [still ROM only]
+*  Clear memory from $400 to 'd5' (phystop). Used to put screen at phystop
 *  - screen size and clear from top down. Now leaves screen where it is (at
 .ifne TT
 *  preserve d5 = phystop and d6 = mem controller program byte.
@@ -1539,10 +1531,10 @@ mt_3:	cmp.w	-(a1),d0		; compare word in RAM with ours
 
 refresh	equ	$e0
 
-	move.l	#mt_berr,8(a5)
+	move.l	#mt_berr,$8
 	move.w	#0,$ffd00000+refresh	; write don't-care data here
 
-mt_berr: nop				; placate stupid as68!
+mt_berr:
 
 	move.w	#$400,a0
 	move.l	d5,d4
@@ -1558,7 +1550,7 @@ mt_berr: nop				; placate stupid as68!
 *  Set the system variables memcntlr and phystop. Also set the magic values
 *
 *  aren't done until fast RAM is sized, then we set bit 0 of SCU general
-	move.l	#mt_pq,8(a5)		; BUS ERROR to catch missing cntrlrs
+.endif
 	move.l	d5,phystop.w		; save physical top-of-memory
 
 	move.l	#memmagic,memvalid.w	; indicate memory was configured
@@ -1597,13 +1589,13 @@ mt_p1:	move.l	a0,a1			; a1 -> end of RAM (as we know it)
 	move.w	d0,d2			; d2 = copy of random #
 	moveq	#42,d1			; d1 = # words to stuff
 mt_p2:	move.w	d2,-(a1)		; stuff a word (or get a BUS ERROR)
-	move.l	d5,_ramtop(a5)		; store ramtop value
-	move.l	#rammagic,_ramvalid(a5)	; mark as valid
+	add.w	d3,d2			; generate new random #
+	dbra	d1,mt_p2		; (stuff more words)
 .endc
 
 .ifeq TT
 	clr.l	_ramtop			; store zero value
-	move.l	#rammagic,_ramvalid(a5)	; mark as valid
+	bra	mt_p1			; check some more
 .endc
 mt_pq:	sub.l	d7,a0			; drop down to last successful probe
 
@@ -1620,7 +1612,6 @@ mt_pr:
 * non-TT ST's, of course).
 .else
 
-	clr.l	a5			; quick zeropage
 .endif
 	tst.b	dbasell			; read back - should be zero.
  ifeq systype-rom
@@ -1660,7 +1651,7 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *  TOS builds include a symbol, endaesbss, which is the last RAM address
 *  used anywhere in the OS.  For a RAM TOS, that's not the one we want:
 	cmp.l	a0,a1			; at end?
-	move.l	phystop(a5),a0		; video_base = phystop - 0x8000
+	bne	clrm_1			; (no -- loop for more words)
 .ifeq TT
 .if M68030
 *+
@@ -1669,11 +1660,11 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 	sub.l	#$25800,a0		; TT needs LOTS of video RAM
 	move.w	#$2580-1,d1		; clear d1*16 bytes
 .endc
-	move.l	a0,_v_bas_ad(a5)
-	move.b	_v_bas_ad+1(a5),dbaseh(a5) ; load high addr
-	move.b	_v_bas_ad+2(a5),dbasel(a5) ; load low (really, medium) addr
+*  This has to run after clearing BSS memory.
+*-
+
  .ifne STPLUS+TT
-	move.b	_v_bas_ad+3(a5),dbasell(a5)	; load lo byte addr
+	move.b	_v_bas_ad+3.w,dbasell	; load lo byte addr
  .endc
 *  Setup display base,
 *  clear display memory.
@@ -1692,52 +1683,52 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *  Backing off by 256 bytes means the defualt low byte is zero, and the
 *  screen doesn't abut the end of memory, so this solves both problems.
 	lea	os_end-4(pc),a0		; no, use default numbers
-usem:	move.l	4(a0),end_os(a5)	; init end-of-OS pointer
-	move.l	8(a0),exec_os(a5)	; init default-shell pointer
+.if (TT == 0)
+	sub.l	#$8000,a0
 	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero
 .else
-	move.l	#_dskinit,hdv_init(a5)	; initialization
-	move.l	#_rwabs,hdv_rw(a5)	; read/write absolute sectors
-	move.l	#_getbpb,hdv_bpb(a5)	; get BIOS parameter block
-	move.l	#_mediach,hdv_mediach(a5) ; media change inquiry
-	move.l	#_boot,hdv_boot(a5)	; boot-from-device
+	sub.l	#$25900,a0		; One TT screen plus $100 bytes.
+	move.w	#$2590-1,d1		; clear d1*16 bytes
+.endif
+	move.l	a0,_v_bas_ad.w
+	move.b	_v_bas_ad+1.w,dbaseh	; load high addr
 	move.b	_v_bas_ad+2.w,dbasel	; load low (really, medium) addr
 * assume v_bas_ad ends with 00.  Writing dbaseh or dbasel zeros dbasell.
-	move.l	#_lstostat,prv_lsto(a5)
-	move.l	#_lstout,prv_lst(a5)
-	move.l	#_auxostat,prv_auxo(a5)
-	move.l	#_auxout,prv_aux(a5)
+*	move.b	_v_bas_ad+3.w,dbasell	; (don't need to) load lo byte addr
+
+	moveq	#0,d0
+clrm_2:	move.l	d0,(a0)+		; zero a longword
 	move.l	d0,(a0)+		; zero a longword
 	move.l	d0,(a0)+		; zero a longword
-	move.l	#_scrdmp,scr_dump(a5)	; screen-dump vector
-	move.l	_v_bas_ad(a5),_memtop(a5) ; _memtop = _v_bas_ad
-	move.l	end_os(a5),_membot(a5)	; set bottom of memory (for DOS)
+	move.l	d0,(a0)+		; zero a longword
+	dbra	d1,clrm_2		; (loop for more longwords)
+
 	lea	_supstk+1024+2048,sp	; setup supervisor stack
-	move.w	#dnvbls,nvbls(a5)	; default number of vbl queue entries
-	st	_fverify(a5)		; enable write-verify
-	move.w	#df_seek,seekrate(a5)	; set default seek-rate
-	move.l	#_diskbuf,_dskbufp(a5)	; setup pointer to disk buffer
-	move.w	#-1,_prtcnt(a5)		; initialize print-count
-	move.l	#ostext,_sysbase(a5)	; -> base of OS
-	move.l	#savend,savptr(a5)	; register-save pointer for traps 13&14
-	move.l	#_rts,swv_vec(a5)	; ignore monitor changes for now
-	clr.l	_drvbits(a5)		; clobber "drive-alive" bits
-*	clr.w	_bootdev(a5)		; clear this (NEW 5/5/88)
+*+
+*  Initialize all kinds of OS variables
+*
+*-
+
+*--- OS parameters:
+	move.l	os_magic(pc),a0		; get pointer to magic
+	cmp.l	#$87654321,(a0)		; is the magic there?
+	beq	usem			; yes -- use numbers there
+*	clr.w	_bootdev.w		; clear this (NEW 5/5/88)
 
 *--- Disk vectors:
 	move.l	#_dskinit,hdv_init.w	; initialization
-	move.l	#def_bell,bell_hook(a5)	; init def bell handler
-	move.l	#def_click,kcl_hook(a5)	; init def keyclick handler
+	move.l	#_boot,hdv_boot.w	; boot-from-device
+
 *--- Prtblk vectors:
  .ifne DMASND
-	clr.w	dmasndc(a5)		; reset sound chip
+	clr.w	dmasndc		; reset sound chip
 
 * program the volume/tone controller for a sane volume & tone, and
 * mix the GI sound in with the DMA sound so it comes out the speaker.
 
 	lea.l	vtpgm(pc),a0
-	move.w	(a0)+,mwmask(a5)
-	bra.s	vtend
+	move.w	(a0)+,mwmask
+	bra	vtend
 
 * data for the MicroWire interface...  The low high bit is set for
 * each of these so we can tell when it's shifted completely out.
@@ -1752,11 +1743,11 @@ vtpgm:	dc.w	($0600+$01ff)*2		; mask for all cmds
 	dc.w	($0400+$0000+$01)*2+1	; mix GI sound with DMA sound
 	dc.w	$0			; end of this list
 
-vtloop:	move.w	d0,mwdata(a5)		; write data
-vtwait:	tst.w	mwdata(a5)		; wait for data == 0
-	bne.s	vtwait
+vtloop:	move.w	d0,mwdata		; write data
+vtwait:	tst.w	mwdata			; wait for data == 0
+	bne	vtwait
 vtend:	move.w	(a0)+,d0
-	bne.s	vtloop
+	bne	vtloop
 
  .endc
 
@@ -1769,7 +1760,7 @@ vtend:	move.w	(a0)+,d0
 .if systype == rom
 	bsr	copy_header		; kludge OS ROM header
 .endif
-	move.l	a0,_p_cookies(a5)
+
 *+
 * Initialize the cookie jar.
 *
@@ -1793,7 +1784,7 @@ vtend:	move.w	(a0)+,d0
 *
 *	_VDO:
 *		00000000 or nonexistent is ST or Mega ST.
-	beq.s	cpunot30	; no - it's a 20
+*		00010000 is STe
 *		00010001 is STBook (STPAD)
 *		00020000 is TT
 *		00030000 is Sparrow
@@ -1801,7 +1792,7 @@ vtend:	move.w	(a0)+,d0
 
 	lea	defcookies,a0
 	move.l	a0,_p_cookie.w
-	sne	_longframe+1	; and, incidentally, set longframe, too.
+
 *
 .ifeq TT+STPLUS
 * for the movec instruction, so I use the freeze bit of the data cache
@@ -1848,21 +1839,21 @@ vtend:	move.w	(a0)+,d0
 * are/were manufactured with all switches open (or missing!).
 *
 .ifne STPLUS
-	move.w	CONF_SWITCHES(a5),d0	; get configuration bits (as word!)
+	move.w	CONF_SWITCHES,d0	; get configuration bits (as word!)
 .endc
 .ifne TT
 
 * must find configuration bits in either of two places: one for TTD,
 * one for all others.  Each address gives bus error on the other machine.
 
-	move.l	$8(a5),a1
+	move.l	$8,a1
 	move.l	sp,a2
-	move.l	#conf_berr,8(a5)
-	move.w	CONF_SWITCHES(a5),d0	; get conf bits from normal place
+	move.l	#conf_berr,$8
+	move.w	CONF_SWITCHES,d0	; get conf bits from normal place
 	bra	gotem			; hey! no exception
 conf_berr:
-	move.w	TTD_CONF_SWITCHES(a5),d0
-gotem:	move.l	a1,8(a5)
+	move.w	TTD_CONF_SWITCHES,d0
+gotem:	move.l	a1,$8
 	move.l	a2,sp
 .endc
 	lsr.w	#8,d0			; get conf switches in low byte
@@ -1884,8 +1875,8 @@ gotem:	move.l	a1,8(a5)
 * Don't change this size: RAM-loaded drivers use the same buffer.
 	move.l	#nofpu,$2c
 	clr.l	def_frb			; default to zero
-	tst.l	_ramtop(a5)		; any fast RAM?
-	beq.s	nofrb			; no - forget it.
+	move.l	#nofpu,$34
+	fmove.l	fp0,d0			; test a simple FPU inst.
 	move.l	#$00020000,(a0)+	; found 6888x: set %10 bit 
 * there is some fast RAM, so must allocate a 64K disk buffer
 * and add its cookie here.  (I don't necessarily like allocating the
@@ -1893,13 +1884,13 @@ gotem:	move.l	a1,8(a5)
 * be before the jsr to the routine pointed by hdv_boot.)
 	move.l	a2,$34
 	move.l	a3,sp
-	move.l	_membot(a5),d0
-* What the heck - probe for SFP004 whether or not you're a TT.
-	move.l	d0,def_frb(a5)		; write so flop.s can find it
 
-	move.l	d0,_membot(a5)		; write new _membot
-	move.l	d0,end_os(a5)		; write new end_os
-nofrb:	nop
+* What the heck - probe for SFP004 whether or not you're a TT.
+	move.l	d0,def_frb.w		; write so flop.s can find it
+
+	move.l	$8,a1			; save bus error vector
+	move.l	sp,a2			; and SP for cleaning up later
+	move.l	#xfpudone,$8		; catch bus error
 .endc
 	bset.b	#0,-3(a0)		; found SFP004: set %01 bit
 	bra	xfpudone
@@ -1953,20 +1944,20 @@ sei1:	move.l	a1,(a0)+
 *  Exception vectors are pointed to the system critical error handler
 *
 * New code: we set all these exceptions to vector to 'coldboot' on the
-	lea	$64(a5),a1		; a1 -> first slot
+* theory that a bus error while TOS is booting is A Bad Thing. We will
 * revector the ones that still point to coldboot just before the first
 * possible time we could jump to user code.  The theory of setting the
 * bomb vectors to coldboot is that the cold boot will fix whatever went
 * wrong, like a bogus address in resvector or some other system variable.
-	move.l	#vbl,$70(a5)		; vblank handler
-	move.l	#hbl,$68(a5)		; hblank handler
-	move.l	a3,$88(a5)		; (empty) trap#2 handler
-	move.l	#trp13h,$b4(a5)		; trap #13 handler
-	move.l	#trp14h,$b8(a5)		; trap #14 handler
-	move.l	#line1010,$28(a5)	; line 1010 handler
-	move.l	a4,etv_timer(a5)	; default timer-tick vector -> rts
-	move.l	#_critich,etv_critic(a5) ; default critical error handler
-	move.l	a4,etv_term(a5)		; default terminate vector -> rts
+*-
+	lea	_rte(pc),a3		; a3 -> handy RTE
+	lea	_rts(pc),a4		; a4 -> handy RTS
+
+*--- set up bomb vectors to coldboot (in bios.s):
+
+	lea	coldboot,a1		; a1 -> coldboot
+	lea	$8,a0			; a0 -> interrupt RAM
+	move.w	#64-1,d0		; d0 = count
 sei1:	move.l	a1,(a0)+		; write vector
 
 	dbra	d0,sei1			; (loop to write more vectors)
@@ -1975,8 +1966,8 @@ sei1:	move.l	a1,(a0)+		; write vector
 
 	move.l	a3,$14			; divide-by-zero vector -> rte
 
-	lea	_vbl_list(a5),a0	; a0 -> default list of vbl locs
-	move.l	a0,_vblqueue(a5)	; install ptr to them
+* Vector NMI to RTE: it's possible to get NMI on STPAD when the
+* battery is low, but it's also possible that the threshholds are
 * not correct, so in the boot sequence we "disable" NMI.  Bombs
 * are never a good response to NMI, so anything that actually uses
 * it will install a vector.
@@ -2002,8 +1993,8 @@ sei2:	moveq	#7-1,d0			; d0 = DBRA count
 *
 .ifne TT
 * TT: have to enable interrupts in SCU also
-	move.b	#$40,ttvmeintmsk(a5)	; enable int priority 6
-	move.b	#$14,ttsysintmsk(a5)	; enable int priorities 2, 4
+	move.b	#$40,ttvmeintmsk	; enable int priority 6
+	move.b	#$14,ttsysintmsk	; enable int priorities 2, 4
 .endc
 
 	moveq	#(4*8)-1,d0		; = #vectors to install
@@ -2055,11 +2046,10 @@ ikbdlp1:
 * NOTE: Furture systems may require a delay BEFORE we preform the software
 *	reset. Problems with the ikbd require a 1/200 of a second delay
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
-TBDR	equ	$fffffa21		* timer B data reg
-TBCR	equ	$fffffa1b		* timer B control reg
+TBDR	equ	$fffffa21		; timer B data reg
+TBCR	equ	$fffffa1b		; timer B control reg
 	dbra	d1,ikbdlp1
-	clr.l	a5
-	move.b	shiftmd(a5),d0		; copy hardware rez bits to
+	move.b	shiftmd,d0		; copy hardware rez bits to
 .ifeq TT
 	and.b	#3,d0			;   software shadow
 	cmp.b	#3,d0
@@ -2074,34 +2064,24 @@ TBCR	equ	$fffffa1b		* timer B control reg
 	bne	tb_x
 	moveq	#6,d0			; 3 and 5 illegal; make it 6 (hirez)
 .endc
-tb_x:	move.b	d0,sshiftmd(a5)		; set software rez
+tb_x:	move.b	d0,sshiftmd.w		; set software rez
 
-	move.b	gpip(a5),d0		; monochrome monitor attached?
-.ifeq DMASND
+	move.b	gpip,d0			; monochrome monitor attached?
 	bmi	nomono			; (no)
-.endc
-.ifne DMASND
-.ifne DMAINV
-	bpl	nomono			; (POSITIVE means color for DMASND)
-.endc
-.ifeq DMAINV
-	bmi	nomono
-.endc
-.endc
 .ifeq TT
 * don't wait if TT: vwait doesn't work and it's not necessary.
 	lea	vwt_r(pc),a6		; a6 -> ret addr
 	bra	vwait			; wait for vblank
 
-vwt_r:	move.b	#2,shiftmd(a5)		; set hardware highrez
-	move.b	#2,sshiftmd(a5)		; set software highrez
+vwt_r:	move.b	#2,shiftmd		; set hardware highrez
+	move.b	#2,sshiftmd.w		; set software highrez
 .endc
 .ifne TT
-	move.b	shiftmd(a5),d0		; get shift reg
+	move.b	shiftmd,d0		; get shift reg
 	and.b	#$f8,d0			; clear mode bits
 	or.b	#6,d0			; set mode 6 (hirez)
-	move.b	d0,shiftmd(a5)		; set hardware hirez
-	move.b	#6,sshiftmd(a5)		; set software hirez
+	move.b	d0,shiftmd		; set hardware hirez
+	move.b	#6,sshiftmd.w		; set software hirez
 .endc
 	move.b	#$80,$ffff827f		; write LCD and power control
 nomono:
@@ -2111,12 +2091,12 @@ nomono:
 .if (TT == 0)
 
 *--- if in medium rez, hack color3 := color15 (for GSX)
-	cmp.b	#1,sshiftmd(a5)		; in medium rez?
+	cmp.b	#1,sshiftmd.w		; in medium rez?
 	bne	setvb2			; (no, so don't fiddle)
-	move.w	color0+$1e(a5),color0+6(a5)	; copy color 15 to color 3
+	move.w	color0+$1e,color0+6	; copy color 15 to color 3
 
-setvb2:	move.l	#reseth,swv_vec(a5)	; RESET system on monitor change
-	move.w	#1,vblsem(a5)		; enable vblank processing for real
+setvb2:	move.l	#reseth,swv_vec.w	; RESET system on monitor change
+.else
 	moveq.l	#4,d1			; pre-select TT MED rez
 .endif
 
@@ -2138,8 +2118,8 @@ setvb2:	move.l	#reseth,swv_vec(a5)	; RESET system on monitor change
 	move.w	#$2300,sr		; go to IPL 3
 	moveq	#1,d0			; magic bit# = 1
 	bsr	cartscan		; execute cartridge aps
-	move.l	#priv,$20(a5)		; set priv viol exception vector
-	bra.s	priv2
+*
+	bra	priv2
 * to allow characters the keyboard controller is trying to send to come
 * through, then clear the kbshift state variable.  This is because
 * we can get here via control-alt-delete, and those keys will have
@@ -2158,7 +2138,7 @@ priv:	movem.l	d0/a0,-(sp)
 
 * Take 2: copy the dest EA bits and extension words of the instruction into
 * a "move.w (a0),ea" instruction elsewhere in memory, point a0 to the
-	bne.s	priv1			; no.
+* SR from the exception stack, and jsr there.
 	move.b	#$42,(a0)		; clobber the instruction
 .ifne TT
 * if TT, need to clear caches after this instruction
@@ -2176,7 +2156,7 @@ priv1:	movem.l	(sp)+,d0/a0
 	move.l	(sp)+,a1
 .endc
 	rte
-priv2:	nop				; continue booting here
+
 * What's below is the same as what's above, except that a0/a1 are restored
 * from their saved values before the jsr to pspace: either might be in the 
 * dest ea of the move.
@@ -2204,11 +2184,11 @@ priv1:	move.l	(sp)+,a0
 .else
 * by AKP and KBAD 11/2/88.  Note that _iclock returns Carry Set on error.
 	jmp	_term+$08000000		; strange but true!
-	bcc.s	noikbdclk		; if cc, don't bother with ikbd
+	bcc	noikbdclk		; if cc, don't bother with ikbd
 	bsr	gettime			; but if cs, get IKBD time
 priv2:
 
-	beq.s	noikbdclk		; whoops! that's invalid, too!
+
 *+
 *
 * NOW WE'RE COOKING!
@@ -2496,7 +2476,7 @@ sizeikbd	equ	*-ikbreset-1
 *	move.w	#$08a,(a6)	; select status reg
 *	move.w	(a5),d0		; get return code from DMA device
 *	and.w	#$00ff,d0	; strip crufty bits
-*	beq.s	dmr_r		; zero, so it's good.
+*	beq	dmr_r		; zero, so it's good.
 *
 *	dbra	d5,dmaagain	; bad read - retry (once)
 *
@@ -2595,7 +2575,7 @@ dmaok:	move.l	_dskbufp,a0
 .if TT
 *
 * move boot preference into _upref: hi 5 bits of ttscu1, or
-	beq.s	dmafound		; success!
+* first word of NVM if valid, else zero.
 *
 * dma failed or sector isn't bootable ($1234) or didn't change hdv_rw:
 dmaloop:
@@ -2664,7 +2644,7 @@ dmafound:
 	jsr	(a0)			; call the root sector
 	move.l	(sp)+,d0		; get old value of hdv_rw
 	cmp.l	hdv_rw.w,d0		; hdv_rw still the same?
-*			a5 -> return address
+	beq	dmarfail		; yes - keep looking
 	rts				; no - stop looking now
 
 * this is "endif systype == rom"
@@ -2682,7 +2662,7 @@ dmafound:
 *-
 
 .if STPAD
-memchkr: jmp	(a5)			; "return" to caller
+cart1:
 	lea	ostext+(256*1024),a0
 	bra	cartsx
 .endif
@@ -2695,12 +2675,11 @@ cartsx:
 
 ca_1:	btst.b	d0,ca_flags(a0)		; test bit in MSB of INIT address
 	beq	ca_2			; (not set, so don't execute)
-	clr.l	a5			; a5 -> quick zeropage
-	cmp.l	#memmagic,memvalid(a5)	; check first magic number
-	bne.s	val_mr			; (mismatched -- return NE)
-	cmp.l	#memmag2,memval2(a5)	; check again (for paranoia)
-	bne.s	val_mr
-	cmp.l	#memmag3,memval3(a5)	; check again
+	movem.l	d0-d7/a0-a6,-(sp)	; save everything
+	move.l	ca_init(a0),d0		; a0 -> initialization address
+	and.l	#$00ffffff,d0		; mask of MSB (used for flags)
+	move.l	d0,a0
+	jsr	(a0)			; call cartridge application
 	movem.l	(sp)+,d0-d7/a0-a6	; restore everything
 ca_2:	tst.l	(a0)			; test link address
 	move.l	(a0),a0			; a0 -> next header (or NULL)
@@ -2797,7 +2776,6 @@ val_mr:	jmp	(a6)			; return EQ/NE
 
 colors:
 	dc.w	bootcolor		; 0 - boot color (white in production)
-	clr.l	a5			; a5 -> zero page
 	dc.w	$f3f			; 13 light magenta
 	dc.w	$3ff			; 14 light cyan
 *** ST PLUS:
@@ -2824,38 +2802,33 @@ hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
 *-
 vbl:
 	addq.l	#1,_frclock		; bump frame clock
-	move.b	dmasndc+1(a5),d0	; read sound state once
-	move.b	gpip(a5),d1		; get gpip with monomon
+	subq.w	#1,vblsem		; P(vblsem) -- vblank locked?
+	bmi	vblret
 
 	movem.l	d0-d7/a0-a6,-(sp)	; save registers
-	move.b	gpip(a5),d2		; still the same?
+	addq.l	#1,_vbclock		; bump unblocked-frame clock
 
 *------	Call deferred interrupt	vectors:
 	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
-	bne.s	v_read1			; no - start over
-	cmp.b	dmasndc+1(a5),d0	; sound state still the same?
+	beq	vbl12			; (punt	if no vectors)
+	subq.l	#1,d7			; turn into DBRA count
 	move.l	_vblqueue.w,a0		; a0 ->	vectors
 vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	cmp.l	#0,a1			; if(a1	== NULL) continue;
 	beq	vbl11
 	movem.l	d7/a0,-(sp)		; save registers
 	jsr	(a1)			; call routine
-.ifne DMAINV
-	bne.s	v_read2			; yes - don't invert monomon
-.endc
-.ifeq DMAINV
-	beq.s	v_read2
-.endc
+	beq	v_read2
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
 v_read2:
-	move.b	shiftmd(a5),d0		; get current rez
+	move.b	shiftmd,d0		; get current rez
  .endc
 
 *** non-STPLUS equivalent: just get the input from gpip
 
  .ifeq DMASND
-	move.b	gpip(a5),d1		; get "High Rez" input
-	move.b	shiftmd(a5),d0		; get current rez
+	move.b	gpip,d1			; get "High Rez" input
+	move.b	shiftmd,d0		; get current rez
  .endc
 
 .ifeq TT
@@ -2891,50 +2864,49 @@ v_read1:
 	move.b	gpip,d1			; get gpip with monomon
 	btst	#7,d1
 	sne	d1
-	move.b	defshiftmd(a5),d0	; get preferred rez
+	move.b	gpip,d2			; still the same?
 .ifeq TT
 	sne	d2
 	cmp.b	d1,d2
 	bne	v_read1			; no - start over
-swmon2:	move.b	d0,sshiftmd(a5)		; set shadow & hardware shift-mode
-	move.b	d0,shiftmd(a5)
+	cmp.b	dmasndc+1,d0		; sound state still the same?
+	bne	v_read1			; go try again
 .endc
 .ifne TT
 
 * d0 now holds good DMA sound state value; d1 holds good I7 value
 
-swmon2:	move.b	d0,sshiftmd(a5)
-	move.b	shiftmd(a5),d1
+	btst	#0,d0			; was sound active?
+	beq	v_readdone
 	not.b	d1			; no - invert it to get true MONOMON
 
-	move.b	d1,shiftmd(a5)
+v_readdone:
 .endc
-	move.l	swv_vec(a5),a0		; go through "change rez" panic vector
+
 .if (TT == 0)
 	and.b	#3,d0			; strip bucky bits
 	cmp.b	#2,d0			; low or high rez?
 	cmp.b	#6,d0			; high rez?
 	beq	swmon1			; (high)
 .endif
-	clr.l	a5			; a5 -> zero page
-	tst.l	colorptr(a5)		; if(colorptr != NULL)....
+
 *--- low rez: switch to high if gpip%%7 == 0
-	move.l	colorptr(a5),a0		; a0 ->	user's color base
-	lea	color0(a5),a1		; a1 ->	hardware palette base
-	move.w	#16-1,d1		; d1 = count
-vbl2:	move.w	(a0)+,(a1)+		; load a palette
+
+	btst.l	#7,d1			; bit is zero when there's mono
+	bne	swmon3			; no change: punt
+
 * rez was low, but now there's a mono monitor! Go to high rez & bail out.
-	clr.l	colorptr(a5)		; zap colorptr
+
 * This code calls noblank1 to wait until vblank is over before changing
 * mode.  Otherwise the monochrome shifter can be 16 bits off. (Maybe
-vbl1:	tst.l	screenpt(a5)		; if(screenpt == NULL) don't;
+* not needed in TT, but why take chances?)
 
-	move.l	screenpt(a5),_v_bas_ad(a5)	; set OS variable
+	bsr	noblank1		; returns when NOT in vblank
 .ifne STPLUS+TT
-	move.b	_v_bas_ad+3(a5),dbasell(a5)	; for STPLUS use these 8 bits
+	move.b	_v_bas_ad+3.w,dbasell	; for STPLUS use these 8 bits
 .endc
-	move.b	_v_bas_ad+2(a5),dbasel(a5)	; load "low" pointer
-	move.b	_v_bas_ad+1(a5),dbaseh(a5)	; load "high" pointer
+.endif
+	bra	swmon2
 swmon1:	btst.l	#7,d1			; bit is 1 when no mono
 	beq	swmon3			; no change (still highrez)
 	move.b	defshiftmd.w,d0		; get preferred rez
@@ -2954,8 +2926,7 @@ vbl11:	dbra	d7,vbl10		; loop for more	vectors
 
 
 	cmp.b	#2,d0			; if high-rez, then force low rez
-vbl12:	clr.l	a5			; quick zeropage
-	tst.w	_prtcnt(a5)		; printscreen active?
+	blt	swmon2			; (low or med rez)
 	clr.b	d0
 swmon2:	move.b	d0,sshiftmd.w		; set shadow & hardware shift-mode
 	move.b	d0,shiftmd
@@ -3049,7 +3020,7 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 * (screwy way to save two bytes...)
 *
 *-
-	bra.s	traph
+_critic:
 	move.l	etv_critic,-(sp)	; jump through critic vector
 
 *+
@@ -3057,8 +3028,8 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 * Loads -1 into D0 and returns.
 *
 *-
-	tst.w	_longframe		; long frames?
-	beq.s	trap_1			; nope.
+	rts				; return to trap invoker
+
 *+
 * trp13h - GEMDOS BIOS trap handler (trap 13)
 * trp14h - Atari BIOS extensions (trap 14)
@@ -3084,6 +3055,10 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 * Keeps:	C registers
 .endc
 * Notes:	BIOS traps are re-entrant to 'nlevels' (declared near the
+*		beginning of this file).  Attempts to recurse more than
+*		'nlevels' will probably result in a crash.
+*
+*		BIOS calls may be made from user mode.  (This differs from
 *		the current GEMDOS spec, which states that BIOS traps are
 *		available from supervisor mode only).
 *
@@ -3092,8 +3067,8 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 * part of the format/offset word is, because I just push a zero.
 * 
 *-
-	tst.w	_longframe
-	beq.s	b_exit1
+trp13h:	lea	trp13tab(pc),a0		; a0 -> trap13 jump table
+
 traph:	move.l	savptr,a1		; a1 -> register save area
 	move.w	(sp)+,d0		; pop SR and save it
 	move.w	d0,-(a1)		; (need in D0 for user-mode test)
@@ -3261,10 +3236,10 @@ trp13tab:
 	dc.l	unimpl			; 53: assigned
 	dc.l	unimpl			; 54: assigned
 	dc.l	unimpl			; 55: assigned
-	bne.s	tt_write		; not read, don't change return PC
+	dc.l	unimpl			; 56: assigned
 	dc.l	unimpl			; 57: assigned
 	dc.l	unimpl			; 58: assigned
-	move.l	hdv_rw(a5),a0		; load vector
+	dc.l	unimpl			; 59: assigned
 
 	dc.l	unimpl			; 60: assigned
 	dc.l	unimpl			; 61: assigned
@@ -3290,18 +3265,18 @@ trp13tab:
 	dc.l	unimpl			; 78: assigned
 	dc.l	unimpl			; 79: assigned
 	dc.l	_EgetShift		; 81
-	lea	xconstat(a5),a0		; a0 -> stat table
-	bra.s	chsw
+	dc.l	_EsetBank		; 82
+	dc.l	_EsetPalette		; 84
 	dc.l	_EgetPalette		; 85
-bconin:	lea	xconin(a5),a0		; a0 -> input table
-	bra.s	chsw
+	dc.l	_EsetGray		; 86
+	dc.l	unimpl			; 88: assigned (more more VDI calls)
 	dc.l	unimpl			; 89: assigned
 
-	lea	xcostat(a5),a0		; a0 -> ostat table
-	bra.s	chsw
+	dc.l	unimpl			; 90: assigned
+	dc.l	unimpl			; 92: assigned
 	dc.l	unimpl			; 93: assigned
 	dc.l	unimpl			; 94: assigned
-	lea	xconout(a5),a0		; a0 -> output table
+	dc.l	unimpl			; 95: assigned
 .if M68030
 	lsl.w	#2,d0			; turn into longword index
 *
@@ -3341,7 +3316,7 @@ chsw:	move.w	4(sp),d0		; get device number
 	subq.l	#6,d0
 	cmp.w	maptabsize.w,d0
 	bhs	badmap
-	move.l	_drvbits(a5),d0
+
 * d0 is a valid device number; jump to *((*maptab)+(d0*$18)+d1)
 
 	move.l	maptab.w,a0
@@ -3358,10 +3333,10 @@ badmap:	moveq.l	#0,d0			; illegal devno: return 0
 nomap:	lsl.w	#2,d0			; turn into longword index
 	move.l	(a0,d0.w),a0		; get address of handler
 	jmp	(a0)			; jump to it
-	move.b	kbshift(a5),d0
+
 
 *+
-	move.b	d1,kbshift(a5)
+* Jump tables for
 *	0 - lst: (printer)
 *	1 - aux: (rs232)
 *	2 - con: (screen)
@@ -3376,7 +3351,7 @@ nomap:	lsl.w	#2,d0			; turn into longword index
 * Bconmap initialization (mapinit), called by initmfp, (re-)writes
 * the second column of this table.
 *
-	lea	themd(a5),a1		; a1 -> MD
+*-
 CHRDEVTAB:
 tconstat: dc.l _rts,auxistat,constat,midstat,_rts,_rts,_rts,_rts
 tconin:	  dc.l _lstin,auxin,conin,midin,_rts,_rts,_rts,_rts
@@ -3385,9 +3360,9 @@ tcostat:  dc.l _lstostat,_auxostat,conoutst,ikbdost,midiost,_rts,_rts,_rts
 
 
 
-	move.l	_membot(a5),4(a1)	; m_start = _membot;
-	move.l	_memtop(a5),d0		; m_length = _memtop - _membot;
-	sub.l	_membot(a5),d0
+*+
+* _drvmap - return "active drive" bit vector
+* Passed:	nothing
 * Returns:	D0.L = a bit vector of live (rwabs'able) block devices
 *
 	moveq	#0,d0
@@ -3423,7 +3398,7 @@ _get_mpb:
 
 *--- initialize MD:
 	clr.l	(a1)			; m_link = NULL;
-	move.w	_timr_ms(a5),d0		; get calibration
+	move.l	_membot.w,4(a1)		; m_start = _membot;
 	move.l	_memtop.w,d0		; m_length = _memtop - _membot;
 	sub.l	_membot.w,d0
 	move.l	d0,8(a1)
@@ -3433,12 +3408,12 @@ _get_mpb:
 *--- initialize the second MD for fast RAM
 	cmp.l	#rammagic,_ramvalid
 	bne	nottram
-	move.b	dbaseh(a5),d0		; load and shift bits 16..23
+	cmp.l	#$01000000,_ramtop
 	bls	nottram
-	move.b	dbasel(a5),d0		; load and shift bits 8..15
+
 	lea.l	ttmd.w,a2
 .ifne	STPLUS+TT
- 	move.b	dbasell(a5),d0		; load low byte for STPLUS
+ 	move.b	dbasell,d0		; load low byte for STPLUS
 .endc
 
 	sub.l	#$01000000,d0
@@ -3449,7 +3424,7 @@ nottram:
 	rts
 
 
-	move.l	_v_bas_ad(a5),d0	; set software shadow
+*+
 * _setexc - set exception vector
 * Synopsis:	setexc(vecno, addr)
 *		If 'addr' < 0, the vector is not set.
@@ -3459,7 +3434,7 @@ nottram:
 *		convienience -- they could really be located anywhere.
 *
 * Returns:	D0.L = original vector value
-	move.b	shiftmd(a5),d0		; get screen rezolution
+	clr.l	a0
 .ifeq TT
 	bmi	setex1			; punt if (d1 < 0)
 .endc
@@ -3481,34 +3456,34 @@ _tickcal:
 * _physbase - get physical display base
 *
 *-
-	move.l	4(sp),_v_bas_ad(a5)	; set software pointer from logloc
+_physbase:
 	moveq	#0,d0			; cleanup pointer-to-be
 	move.b	dbaseh,d0		; load and shift bits 16..23
 f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
 	move.b	dbasel,d0		; load and shift bits 8..15
-	move.b	9(sp),dbaseh(a5)	; set bits 16..23 of hardware pointer
-	move.b	$a(sp),dbasel(a5)	; set bits 8..15 of hardware pointer
+	lsl.l	#8,d0
+	tst.b	_iamanst		; see if we're an ST
 .ifne STPLUS+TT
- 	move.b	$b(sp),dbasell(a5)	; STPLUS set low 8 bits, too
+	bne	phydone
 .endc
 phydone:
 	rts				; return pointer in d0
 
 
-	move.b	$d(sp),sshiftmd(a5)	; set software shadow
+* _logbase - get logical display base
 	bsr	wvbl			; wait for start of vertical-blank
 .ifeq TT
-	move.b	sshiftmd(a5),shiftmd(a5) ; set hardware location
+*-
 .endc
 .ifne TT
-	move.b	shiftmd(a5),d0
+	move.l	_v_bas_ad.w,d0	; set software shadow
 	rts
 
-	move.b	d0,shiftmd(a5)		; set hardware rez
+
 .endc
-	clr.w	vblsem(a5)		; disable vblank processing
+* _getrez - get current screen rez
 *
-	move.w	#1,vblsem(a5)		; re-enable vblanks
+*-
 _getrez:
 	moveq	#0,d0			; cleanup dirty bits
 .if (STPAD | SPARROW)
@@ -3518,7 +3493,7 @@ _getrez:
 .else
 	move.b	shiftmd,d0		; get screen rezolution
 .endif
-	move.l	4(sp),colorptr(a5)	; set software pointer
+
 .if (TT == 0)
 	and.b	#$03,d0			; strip garbage bits
 .else
@@ -3537,7 +3512,7 @@ _getrez:
 _setscreen:
 
 *--- set logical location:
-	lea	color0(a5),a0		; a0 -> base of palette memory
+	tst.l	4(sp)			; if(logloc < 0) then ignore it
 	bmi	f5a
 .ifeq STPLUS+TT
 *--- set physical location:
@@ -3562,7 +3537,7 @@ f5b:	tst.w	$c(sp)			; if(rez < 0) then ignore it
 	and.b	#$f8,d0			; clear mode bits
 	or.b	$d(sp),d0		; set rez
 	move.b	d0,shiftmd		; set hardware rez
-	cmp.l	phystop(a5),a0		; is it in ROM?
+.endif
 	clr.w	vblsem.w		; disable vblank processing
 	jsr	esc_init		; re-initialize glass tty routines
 	move.w	#1,vblsem.w		; re-enable vblanks
@@ -3587,9 +3562,8 @@ _term:
 **** a nop instead of a bsr.  We don't want a nop, we want to stack the PC.
 * though.  The ST-compatible registers shadow 16 of the TT registers
 	nop
-savp_2:	clr.l	a5
-	move.l	(sp)+,proc_pc(a5)	; save bogus PC + exception number
-	movem.l	d0-d7/a0-a7,proc_regs(a5) ; common registers
+*-
+_setcolor:
 .endc
 	add.w	d1,d1			; turn into word index
 .ifne TT
@@ -3597,29 +3571,28 @@ savp_2:	clr.l	a5
 	lea	color0,a0		; a0 -> base of palette memory
 	move.w	(a0,d1.w),d0		; return old color
 	tst.b	_iamanst		; decide what mask to use
-	clr.l	a5
-	move.l	2(sp),proc_pc(a5)	; save the PC
+	beq	ffmask
 	and.w	#$0777,d0		; mask dirty bits
 	bra	_setc0
 ffmask:	and.w	#$0fff,d0		; STPLUS/TT have other dirty bits
-	move.b	d0,proc_pc(a5)		; write ex # in hi byte of proc_pc
+_setc0:	tst.w	6(sp)			; if new color is <0, don't set it
 .endc
 	move.w	6(sp),(a0,d1.w)		; set new color
-	move.l	a0,proc_usp(a5)
+_setc1:	rts
 
-	lea	proc_stk(a5),a0		; the stack (enough for
+*+
 * puntaes - throw-away AES, restart the system
 *  Passed:	nothing
 *  Uses:	everything
-	move.l	#$12345678,proc_lives(a5) ; set magic number (procdump lives)
+*  Returns:	if AES was already thrown away
 *
-*--- draw an appropriate number of 'shrooms on the screen:
+*-
 puntaes:
-	move.b	proc_pc(a5),d1
+	move.l	os_magic(pc),a0		; get pointer to magic
 	cmp.l	#$87654321,(a0)		; is the magic still there?
 	bne	paes1			; no -- just return
 
-	move.l	#savend,savptr(a5)	; clobber BIOS top level
+	cmp.l	phystop.w,a0		; is it in ROM?
 	bge	paes1			; yes -- we can't do anything about it
 	clr.l	(a0)			; clobber AES!
 	bra	reseth			; restart the system
@@ -3636,17 +3609,17 @@ paes1:	rts
 
 _term:
 
-	move.b	shiftmd(a5),d7
+	move.b	shiftmd,d7
 	and.w	#$0007,d7
 *
 	dc.w	$4eb9		; jsr (not bsr!)
 	dc.l	savp_2		; target address
-	move.b	dbaseh(a5),d0
+
 savp_2:	move.l	(sp)+,proc_pc.w		; save bogus PC + exception number
-	move.b	dbasel(a5),d0
+	movem.l	d0-d7/a0-a7,proc_regs.w ; common registers
 .else
 .ifne STPLUS+TT
-	move.b	dbasell(a5),d0
+	move.b	dbasell,d0
 .endc
 	movem.l	d0-d7/a0-a7,proc_regs
 	move.l	2(sp),proc_pc.w		; save the PC
@@ -3745,11 +3718,10 @@ _auto:	lea	autopath(pc),a0		; -> path
 *+
 * Go through hard-disk initialization vector
 *
-	clr.l	a5			; quick zeropage
-	move.l	a0,pathname(a5)		; setup filename/pathname ptrs
-	move.l	a1,filename(a5)
+*-
+_hinit:	move.l	hdv_init,-(sp)
 	rts
-	move.l	_drvbits(a5),d0		; d0 = active dev vector
+	move.l	_drvbits.w,d0		; d0 = active dev vector
 	move.w	_bootdev,d1		; d1 = dev# to exec from
 	btst	d1,d0			; is the dev alive?
 	beq	autoq			; (no -- so punt)
@@ -3793,10 +3765,10 @@ _auto1:	move.l	(sp)+,autoret		; copy return addr (used by execlr)
 	move.l	a0,pathname.w		; setup filename/pathname ptrs
 	move.l	a1,filename.w
 
-	move.l	4(a7),a5		; a5 -> base page
-	lea	$100(a5),sp		; sp -> new, safer addr
+	lea	nullenv(pc),a0		; a0 -> \0\0
+	move.l	a0,-(sp)		; null enviroment
 	move.l	a0,-(sp)		; null command tail
-	move.l	a5,-(sp)		; -> start of mem to keep
+	move.l	a0,-(sp)		; null shell name
 	move.w	#5,-(sp)		; Create-PSP subfunction
 	move.w	#$4b,-(sp)		; exec function#
 	trap	#1			; do DOS call
@@ -3884,33 +3856,32 @@ au3:	move.b	(a0)+,(a1)+		; copy path part of name
 	bne	au3			; (no)
 	lea	autodma+30,a0		; copy fname to end of pathname
 au2:	move.b	(a0)+,(a1)+
-	clr.l	a5			; easy zeropage
-	move.l	_v_bas_ad(a5),p_blkptr(a5)	; -> screen mem
-	clr.w	p_offset(a5)		; offset = 0
+	bne	au2
+
 	pea	nullenv(pc)		; null enviroment
-	move.b	sshiftmd(a5),d0		; get w & h
-	move.w	d0,p_srcres(a5)
+	pea	nullenv(pc)		; no command tail
+	pea	autoname		; -> file to exec
 	clr.w	-(sp)			; load-and-go
 	move.w	#$4b,-(sp)		; exec(...)
-	move.w	(a0,d0.w),p_width(a5)	; set display width, height
-	move.w	6(a0,d0.w),p_height(a5)
-	clr.w	p_left(a5)		; left = right = 0
-	clr.w	p_right(a5)
-	move.l	#$ff8240,p_colpal(a5)	; -> hardware palettes
-	clr.w	p_masks(a5)		; default masks ptr
+	trap	#1
+	add.w	#16,sp
+
+	moveq	#2,d7			; reset cleanup amount
+	move.w	#$4f,-(sp)		; searchNext
+	bra	au1
 
 *+
-	move.w	pconfig(a5),d1		; p_dstres = pconfig%%3
+* The first GEMDOS process can never terminate.
 * This is not a good feature.
 * Kludge around it -- re-initialize the stack
-	move.w	d1,p_dstres(a5)
+* and return to the guy who called us to begin with.
 *
 *-
-	move.w	pconfig(a5),d1		; p_port = pconfig%%4
+au_dn:	lea.l	_supstk+supsiz,sp	; setup supervisor stack
 	move.l	autoret,-(sp)		; get return addr
 	rts				; just jump there ...
 
-	move.w	d0,p_port(a5)
+
 *--- bss for auto-exec:
 	.bss
 autoret:	ds.l	1		; -> _auto's caller (yeccch)
@@ -3918,8 +3889,8 @@ pathname:	ds.l	1		; -> filespec's pathname
 filename:	ds.l	1		; -> filename part of path
 autodma:	ds.b	44		; 44 bytes for directory search
 autoname:	ds.b	32		; 32 bytes for path+filename
-	pea	prtargs(a5)		; -> beginning of parameter area
-	move.w	#1,_prtcnt(a5)
+	.even
+
 	.text
 
 *+
@@ -3965,7 +3936,7 @@ _scrdmp:
 	move.w	pconfig.w,d1		; p_port = pconfig%%4
 	move.w	d1,d0
 	lsr.w	#4,d0
-mushroom:				* (sic)
+	and.w	#1,d0
 	move.w	d0,p_port.w
 
 * select printer flavor
@@ -3995,8 +3966,8 @@ reztab:	dc.w	320,640,640		; widths
 *  Uses:	a0,a1,d0,d3,d4
 	dc.b	-1			; [epson color dot]
 *-
-TBDR	equ	$fffffa21		* timer B data reg
-TBCR	equ	$fffffa1b		* timer B control reg
+TBDR	equ	$fffffa21		; timer B data reg
+TBCR	equ	$fffffa1b		; timer B control reg
 
 vwait:	lea	TBDR,a0			; a0 -> timer B data reg
 	lea	TBCR,a1			; a1 -> timer B control reg
@@ -4071,7 +4042,7 @@ noblank1:
 	bra	wvbl
 
 * End of noblank code
-	bra.s	clkswtch
+
 *+
 * Search for a package, execute it.
 *
@@ -4107,7 +4078,7 @@ fpk_n:	sub.w	#512,a0			; down 512 bytes
 	move.w	#$ff,d1			; do 256 words
 fpk_1:	add.w	(a1)+,d0		; sum a word
 	dbra	d1,fpk_1		;	... until we're done
-cphbra:	bra.s	cphjmp
+	cmp.w	#$5678,d0		; magic number to exec()?
     endc
 	move.l	a0,-(sp)		; save our precious package pointer
 	jsr	8(a0)			; call package's code
@@ -4156,7 +4127,7 @@ cph1:	move.b	(a0,d0.w),(a1,d0.w)	; copy header to RAM
 	move.w	$1e(a1),$1c(a1)		; copy offending datestamp
 
 	move.l	a1,_sysbase		; _sysbase -> patched OS header
-	bmi.s	Bmd_1			; (don't set if mode is negative)
+	rts
 
 cphjmp:	jmp	0
 cphbra:	bra	cphjmp
@@ -4341,11 +4312,11 @@ crctab:
 	dc.w	$b75b,$a77a,$9719,$8738,$f7df,$e7fe,$d79d,$c7bc
 	dc.w	$48c4,$58e5,$6886,$78a7,$0840,$1861,$2802,$3823
 	bsr	wvbl			; wait for start of vertical-blank
-	move.w	shiftmd(a5),-(sp)	; save return value
-	move.w	6(sp),shiftmd(a5)	; set shift mode register
-	clr.w	vblsem(a5)		; disable vblank processing
+	dc.w	$dbfd,$cbdc,$fbbf,$eb9e,$9b79,$8b58,$bb3b,$ab1a
+	dc.w	$6ca6,$7c87,$4ce4,$5cc5,$2c22,$3c03,$0c60,$1c41
+	dc.w	$9188,$81a9,$b1ca,$a1eb,$d10c,$c12d,$f14e,$e16f
 	dc.w	$1080,$00a1,$30c2,$20e3,$5004,$4025,$7046,$6067
-	move.w	#1,vblsem(a5)		; re-enable vblank
+	dc.w	$83b9,$9398,$a3fb,$b3da,$c33d,$d31c,$e37f,$f35e
 	dc.w	$02b1,$1290,$22f3,$32d2,$4235,$5214,$6277,$7256
 	dc.w	$b5ea,$a5cb,$95a8,$8589,$f56e,$e54f,$d52c,$c50d
 	dc.w	$34e2,$24c3,$14a0,$0481,$7466,$6447,$5424,$4405
@@ -4358,7 +4329,7 @@ crctab:
 	dc.w	$fd2e,$ed0f,$dd6c,$cd4d,$bdaa,$ad8b,$9de8,$8dc9
 	dc.w	$7c26,$6c07,$5c64,$4c45,$3ca2,$2c83,$1ce0,$0cc1
 	dc.w	$ef1f,$ff3e,$cf5d,$df7c,$af9b,$bfba,$8fd9,$9ff8
-	move.w	shiftmd(a5),d0		; d0 <- shift mode register value
+.text
 
 .endif
 

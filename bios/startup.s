@@ -3,16 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/28 16:08:09 $
+* $Date: 88/05/03 15:09:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.10  88/05/03  15:09:56  apratt
+* Added comments as relates to the version number and problems with
+* First Byte's Kid series of software -- you get address error unless
+* the version number is even.  See comments above 'systype' for more
+* information.
+*
 * Revision 1.9  88/04/28  16:08:09  apratt
 * Backed out table entry for Flopwp XBIOS call. See flop.s for more.
-*
+* 
 * Revision 1.8  88/04/22  13:07:53  apratt
 * Fixed dmahi to dmahigh in dmaread (slip of the finger...)
 * 
@@ -48,7 +54,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.9 $
+* $Revision: 1.10 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -96,11 +102,20 @@ norway		=      12 ***DON'T  CHANGE***
 *  YYYYYYYMMMMDDDDD:
 *		YYYYYYY	= year - 1980
 *		   MMMM = month (1-12)
+*		  DDDDD = day (1-31)
+*
+*
+* The version number must be even.  This is because at least one line
+* be more than 3ffe bytes away, for the same reason (bus error when
+* from (a2) -- this causes address error unless the version number is even.
+* In addition, the target of the short branch at reseth must not 
+* be more than $3e bytes away, for the same reason (bus error when
+* reading RAM address >3fffff).
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
 systype		=	ram		; 'rom' or 'ram'
-country		=	spain      	; 'usa', etc....
-version		=	$0102		; version number
+country		=	usa      	; 'usa', etc....
+version		=	$0104		; version number *MUST BE EVEN*
 date		=	$11241987	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
 dosdate		=	%0000111101111000	;nov 24 '87

@@ -1,15 +1,18 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.9 $	$Source: pool.c,v $
+* $Revision: 2.10 $	$Source: e:/tos/gd2\RCS\pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:30:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
+* Revision 2.10  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.9  91/01/23  14:30:26  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 
@@ -128,7 +131,7 @@ long size;
  *
  ***********************************************************************/
 
-DND
+void
 *getbig()
 {
     REG struct block *ptr;

@@ -1,17 +1,20 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.10 $	$Source: fs.h,v $
+* $Revision: 2.11 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 17:06:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.11  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.10  91/01/23  17:06:48  apratt
 * Use voidfn for "function returning void" in prototypes.  Changed d_left to
 * d_child, d_right to d_next globally.  Removed o_thread, d_scan, m_fatofd,
 * m_ofl, and d_dirfil.
-*
+* 
 * Revision 2.9  91/01/23  14:29:50  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
 * 
@@ -29,10 +32,17 @@
 
 /* prototypes and GCC qualifiers */
 
-#if __ANSI__
+#define DBMSG(s) trap14(11,5,0xf000,(s))
+
+#if __STDC__
 #define _P(x) x
+#define ASSERT(exp) ((exp) ? 0 : __assert (#exp, __FILE__, __LINE__))
+#define __assert(exp,file,line) \
+	DBMSG("Failed assert \"" exp "\" file " #file " line " #line)
+#define voidfn void
 #else
 #define _P(x) ()
+#define ASSERT(exp) ((exp) ? 0 : DBMSG("Failed assert"))
 #define void char
 #define voidfn void
 #define volatile
@@ -52,14 +62,12 @@
  * 
  * 0x1800 is for TT TOS of around 5/90.
  * 0x1900 is for TT TOS from 7/19 on (hopefully final TT TOS).
+ * 0x2000 is something I'm hacking up (1/91).
  */
 
 /* GEMDOS version number (byte-reversed, nybble-packed, used only in sup.c) */
-#define	VERS_NUM	0x1900L
+#define	VERS_NUM	0x2000L
 
-/*
- *  Fundamental constants --- do not change too much
- */
 #define	NULL	0L
 #define	OK	0
 #define NULPTR	((void *) 0)
@@ -68,35 +76,44 @@
 #define	MAXDEVS	16		/* max number of block devices */
 #define SLASH	'\\'		/* path character */
 
+/*
+ *  Fundamental(?) constants
+ */
+
 #define SUPSIZ	(1024+512)	/* common supervisor stack size (in words) */
 #define OPNFILES	75	/* max open files in system */
 #define NCURDIR		40	/* max current directories in use in system */
 #define NUMSTD		6	/* number of standard files */
+#define NUMBIOS		3	/* number of BIOS dev handles -1, -2, -3 */
 #define	KBBUFSZ		80	/* size of typeahead buffer */
-
+#define SLASH		'\\'
+#define COLON		':'
 
 /*
  * Hacky Macros
  *
  */
+#define uint unsigned int
+#define ulong unsigned long
 #define	REG		register
 #define swp68(x)	s68(&(x))
 #define swp68l(x)	s68l(&(x))
 #define MGET(x)		((x*)getbig())
 #define GETMD()		((MD *)getsmall())
 #define xmfreblk(p)	freebig(p)
-#define dirscan(a,c)	((DND *) scan(a,c,0x10,&negone))
 #define bconstat(a)	trap13(1,a)
 #define bconin(a)	trap13(2,a)
 #define bconout(a,b)	trap13(3,a,b)
 #define bconostat(a)	trap13(8,a)
 #define getbpb(a)	trap13(7,a)
 #define getmpb(a)	trap13(0,a)
+#define mediach(a)	trap13(9,a)
 #define min(a,b)	(((a)<(b))?(a):(b))
+
 #define rwabs(a,b,c,d,e) if(rwerr=trap13(4,a,b,c,d,e)){errdrv=e;\
 /* ------------------------------------------ */	longjmp(errbuf,rwerr);}
 
-#define cl2rec(cl,dm) (cl * dm->m_clsiz)
+#define cl2rec(cl,dm) (!(cl) ? 0 : (((cl) * (dm)->m_clsiz) + (dm)->m_recoff[2]))
 
 #define	Panic()		panic()
 
@@ -112,15 +129,14 @@
 #define divmod(p_rem,divdnd,divsor) \
 	(*(p_rem) = ((divdnd)&logmsk[(divsor)]), (divdnd) >> (divsor))
 
-extern long trap13();
-
 /*
  * Structure Names
  */
 #define OFD	struct _ofd
+#define DFD	struct _dfd
+#define DIR	struct _dir
 #define FCB	struct _fcb
 #define BPB	struct _bpb
-#define DND	struct _dnd
 #define BCB	struct _bcb
 #define DMD	struct _dmd
 #define MD	struct _md
@@ -131,32 +147,29 @@ extern long trap13();
 #define PRG	struct _prg
 
 /*
- * DTA, used for sfirst/snext (AKP 1/88)
+ * DTA, used for sfirst/snext
  */
 
 DTA
 {
     /* the private part: 21 bytes */
-    char dta_sname[12];	/* filename string being searched for */
-
-    /* low nybble of this long is the device number */
-    /* if rest of long is nonzero, this is a root directory search */
-    /* on that device; otherwise the search uses dta_pos and dta_clust */
-    long dta_rdpos;
-    int dta_pos;
-    int dta_clust;
-    char dta_attr;	/* attribute byte of search */
+    char dta_sname[11];	/* name-part of FCB to use in search */
+    char dta_attr;	/* attrib to use in search */
+    uint dta_clust;	/* strtcl of dir slot was found in */
+    uint dta_curcl;
+    uint dta_recno;
+    uint dta_recoffs;
+    char dta_dev;
 
     /* the public part */
     char fattrib;	/* attribute of found file */
-    int ftime, fdate;	/* time & date of found file */
-    long flength;	/* length of found file */
+    uint ftime, fdate;	/* time & date of found file */
+    ulong flength;	/* length of found file */
     char fname[14];	/* name of found file as "base.ext\0" */
 };
 
 /*
  * Basepage, "process descriptor"
- *
  */
 PD
 {
@@ -181,9 +194,7 @@ PD
 	char	p_curdrv;	/* current drive */
 	long	p_1fill[2];	/* (junk) */
 /* 0x40 */
-	char	p_curdir[16];	/* index into sys dir table */
-/* 0x50 */
-	long	p_2fill[4];	/* (junk) */
+	uint	p_curdir[MAXDEVS];	/* startcl of cur dir on each drive */
 /* 0x60 */
 	long	p_3fill[2];	/* (junk) */
 	long	p_dreg[1];	/* dreg[0] */
@@ -212,7 +223,6 @@ PRG
 #define P_NOCLRBSS	1
 #define P_RAMEXEC	2
 #define P_RAMALLOC	4
-
 
 /*
  * Memory Descriptor
@@ -243,34 +253,82 @@ MPB
  * Open File Descriptor
  */
 
-#define O_DIRTY 1		/* OFD is dirty */
-#define O_COMPLETE 2		/* directory traversal is complete */
 OFD
 {
-	/* info intrinsic to the file on disk */
-	OFD	*o_link;
-	int	o_flag;
-
-	int	o_time;    /* the next 4 item must be in same order as FCB */
-	int	o_date;
-	int	o_strtcl;
-	long	o_fileln;
-
-	DMD	*o_dmd;
-	DND	*o_dnode;  /* DND of this file's parent */
-	OFD	*o_dirfil; /* OFD of parent */
-	long	o_dirbyt;  /* pos in dir of this files fcb (was dcnt) */
-
 	/* file position and per-open information */
-	long	o_bytnum;  /* byte pointer within file */
-	int	o_curcl;   /* current cluster pointer */
-	int	o_currec;  /* rec number of current cluster */
-	int	o_curbyt;  /* byte offset in current cluster */
-	int	o_usecnt;  /* use count for inherited files */
-	long	o_res1;	   /* unused */
-        int     o_mod;     /* mode file opened in (r, w, r/w) */
+
+	OFD	*o_next;	/* next in unordered list of OFDs */
+	int	o_use;		/* use count */
+        int     o_mode;		/* mode file opened in (r, w, r/w) */
+	DFD	*o_dfd;		/* DFD this OFD refers to */
+	long	o_bytnum;	/* byte pointer within file */
+	uint	o_curcl;	/* current cluster pointer */
+	uint	o_currec;	/* rec number of current cluster */
+	uint	o_curbyt;	/* byte offset in current cluster */
 };
 
+/*
+ * Disk File Descriptor
+ */
+
+DFD
+{
+	DFD	*dfd_next;	/* next in unordered list of DFDs */
+	int	dfd_use;
+
+	/* these items are in the same order as the FCB.  In memory, */
+	/* time, date, and strtcl are in 8088 format, but length isn't */
+	uint	dfd_time, dfd_date, dfd_strtcl;
+	ulong	dfd_fileln;
+
+	char	dfd_attrib;	/* attributes, here for setting FA_ARCHIVE */
+	char	dfd_dirty;	/* flag: set when dirty */
+	uint	dfd_dev;	/* device this file's on */
+	uint	dfd_dircl;	/* strtcl of dir this file's in */
+	uint	dfd_dirrec;	/* record of slot this file's in */
+	uint	dfd_diroffs;	/* offset in dirrec of this file's slot */
+};
+
+/*
+ * DIR, a description of a slot in a directory.
+ *
+ * When "fresh" the BCB and FCB fields point to a buffer and a byte
+ * in that buffer, respectively.
+ */
+
+DIR
+{
+	uint	dir_dev;	/* the dev the slot is in */
+	uint	dir_clust;	/* strtcl of dir the slot is in */
+	uint	dir_curcl;	/* cluster the slot is in */
+	uint	dir_recno;	/* record the slot is in */
+	uint	dir_recoffs;	/* offset into record of the slot */
+	BCB	*dir_bcb;	/* BCB of buffer, only if fresh */
+	FCB	*dir_fcb;	/* points into buffer, only if fresh */
+};
+
+/* flags to fn2dir */
+#define FN_NORM 0
+#define FN_DOTSOK 1
+#define FN_EARLY 2
+#define FN_EMPTYOK 3
+
+/*
+ * dirfirst macro: initialize dir to the first slot in the dir from the dev/cl 
+ */
+
+#define dirfirst(dir,dmd) \
+    (((dir)->dir_curcl = (dir)->dir_clust), \
+     ((dir)->dir_recno = cl2rec((dir)->dir_clust,(dmd))), \
+     ((dir)->dir_recoffs = 0), \
+     dir2dir(dir))
+
+/* dirnext macro; see scan.c */
+
+#define dirnext(dir,dmd) \
+    (((dir)->dir_fcb++), \
+     ((dir)->dir_recoffs += sizeof(FCB)), \
+     (((dir)->dir_recoffs < (dmd)->m_recsiz) ? E_OK : _dirnext((dir),(dmd))))
 
 /*
  * File Control Block
@@ -282,8 +340,12 @@ OFD
 #define FA_LABEL	0x08		/* volume label */
 #define FA_SUBDIR	0x10		/* file is a subdirectory */
 #define FA_ARCHIVE	0x20		/* archive bit */
-#define FA_NORM		0x27		/* normal search: will match attr 0 */
-					/* or as little as a one-bit match. */
+
+#define FA_ALL		0xF7		/* all but label bit */
+#define FA_NORM		0xE7		/* all but label & subdir */
+
+#define ERASED		((char)0xe5)
+
 FCB
 {
 	char	f_name[11];
@@ -293,31 +355,6 @@ FCB
 	int	f_date;
 	int	f_clust;
 	long	f_fileln;
-};
-
-
-/*
- * Directory Node Descriptor.
- * These are linked together into a tree
- * that describes the volume's heirarchy.
- */
-DND
-{
-	char	d_name[11];	/* directory name */
-	char	d_fill;		/* unused */
-	int	d_flag;		/* 0x0c flags */
-	int	d_strtcl;	/* 0x0e starting cluster number */
-	int	d_time;		/* 0x10 creation time */
-	int	d_date;		/* 0x12 creation date */
-	OFD	*d_ofd;		/* 0x14 -> OFD of this directory file */
-	DND	*d_parent;	/* 0x18 -> parent DND */
-	DND	*d_child;	/* 0x1c -> child DND (down the tree) */
-	DND	*d_next;	/* 0x20 -> next DND (across the tree) */
-	DMD	*d_drv;		/* 0x24 -> drive's DMD */
-	long	d_res0;		/* 0x28 unused */
-	long	d_dirpos;	/* 0x2c offset in parent of this dir */
-	long	d_res1;		/* 0x30 unused */
-	OFD	*d_files;	/* 0x34 -> first open file on this node */
 };
 
 
@@ -340,37 +377,40 @@ BPB
 
 
 /*
- * Drive Media Block
- * Derived from the BPB, also contains the
- * root of the volume's directory tree.
+ * Drive Media Descriptor
+ * Derived from the BPB.
+ * Pity the BPB doesn't include "number of FATs."
  */
 DMD
 {
 	int	m_recoff[3];	/* record offsets for fat,dir,data */
-	int	m_drvnum;	/* 0x06 drive number */
-	int	m_fatrec;	/* 0x08 record # of start of 2nd FAT (AKP) */
-	int	m_fsiz;		/* 0x0a fat size (records?) */
-	int	m_clsiz;	/* 0x0c cluster size in records */
-	int	m_clsizb;	/* 0x0e cluster size in bytes */
-	int	m_recsiz;	/* 0x10 record size in bytes */
 
-	int	m_numcl;	/* 0x12 #clusters on media */
-	int	m_clrlog;	/* 0x14 clsiz in rec, log2 is shift */
-	int	m_clrm;		/* 0x16 clsiz in rec, mask */
-	int	m_rblog;	/* 0x18 recsiz in bytes, shift */
-	int	m_rbm; 		/* 0x1a recsiz in bytes, mask */
-	int	m_clblog;	/* 0x1c */
-	long	m_res1;		/* 0x1e not used any more */
+/* "field names" for elements in m_recoff */
+#define m_recfat m_recoff[0]
+#define m_recrd m_recoff[1]
+#define m_recdata m_recoff[2]
 
-	long	m_res2;		/* 0x22 not used */
-	DND	*m_dtl;		/* 0x26 -> root DND */
-	int	m_16;		/* 0x2a 16 bit fat flag */
+	int	m_drvnum;	/* drive number */
+	int	m_fsiz;		/* fat size (records?) */
+	int	m_clsiz;	/* cluster size in records */
+	int	m_clsizb;	/* cluster size in bytes */
+	int	m_recsiz;	/* record size in bytes */
+	int	m_numcl;	/* #clusters on media */
+	int	m_clrlog;	/* log2 of clsiz */
+	int	m_clrm;		/* mask: (2^clrlog)-1 */
+	int	m_rblog;	/* log2 of recsiz */
+	int	m_rbm; 		/* mask: (2^rblog)-1 */
+	int	m_clblog;	/* log2 of clsizb */
+	int	m_16;		/* 16 bit fat flag */
 };
 
 
 /*
  * Buffer Control Block
  * Used for buffer cache.
+ * This is a published structure.  Well, really the size of the struct
+ * and its link field are defined, and the fact that bufdrv == -1 means
+ * invalid.
  */
 BCB
 {
@@ -379,10 +419,11 @@ BCB
 	int	b_buftyp;	/* buffer type */
 	int	b_bufrec;	/* record# this block caches */
 	int	b_dirty;	/* 1: dirty (must be written) */
-	DMD	*b_dm;		/* -> DMD for this block's drive */
+	DMD	*b_dmd;		/* -> DMD for this block's drive */
 	char	*b_bufr;	/* -> 512-byte buffer */
 };
 
+#define B_INVALID -1	/* invalid flag; goes in b_bufdrv */
 
 /*
  * File Table entry
@@ -390,13 +431,16 @@ BCB
  */
 FTAB
 {
-	OFD	*f_ofd;		/* -> the OFD */
 	PD	*f_own;		/* file's owner */
-	int	f_use;		/* use count */
+	OFD	*f_ofd;		/* -> the OFD */
 };
 
-#define CL_DIR 0x0002	/* this is a directory file, flush, do not free */
-#define CL_FULL 0x0004  /* even though its a directory, full close */
+/* macros for handling the OFD field of an sft entry */
+
+#define ofdisatty(ofd) (((long)(ofd)) & 1)
+#define ofddevno(ofd) ((short)((((unsigned long)(ofd)) >> 1)))
+#define ofdmaketty(ofd,devno) ((ofd) = (OFD *)(((devno) << 1) | 1))
+
 
 struct block {
     struct block *b_next;	/* next block in the heap */
@@ -404,7 +448,7 @@ struct block {
     char b_callno;		/* used only if the block is big */
     union {
 	char b_big[64];		/* either one big block, or... */
-	MD b_mem[4];	/* four small blocks */
+	MD b_mem[4];		/* four small blocks */
 				/* if m_own is 1, little block is free */
     } b_data;
 };
@@ -430,6 +474,10 @@ struct block {
  * prototypes for functions which aren't in C
  */
 
+long trap13 _P(( int,... ));
+long trap14 _P(( int,... ));
+
+int uc _P(( int ));
 int setjmp _P(( long *jmpbuf ));	/* takes three longs */
 voidfn longjmp _P(( long *jmpbuf,int error ));
 long trap13 _P(( int,... ));

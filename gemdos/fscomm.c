@@ -1,46 +1,40 @@
 /*
 ***************************    FSCOMM.C    ******************************
 *
-* $Revision: 2.4 $	$Source: fscomm.c,v $
+* $Revision: 2.5 $	$Source: e:/tos/gd2\RCS\fscomm.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:30:00 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscomm.c,v $
+* Revision 2.5  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.4  91/01/23  14:30:00  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 
 #include "fs.h"
 
-
 /*
- * Log values of 1, 2, 4, 8 ...
+ * mask for getting remainder of powers of two
  */
-int logmsk[] = {
-	0,	1,	3,	7,
-	15,	31,	63,	127,
-	255,	511,	1023,	2047,
-	4095,	8191,	16383,	32767
+
+uint logmsk[] = {
+	0,	1,	3,	7,	15,	31,	63,	127,
+	255,	511,	1023,	2047,	4095,	8191,	16383,	32767, 65535
 };
 
-int drvsel;		/* mask of drives selected since power up */
 long rwerr;		/* hard error number currently in progress */
-int errdrv;		/* drive on which error occurred */
-long negone = {-1L};	/* handy -1 */
-unsigned int time;	/* current time word */
-unsigned int date;	/* current date word */
-
-/*
- * Special directory file names
- *		   "0123456789a"
- */
-char dots[22] =  { ".          " } ;
-char dots2[22] = { "..         " } ;
+uint errdrv;		/* drive on which error occurred */
+uint time;		/* current time word */
+uint date;		/* current date word */
+PD rootpd;
+char callno;
+DFD *dfd_head;
+OFD *ofd_head;
 
 FTAB sft[OPNFILES];	/* system file table */
-DND *dirtbl[NCURDIR];	/* current directory DND ptr */
-char diruse[NCURDIR];	/* current directory reference count */
-DMD *drvtbl[16];	/* -> drive media descriptor for dev */
+DMD drvtbl[MAXDEVS];	/* drive media descriptor for each dev */

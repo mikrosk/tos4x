@@ -1,15 +1,18 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.13 $	$Source: fsproc.c,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:30:16 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.14  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.13  91/01/23  14:30:16  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 

@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/01/23 17:09:42 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.9  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.8  1991/01/23  17:09:42  apratt
 * Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
 * d_scan, m_fatofd, m_ofl, and d_dirfil.
@@ -33,82 +36,44 @@
 #define buflist(n) ((n) == 2)
 
 /*
- *  Allocate raw DMD;
- *	allocate DND for root directory;
- *	allocate OFD for root directory;
- *	allocate OFD for FAT sectors.
- *
- * Since MGET panics when it fails, we don't ever return errors.
+ * compute log base 2 of n
  */
-DMD
-*getdmd(drv)
-int drv;
+
+int
+log2(n)
+uint n;
 {
-  REG DMD *dm;
-
-    drvtbl[drv] = dm = MGET(DMD);
-    dm->m_dtl = MGET(DND);
-
-    dm->m_dtl->d_ofd = MGET(OFD);
-    return dm;
+    uint i;
+    for (i = 0; n; i++) n >>= 1;
+    return i-1;
 }
-
 
 /*
  * Login `drv' given BPB `b'.
  *
  */
-long
+voidfn
 log(b,drv)			/* log in a media b on drive drv */
 BPB *b;
 int drv;
 {
-  OFD *f;
-  DND *d;
-  DMD *dm;
-  int rsiz;
-  int cs;
-  int n;
-  int fs;
-  int ncl;
-  int fcl;
-  
-  rsiz = b->recsiz;
-  cs = b->clsiz;
-  n = b->rdlen;
-  fs = b->fsiz;
-  dm = getdmd(drv);
-  d = dm->m_dtl;
-  dm->m_fsiz = fs;			/* fat size */
-  f = d->d_ofd;				/* root dir file */
-  dm->m_drvnum = drv;
-  f->o_dmd = dm;
-  d->d_drv = dm;
-  d->d_name[0] = 0;
-  dm->m_fatrec = b->fatrec;
-  dm->m_16 = b->b_flags & 1;
-  dm->m_clsiz = cs;
-  dm->m_clsizb = b->clsizb;
-  dm->m_recsiz = rsiz;
-  dm->m_numcl = b->numcl;
-  dm->m_clrlog = log2(cs);
-  dm->m_clrm = logmsk[dm->m_clrlog];
-  dm->m_rblog = log2(rsiz);
-  dm->m_rbm = logmsk[dm->m_rblog];
-  dm->m_clblog = log2(dm->m_clsizb);
-  f->o_fileln = n * rsiz;
-  
-  /* number of "clusters" for root dir */
-  ncl = (n + cs - 1)/cs;
-  d->d_strtcl = f->o_strtcl = -1 - ncl;
-  fcl = (fs + cs - 1)/cs;
-  dm->m_recoff[0] = b->fatrec - ((d->d_strtcl - fcl) * cs);
-  dm->m_recoff[1] = (b->fatrec + fs) - (d->d_strtcl * cs);
-  
-  /* 2 is first data cluster */
-  dm->m_recoff[2] = b->datrec - (2 * cs);
-  
-  return (0L);
+    DMD *dmd = &drvtbl[drv];
+
+    dmd->m_recfat = b->fatrec;
+    dmd->m_recrd = b->fatrec + b->fsiz;
+    dmd->m_recdata = b->datrec;
+    dmd->m_drvnum = drv;
+    dmd->m_fsiz = b->fsiz;
+    dmd->m_clsiz = b->clsiz;
+    dmd->m_clsizb = b->clsizb;
+    dmd->m_recsiz = b->recsiz;
+    dmd->m_numcl = b->numcl;
+    dmd->m_clrlog = log2(b->clsiz);
+    dmd->m_clrm = b->clsiz - 1;
+    dmd->m_rblog = log2(b->recsiz);
+    dmd->m_rbm = b->recsiz - 1;
+    dmd->m_clblog = log2(b->clsizb);
+    dmd->m_16 = b->b_flags;
 }
 
 /*
@@ -126,12 +91,12 @@ void
 flush(b)
 BCB *b;
 {
-  REG int n;
-  REG int d;
-  REG DMD *dm;
+  uint n;
+  uint d;
+  DMD *dmd;
   int i;
 
-  dm = b->b_dm;
+  dmd = b->b_dmd;
   n = b->b_buftyp;
   d = b->b_bufdrv;
 
@@ -147,10 +112,10 @@ BCB *b;
     if (b->b_bufdrv == d && b->b_dirty) {
     	n = b->b_buftyp;	/* n gets THIS BUFFER's type */
 	b->b_bufdrv = -1;	/* invalidate now in case of error */
-	rwabs(1,b->b_bufr,1,b->b_bufrec+dm->m_recoff[n],d);
+	rwabs(1,b->b_bufr,1,b->b_bufrec,d);
 	/* if FAT operation, flush to both FATs */
 	if (!n) 
-	    rwabs(1,b->b_bufr,1,b->b_bufrec+dm->m_recoff[0]-dm->m_fsiz,d);
+	    rwabs(1,b->b_bufr,1,b->b_bufrec - dmd->m_fsiz,d);
 	/* re-validate the buffer */
 	b->b_bufdrv = d;
 	b->b_dirty = 0;
@@ -195,89 +160,91 @@ flushall()
     }
 }
 
-/*	Last modified	SCC	10 Apr 85
+/*
+ * usrio: actually do a block rwabs for a user file
+ *
+ * Invalidates any buffers in the region spanned by the operation.
+ * For reads, writes the data first, but doesn't bother for writes.
+ *
+ * Adds dmd->m_recdata to the record number: the caller (xrw) works
+ * in zero-based data record numbers.
+ *
+ * rwabs is a macro which longjmps on error.
+ */
 
-NOTE:	rwabs() is a macro that includes a longjmp() which is executed if the
-	BIOS returns an error, therefore usrio() does not need to return any
-	error codes.
-*/
-
-void
-usrio(rwflg,num,strt,ubuf,dm)
-int rwflg,num;
-int strt;
-char *ubuf;
-DMD *dm;
+voidfn
+usrio(rwflg,num,strt,ubuf,dmd)
+uint rwflg,num;
+uint strt;
+void *ubuf;
+DMD *dmd;
 {
-	REG BCB *b;
-	REG int d;
-	REG int end;
+	BCB *b;
+	uint d;
+	uint end;
 
 	end = strt+num;
-	d = dm->m_drvnum;
+	d = dmd->m_drvnum;
 
 	/* flush all data blocks which overlap this write */
 	for (b = bufl[1]; b; b = b->b_link) {
 	    if ((b->b_bufdrv == d) &&
 		(b->b_bufrec >= strt) &&
 		(b->b_bufrec < end)) {
-		    if (b->b_dirty) flush(b);
+		    if (!rwflg && b->b_dirty) flush(b);
 		    b->b_bufdrv = -1;	/* invalidate the buffer */
 	    }
 	}
 
-	rwabs(rwflg,ubuf,num,strt+dm->m_recoff[2],dm->m_drvnum);
+	rwabs(rwflg,ubuf,num,strt+dmd->m_recdata,d);
 }
 
 
+/*
+ * getrec: return pointer to buffer representing a record on disk.
+ *
+ * The record number is absolute. All buffer management goes here.
+ * Buffers are managed LRU, and written using flush() when the victim is
+ * dirty.  If wrtflg is 0, the buffer's dirty flag is left alone or cleared.
+ * If 1, it's marked dirty.  If 2, the buffer management stuff is done,
+ * but the buffer isn't actually read from disk; this is for extending files,
+ * where the contents of the old record don't matter.  (For increased 
+ * security, zero the buffer before returning it.)
+ */
+
 char
-*getrec(recn,dm,wrtflg)
-int recn;
-DMD *dm;
+*getrec(recn,dmd,wrtflg)
+uint recn;
+DMD *dmd;
 int wrtflg;
 {
-	REG BCB *b;
-	REG int n;
-	REG int err;
+	BCB *b;
+	uint n;
+	long err;
 	BCB *p;
 	BCB *mtbuf;
 	REG BCB **q;
 	BCB **phdr;
+	int doread;
+	int mcflag = 0;
+
+	if (wrtflg == 2) doread = 1, wrtflg = 1;
+	else doread = 0;
 
 	/* put bcb management here */
 
-	/*
-	 * THIS CODE PERMITS UP TO 32MB PER PARTITION.
-	 * The trick is to differentiate large, positive sector numbers from
-	 * the negative sector numbers used for FAT and root directory ops.
-	 * The FAT & RD sectors are in [xx..-1]; numbers outside
-	 * that range are large positive sector numbers.  
-	 *	XX = - ( dm->m_recoff[0] - dm->m_fatrec )
-	 * 
-	 */
-	{
-	    long xrecn = recn;
-	    if (recn >= 0 || (recn < (- dm->m_recoff[0] - dm->m_fatrec))) {
-		/* it's not meant to be negative */
-		/* old compiler bug: 0xffff gets sign extended, so use L */
-		xrecn &= 0xffffL;
-	    }
-	    /* rhs of the < is a negative "sector number" where RD starts */
-	    if (xrecn < (dm->m_dtl->d_strtcl << dm->m_clrlog)) 
-		n = 0;
-	    else if (xrecn < 0) n = 1;
-	    else n = 2;
-	}
+	/* set n to the region for this sector: FAT, RD, or DATA */
+	if (recn < dmd->m_recrd) n = 0;
+	else if (recn < dmd->m_recdata) n = 1;
+	else n = 2;
 
 	mtbuf = 0;
 
-	/* CHANGED by AKP 4/88: bufl 0 is FAT/root dir, bufl 1 is other */
 	phdr = &bufl[buflist(n)];
 
 	/* set b to the matching buffer or the LAST empty buffer */
-	for (b = *(q = phdr); b; b = *(q = &b->b_link))
-	{
-		if ((b->b_bufdrv == dm->m_drvnum) && (b->b_bufrec == recn)) {
+	for (b = *(q = phdr); b; b = *(q = &b->b_link)) {
+		if ((b->b_bufdrv == dmd->m_drvnum) && (b->b_bufrec == recn)) {
 			break;
 		}
 
@@ -286,8 +253,8 @@ int wrtflg;
 			mtbuf = b;
 		}
 	}
-	if (!b)
-	{	/* we went to the end of the list. */
+	if (!b) {
+		/* we went to the end of the list. */
 		/* if mtbuf, set b to it and q to its prev's link */
 		/* else set b to last buffer in the list & q to prev's link */
 
@@ -296,35 +263,50 @@ int wrtflg;
 			b = mtbuf;
 		}
 
-		/* need to find predecessor of mtbuf, or last guy */
-doio:		for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
+		/* need to set q to link field of b's prev, or */
+		/* set b to last buf & q to its prev's link field */
+
+		/* The label doio is used to actually do the I/O when there's */
+		/* a cache hit, but the the mediach state is 1 (so we check) */
+doio:
+		for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
 			if (b == p)
 				break;
 
 		b = p;
+
+		/* if our victim is in use & dirty, flush him */
 		if (b->b_bufdrv != -1 && b->b_dirty) flush(b);
 
 		/* INVALIDATE this buffer because the rwabs might fail! */
 		b->b_bufrec = -1;
-		rwabs(0,b->b_bufr,1,recn+dm->m_recoff[n],dm->m_drvnum);
+
+		/* do the read if doread, or mediach was/is nonzero */
+
+		if (doread || mcflag == 1 || mediach(dmd->m_drvnum)) {
+		    rwabs(0,b->b_bufr,1,recn,dmd->m_drvnum);
+		}
 		b->b_bufrec = recn;
 		b->b_dirty = 0;
 		b->b_buftyp = n;
-		b->b_bufdrv = dm->m_drvnum;
-		b->b_dm = dm;
+		b->b_bufdrv = dmd->m_drvnum;
+		b->b_dmd = dmd;
 	}
 	else {
 		/* cache hit */
 		/* use a buffer, but first validate media */
-		if (err = trap13(9,b->b_bufdrv))
-			if (err == 1)
-				goto doio; /* media may be changed */
-			else if (err == 2)
-			{ /* media definitely changed */
+		if (err = mediach(b->b_bufdrv)) {
+			if (err == 1) {
+			    mcflag = 1;
+			    goto doio; /* media may be changed */
+			}
+			else if (err == 2) {
+				/* media definitely changed */
 				errdrv = b->b_bufdrv;
 				rwerr = E_CHNG; /* media change */
 				longjmp(errbuf,rwerr);
 			}
+		}
 	}
 
 	/* make this block most-recently-used in its list */
@@ -339,7 +321,6 @@ doio:		for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
 }
 
 
-/***********************************************************************/
 /***********************************************************************
  * New FAT code by AKP 17-Sep-1987
  *
@@ -352,35 +333,51 @@ doio:		for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
  * getrec twice to get pointers to *two* FAT buffers, and assume they 
  * are both in memory at the same time.
  *
+ * To use this code, set newcl = TRUE before and after any loop of cluster
+ * calls in your code.  This invalidates the cached info so you're sure to 
+ * get a read.  Calls:
+ * 
+ * getcl(cl,dmd) returns the FAT entry for cl
+ * 
+ * clfix(cl,link,dmd) writes 'link' into the FAT entry for cl
+ * 
+ * nextcl(cl,dmd,extflag,&extended) returns the next cluster in the chain,
+ * extending the chain if necessary and extflag.  When extending, marks the
+ * new cluster with -1.  *extended reflects whether or not the chain was
+ * actually extended; pass in NULL if you don't care. Returns zero on EOF when
+ * !extflag, and when extending fails because there are no free clusters, and
+ * also if cl's entry is 0 or 0xfffx (where x is 0-e).  If cl itself is zero,
+ * the first free cluster on the disk is returned (and marked with -1).
+ * 
  **********************************************************************/
 
-int newcl;		/* flag: goes TRUE at start of a cluster loop */
-int clsector;		/* holds saved sector number */
+uint newcl;		/* flag: goes TRUE at start of a cluster loop */
+uint clsector;		/* holds saved sector number */
 DMD *cldev;		/* holds DMD of saved sector */
 char *clsave;		/* holds saved sector pointer */
-int clwrite;		/* when TRUE, the sector has been marked dirty */
+uint clwrite;		/* when TRUE, the sector has been marked dirty */
 
 /*
  * getfat: this combination of macro and procedure returns the requested
  * FAT sector from the disk, with a combination of speed & small code size.
  */
 
-#define Getfat(s,dm,wflag) \
-    ((newcl || (cldev != (dm)) || \
+#define Getfat(s,dmd,wflag) \
+    ((newcl || (cldev != (dmd)) || \
      (clsector != (s)) || ((wflag && !clwrite))) ? \
-	getfat((s),(dm),(wflag)) : clsave)
+	getfat((s),(dmd),(wflag)) : clsave)
 
 char
-*getfat(s,dm,wflag)
+*getfat(s,dmd,wflag)
 unsigned int s;
-DMD *dm;
+DMD *dmd;
 int wflag;
 {
 	/* get the buffer the sector is in */
 	newcl = TRUE;		/* do this in case getrec longjmp's */
-	clsave = getrec(s-(dm->m_recoff[0]-dm->m_fatrec),dm,wflag);
+	clsave = getrec(s+dmd->m_recfat,dmd,wflag);
 	clsector = s;
-	cldev = dm;
+	cldev = dmd;
 	clwrite = wflag;
 	newcl = FALSE;
 	return clsave;
@@ -391,35 +388,35 @@ int wflag;
 #define lobyte(w) ((w) & 0xff)
 
 void
-clfix(cl,link,dm)
-int cl;
-int link;
-DMD *dm;
+clfix(cl,link,dmd)
+uint cl;
+uint link;
+DMD *dmd;
 {
     /* used by m_16 only */
-    int offset;
-    REG unsigned int sector;
-    REG char *buf;
+    uint offset;
+    uint sector;
+    char *buf;
     char *obuf;
-    REG long pos;
+    ulong pos;
     
     /* used by !m_16 only */
-    int mask;
-    unsigned fatword;
-    REG char *fptr;	/* points to first byte of fatword */
+    uint mask;
+    uint fatword;
+    char *fptr;		/* points to first byte of fatword */
     char *q;		/* points to buf[offset] once that's known */
 
-    if (dm->m_16) {
+    if (dmd->m_16) {
 	/* compute byte offset into FAT */
-	pos = ((long)cl) << 1;
+	pos = ((ulong)cl) << 1;
 
 	/* now compute start of sector in FAT and byte offset in sector */
-	sector = divmod(&offset,pos,dm->m_rblog);
+	sector = divmod(&offset,pos,dmd->m_rblog);
 
-	buf = Getfat(sector,dm,TRUE);	/* get sector for writing */
+	buf = Getfat(sector,dmd,TRUE);	/* get sector for writing */
 
 	swp68(link);
-	*(int *)(&buf[offset]) = link;
+	*(uint *)(&buf[offset]) = link;
 	return;
     }
     else {
@@ -436,17 +433,17 @@ DMD *dm;
 	    mask = 0xf000;
 
 	/* hand-compute record and byte offset */
-	sector = divmod(&offset,pos,dm->m_rblog);
+	sector = divmod(&offset,pos,dmd->m_rblog);
 
-	buf = Getfat(sector,dm,TRUE);	    /* get fat sector for writing */
+	buf = Getfat(sector,dmd,TRUE);	    /* get fat sector for writing */
 
 	/* fatword comes out of this pre-swapped from 8088 format */
 
 	*(fptr+1) = *(q = &(buf[offset]));
-	if (offset == dm->m_recsiz-1) {
+	if (offset == dmd->m_recsiz-1) {
 	    /* get next sector for the other half of the fat word */
 	    obuf = buf;		/* save old buffer address */
-	    buf = Getfat(sector+1,dm,TRUE);
+	    buf = Getfat(sector+1,dmd,TRUE);
 	    *fptr = buf[0];
 	}
 	else {
@@ -471,51 +468,42 @@ DMD *dm;
 }
 
 int
-getcl(cl,dm)
-int cl;
-DMD *dm;
+getcl(cl,dmd)
+uint cl;
+DMD *dmd;
 {
-    REG long pos;
-    unsigned offset;
-    REG unsigned int sector;
-    REG char *buf;
+    ulong pos;
+    uint offset;
+    uint sector;
+    char *buf;
 
-    unsigned int fatword;
-    REG char *fptr;	/* points to first byte of fatword */
+    uint fatword;
+    char *fptr;		/* points to first byte of fatword */
     char *q;		/* points to buf[offset] when that's known */
 
-    /*
-     * RD clusters are in the range [XX..-1] wher XX is d_strtcl for RD.
-     * NOTE: Jason's code originally used negative cl numbers for FAT,
-     * but my new cluster code does not. Otherwise this would not be
-     * sufficient.
-     */
-
-    if (cl < 0 && cl >= dm->m_dtl->d_strtcl) return cl+1;
-
-    if (dm->m_16) {
+    if (dmd->m_16) {
 	/* compute byte offset into FAT */
-	pos = ((long)cl) << 1;
+	pos = ((ulong)cl) << 1;
 
 	/* now compute sector number in FAT and byte offset in the sector */
-	sector = divmod(&offset,pos,dm->m_rblog);
+	sector = divmod(&offset,pos,dmd->m_rblog);
 
-	buf = Getfat(sector,dm,FALSE);
+	buf = Getfat(sector,dmd,FALSE);
 
-	fatword = *(int *)(&buf[offset]);
+	fatword = *(uint *)(&buf[offset]);
 	swp68(fatword);
 	return fatword;
     }
     else {
 	fptr = (char *)(&fatword);
     	pos = cl + (cl >> 1);
-	sector = divmod(&offset,pos,dm->m_rblog);
-    	buf = Getfat(sector,dm,FALSE);
+	sector = divmod(&offset,pos,dmd->m_rblog);
+    	buf = Getfat(sector,dmd,FALSE);
 
 	/* fatword comes out of this pre-swapped into 68000 format */
 	*(fptr+1) = *(q = (&buf[offset]));
-	if (offset == dm->m_recsiz-1) {
-	    buf = Getfat(sector+1,dm,FALSE);
+	if (offset == dmd->m_recsiz-1) {
+	    buf = Getfat(sector+1,dmd,FALSE);
 	    *fptr = buf[0];
 	}
 	else *fptr = *(q+1);
@@ -531,100 +519,68 @@ DMD *dm;
 	else
 	    cl &= 0x0fff;
 
-	return(cl);
+	return cl;
     }
 }
 
 
-/**********************************************************************/
-
 int
-nextcl(p,wrtflg)
-OFD *p;
-int wrtflg;
+nextcl(cl,dmd,extflag,extended)
+uint cl;
+DMD *dmd;
+int extflag;
+int *extended;
 {
-	REG DMD *dm;
-	REG int i;
-	REG int cl;
-	REG int cl2;
-	REG int rover;
-	REG int lastcl;
+	uint xcl, lastcl, cl2, rover, i;
 
-	cl = p->o_curcl;
-	dm = p->o_dmd;
+	if (extended) *extended = 0;
 
-	/*
-	 * NEW CODE for returning the "next cluster" of the root directory.
-	 * RD clusters are in the range [xx..-1] where XX = d_strtcl for RD.
-	 */
-	if (cl < (dm->m_dtl->d_strtcl)) {
-	    cl2 = cl + 1;
-	    goto retcl;
+	if (!cl) {
+	    if (!extflag) return 0;
+	    /* get first cluster, mark with 0xffff, return it */
+	    goto extend;
 	}
-	else if (cl) cl2 = getcl(cl,dm);
-	else cl2 = (p->o_strtcl ? p->o_strtcl : -1);
 
-	if (wrtflg && (cl2 == -1))
-	{ /* end of file, allocate new clusters */
-	/* OPTIMIZE HERE FOR QUICK FINDING OF FIRST FREE CLUSTER ON DISK */
-#ifdef MISSING2CLFIX
-		lastcl = dm->m_numcl+2;
-#else
-		lastcl = dm->m_numcl;
-#endif
+	xcl = getcl(cl,dmd);
+	if (!xcl) {
+	    /* bad news: some clust or dir slot points to a free clust */
+	    return 0;
+	}
+	else if (xcl == 0xffff) {
+	    if (!extflag) return 0;
 
-		if (!cl && dm->m_16) {
-		    if (cl2 = fastcl(dm,lastcl,FALSE)) i=0;
-		    else i = lastcl;	/* failed */
-		    goto gotcl;
-		}
-
+extend:
+	    /* extend the chain, return the new cl */
+	    lastcl = dmd->m_numcl + 2;
+	    if (!cl && dmd->m_16) {
+		cl2 = fastcl(dmd,lastcl,FALSE);
+		if (!cl2) return 0;
+	    }
+	    else {
 		/*
-		 * this loop can run more than necessary, but only
-		 * when you're out of space anyway, so don't bother
-		 * trying to save a couple of milliseconds.
+		 * this loop can run more than nec., but only if no space.
 		 */
-
 		rover = cl;
-		for (i=2; i < lastcl; i++) 
-		{
-			if (rover < 2)
-				rover = 2;
-
-			if (!getcl(rover,dm))
-				break;
-			else
-				rover = (rover + 1) % lastcl;
+		for (i=2; i<lastcl; i++) {
+		    if (rover < 2) rover = 2;
+		    if (!getcl(rover,dmd)) {
+			cl2 = rover;
+			goto gotone;
+		    }
+		    if (++rover > lastcl) rover = 0;
 		}
-
-		cl2 = rover;
-gotcl:
-		if (i < lastcl)
-		{
-			/* order changed by AKP to fix cl before cl2 */
-			/* on the assumption that cl < cl2 (usually) */
-			if (cl)
-				clfix(cl,cl2,dm);
-			else
-			{
-				p->o_strtcl = cl2;
-				p->o_flag |= O_DIRTY;
-			}
-			clfix(cl2,-1,dm);
-		}
-		else
-			return(-1);
+		return 0;
+	    }
+gotone:
+	    if (cl) clfix(cl,cl2,dmd);
+	    clfix(cl2,-1,dmd);
+	    *extended = 1;
+	    return cl2;
 	}
-
-	if (cl2 == -1)
-		return(-1);
-
-retcl:	p->o_curcl = cl2;
-	p->o_currec = cl2rec(cl2,dm);
-	p->o_curbyt = 0;
-
-	return(E_OK);
+	else if ((xcl & 0xfff0) == 0xfff0) return 0;
+	else return xcl;
 }
+
 
 /*
  * Fast cluster code, invoked when looking for the first unused cluster
@@ -633,7 +589,7 @@ retcl:	p->o_curcl = cl2;
  * like too high a price to pay.)
  *
  * 'i' is used as a FAT sector counter.  'end' is set to the index
- * of the last FAT sector actually used (independent from dm->m_fsiz).
+ * of the last FAT sector actually used (independent from dmd->m_fsiz).
  * 'end' is computed in a sector-size-independent way.
  * In the inner loop, 'cl' is the count of words left to check in this
  * sector: it starts out short by two (and buf starts out incremented
@@ -646,29 +602,28 @@ retcl:	p->o_curcl = cl2;
  */
 
 int
-fastcl(dm,lastcl,freeflag)
-DMD *dm;
+fastcl(dmd,lastcl,freeflag)
+DMD *dmd;
 int lastcl;
 int freeflag;
 {
-    REG int *buf;
-    REG char *free;
-    REG int clcount;
-    REG int cl;
-    REG int i;
-    REG int clpersec;	    /* clusters represented by each sector of FAT */
+    uint *buf;
+    uint free;
+    uint clcount;
+    uint cl;
+    uint i;
+    uint clpersec;	    /* clusters represented by each sector of FAT */
 
-    clpersec = dm->m_recsiz >> 1;
+    clpersec = dmd->m_recsiz >> 1;
 
-    /* be sneaky: use an A register as a counter.  Who'll know? */
-    free = 0L;
+    free = 0;
 
     /* set up the first pass here; remainder get set up before "goto again" */
 
     i = 0;
     clcount = 2;
     cl = min(clpersec,lastcl) - 2;
-    buf = ((int *)getfat(i,dm,FALSE)) + 2;
+    buf = ((uint *)getfat(i,dmd,FALSE)) + 2;
 
 again:
     /* stop at the sooner of the end of sector or the end of FAT */
@@ -694,7 +649,7 @@ again:
     if (clcount < lastcl) {
 	i++;
 	cl = min(clpersec,lastcl-clcount);
-	buf = (int *)getfat(i,dm,FALSE);
+	buf = (uint *)getfat(i,dmd,FALSE);
 	goto again;
     }
 
@@ -703,273 +658,246 @@ again:
     return 0;
 }
 
+/*
+ * long and involved read-write call. Operates on OFD's.
+ *
+ * The read/write pointer information in the OFD is maintained thus:
+ *
+ * o_bytnum is the read/write pointer for the file.
+ * o_curcl is the cluster number bytnum is in; when zero, the file is
+ *	zero-length and the rest doesn't matter.
+ * o_currec is the record number on disk where bytenum is, zero-based
+ *	from the start of the data part of the disk.
+ *
+ * If you call this for reading, don't try to read past EOF.  That is assumed
+ * very subtly in a couple of places.
+ *
+ * The overall logic is as follows:
+ *
+    The "head" of the operation is the part that fills out the rest of
+the record o_bytnum is in the middle of.
 
-void
-addit(p,siz,flg)
-OFD *p;
-long siz;
-int flg; /* update curbyt ? (yes if less than 1 cluster transferred) */
-{
-	p->o_bytnum += siz;
+    The "middle" of the operation is the span of whole records.
 
-	if (flg)
-		p->o_curbyt += siz;
+    The "tail" is the part that falls into the leading fringe of the
+last record of the operation.
 
-	if (p->o_bytnum > p->o_fileln)
-	{
-		p->o_fileln = p->o_bytnum;
-		p->o_flag |= O_DIRTY;
-	}
-}
+    The head is done first, then the middle, then the tail.  If bytnum is
+on a record boundary, the op can't have a head, only a middle and a tail.
 
+    The logic of the middle part is thus:
+
+    if (there's a middle) {
+	set up a run starting at the current record;
+	do {
+	    ++currec;
+	    if (fell off the end of the current cluster) {
+		curcl = next cluster of this file, extending if nec;
+		currec = cl2rec(curcl);
+		if (currec not contiguous with run) {
+		    write out the run;
+		    set up a new run;
+		}
+	    }
+	    run ends at currec;
+	} while (--middle_length_in_records);
+	write out the run;
+    }
+
+It seems like this code handles falling off a cluster a lot: in three
+different places.  If you can think of a better way, let me know.
+
+ */
 
 long
-xrw(wrtflg,p,len,ubufr,bufxfr)
+xrw(wrtflg,ofd,len,ubufr,bufxfr)
 int wrtflg;
-OFD *p;
+OFD *ofd;
 long len;
 void *ubufr;
 void (*bufxfr)();
 {
 	char *bufp;
-REG	DMD *dm;
-	int bytn,recn,rsiz,lenxfr,csiz,csizb,lentail,num;
-	int hdrrec,lsiz,tailrec;
-	int last, nrecs, lflg; /* multi-sector variables */
-	long nbyts;
-REG	long rc;
-	long bytpos,lenrec,lenmid;
-	int hlen;
+	DMD *dmd;
+	uint lenhead, lenmid, lentail;
+	uint run_start, run_end, run_len;
+	uint xcl;
+	int extended;
+	ulong rc;
+	ulong runlen;
 
-	/* determine "header" of request */
+	/* holders for commonly-used fields */
+	uint recsiz, clsiz, clsizb;
+	ulong bytnum;
+	uint curcl, currec, recoffs;
 
-	dm = p->o_dmd;
-	rsiz = dm->m_recsiz;
-	csiz = dm->m_clsiz;
-	csizb = dm->m_clsizb;
-	bytpos = p->o_bytnum; /* starting file position */
-	recn = divmod(&bytn,(long) p->o_curbyt,dm->m_rblog);
-	recn += p->o_currec;
+	dmd = &drvtbl[ofd->o_dfd->dfd_dev];
+	recsiz = dmd->m_recsiz;
+	clsiz = dmd->m_clsiz;
+	clsizb = dmd->m_clsizb;
+	bytnum = ofd->o_bytnum;
 
-	if (bytn) /* do header */
-	{
-	  lenxfr = min(len,rsiz-bytn);
-	  bufp = getrec(recn,dm,wrtflg);
-	  addit(p,(long) lenxfr,1);
-	  len -= lenxfr;
-	  recn++;
-	  if (!ubufr) 
-	  {
-	    rc = (long) (bufp+bytn);
-	    goto exit;
-	  }
-	  (*bufxfr)(lenxfr,bufp+bytn,ubufr);
-	  ubufr += lenxfr;
-	}
-	lentail = len & dm->m_rbm;
+	curcl = ofd->o_curcl;
+	currec = ofd->o_currec;
 
-	newcl = TRUE;		/* AKP: new loop of cluster calls */
+	recoffs = bytnum & dmd->m_rbm;
 
-	/* is there any middle part ? */
+	if (!recoffs) lenhead = 0;
+	else lenhead = min(recsiz-recoffs,len);
 
-	if (lenmid = len - lentail)
-	{ /* do "header" records left in current cluster */
-	  hdrrec = recn & dm->m_clrm;
-	  if (hdrrec)
-	  {
-	    /*
-	     * hdrrec is record offset in current cluster.
-	     * lenmid is number of bytes in whole records left to go.
-	     * set hlen = min(records-left-to-go,
-	     *			records-left-in-current-cluster)
-	     */
-	    if ((hlen = (lenmid >> dm->m_rblog)) > (dm->m_clsiz - hdrrec))
-		hlen = dm->m_clsiz - hdrrec;
-	    usrio(wrtflg,hlen,recn,ubufr,dm);
-	    ubufr += (lsiz = hlen << dm->m_rblog);
-	    lenmid -= lsiz;
-	    addit(p,(long) lsiz,1);
-	  }
-	  /* do "middle" complete clusters */
-	  lenrec = lenmid >> dm->m_rblog;
-	  num = divmod(&tailrec,lenrec,dm->m_clrlog);
-	  last = nrecs = nbyts = lflg = 0;
-	  while (num--)
-	  {
-	    rc = nextcl(p,wrtflg);
-	    /* if eof or non-contiguous cluster, or last cluster of request, */
-	    /* 		then finish pending I/O */
-	    if ((!rc) && (p->o_currec == last + nrecs))
-	    {
-		nrecs += csiz;
-		nbyts += csizb;
-		if (!num) goto mulio;
+	newcl = TRUE;
+
+	/* do the head.  If there is one, then curcl is valid. */
+	if (lenhead) {
+	    bufp = getrec(currec+dmd->m_recdata,dmd,wrtflg);
+	    (*bufxfr)(lenhead,bufp+recoffs,ubufr);
+	    ubufr += lenhead;
+	    bytnum += lenhead;
+	    len -= lenhead;
+	    if (len && (++currec & dmd->m_clrm) == 0) {
+		/* more to do and fell off a cluster! */
+		xcl = nextcl(curcl,dmd,wrtflg,NULL);
+		if (xcl == 0) goto eof;
+		curcl = xcl;
+		currec = cl2rec(curcl,dmd);
 	    }
-	    else
-	    {
-		if (!num)
-			lflg = 1;
-mulio:		if (nrecs)
-			usrio(wrtflg,nrecs,last,ubufr,dm);
-		ubufr += nbyts;
-		addit(p,nbyts,0);
-		if (rc)
-			goto eof;
-		last = p->o_currec;
-		nrecs = csiz;
-		nbyts = csizb;
-		if ((!num) && lflg)
-		{
-			lflg = 0;
-			goto mulio;
+	}
+
+	/* head is done. Now compute lentail, lenmid. lenmid counts RECORDS. */
+
+	lentail = len & dmd->m_rbm;
+	len -= lentail;
+	lenmid = len >> dmd->m_rblog;
+
+	if (lenmid) {
+	    run_start = currec;
+	    run_end = currec;
+	    run_len = 1;
+	    do {
+		if ((++currec & dmd->m_clrm) == 0) {
+		    /* fell off a cluster */
+		    xcl = nextcl(curcl,dmd,wrtflg,NULL);
+		    if (xcl == 0) goto eof;
+		    curcl = xcl;
+		    currec = cl2rec(curcl,dmd);
+		    if (currec != (run_end+1)) {
+			/* do the run */
+			usrio(wrtflg,run_len,run_start,ubufr,dmd);
+			runlen = ((ulong)run_len) << dmd->m_rblog;
+			ubufr += runlen;
+			bytnum += runlen;
+			/* set up next run */
+			run_start = currec;
+			run_len = 0;
+		    }
 		}
+		run_len++;
+		run_end = currec;
+	    } while (--lenmid);
+
+	    /* do the last run */
+	    usrio(wrtflg,run_len,run_start,ubufr,dmd);
+	    runlen = ((ulong)run_len) << dmd->m_rblog;
+	    ubufr += runlen;
+	    bytnum += runlen;
+	}
+
+	/* do tail bytes in last record */
+
+	if (lentail) {
+	    extended = 0;
+	    if ((++currec & dmd->m_clrm) == 0) {
+		/* tail starts a new cluster */
+		xcl = nextcl(curcl,dmd,wrtflg,&extended);
+		if (xcl == 0) goto eof;
+		curcl = xcl;
+		currec = cl2rec(curcl,dmd);
 	    }
-	  }
-
-	  /* do "tail" records */
-
-	  if (tailrec)
-	  {
-	    if (nextcl(p,wrtflg))
-		goto eof;
-	    lsiz = tailrec << dm->m_rblog;
-	    addit(p,(long) lsiz,1);
-	    usrio(wrtflg,tailrec,p->o_currec,ubufr,dm);
-	    ubufr += lsiz;
-	  }
+	    /* getrec for the record; if extended, don't read it in */
+	    bufp = getrec(currec + dmd->m_recdata,dmd,(extended ? 2 : wrtflg));
+	    (*bufxfr)(lentail,bufp,ubufr,wrtflg);
 	}
-	/* do tail bytes within this cluster */
-	if (lentail)
-	{
-	  recn = divmod(&bytn,(long) p->o_curbyt,dm->m_rblog);
-	  if ((!recn) || (recn == csiz))
-	  {
-		if (nextcl(p,wrtflg))
-			goto eof;
-		recn = 0;
-	  }
-	  bufp = getrec(p->o_currec+recn,dm,wrtflg);
-	  addit(p,(long) lentail,1);
-	  if (!ubufr)
-	  {
-	    rc = (long) bufp;
-	    goto exit;
-	  }
-	  (*bufxfr)(lentail,bufp,ubufr,wrtflg);
+
+eof:
+	/* set rc to actual number of bytes transferred */
+	rc = bytnum - ofd->o_bytnum;
+	ofd->o_currec = currec;
+	ofd->o_curcl = curcl;
+	ofd->o_bytnum = bytnum;
+	if (bytnum > ofd->o_dfd->dfd_fileln) {
+	    ofd->o_dfd->dfd_fileln = bytnum;
+	    ofd->o_dfd->dfd_dirty = 1;
 	}
-eof:	rc = p->o_bytnum - bytpos;
-exit:	newcl = TRUE;		/* AKP: set this just in case */
-	return(rc);
+	return rc;
 }
 
 
 /*
-	Last modified	SCC	8 Apr 85
-*/
+ * ckdrv: return 0 for success.  Checks to see if a drive exists, logs it
+ * in if so and doesn't have a DMD.  drvsel is a bitmap of drives which have
+ * DMD's.  If a drive experiences mediach, its drvsel bit is cleared.
+ * If the subsequent getbpb fails, it won't get set again.
+ *
+ * Call this before doing anything with any drive in an OS call.
+ * fn2dir is a good choice, but some calls (Fsnext, Dgetpath) don't take
+ * file names, yet need to use this call.
+ */
 
 long
 ckdrv(d)
-int d;		/* has this drive been accessed, or had a media change */
+uint d;
 {
-	REG int mask;
-	REG int i;
-	REG BPB *b;
-	long err;
+	uint mask;
+	BPB *b;
 
 	mask = 1 << d;
 
-	if (!(mask & drvsel))
-	{
+	if (!(drvsel & mask)) {
 		b = (BPB *)getbpb(d);
-		if (!b)
-			return(ERROR);
-		if (log(b,d)) return (ENSMEM);
+		if (!b) return ERROR;
+		log(b,d);
 		drvsel |= mask;
+		run->p_curdir[d] = 0;
 	}
-#ifdef CKMEDIA
-1+; deliberate syntax error: this code doesn't work so don't use it.
-
-	/* else drive exists, but need to validate it */
-	else if (err = trap13(9,d)) {
-	    if (err == 1) {
-		/* only maybe: find out for sure */
-		/* read into the same buf RWABS uses for reading serial	*/
-		/* number, etc.  Don't care about the data, but will	*/
-		/* actually read the disk if the state is "not sure."	*/
-		extern char diskbuf[];		/* buffer exported by VDI */
-		rwabs(0,diskbuf,1,0,d);
-	    }
-	    else {
-	    	errdrv = d;
-	    	rwerr = E_CHNG;
-	    	longjmp(errbuf,rwerr);
-	    }
-	}
-#endif
-	if ((!run->p_curdir[d]) || (!dirtbl[run->p_curdir[d]]))
-	{  /* need to allocate current dir on this drv */
-		for (i = 1; i < NCURDIR; i++)
-			if (!diruse[i])
-				goto gotone;
-		return(ERROR);
-
-gotone:
-		diruse[i]++;
-		dirtbl[i] = drvtbl[d]->m_dtl;
-		run->p_curdir[d] = i;
-	}
-	return(d);
+	return E_OK;
 }
 
 
-/*	Function 0x36	d_free
-
-	Error returns
-		ERROR
-
-*/
+/*
+ * Dfree()
+ */
 
 long
-xgetfree(p_buf,p_drv) /*+ get disk free space data into buffer */
-int p_drv;
-long *p_buf;
+xgetfree(buf,drv)
+uint drv;
+long *buf;
 {
-REG	int drv;
-REG	long *buf;
-REG	int i;
-REG	int free;
-REG	DMD *dm;
-REG	int end;
-
-	drv = p_drv;
-	buf = p_buf;
+	uint i;
+	uint free;
+	DMD *dmd;
+	uint end;
 
 	drv = (drv ? drv-1 : run->p_curdrv);
 
-	if ((i = ckdrv(drv)) < 0)
-		return(ERROR);
+	if (ckdrv(drv)) return ERROR;
 
-	dm = drvtbl[i];
+	dmd = &drvtbl[drv];
 	free = 0;
-	newcl = TRUE;		/* AKP: new loop of cluster calls */
+	newcl = TRUE;
 
-#ifdef MISSING2CLFIX
-	end = dm->m_numcl+2
-#else
-	end = dm->m_numcl;
-#endif
+	end = dmd->m_numcl+2;
 
-	if (dm->m_16) free = fastcl(dm,end,TRUE);
+	if (dmd->m_16) free = fastcl(dmd,end,TRUE);
 	else {
 	    for (i = 2; i < end; i++) 
-		if (!getcl(i,dm)) 
+		if (!getcl(i,dmd)) 
 		    free++;
 	}
 
-	newcl = TRUE;		/* AKP: set this again just in case */
+	newcl = TRUE;
 	*buf++ = (long)(free);
-	*buf++ = (long)(dm->m_numcl);
-	*buf++ = (long)(dm->m_recsiz);
-	*buf++ = (long)(dm->m_clsiz);
+	*buf++ = (long)(dmd->m_numcl);
+	*buf++ = (long)(dmd->m_recsiz);
+	*buf++ = (long)(dmd->m_clsiz);
 	return(E_OK);
 }

@@ -1,0 +1,546 @@
+/*
+***************************    DIR.C     ********************************
+*
+* $Revision: 1.1 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* =======================================================================
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* =======================================================================
+*
+* $Log: scan.c,v $
+* Revision 1.1  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
+*************************************************************************
+*/
+
+#include "fs.h"
+
+/*
+ * low-level directory structure operations
+
+The DIR structure information about a slot in a directory.  The info
+includes the drive, the starting cluster number of the directory the slot
+is in, the cluster number that the slot itself is in, the record number of
+the slot, and the offset in that record of the slot.  In addition, a
+"fresh" DIR structure has valid FCB and BCB pointers: FCB points to the
+image of the slot in a disk cache sector, and BCB points to that sector's
+BCB (so you can mark it dirty).
+
+FUNCTIONS:
+
+long
+fn2dir(pname,dir,flag)
+char **pname;
+DIR *dir;
+
+Fills in (uninitialized) 'dir' with the info on the slot referenced by the
+string at *pname, and advances that pointer to the last component of the
+string (after the last SLASH).  Returns zero on success.  The file
+attribute does not participate, except that FA_LABEL inhibits a match.
+
+The input pathname is checked several ways, and errors return EBADRQ. The
+idea behind EBADRQ is that retrying the request won't do any good: it's
+intrinsically bad, not just "can't do that right now."
+
+EBADRQ errors: any component includes a '*' or '?' character, any component
+is empty, last component is "." or "..", any component is an invalid file
+name.  Also a component like "..abc" or other unparsable.
+
+Call with flags == FN_DOTSOK to enable finding . and .. in the last
+component; call with FN_EARLY to return E_OK before searching in the last
+dir for the last component.
+
+If the file doesn't exist, but you got all the way to the last directory,
+then EFILNF is returned and that directory's dev and cluster are valid.
+(These are the only parts used as input to dirslot.)
+
+If you didn't even get to the last directory, EPTHNF is returned.
+
+On successful return from fn2dir() (return code zero), dir is fresh.
+
+QUIET CHANGE FROM ORIGINAL GEMDOS: Fopen("a:\*.*",0) used to open the first
+file on A: but this code returns EBADRQ.
+
+long
+dir2dir(dir)
+DIR *dir;
+
+Freshens (valid, stale) dir.  A dir can't be freshened across media-change
+on a drive, but this isn't checked.  All that happens is xgetrec() on the
+record in question.  Uses only the dev, recno, and recoffs fields.
+
+long
+dirfirst(dir)
+DIR *dir;
+
+Initializes (valid, stale) dir to the first slot in the dir specified
+in the dev and cl fields.  On zero return dir is fresh.  Returns errors.
+
+long
+dirnext(dir,dmd)
+DIR *dir;
+
+Partly a macro. Advances (fresh) dir to the next slot in the directory.
+'dmd' is &drvtbl[dir->dir_drv] (saves multiplying inside loops). Returns
+zero and leaves dir fresh for success.  ENMFIL means everything succeeded
+and you fell off the end of the dir.  ERROR means something went wrong (bad
+FAT). In each case, dir_curcl is unchanged, meaning it's the last cluster
+of the dir, but dir_recno is bad and the dir isn't fresh.  Can also return
+any error from xgetrec, in which case all fields are correct but not fresh.
+
+long
+dirslot(dir)
+DIR *dir;
+
+Fills in dir (just dev/cl) with the first slot available in the directory
+specified by dir's dev and clust fields.  Includes extending dir if
+necessary. On successful return, dir is fresh.  Disk errors cause a return
+with an error code, not a longjmp. [?]
+
+void
+dirdirty(dir)
+DIR *dir;
+
+Mark dir->dir_bcb as dirty and (maybe) flush it to disk.  It is not clear
+when the flush should really happen; maybe not until the GEMDOS call is over.
+Maybe not.
+
+int
+match(patfcb,filfcb)
+FCB *patfcb, *filfcb;
+
+Returns 1 if the two fcb's match.  A match is letter-for-letter matching of
+names, plus attribute match as fn2dir: FA_LABEL in filfcb inhibits match. 
+This is used internally (by fn2dir) only. Use wmatch for wildcard matching.
+
+int
+wmatch(patfcb,filfcb)
+FCB *patfcb, *filfcb;
+
+Returns 1 if the two fcb's match, including wildcards and attribute match
+TBD.
+
+long
+name2fcb(name,end,fcb)
+char *name, *end;
+FCB *fcb;
+
+Creates an FCB from the name. If 'end' is null, the name is
+null-terminated. If 'end' is non-null, it's the first char which is NOT
+part of the name. Name may be '.' (in which case the FCB is for '.'), or
+'..' (ditto) or an 8.3 filename, with or without wildcards. For the moment,
+I guess ".abc" should be a legal filename, expanding to "xxxxxxxabc" (where
+x is space).
+
+*/
+
+#define isdots(s) (*s == '.' && (!*(s+1) || (*(s+1) == '.') && (!*(s+2))))
+
+long
+fn2dir(pname, dir, flags)
+char **pname;
+DIR *dir;
+int flags;
+{
+    char *name = *pname, *oname, *end;
+    DMD *dmd;
+    uint dev;
+    uint cl;
+
+    int dotflag = (flags == FN_DOTSOK);
+    int earlyflag = (flags == FN_EARLY);
+    int m = 0;			/* this shuts up GCC, not really necessary */
+    long err;
+    FCB fcb;
+
+    if (!*name) return EBADRQ;
+    if (*(name+1) == COLON) {
+	dev = uc(*name);
+	name += 2;
+	if (!*name) return EBADRQ;
+    }
+    else dev = run->p_curdrv;
+
+    if (dev > MAXDEVS) return EDRIVE;
+
+    dmd = &drvtbl[dev];
+
+    /* got d: out of the way */
+
+    if (*name == SLASH) {
+	cl = 0;
+	name++;
+    }
+    else cl = run->p_curdir[dev];
+
+    dir->dir_dev = dev;
+    dir->dir_clust = cl;
+
+    do {
+	/* Find the end of name (SLASH or null byte) and */
+	/* scan the directory dev/cl for that name. */
+	/* While you're at it, reject wildcards. */
+	for (end = name; *end && *end != SLASH; ++end) {
+		if (*end == '?' || *end == '*') return EBADRQ;
+	}
+
+	/* empty component? */
+	if (end == name) return EBADRQ;
+
+	/* if name is last component, bail out here if earlyflag is set */
+	/* or if name is "." or ".." and they are not allowed. */
+
+	if (!*end) {
+	    /* this is last component: check for earlyflag and dots */
+	    if (earlyflag) {
+		*pname = name;
+		return E_OK;
+	    }
+	    if (!dotflag && isdots(name))
+		return EBADRQ;
+	}
+
+	/* build an FCB from the name */
+	if (err = name2fcb(name,end,&fcb)) return err;
+	fcb.f_attrib = FA_ALL;
+
+	/* do the scan */
+	for (err = dirfirst(dir,dmd);
+	     !err && dir->dir_fcb->f_name[0] && !(m = match(&fcb,dir->dir_fcb));
+	     err = dirnext(dir,dmd)) /* empty loop */;
+
+	if (err) return err;
+	if (!m) {
+	    /* no match; if not last component then EPTHNF */
+	    if (*end) return EPTHNF;
+	    else {
+		/* last component not found; fill in *pname; yield EFILNF */
+		*pname = name;
+		return EFILNF;
+	    }
+	}
+
+	/* got a match */
+
+	oname = name;
+	name = end;
+	if (*name == SLASH) {
+	    /* fail if found a file but not at end of path */
+	    if (!(dir->dir_fcb->f_attrib & FA_SUBDIR)) return EPTHNF;
+	    name++;
+        }
+    } while (*name);
+
+    /* end still points to end of last component; check for trailing SLASH */
+    if (*end == SLASH) return EBADRQ;
+
+    *pname = oname;
+    return E_OK;
+}
+
+long
+dir2dir(dir)
+DIR *dir;
+{
+    long err;
+    FCB *fcb;
+
+    if (err = xgetrec(dir->dir_dev,dir->dir_recno,&dir->dir_bcb,&fcb)) return err;
+    dir->dir_fcb = (FCB *)(((char *)fcb) + dir->dir_recoffs);
+    return E_OK;
+}
+
+/*
+ * dirfirst: given just dev and cl, initialize the rest of the dir structure
+ * and freshen it so it refers to the first slot of the dir.
+ *
+ * This is a macro, as follows:
+ * #define dirfirst(dir,dmd) \
+ *     ((dir->dir_curcl = dir->dir_clust), \
+ *      (dir->dir_recno = cl2rec(dir->dir_clust,dmd), \
+ *      (dir->dir_recoffs = 0), \
+ *      dir2dir(dir))
+ */
+
+/*
+ * dirnext: advance dir to point to the next slot.  This will advance to the
+ * end of the last record of the last cluster in the dir, and won't stop at
+ * null-byte entries.  Returns E_OK and fresh dir on success, ENMFIL on
+ * failure (in which case dir_curcl is the last cluster), and other errors.
+ * In any error case, dir isn't fresh any more.
+ *
+ * This is partly a macro: the fcb and recoffs fields are bumped to the next
+ * FCB in the record, and if that's still in the current record then that's
+ * it.  Otherwise a procedure call is made to _dirnext.
+ *
+ * The macro part looks like this:
+ * 
+ * #define dirnext(dir,dm) \
+ *     ((dir->dir_fcb++), \
+ *      (dir->dir_recoffs += sizeof(FCB)), \
+ *      ((dir->dir_recoffs < dm->m_recsiz) ? E_OK : _dirnext(dir,dm)))
+ *
+ * "Bump the fcb & recoffs; call dirnext if you fell off the end."
+ * 
+ */
+
+long
+_dirnext(dir,dm)
+DIR *dir;
+DMD *dmd;
+{
+    uint xcl, curcl;
+    long err;
+
+    /* you only call this if you fell off the end of this record */
+	"print -n (DMD) ; dmd lpeek(a6 + c);_c");
+
+    curcl = dir->dir_curcl;
+
+    /* bump recno/recoffs to the top of the next record */
+
+    dir->dir_recoffs = 0;
+    dir->dir_recno += 1;
+
+    /* did you fall off this cluster? (RD is one big cluster) */
+
+    if (!dir->dir_clust) {
+	if (dir->dir_recno >= dmd->m_recdata) return ENMFIL;
+	if (dir->dir_recno >= dmd->m_recdata) return EFILNF;
+    }
+    else {
+	/*
+	 * Not root dir; fallen off this cluster yet?
+	 *
+	    if (xcl == 0xffff) return ENMFIL;
+	 * is only valid for sector numbers which are zero-based w.r.t
+	 * the start of the data part of the disk.
+	 */
+
+	if (((dir->dir_recno - dmd->m_recdata) & dmd->m_clrm) == 0) {
+	    dir->dir_recno = cl2rec(dir->dir_curcl,dmd);
+	    xcl = getcl(dir->dir_curcl,dmd);
+	    if (xcl == 0xffff) return EFILNF;
+	    if (!xcl || ((xcl & 0xfff0) == 0xfff0)) {
+		/* FAT error */
+		return ERROR;
+    if (err = xgetrec(dir->dir_dev,dir->dir_recno,
+		    &(dir->dir_bcb),&(dir->dir_fcb)))
+	return err;
+	/* (else recno is fine; it's the next rec of this clust) */
+    }
+
+    /* we've updated recno (and curcl if necessary) */
+    dir->dir_fcb = getrec(dir->dir_recno,dmd,0,&(dir->dir_bcb));
+
+    DBCMD(0x20,"print _dirnext returns. dir -t -x lpeek(a6+8) :;"
+	       "dirf (lpeek (`a6 + 8));_c");
+
+    return E_OK;
+}
+    uint cl, rec, i;
+dirslot(dir)
+DIR *dir;
+    do {
+	if (dir->dir_fcb->f_name[0] == 0 ||
+	    dir->dir_fcb->f_name[0] == ERASED) return E_OK;
+    } while ((err = dirnext(dir,dmd)) == 0);
+
+    if (err != ENMFIL) return err;
+
+    while (1) {
+	if (err = dirnext(dir,dmd)) {
+	    if (err == EFILNF) break;
+	    else return err;
+	}
+    }
+
+    if (!(cl = nextcl(dir->dir_curcl,dmd,TRUE,NULL))) return ERROR;
+
+    /* Have to extend the directory. Allocate a new cluster. */
+    rec = cl2rec(cl,dmd);
+    if (!(cl = nextcl(dir->dir_curcl,dmd,TRUE))) {
+	DBCMD(0x20,"print dirslot can not extend dir;_c");
+	return ERROR;
+    }
+	if (err = xgetrec(dir->dir_dev,rec+i,&bcb,&fcb)) {
+	    /* error getting newly-allocated sector */
+	    /* should probably clfix(cl,0) and clfix(dir->dir_curcl,-1) */
+	    return err;
+	}
+    /* zero out that cluster */
+	bcb->b_dirty = 1;
+
+    for (i=dmd->m_clsiz; --i >= 0; ) {
+	/* on getrec error, should probably clfix(cl,0) */
+	/* and clfix(dir->dir_curcl,-1), but we don't. */
+	fcb = getrec(rec+i,dmd,2,&bcb);	    /* special flag */
+	clear(fcb,((char *)fcb)+dmd->m_recsiz);
+    }
+
+    /* the last record we zeroed was the first record of the cluster */
+    /* and that's the record, bcb, and fcb we return. */
+
+    dir->dir_clust = dir->dir_curcl = cl;
+    dir->dir_recoffs = 0;
+    dir->dir_recno = rec;
+    dir->dir_fcb = fcb;
+    dir->dir_bcb = bcb;
+    return 0;
+}
+ * Attribute matching: since this is only called for non-wildcard
+ * matches, the pattern attribute doesn't matter.  fcb's
+ * attribute is used only to inhibit matching of FA_LABEL.
+ *
+ * There's a trick here: we assume the names are on word boundaries
+ * and compare 5 int's and a byte.  (GCC actually uses "cmpm.l (a2)+,(a3)+"!)
+ * Attribute matching: since this is only called for non-wildcard matches,
+ * the pattern attribute doesn't matter.  fcb's attribute is used only to
+ * inhibit matching of FA_LABEL.
+ *
+ * There's a trick here: we assume the names are on word boundaries and
+ * compare 5 int's and a byte.  (GCC actually uses "cmpm.l (a2)+,(a3)+"!)
+ */
+
+int
+    if (fcb->f_attrib & FA_LABEL) return 0;
+{
+    int *p, *f;
+
+    /* no matches on erased files or labels */
+    if (fcb->f_name[0] == ERASED ||
+	(fcb->f_attrib & FA_LABEL)) return 0;
+
+    p = (int *)(pat->f_name);
+    f = (int *)(fcb->f_name);
+    if (*p++ == *f++ &&
+	*p++ == *f++ &&
+	*p++ == *f++ &&
+	*p++ == *f++ &&
+	*p++ == *f++ &&
+	*(char *)p == *(char *)f) return 1;
+    return 0;
+}
+
+    char *f = pat->f_name;
+wmatch(pat,fcb)
+FCB *pat;
+FCB *fcb;
+{
+    char *p = pat->f_name;
+    char *f = fcb->f_name;
+     * Old attr matching logic: "match if file att is 0 and input not 8,
+     * or there is at least a one-bit match."
+    /* no match on erased files */
+     * The caller is assumed to have ORed in FA_ARCHIVE and FA_RO.
+     * This results in archive and r/o files being unhideable.
+    /*
+     * A saner approach is to use the SUBDIR, HIDDEN, and SYSTEM
+     * bits only in the zero-or-any-bit-match test, but this might
+     * just be too much incompatibility.
+     * The caller is assumed to have ORed in FA_ARCHIVE and FA_RO. This
+     * results in archive and r/o files being unhideable.
+     *
+     * A saner approach is to use the SUBDIR, HIDDEN, and SYSTEM bits only
+     * in the zero-or-any-bit-match test, but this might just be too much
+     * incompatibility.
+	if (*p != '?' && *p != *f) return 0;
+
+    if (!(((fcb->f_attrib == 0) && (pat->f_attrib != FA_LABEL)) ||
+	(fcb->f_attrib & pat->f_attrib))) return 0;
+
+    for (i=11; i; i--, p++, f++) {
+	if (!(*p == '?' || *p == *f)) return 0;
+    }
+
+ * This returns EBADRQ on some illegal file names, not all.
+ * The only kind it catches now is "..abc" but it would be
+ * nice to catch names with spaces, too.  But it is imperative
+ * that the FCB not be changed if the file name is illegal:
+ * that way there is less to undo.  (Sometimes this is called
+ * to stuff a name directly in a disk buffer.  To lift the
+ *
+ * This returns EBADRQ on some illegal file names, not all. The only kind
+ * it catches now is "..abc" but it would be nice to catch names with
+ * spaces, too.  But it is imperative that the FCB not be changed if the
+ * file name is illegal: that way there is less to undo.  (Sometimes this
+ * is called to stuff a name directly in a disk buffer.  To lift the
+ * restriction on errors, change those calls.)
+ */
+
+long
+name2fcb(name,end,fcb)
+char *name;
+char *end;
+FCB *fcb;
+{
+	int count = 8;
+	char *f = &fcb->f_name[0];
+	char fill = ' ';
+
+	/* if end is NULL, set it to the null at the end */
+	if (end == NULL) {
+		for (end = name; *end; end++) /* empty */ ;
+	}
+
+	/* Check for special cases */
+	if (*name == '.') {
+		if (++name == end) {
+			/* it's dot */
+			*f++ = '.';
+			count--;
+			goto gotdot;
+		}
+		else if (*name == '.') {
+			if (++name == end) {
+				/* it's dot-dot */
+				*f++ = '.';
+				*f++ = '.';
+				count -= 2;
+				goto gotdot;
+			}
+			/* else it's ..abc which is illegal */
+			else return EBADRQ;
+		}
+		else {
+			/* it's .abc */
+			goto gotdot;
+		}
+	}
+
+	/* fill *f with at most 8 chars, but stop at end or dot */
+	while (name < end && *name != '.') {
+		if (*name == '*') {
+			fill = '?';
+			goto skip;
+		}
+		*f++ = uc(*name++);
+		if (!(--count)) {
+skip:
+			/* skip to end or dot, then goto gotdot */
+			while (name < end && *name++ != '.') /* empty */ ;
+			break;
+		}
+	}
+
+gotdot:
+	/* Either name == end or *name is dot or char after dot. */
+	/* Fill out FCB to 8 spaces */
+	while (count) *f++ = fill, --count;
+
+	/* note: if (*name == '.') then we assume (name < end) */
+
+	if (*name == '.') name++;
+	count = 3;
+		if (*name == '*') {
+			fill = '?';
+			break;
+		}
+		/* break on encountering a second dot */
+		else if (*name == '.') break;
+		*f++ = uc(*name++);
+		--count;
+	}
+	while (count) *f++ = fill, --count;
+	return 0;
+}

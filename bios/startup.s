@@ -1,20 +1,29 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/11/28 11:16:44 $
+* $Date: 88/12/06 16:24:23 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.20  88/12/06  16:24:23  apratt
+* Added code for STPLUS to fix the check for MONOMON in the Vblank
+* handler: it gets inverted when the DMA sound is active, so this code
+* has to un-invert it.  It's not quite bulletproof, but it should be
+* pretty damn rare that a spurious reset sneaks through.  Well-nigh
+* impossible, I hope.
+*
+* Only a tiny code change if not STPLUS.
+*
 * Revision 1.19  88/11/28  11:16:44  kbad
 * Put the magic back in.  Dungeon Master was depending on the AES magic
 * to reclaim the AES BSS after the boot sequence takes it away.  This
 * is deemed a Good Feature - 12K is no small potatoes on a 520 ST.
-*
+* 
 *
 * Revision 1.18  88/11/16  15:10:19  apratt
 * Added STPLUS assembly-time flag.  Set to 1 for ST PLUS, 0 for ST.
@@ -101,7 +110,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.19 $
+* $Revision: 1.20 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -440,7 +449,6 @@ osconf		equ	%11001
 	.globl	_nflops			; "Hey!  Clams got floppies!"
 	.globl	_critic			; critical error handler binding for C
 	.globl	_hz_200			; 200hz raw system timer tick
-
 
 
 
@@ -1870,13 +1878,51 @@ colors:
 	clr.l	a5			; a5 -> zero page
 	dc.w	$f3f			; 13 light magenta
 	dc.w	$3ff			; 14 light cyan
+*** ST PLUS:
+
+*+
+* hbl - force caller to IPL 3
+* Oh-well:	"Yeah, it sucks, but it works" (--lt)
+*
+* Note:		Hacks caller's IPL to 3 (if it was 0).  This is
+*		a kludge against fascist programs and certain
+*		debuggers that insist on starting processes up
+*		at IPL 0.
+*
+* Note again:	It is guaranteed that GEMDOS starts programs
+* 		up at IPL 0, because it's handy (see GEMDOS comments
+*		for more of a reason).
+*
+*-
+hbl:	move.w	d0,-(sp)		; save d0
+*** (note: the move from shiftmd is inside the conditional so the conditional
+*** doesn't end with a label, which is a no-no in old as68)
+.ifne STPLUS
+	addq.l	#1,_frclock		; bump frame clock
+	move.w	$8900,d0		; read sound state once
+	move.b	gpip,d1			; get gpip with monomon
+	cmp.b	gpip,d1			; still the same?
+	bne.s	v_read1			; no - start over
+	cmp.w	$8900,d0		; sound state still the same?
+	move.l	_vblqueue.w,a0		; a0 ->	vectors
+	tst.w	d0			; was sound active?
+	beq.s	v_read2			; no - don't invert monomon
+	bchg	#7,d1			; yes - invert it to get true MONOMON
+v_read2:
 	move.b	shiftmd,d0		; get current rez
+.endc
+*** non-STPLUS equivalent: just get the input from gpip
+.ifeq STPLUS
+	move.b	gpip,d1			; get "High Rez" input
+	move.b	shiftmd,d0		; get current rez
+.endc
 ***	READ sound status (to d0)
 ***	READ gpip (to d1)
 ***	IF gpip != d1 then try again
 ***
 *** We have to read sound status more than once because it might be active
-	btst.b	#7,gpip			; get "High rez" input
+*** when we test it, then go inactive before we read MONOMON.  Moreover,
+*** it might spike while reading gpip, then settle again.  This sequence
 *** doesn't quite ensure lack of trouble, but it does give some hope.
 	move.w	#2000,d0		; delay 2..3 ms to wait for mono's
 v_d23:	dbra	d0,v_d23		;  window of vulnerability to end
@@ -1884,7 +1930,7 @@ v_d23:	dbra	d0,v_d23		;  window of vulnerability to end
 v_read1:
 	move.b	dmasndc+1,d0		; read sound state once
 	move.b	gpip,d1			; get gpip with monomon
-swmon1:	btst.b	#7,gpip			; get "High rez" input
+	btst	#7,d1
 	sne	d1
 	move.b	defshiftmd(a5),d0	; get preferred rez
 	sne	d2

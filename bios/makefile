@@ -1,16 +1,20 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.4 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.5 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 89/09/22 16:54:54 $     $Locker:  $
+#  $Author: apratt $	$Date: 90/08/03 11:28:25 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.4  89/09/22  16:54:54  apratt
-#  THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
-#  No functional changes from previous revision, which is the last to
-#  require Alcyon's AS68 assembler.
+#  Revision 2.5  90/08/03  11:28:25  apratt
+#  This version has variables set for machine and country, to tell it
+#  what switches and object files to use.
 #
+# Revision 2.4  89/09/22  16:54:54  apratt
+# THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+# No functional changes from previous revision, which is the last to
+# require Alcyon's AS68 assembler.
+# 
 # Revision 2.3  89/08/25  16:45:58  apratt
 # Added dmaread.o and dmaread.s (needs mac, not as68).
 # 
@@ -30,9 +34,33 @@
 # 880824 kbad	added actions to makefile
 # 880701 kbad	Modified to rely on Mark Williams make control files:
 #
+
+#
+# startup is affected by country, systype, and machine switches:
+# first letter t for TT, e for STe, s for ST.  Systype is the
+# middle letter: a for RAM, o for ROM.  Country is the third
+# letter: u=usa, g=germany, ...
+#
+# dmaread, flop, and clock are affected only by machine switches,
+# and even then there are only two: t for TT and sx for others.
+#
+# bios is affected by machine and country.
+#
+# Set these switches with no spaces.  MACHINE is s, e, or t;
+# TSXMACHINE is sx or t (for dmaread, flop, and clock).
+
+CCODE=u
+MACHINE=t
+TSXMACHINE=t
+
+# that's all you need to set for different machines or countries.
+############
+
 TMPDIR	=	m:
-.SUFFIXES: .o .c .s
-ASM = mas -3 -S -U $*.s
+
+ASM = mas -3 -S $*.s -O=$@
+
+# You can add "-s c:\alcyon\lib\oas68sym.dat" or whatever to the as68 line.
 
 .c.o:
 	cp $*.c $(TMPDIR)
@@ -57,39 +85,19 @@ SFILES	=	xinout.o clear.o
 
 CFILES	=	prtblk.o rwabs.o
 
-allbios.tau:	startup.tau dmaread.tau flop.tau clock.tau bios.tau \
+allbios.$(MACHINE)a$(CCODE):	startup.$(MACHINE)a$(CCODE) \
+			dmaread.$(TSXMACHINE) flop.$(TSXMACHINE) \
+			clock.$(TSXMACHINE) bios.$(MACHINE)$(CCODE) \
 			$(CFILES) $(SFILES)
-		aln -u -q -w -l -o $@ $<
+		aln -u -p -w -l -o $@ $<
 		cp $@ ..\build
 		@echo $@ linked.
 
-allbios.tou:	startup.tou dmaread.tou flop.tou clock.tou bios.tou \
+allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o$(CCODE) \
+			dmaread.$(TSXMACHINE) flop.$(TSXMACHINE) \
+			clock.$(TSXMACHINE) bios.$(MACHINE)$(CCODE) \
 			$(CFILES) $(SFILES)
-		aln -u -q -w -l -o $@ $<
-		cp $@ ..\build
-		@echo $@ linked.
-
-allbios.eau:	startup.eau dmaread.eau flop.eau clock.eau bios.eau \
-			$(CFILES) $(SFILES)
-		aln -u -q -w -l -o $@ $<
-		cp $@ ..\build
-		@echo $@ linked.
-
-allbios.eou:	startup.eou dmaread.eou flop.eou clock.eou bios.eou \
-			$(CFILES) $(SFILES)
-		aln -u -q -w -l -o $@ $<
-		cp $@ ..\build
-		@echo $@ linked.
-
-allbios.sau:	startup.sau dmaread.sau flop.sau clock.sau bios.sau \
-			$(CFILES) $(SFILES)
-		aln -u -q -w -l -o $@ $<
-		cp $@ ..\build
-		@echo $@ linked.
-
-allbios.sou:	startup.sou dmaread.sou flop.sou clock.sou bios.sou \
-			$(CFILES) $(SFILES)
-		aln -u -q -w -l -o $@ $<
+		aln -u -p -w -l -o $@ $<
 		cp $@ ..\build
 		@echo $@ linked.
 
@@ -98,142 +106,56 @@ prtblk.o:	prtblkc.h prtblk.c
 rwabs.o:	portab.h rwabs.c
 
 xinout.o:	xinout.s
-		mas -S -U xinout.s
+		$(ASM)
 
 clear.o:	clear.s
-		mas -S -U clear.s
+		$(ASM)
 
-########
+############
 
-startup.tau:	startup.s
+# any switches.t* will do for these three
+
+dmaread.t:	dmaread.s
 		cp switches.tau switches.s
-		mas -S -U startup.s -O=startup.tau
+		$(ASM)
 
-dmaread.tau:	dmaread.s
+flop.t:		flop.s
 		cp switches.tau switches.s
-		mas -S -U dmaread.s -O=dmaread.tau
+		$(ASM)
 
-flop.tau:	flop.s
+clock.t:	clock.s
 		cp switches.tau switches.s
-		mas -S -U flop.s -O=flop.tau
+		$(ASM)
 
-clock.tau:	clock.s
-		cp switches.tau switches.s
-		mas -S -U clock.s -O=clock.tau
 
-bios.tau:	bios.s
-		cp switches.tau switches.s
-		mas -S -U bios.s -O=bios.tau
+# any switches.s* file will do for these three
 
-########
-
-startup.tou:	startup.s
-		cp switches.tou switches.s
-		mas -S -U startup.s -O=startup.tou
-
-dmaread.tou:	dmaread.s
-		cp switches.tou switches.s
-		mas -S -U dmaread.s -O=dmaread.tou
-
-flop.tou:	flop.s
-		cp switches.tou switches.s
-		mas -S -U flop.s -O=flop.tou
-
-clock.tou:	clock.s
-		cp switches.tou switches.s
-		mas -S -U clock.s -O=clock.tou
-
-bios.tou:	bios.s
-		cp switches.tou switches.s
-		mas -S -U bios.s -O=bios.tou
-
-########
-
-startup.eau:	startup.s
-		cp switches.eau switches.s
-		mas -S -U startup.s -O=startup.eau
-
-dmaread.eau:	dmaread.s
-		cp switches.eau switches.s
-		mas -S -U dmaread.s -O=dmaread.eau
-
-flop.eau:	flop.s
-		cp switches.eau switches.s
-		mas -S -U flop.s -O=flop.eau
-
-clock.eau:	clock.s
-		cp switches.eau switches.s
-		mas -S -U clock.s -O=clock.eau
-
-bios.eau:	bios.s
-		cp switches.eau switches.s
-		mas -S -U bios.s -O=bios.eau
-
-########
-
-startup.eou:	startup.s
-		cp switches.eou switches.s
-		mas -S -U startup.s -O=startup.eou
-
-dmaread.eou:	dmaread.s
-		cp switches.eou switches.s
-		mas -S -U dmaread.s -O=dmaread.eou
-
-flop.eou:	flop.s
-		cp switches.eou switches.s
-		mas -S -U flop.s -O=flop.eou
-
-clock.eou:	clock.s
-		cp switches.eou switches.s
-		mas -S -U clock.s -O=clock.eou
-
-bios.eou:	bios.s
-		cp switches.eou switches.s
-		mas -S -U bios.s -O=bios.eou
-
-########
-
-startup.sau:	startup.s
+dmaread.sx:	dmaread.s
 		cp switches.sau switches.s
-		mas -S -U startup.s -O=startup.sau
+		$(ASM)
 
-dmaread.sau:	dmaread.s
+flop.sx:	flop.s
 		cp switches.sau switches.s
-		mas -S -U dmaread.s -O=dmaread.sau
+		$(ASM)
 
-flop.sau:	flop.s
+clock.sx:	clock.s
 		cp switches.sau switches.s
-		mas -S -U flop.s -O=flop.sau
+		$(ASM)
 
-clock.sau:	clock.s
-		cp switches.sau switches.s
-		mas -S -U clock.s -O=clock.sau
+############
 
-bios.sau:	bios.s
-		cp switches.sau switches.s
-		mas -S -U bios.s -O=bios.sau
+startup.$(MACHINE)a$(CCODE):	startup.s
+		cp switches.$(MACHINE)a$(CCODE) switches.s
+		$(ASM)
 
-########
+startup.$(MACHINE)o$(CCODE):	startup.s
+		cp switches.$(MACHINE)o$(CCODE) switches.s
+		$(ASM)
 
-startup.sou:	startup.s
-		cp switches.sou switches.s
-		mas -S -U startup.s -O=startup.sou
+############
 
-dmaread.sou:	dmaread.s
-		cp switches.sou switches.s
-		mas -S -U dmaread.s -O=dmaread.sou
+# any switches.x?y will do for BIOS (x is machine, y is country)
 
-flop.sou:	flop.s
-		cp switches.sou switches.s
-		mas -S -U flop.s -O=flop.sou
-
-clock.sou:	clock.s
-		cp switches.sou switches.s
-		mas -S -U clock.s -O=clock.sou
-
-bios.sou:	bios.s
-		cp switches.sou switches.s
-		mas -S -U bios.s -O=bios.sou
-
-########
-
+bios.$(MACHINE)$(CCODE):	bios.s
+		cp switches.$(MACHINE)a$(CCODE) switches.s
+		$(ASM)

@@ -1,18 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: lozben $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/08/25 18:46:04 $
+* $Date: 89/08/28 19:03:23 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.23  89/08/28  19:03:23  kbad
+* Fixed(?) bomb handler for all resolutions.  Also fixed a couple of
+* fatfingers at dmaboot. (_diskbufp != _dskbufp !!!)
+*
 * Revision 2.22  89/08/25  18:46:04  lozben
 * Fixed a bug in EsetShift().
-*
+* 
 * Revision 2.21  89/08/25  15:38:36  apratt
 * Added new dma boot code which calls _dmaread, and added _dmaread
 * as XBIOS call $2a.
@@ -291,7 +295,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.22 $
+* $Revision: 2.23 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -395,9 +399,9 @@ dosdate		equ	%0001001001111110 ; Mar 30, 1989
 
 .ifne TT
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$05231989	; date, $MMDDYYYY
+date		equ	$08281989	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001010110111 ; May 23, 1989
+dosdate		equ	%0001001100011100 ; Aug 28, 1989
 .endc
 
 ****
@@ -2536,8 +2540,8 @@ dmab_todone:
 dmab_skip:
 	bne	dmarfail
 	jsr	_resetscsi		; reset the SCSI bus
-; read won; checksum the sector, look for $1234 (bootmagic)
-	move.l	_diskbufp,a0
+* ; read won; checksum the sector, look for $1234 (bootmagic)
+	move.l	_dskbufp,a0
 	clr.w	the_env			; zero our device sequencer
 
 .if TT
@@ -2564,7 +2568,7 @@ dmab_skip:
 * the AUTO folder, etc.).
 	cmp.w	#bootmagic,d1
 	beq	dmafound		; success!
-	move.l	_diskbufp,a0
+	move.l	_dskbufp,a0
 *
 * dmarfail:  DMAread failed or sector isn't bootable ($1234) or didn't
 * change hdv_rw; try the next device.
@@ -3628,7 +3632,7 @@ paes1:	rts
 _term:
 
 	move.b	shiftmd(a5),d7
-	and.w	#$0003,d7
+	and.w	#$0007,d7
 *
 	dc.w	$4eb9		; jsr (not bsr!)
 	dc.l	savp_2		; target address
@@ -3655,11 +3659,22 @@ savp_1:	move.w	(a1)+,(a0)+		; save a word
 	move.b	proc_pc.w,d1
 	subq	#1,d1			; 2 for bus error, 3 for address, etc.
 	bsr	do_shroom
+
+	moveq	#59,d7			; wait a 60 Hz second
+	move.w	#$ffff,-(sp)		; -1 ("error") return condition
+	move.w	#$4c,-(sp)		; GEMDOS function #$4c: Pterm(code)
+	trap	#1			; "terminate process"
 	bra	reseth			; on return, reset system
 
-mindex:		dc.w	100*160,100*160,200*80,200*80
-mcount:		dc.w	3,1,0,0
-mwidth:		dc.w	160,160,80,80
+
+*+
+* do_shroom - draw little mushroom clouds on the screen
+mindex:
+dc.w    100*160,  100*160,  200*80,   0, 240*320,  0, 480*160,   100*320
+*
+*  Discussion:	The graphics ain't all that great.  And this is silly.
+*
+*-
 do_shroom:
 	move.b	sshiftmd.w,d7
 .if TT

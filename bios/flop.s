@@ -4,20 +4,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/15 15:31:18 $
+* $Date: 1991/09/06 14:49:02 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.31  1991/09/06  14:49:02  apratt
+* Removed a lot of comments and log messages.  Removed SLOWACSI
+* conditional -- now we're always SLOWACSI.  Made the "nospindelay"
+* field of the dsb truly conditional on HI_DEN.
+*
+* Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
+*
 * Revision 2.30  91/08/15  15:31:18  apratt
 * In STPAD, do a better "ram test" on the registers in the 1772 before
 * deciding that it's there.  If you just write a value to one register, then
 * read it back, it's possible you'll read what you wrote because of signal
 * persistence, not because the 1772 is there.  So instead we write -1 to trkreg,
 * 0 to secreg, then read them back in order.
-*
+* 
+* 
 * Revision 2.29  91/08/05  15:13:36  apratt
 * Removed nospindelay global; now spin delay is the first byte of the field
 * of the DSB. It has to be first because startup.s sets it for drive 0 when
@@ -88,136 +96,12 @@
 * Revision 2.17  90/08/03  13:22:58  apratt
 * TTOS FINAL RELEASE
 * 
-* Revision 2.16  90/07/19  18:51:14  apratt
-* Removed some leftover debugging code.
-* 
-* Revision 2.15  90/05/22  13:53:33  apratt
-* In go2track, an EQ return from flopcmds doesn't mean success, it
-* only means no timeout; you have to check the error bits in d7
-* to see if the seek-with-verify actually succeeded.  This is why
-* lengthening timeouts caused failure: before, the short timeout
-* expired first, so this code worked.  Now it works anyway.
-* 
-* Revision 2.14  90/05/21  12:21:15  apratt
-* Lengthened timeouts; they were so short they timed out before the
-* 1772 could return record-not-found errors.
-* 
-* Revision 2.13  90/04/30  18:43:55  apratt
-* Added code to check the cookie jar for _FRB the first time alternative
-* RAM is used, rather than counting on the BIOS having found the alt. RAM
-* at boot time.  This lets people call "Maddalt()" and add an _FRB cookie
-* to install new memory (e.g. on the VME bus).
-* 
-* Also removed the first toggle of the direction bit, so it changes
-* either once or twice, not twice or three times.  Makes the ACSI DMA
-* chip happier, and might even allow removal of SLOWACSI code.
-* 
-* Revision 2.12  90/03/01  17:11:39  apratt
-* Oops - end of track is 1400 bytes regular, 2800 high density. Fixed.
-* 
-* Revision 2.11  90/03/01  15:47:26  apratt
-* Changed track leadin on high-density floppies from 60 bytes to 120.
-* Changed track trailer, too: 700 bytes in reg. den., 1400 in high.
-* Reset1770 code had a bug, and rwdelay: fixed.
-* 
-* Revision 2.10  90/02/26  17:10:24  apratt
-* Removed all instruction-dependent timing loops.  The delay at reset1770
-* and rwdelay are done with a trick which assumes that Timer C is still
-* programmed the way BIOS programmed it.  It does NOT assume that
-* the interrupt is actually enabled or that the system interrupt handler
-* is handling it.  (This is in preparation for Mega STe with 16MHz CPU
-* but no extra MFP with its extra timers.)
-* 
-* Revision 2.9  90/02/22  17:50:49  apratt
-* Worked around a MAS PC-relative bug, and added "and.w #3,d0" to
-* mask off the unwanted bits in denselect before using it.
-* 
-* Revision 2.8  89/11/30  11:14:27  apratt
-* Removed a little hi-density debugging code I inadvertently left in.
-* 
-* Revision 2.7  89/11/27  14:48:57  apratt
-* Added support for 1.44MB floppies ifne HI_DEN.  HI_DEN is
-* set to the same value as the TT flag, for now.
-* 
-* Revision 2.6  89/09/22  16:43:05  apratt
-* THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
-* No functional changes from previous revision, which is the last to
-* require Alcyon's AS68 assembler.
-* 
-* Revision 2.5  89/09/07  16:28:11  apratt
-* Added SLOWACSI code.  Seems to work, but I'm not happy with it.
-* 
-* Revision 2.4  89/08/30  15:56:23  apratt
-* Added code to handle floppy I/O with fast RAM.  Calls to ??fast
-* either do a pre-copy and change the buffer address on the stack,
-* or they set up a post-copy using fastbuf and fastcnt.  unfast handles
-* the post-copy, called at the common floppy return point unlok1.
-* 
-* Revision 2.3  89/08/18  14:31:51  apratt
-* Added some calls to clrcache -- putting it at RWABS isn't good enough.
-* 
-* Revision 2.2  89/07/19  14:22:09  apratt
-* Changed all timeouts to use 200Hz, added TT flag, when set,
-* short delays use ttwait rather than instruction loops.
-* 
-* Revision 2.1  89/02/21  17:21:05  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.11  89/02/06  23:07:08  kbad
-* Changed _acctim (last floppy access time) to use video frame counter
-* instead of 200Hz clock.  Safer that way, since floppy WP is checked
-* at vblank time -- this way mediach() will work even if 200Hz is disabled.
-* 
-* Revision 1.10  88/12/22  12:56:27  apratt
-* Added (a5)'s to save some words & some time (as if it mattered in 
-* floppy code...)
-* 
-* Revision 1.9  88/10/12  17:23:15  apratt
-* Added the Floprate call: oldrate = Floprate(devno,newrate) where
-* newrate == -1 if you don't want to change it.
-* 
-* Revision 1.8  88/06/28  16:27:21  apratt
-* Removed extra index information because it made 10-sector
-* formatting not work.  Better to be compatible with our own
-* programs than to try to be compatible with crummy PC drives.
-* 
-* Revision 1.7  88/04/28  16:06:39  apratt
-* Backed out Flopwp XBIOS call... Turned out to be a flop.
-* (I didn't want the Desktop to use this one Flop call, because it's possible
-* that somebody installed an Rwabs-level driver for drives A and B.)
-* 
-* Revision 1.6  88/04/27  13:36:26  apratt
-* Added code to set last-access time of both drives to "long ago"
-* when you change logical disks in a physical drive, so the next call
-* to mediach() won't think it's still in the "grace period."
-* 
-* Revision 1.5  88/04/05  17:45:52  apratt
-* Tested Flopwp call; it returns TRUE when there is no disk in the drive.
-* This can be overcome by doing a READ to make sure there *is* a disk
-* in the drive.  The read should come from GEMDOS (e.g. Fsfirst("A:\\*.*",-1))
-* rather than BIOS to be sure that media change is processed.
-* 
-* Revision 1.4  88/04/04  15:39:24  apratt
-* Didn't do anything: don't know why it was locked.
-* 
-* Revision 1.3  88/03/28  11:45:48  apratt
-* Added check-floppy-state Xbios call.  Can cause "insert other floppy"
-* message, so use this only when you would cause a swap anyway.
-* 
-* Revision 1.2  88/03/25  11:49:50  apratt
-* This version has more index information per Intel controller spec
-* in the format-track code.  THIS IS UNTESTED AND MIGHT NOT WORK.
-* 
-* Revision 1.1  87/11/20  14:23:48  lozben
-* Initial revision
-* 
-*
 * =======================================================================
 *
-* $Revision: 2.30 $
+* $Revision: 2.31 $
 * =======================================================================
 *
-* $Source: /u2/MRS/osrevisions/bios/flop.s,v $
+* $Source: d:/tos/bios\rcs\flop.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -227,58 +111,22 @@
 *	Floppy Disk Driver						:
 *	Copyright 1985, 1986 Atari Corp.				:
 *									:
-*----									:
-* 15-Aug-1986 lmd	Fixed floprd(), now returns CRC error correctly.:
-*									:
-* 15-Apr-1986 lmd	Removed das_boot conditional assembly.		:
-*			Re-write _floprd() to fix CRC/LOST DATA problem.:
-*			Fixed multiple-sector retry problem (retry count:
-*			only applies to current sector.)		:
-*									:
-* 07-Apr-1986 RMS	New feature to _flopfmt -if interlv is a NEG	:
-*			number then 'filler' points to a skew table	:
-*----									:
-* 22-Feb-1985 lmd	Added write-protect and motor-on monitoring.	:
-* 22-Feb-1985 lmd	Substituted format-track for format-disk.	:
-* 23-Feb-1985 lmd	Multiple-sector DMA in _floprd.			:
-* 25-Feb-1985 lmd	_flopwr understands "ccount" (but cannot do	:
-*			multi-sector DMA -- a hardware constraint).	:
-* 25-Feb-1985 lmd	Added "virgin" parameter to _flopfmt		:
-* 27-Feb-1985 lmd	_flopwr() can write an entire track in one	:
-*			revolution of the disk....			:
-* 28-Feb-1985 lmd	_floprd() doesn't do reseek on seek error	:
-*			(it takes too long)				:
-*  4-Mar-1985 lmd	Added "bad sector" return to _flopfmt		:
-*  7-Mar-1985 lmd	Fixed bug in _flopfmt bad sector return		:
-*  8-Mar-1985 lmd	Fixed "floplock" and "flopulok" to save and	:
-*			restore C registers.				:
-* 10-Mar-1985 lmd	Added "disk flip" code (hook to _critic)	:
-* 13-Mar-1985 lmd	If single-floppy system, copy drive 0's write-	:
-*			protect transitions to drive 1.			:
-* 13-Mar-1985 lmd	Set _wplatch after disk flip			:
-* 13-Mar-1985 lmd	Return reasonable error numbers			:
-* 17-Mar-1985 lmd	Added _flopver()				:
-* 21-Mar-1985 lmd	dasBoot assembly switches, default seek rate	:
-* 22-Mar-1985 lmd	format_track sets media change mode to CHANGED	:
-* 22-Mar-1985 lmd	a write to the boot sector sets the media	:
-*			change mode to UNSURE.				:
-* 28-Mar-1985 lmd	Force write-protect to "real time" mode		:
-*			on any exit from the driver.			:
-*  1-Apr-1985 lmd	Moved floppy DSBs to here.			:
-*  1-Apr-1985 lmd	Based variables off of zero-page		:
-*  8-Apr-1985 lmd	Moved flock out of here to public basepage	:
-* 30-Apr-1985 lmd	Disk errors set media-change mode to UNSURE	:
-*  1-May-1985 lmd	Bug in _flopini; mis-use of args on stack	:
-*  6-May-1985 lmd	Set _motoron nonzero on any floppy command.	:
-*			Added _acctim[] timer variables.		:
-*									:
 *------------------------------------------------------------------------
-	text
+
+.text
 
 * TT switch moved to switches.s
 
 .include "switches.s"
 
+* SPARROW and TT are both M68030.
+
+*M68030		equ	(SPARROW | TT)	; normallly, but see below:
+.include "m68030.s"
+
+*
+* There used to be a switch called SLOWACSI which was used when you reset
+* the ACSI chip: with it set, you write one of the values that accomplishes
 * the reset, then delay for four external bus cycles, then write the other
 * value, then delay again.  Now this is unconditional, because it doesn't
 * hurt and it takes a compile-time conditional out of this file.
@@ -323,14 +171,6 @@ QD	equ	0
 * (the "high-density" configuration switch) and test the flag at	*
 * flopcmds: if nonzero, then inhibit the delay.	Since we seek with	*
 * verify, the fact that the read-data line is masked means you can't	*
-* Set SLOWACSI to 1 to introduce delays after (possibly) changing
-* the direction bit in the DMA chip; changing the bit resets the
-* chip, and you can't talk to it for 16 clocks (at 16MHz) after
-* resetting it.  Four non-cacheable reads should be 16 clocks, at
-* least.
-
-SLOWACSI	equ	TT+STPLUS	; set to 1 for TT(?) @check@
-
 HI_DEN		equ	TT+STPLUS	; 1.44MB flag
 * to speed.								*
 *									*
@@ -368,10 +208,10 @@ tcdr		equ	$fffffa00+$23
 	.globl	flock			; floppy/FIFO lock variable
 	.globl	_frclock		; vbl-frame-counter
 	.globl	_nflops			; number of floppy drives attached
-.ifne TT
+	.globl	_critic			; critical error handler
 	.globl	seekrate		; default floppy seek rate
 	.globl	_diskmode		; disk change mode
-.endc
+	.globl	_hz_200			; 200 hz timer ticker
 	.globl	_iamanst		; byte: true if we're on an ST
 .if M68030
 	.globl	clrcache		; clear i & d caches on TT
@@ -400,7 +240,7 @@ e_wp		equ	-13		; write on write-protected media
 e_undev		equ	-15		; unknown device
 e_badsects	equ	-16		; bad sectors on format-track
 e_insert	equ	-17		; insert_a_disk 
-.ifne HI_DEN
+
 
 *------ Floppy state variables in DSB:
 recal		equ	$ff00		; recalibrate flag (in dcurtrack)
@@ -410,7 +250,7 @@ recal		equ	$ff00		; recalibrate flag (in dcurtrack)
 .if HI_DEN
 dspinflag	equ	0		; spinup-delay flag (in hi byte)
 dcurtrack	equ	2		; current track#
-.endc
+ddenflags	equ	4		; density flags (usu 0 or 3)
 dseekrt		equ	6		; floppy's seek-rate
 dsbsiz		equ	8		; (size of a DSB)
 .else
@@ -481,7 +321,7 @@ gpip	equ	mfp+1			; general purpose I/O
 *	 $4(sp)	->buffer (unused)
 *	 $0(sp)	return address
 *
-.ifne STPAD
+* Returns:	EQ if initialization succeeded (drive attached).
 *		NE if initialization failed (no drive attached).
 *
 * This call didn't save any regs before! Now it saves the Alcyon C regs.
@@ -509,7 +349,7 @@ fi_1:	move.w	seekrate,dseekrt(a1)	; setup default seek rate
 	beq	init_noflops		; done initializing if no floppies
 .endc
 
-.endc
+	bsr	floplock		; setup parameters
 	bsr	select			; select drive and side
 
 	bsr	restore			; attempt restore
@@ -517,9 +357,9 @@ fi_1:	move.w	seekrate,dseekrt(a1)	; setup default seek rate
 	moveq	#10,d7			; attempt seek to track 10
 	bsr	hseek1			; (hard seek to 'd7')
 	bne	fi_nok			; (failed: drive unusable)
-.ifne HI_DEN
+	bsr	restore			; attempt restore after seek
 fi_ok:	beq	flopok			; return OK (on win)
-.endc
+fi_nok:	bra	flopfail		; return failure
 
 .if STPAD
 
@@ -580,17 +420,8 @@ fdcprobe:
 	bne	noflop			; no - no floppies
 	cmp.b	#$ff,d0			; still $ff?
 					; (leave ccr set)
-.ifeq SLOWACSI
-*	move.w	#$090,(a6)		; toggle DMA data direction,
-	move.w	#$190,(a6)		;	leave hardware in READ state
-	move.w	#$090,(a6)
-.endc
-.ifne SLOWACSI
-*	move.w	#$090,(a6)
-*	tst.b	gpip
-*	tst.b	gpip
-*	tst.b	gpip
-*	tst.b	gpip
+noflop:
+	movem.l	(sp)+,d0-d7/a6		; restore changed regs
 					; (doesn't affect ccr)
 	eor.w	#4,sr			; flip Z bit
 	rts				; EQ means no floppies
@@ -601,7 +432,6 @@ fdcprobe:
 * Passed (on the stack):
 *	$14(sp) count
 *	$12(sp) sideno
-.endc
 *	$10(sp) trackno
 *	 $e(sp) sectno
 *	 $c(sp) devno
@@ -718,17 +548,8 @@ eb1:	move.w	d1,curr_err.w		; set current error number & return
 * flopwr - write sector	to floppy
 * Passed (on the stack):
 *	$14(sp) count
-.ifeq SLOWACSI
-*	move.w	#$190,(a6)		; toggle DMA chip to clear status
-	move.w	#$090,(a6)
-	move.w	#$190,(a6)		; leave	in WRITE mode
-.endc
-.ifne SLOWACSI
-*	move.w	#$190,(a6)		; toggle DMA chip to clear status
-*	tst.b	gpip
-*	tst.b	gpip
-*	tst.b	gpip
-*	tst.b	gpip
+*	$12(sp) sideno
+*	$10(sp) trackno
 *	 $e(sp) sectno
 *	 $c(sp) devno
 *	 $8(sp)	->DSB
@@ -739,14 +560,13 @@ eb1:	move.w	d1,curr_err.w		; set current error number & return
 *		NE, the write failed (on some sector).
 *-
 _flopwr:
-.endc
 .if STPAD
 	bsr	fdcprobe
 	beq	noflop1			; no floppies!
 .endif
 
 * set the media change mode to "unsure".
-.ifne QD
+	moveq	#e_write,d0		; set default error number
 	bsr	wrfast
 	bsr	floplock		; lock floppies
 
@@ -756,7 +576,7 @@ _flopwr:
 * (Kludge, kludge, kludge....)
 *-
 	move.w	csect.w,d0		; sector 1
-.endc
+	subq	#1,d0
 	or.w	ctrack.w,d0		; track 0
 	or.w	cside.w,d0		; side 0
 	bne	fwr1			; if not boot sector, then OK
@@ -837,7 +657,7 @@ fwr5:	subq.w	#1,retrycnt.w		; decrement retry count
 * Passed (on the stack):
 *	$1a(sp)	initial sector data
 *	$16(sp)	magic number
-.ifne HI_DEN
+*	$14(sp)	interleave		;* if -1 then skew sectors use table
 *	$12(sp)	side
 *	$10(sp)	track
 *	 $e(sp)	spt
@@ -848,7 +668,7 @@ fwr5:	subq.w	#1,retrycnt.w		; decrement retry count
 *
 denok:	move.w	d0,denselect
 * Note: if the number of sectors is less than 13, assume low density;
-.endc
+* else assume high density.  (Don't know of a drive or controller
 * that can handle 12 sectors, but what the heck.)
 *-
 
@@ -904,11 +724,11 @@ noden1:
 	move.w	spt.w,ccount.w		; set number of sectors to verify
 	move.w	#1,csect.w		; starting sector# = 1
 	bsr	verify1			; verify sectors
-.ifne QD
+
 *--- if there are any bad sectors, return /that/ error...
 	move.l	cdma.w,a2		; a2 -> bad sector list
 	tst.w	(a2)			; any bad sectors?
-.endc
+	beq	flopok			; no -- return OK
 	move.w	#e_badsects,curr_err.w	; set error number
 	bra	flopfail		; return error
 
@@ -976,11 +796,11 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	bsr	wmult
 	move.b	#$fe,(a2)+		; $fe -- address mark intro
 	move.b	ctrack+1.w,(a2)+	; track#
-.ifne QD
+	move.b	cside+1.w,(a2)+		; side#
 	move.b	d4,(a2)+		; sector#
 	move.b	#$02,(a2)+		; sector size (512)
 	move.b	#$f7,(a2)+		; write	checksum
-.endc
+
 *--- gap between AM and data:
 	moveq	#22-1,d1		; 22 x $4e
 	moveq	#$4e,d0
@@ -994,17 +814,8 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 
 *--- data block:
 	move.b	#$fb,(a2)+		; $fb -- data intro
-.ifeq SLOWACSI
-*	move.w	#$190,(a6)		; toggle R/W flag and
-	move.w	#$090,(a6)		; select sector-count register
-	move.w	#$190,(a6)
-.endc
-.ifne SLOWACSI
-*	move.w	#$190,(a6)		; toggle R/W flag and
-*	tst.b	gpip
-*	tst.b	gpip
-*	tst.b	gpip
-*	tst.b	gpip
+	move.w	#256-1,d1		; 256 x virgin.W (initial sector data)
+ot2:	move.b	virgin.w,(a2)+		; copy high byte
 	move.b	virgin+1.w,(a2)+	; copy low byte
 	dbra	d1,ot2			; fill 512 bytes
 	move.b	#$f7,(a2)+		; $f7 -- write checksum
@@ -1015,14 +826,14 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 
 	tst.w	interlv.w		; if interlv is NEG use skew table
 	bmi	use_skewtbl		; 
-.endc
+
 	add.w	interlv.w,d4		; bump sector#
 	cmp.w	spt.w,d4		; if(d4	<= spt)	then_continue;
 	ble	ot1			; proto	more sectors this pass
 	add.w	#1,d3			; bump pass start count
 	cmp.w	interlv.w,d3		; if(d3	<= interlv) then_continue;
 	ble	ot3
-.ifne QD
+
 * end-of-track: write 4e into the buffer a lot (1400 in regular density,
 * 2800 in high density.
 
@@ -1032,7 +843,7 @@ end_track:
 	cmp.w	#26,spt.w
 	bhs	etok
 .endif
-.endc
+
 	move.w	#2800,d1		; high-density value
 	cmp.w	#13,spt.w
 	bhs	etok
@@ -1138,18 +949,9 @@ _flopver:
 .endif
 
 	bsr	change			; hack disk change
-.ifeq SLOWACSI
-*	move.w	#$090,(a6)		; toggle R/W (leave in W state)
 	moveq	#e_read,d0		; set default error#
-	move.w	#$090,(a6)
-.endc
-.ifne SLOWACSI
-*	move.w	#$090,(a6)		; toggle R/W (leave in W state)
-*	tst.b	gpip
-*	tst.b	gpip
-*	tst.b	gpip
-*	tst.b	gpip
-	move.w	#$190,(a6)
+	bsr	vrfast
+	bsr	floplock		; lock floppies, setup parameters
 	bsr	select			; select floppy
 	bsr	go2track		; go to track
 	bne	flopfail		; (punt if that fails)
@@ -1159,7 +961,7 @@ _flopver:
 	bra	flopok			; return "OK"
 
 
-.endc
+*+
 * verify1 - verify sectors on a single track
 * Passed:	csect = starting sector#
 *		ccount = number of sectors to verify
@@ -1348,9 +1150,9 @@ floplock:
 	move.w	d0,def_error.w		; set default error number
 	move.w	d0,curr_err.w		; set current error number
 	move.w	#1,flock.w		; tell vbl not to touch floppies
-.ifne TT
+	move.l	8(sp),cdma.w		; cdma -> /even/ DMA address
 	move.w	$10(sp),cdev.w		; save device# (0 .. 1)
-.endc
+	move.w	$12(sp),csect.w		; save sector# (1 .. 9,	usually)
 	move.w	$14(sp),ctrack.w	; save track# (0 .. 39 .. 79 ..)
 	move.w	$16(sp),cside.w		; save side# (0	.. 1)
 	move.w	$18(sp),ccount.w	; save sector count (1..spt)
@@ -1452,10 +1254,10 @@ unlok2:	move.l	(sp)+,d0		; restore return value
 * Jumps-to:	flopcmds
 * Called-by:	_flopfmt, _flopini
 *
-.ifne HI_DEN
+*-
 hseek:	move.w	ctrack,d7		; dest track = 'ctrack'
 hseek1:	move.w	#e_seek,curr_err	; possible error = "seek error"
-.endc
+hseek2:	move.w	#datareg,(a6)		; write destination track# to data reg
 	bsr	wdiskctl
 	move.w	#$10,d6			; execute "seek" command
 	bra	flopcmds		; (without verify...can't fail)
@@ -1465,7 +1267,7 @@ hseek1:	move.w	#e_seek,curr_err	; possible error = "seek error"
 * reseek - home	head, then reseek track
 * Returns:	EQ/NE on success/failure
 * Falls-into:	go2track
-.ifeq HI_DEN
+.if !HI_DEN
 *-
 reseek:
 	move.w	#e_seek,curr_err	; set "seek error"
@@ -1492,7 +1294,7 @@ reseek:
 * go2track - seek proper track
 * Passed:	Current floppy parameters (ctrack, et al.)
 * Returns:	EQ/NE on success/failure
-.endc
+* Calls:	flopcmds
 *-
 go2track:
 
@@ -1528,29 +1330,31 @@ go2bad:
 	move.w	d0,denselect		; write back new value
 	move.w	d0,denselect
 .else
-.ifne HI_DEN
-.ifeq QD
+	tst.b	_iamanst
+.if !QD
 	move.w	d0,denselect
 noden2:
 .endif
-.endc
-.endc
+.endif
+	subq.w	#1,go2count		; decrement failure countdown
 	bne	go2trr			; really failed! (return NE)
 	bsr	restore			; try again, but restore first.
 	bra	go2retry
 
 go2ok:
-.ifne HI_DEN
+.endif
 
 	move.w	ctrack.w,dcurtrack(a1)	; update current track number
 	clr.w	d7			; return EQ for no error
 go2trr:	rts				; return EQ/NE on succes/failure
 
 
-.endc
+*+
 * restore - home head
 * Passed:	nothing
+* Returns:	EQ/NE on success/failure
 * Calls:	flopcmds
+*
 * high-density note: the 1772 restore command returns when TRK00
 * bit is 1.  It doesn't actually read anything.
 *-
@@ -1562,10 +1366,10 @@ restore:
 	eor	#$04,ccr		; flip Z bit (return NE if bit is zero)
 	bne	res_r			; punt if didn't win
 	clr.w	dcurtrack(a1)		; set current track#
-.ifne HI_DEN
+res_r:	rts
 
 * Passed:	d6.w = 1770 command
-.endc
+* Sets-up:	seek bits (bits 0 and 1) in d6.w
 * Falls-into:	flopcmd
 
 .if HI_DEN
@@ -1601,7 +1405,7 @@ flopcm:	bsr	wdiskct6		; write	command	(in d6)
 flopc1:	cmp.l	_hz_200.w,d7
 	blo	flopcto			; (yes,	reset and return failure)
 	btst.b	#5,gpip			; 1770 completion?
-.ifne TT
+	bne	flopc1			; (not yet, so wait some more)
 	bsr	rdiskct7		; return EQ + 1770 status in d7
 	clr.w	d6
 	rts
@@ -1623,7 +1427,7 @@ do_hiden:
 	tst.w	d0			; hi den?
 	bne	padhi1
 
-.endc
+* padlo1: select low density.  This means zeroing bit 7 of PSG port A
 	clr.b	d0			; clear the bit
 	bra	padden1
 padhi1:	move.b	#$80,d0			; set the bit
@@ -1712,7 +1516,7 @@ select1:
 * Returns:	d1 = value written to port A
 *		d2 = old value read from port A
 * Uses:		d1
-.ifne TT
+*-
 setporta:
 	move	sr,-(sp)		; save our IPL
 	or	#$0700,sr		; start	critical section
@@ -1727,7 +1531,7 @@ setporta:
 
 
 *+
-.endc
+* Primitives to	read/write 1770	controller chip	(DISKCTL register).
 *
 * The 1770 can't keep up with full-tilt	CPU accesses, so
 * we have to surround reads and	writes with delay loops.
@@ -1852,20 +1656,28 @@ dmode1:	move.b	(sp)+,(a0,d0.w)		; set drive's mode
 *	  B	 6cf		  a0d		  a53
 *
 * The values that make sense to the 1772 are:
+*
 *     VALUE    LOW-DEN	HIGH-DEN    QUAD-DEN
+*	00	 6 ms	  3   ms     1.5  ms
 *	01	12 ms	  6   ms     3    ms
 *	02	 2 ms	  1   ms     0.5  ms
 *	03	 3 ms	  1.5 ms     0.75 ms
 *
+* This code does not range-check the value you set, or the drive ID:
 * drive zero -> zero, nonzero -> one.
+*
 * FOR HIGH-DENSITY DRIVES:  The seek rate parm is taken to be a LOW-DEN
 * seek rate; when there is a HIGH-DEN disk in the drive, we map the input
 * value to the appropriate 1772 value, with errors on the slow side: 3->0,
 * 2->0, 1->1 (what can you do?), and 0->1. This is done in rtmap in
+* flopcmds.
 *
 * For quad density, all values are mapped to 1 (3ms).  What can you do?
 *
 * New feature: if the rate is -2, that drive's no-spinup-delay flag is set.
+* A rate of -3 clears the flag, and -4 interrogates the current setting. 
+* When the startup sees that you've thrown the configuration switch
+* declaring high-density drives, it sets the no-spinup-delay flag for
 * physical drive 0.  If drive 1 also should not have the spinup-delay flag
 * set, make this call.
 *
@@ -1943,20 +1755,20 @@ getspinup:
 *	eor.b	#7,d0
 *	bsr	setporta	; (d2 = old bits)
 *	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
-.ifeq TT
+.if !TT
 *	sne.b	d0		; d0 = $00 or $ff
 *	move.b	d0,(a0)		; wpstatus = $00 or $ff
 *	move.b	d2,d0		; d0 = old bits
-.endc
+*	bsr	setporta	; restore old select bits
 *
 *	move.w	_wpstatus.w,d0
 *	or.w	d0,_wplatch.w	; (catch WP transitions)
 *	move.b	(a0),d0		; reload the WP status as return value.
-.ifne TT
+*	ext.w	d0
 *	ext.l	d0
 *	rts
 
-.endc
+***********************************************************************
 *
 * code to handle fast vs slow ram:
 *
@@ -2060,9 +1872,9 @@ fmfast:	cmp.l	#MAXACSI,8(sp)
 * routine to get the _FRB cookie if there is one (see cookie jar spec)
 *
 
-.ifne HI_DEN
+getfrb:
 	tst.l	_frb			; already done this?
-.endc
+	bne	gotfrb			; yes, bail out.
 	move.l	_p_cookie,a0		; no; get base of cookie jar
 	cmp.w	#0,a0			; no cookie jar?
 	beq	getf2			; yow! no cookie jar! bail out.

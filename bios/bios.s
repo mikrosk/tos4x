@@ -4,13 +4,18 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/28 02:00:06 $
+* $Date: 1992/02/28 08:25:20 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.46  1992/02/28  08:25:20  apratt
+* Changed TT to M68030 in some places, where it's really CPU dependency we're
+* talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
+* in any other way. (Well, it has the same clock chip.)
+*
 * Revision 2.45  1992/02/28  02:00:06  apratt
 * Added .globl coldboot to export it.
 *
@@ -129,7 +134,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.45 $
+* $Revision: 2.46 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\RCS\bios.s,v $

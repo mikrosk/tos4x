@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.25 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.26 $	$Source: d:/tos/dos\rcs\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/11/20 19:44:04 $    $Locker:  $
+* $Author: unknown $ 	$Date: 1991/12/12 22:51:12 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.26  1991/12/12  22:51:12  unknown
+* Added some prototypes
+*
 * Revision 2.25  1991/11/20  19:44:04  apratt
 * Memory protection, first cut (no workee yet)
 *
@@ -549,9 +552,6 @@ typedef long jmp_buf[3];
 long trap1 _P(( int,... ));
 long trap13 _P(( int,... ));
 long trap14 _P(( int,... ));
-
-void set_pmmu(void);
-void flush_pmmu(void);
 
 int uc _P(( int ));
 voidfn clear _P(( void *start, void *last_plus_1 ));

@@ -3,20 +3,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/11/18 11:04:15 $
+* $Date: 88/12/13 16:12:13 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.18  88/12/13  16:12:13  apratt
+* Added (a5) to lots of otherwise-long accesses, both to low RAM and
+* high I/O space.
+*
 * Revision 1.17  88/11/18  11:04:15  apratt
 * Documented with comments the fact that kstate is now officially
 * fixed just after ikbdsys (which is to say, after the end of
 * the vector list returned by Kbdvbase).  This has always been
 * true; now it's official.  See the comment with "11/18/88" in it
 * for details.
-*
+* 
 * Revision 1.16  88/11/08  15:58:27  kbad
 * Modified keyboard driver so that ISO keyboards can produce correct
 * control keystrokes (previously, control was handled before alt, thus
@@ -81,7 +85,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.17 $
+* $Revision: 1.18 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -899,7 +903,7 @@ bcdbin:
 *	returns true/okay to send = -1,  false/not ready = 0		*
 *									*
 	moveq	#$-1,d0		;pre-set to true
-	move.b	comstat+midi,d2	;grab midi status
+	move.b	comstat+midi(a5),d2	;grab midi status
 	.globl	midiost
 
 midiost:
@@ -921,7 +925,7 @@ midiox:	rts
 *									*
 *************************************************************************
 
-	lea	midi,a1		;point to midi register base
+	lea	midi(a5),a1	;point to midi register base
 
 midiwc:
 	move.w	6(sp),d1
@@ -970,7 +974,7 @@ midp1:
 *	-1 signifies true/okay  0 - signifies false/no characters	*
 *									*
 	lea	mbufrec(a5),a0	;point to midi i/o bufrec
-	lea	midi,a1		;point to midi register base
+	lea	midi(a5),a1	;point to midi register base
 	moveq	#$-1,d0		;set result to true
 
 midstat:
@@ -2425,21 +2429,21 @@ bauddata:
 *************************************************************************
 *	this code handles the midi/keyboard interrupt exception		*
 	movem.l d0-d3/a0-a3/a5,-(sp)	;save all registers (8/16/85 dbg)
-	lea	$0,a5		;address pointer to variable base
+	clr.l	a5
 
 	movea.l	midisys(a5),a2	;load in system midi handler
 
 	movea.l	ikbdsys(a5),a2	;load in system ikbd handler
 	movem.l d0-d3/a0-a3,-(sp)	;save all registers (8/16/85 dbg)
-	btst.b	#$4,gpip+mfp	;check for pending interrupt occurance
+	btst.b	#$4,gpip+mfp(a5) ;check for pending interrupt occurance
 	movea.l	midisys.w,a2	;load in system midi handler
-	bclr.b	#$6,isrb+mfp	;clear in-service bit
+	bclr.b	#$6,isrb+mfp(a5) ;clear in-service bit
 	movem.l (sp)+,d0-d3/a0-a3/a5	;restore all registers
 	btst.b	#$4,gpip+mfp.w ;check for pending interrupt occurance
 	beq.b	keymidi		;repeat this interrupt processing
 *	bclr.b	#$6,isrb+mfp.w ;clear in-service bit
 	lea	mbufrec(a5),a0	;point to midi buffer record
-	lea	midi,a1		;point to midi register base
+	lea	midi(a5),a1	;point to midi register base
 	movea.l vmiderr(a5),a2	;load in the jump vector
 
 vecmidi:
@@ -3364,11 +3368,12 @@ mauskey1:
 	move.l	#$8,a1
 rloop:	move.l	(a0)+,(a1)+
 	dbra	d0,rloop
-	jmp	$8
+	clr.l	a5
+	jmp	$8(a5)
 .endif
 cstart:
 	lea.l	berr(PC),a0
-	move.l	a0,$8
+	move.l	a0,$8(a5)
 	lea.l	cend(PC),a0
 	moveq.l	#0,d0
 	move.l	d0,d1
@@ -3385,7 +3390,7 @@ cloop:	movem.l	d0-d7,(a0)
 	add.w	#(4*8),a0
 	bra	cloop
 	move.l	#$c,a1
-berr:	move.l	$4,a0
+berr:	move.l	$4(a5),a0
 	jmp	(a0)
 cend:	dc.w	0
 
@@ -3670,7 +3675,7 @@ setmouse:
 *	out the timer A input line out...giving software developers	*
 *	another useful aspect of the machine to utilize.		*
 *									*
-	lea	xbtim,a1	;point to timer -> interrupt # translation tab
+*	The recommended usage of the timers is as follows:		*
 *									*
 *	Timer A - Reserved for end-users and stand-alone applications.	*
 *	Timer B - Reserved for screen graphics, primarily.		*
@@ -3867,7 +3872,7 @@ ikbdvecs:
 
 *************************************************************************
 *									*
-	lea	$0,a5		;address pointer to variable base
+	clr.l	a5
 
 *	C Timer interrupt routine to process the PSG sound table	*
 *									*
@@ -3935,19 +3940,19 @@ t_punt:
 *
 *
 *  Programmed by Dave Staugas
-	move.b	d0,giselect		;else, register load command--select this reg
+	move.b	d0,giselect(a5)		;else, register load command--select this reg
 *
 *  To start a sound, load the 32-bit address of the
 *			byte stream for that sound in 32-bit
 *			"cursnd", & zero the 8-bit "timer"
 *
-	move.b	rddata,d0		;get mixer contents
+	move.b	rddata(a5),d0		;get mixer contents
 *   Called from timer C irq
 *
-	move.b	d0,wrdata		;write data
+	move.b	d0,wrdata(a5)		;write data
 	movem.l	a0/d0-d1,-(sp)
 	move.l	cursnd.w,d0		;get current sound ptr
-	move.b	(a0)+,wrdata		;write next byte as data directly to reg
+	move.b	(a0)+,wrdata(a5)	;write next byte as data directly to reg
 	movea.l	d0,a0			;ptr to a0
 	move.b	timer.w,d0		;check delay timer
 	beq.b	snd3			;br over delay timer update if not on
@@ -3972,11 +3977,11 @@ snd3:
 	bra.b	snd3			;go for next command
 sn1:
 	move.b	(a0)+,wrdata.w	;write next byte as data directly to reg
-	move.b	(a0)+,giselect		;129--select register
+	move.b	(a0)+,giselect(a5)	;129--select register
 *
 	add.b	d0,auxd(a5)		;add to aux data
 *
-	move.b	auxd(a5),wrdata		;load reg from data in auxd
+	move.b	auxd(a5),wrdata(a5)	;load reg from data in auxd
 	cmp.b	auxd(a5),d0		;reached end of cycle?
 	bpl.b	snd5			;br if yes--set delay timer
 *

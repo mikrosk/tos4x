@@ -3,19 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/11 11:27:27 $
+* $Date: 89/07/19 14:15:55 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.3  89/07/19  14:15:55  apratt
+* Added TT flag, added call to ttwait in ikbdws, moved ringbel
+* so VDI's bsr to there is closer.  (VDI should really jsr.)
+*
 * Revision 2.2  89/07/11  11:27:27  apratt
 * I broke Rsconf in rev 2.1 (or possibly before).  Now it's fixed.
 * Previously you couldn't ever set RTS/CTS flow control, now you can.
 * Both RTS/CTS and XON/XOFF is documented, but not useful, and Mega ROMs
 * (and possibly earlier) didn't allow it.  See the comments near auxc0.
-*
+* 
 * Revision 2.1  89/02/27  18:13:55  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
 * 
@@ -110,7 +114,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.2 $
+* $Revision: 2.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -157,8 +161,8 @@ FINLAND		equ     5 ***DON'T  CHANGE*** same as swedish keyboard
 NORWAY		equ    11 ***DON'T  CHANGE***
 DENMARK		equ    12
 
-COUNTRY	equ	FRANCE	;set country of origin
-
+COUNTRY	equ	USA	;set country of origin @check@
+TT	equ	0	; set to 1 for TT, zero for ST and STE @check@
 
 
 *	Revision B Upgrades:
@@ -1343,10 +1347,15 @@ ikbdwc:
 ikbdput:
 *
 	move.w	#$3b6,d2	; delay aprox. 1/200 of a sec
+.ifeq TT
 iklp:
 	jsr	ikbdret
 	dbra	d2,iklp
-
+.endc
+.ifne TT
+ikput2:	move.b	(a0),d2		; get a value
+ikput3:	cmp.b	(a0),d2		; changed?
+.endc
 	dbra	d0,ikput2	; yes - load a new value and loop
 ikbdret:
 	rts			;done for now
@@ -1425,16 +1434,6 @@ cwi2:	move	(sp)+,sr
 
 
 	.globl	conoutst
-	.globl	ringbel
-
-ringbel:
-	btst.b	#$2,conterm(a5)
-	beq.b	rgbel
-	move.l	#bellsnd,cursnd(a5)
-	move.b	#0,timer(a5)
-rgbel:
-	rts
-
 
 conoutst:
 	moveq	#-1,d0
@@ -4035,6 +4034,21 @@ snd6:
 	move.l	a0,cursnd(a5)		;update sound ptr
 *
 *  command 129
+*
+	move.b	(a0)+,giselect.w	;129--select register
+	move.b	(a0)+,d0		;get increment step (signed)
+	add.b	d0,auxd.w		;add to aux data
+	move.b	(a0)+,d0		;get terminating value
+	move.b	auxd.w,wrdata.w	;load reg from data in auxd
+	cmp.b	auxd.w,d0		;reached end of cycle?
+	beq.b	snd4			;br if so
+*
+*  still within loop, reset sound pointer to iterate for next irq
+	btst.b	#$2,conterm(a5)
+	subq	#4,a0			;back up sound ptr to repeat this command
+	move.l	#bellsnd,cursnd(a5)
+	move.b	#0,timer(a5)
+snd4:
 	move.l	a0,cursnd.w		;update sound ptr
 snd1:
 	movem.l	(sp)+,a0/d0-d1		;pop stack & exit

@@ -28,7 +28,7 @@
 
 #include "machine.h"
 #include "dispvars.h"
-#include "aesmint.h"
+#include "mintbind.h"
 
 
 EXTERN	WORD	gl_multi;

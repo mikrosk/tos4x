@@ -44,7 +44,8 @@
 #include "objaddr.h"
 #include "windlib.h"
 #include "message.h"
-#include "aesmint.h"
+#include "osbind.h"
+#include "mintbind.h"
 #include "signal.h"
 
 /* FROM DESKMISC.C */
@@ -315,8 +316,10 @@ do_cpt:
 		    goto do_cpt;
 		}
 		
-		if ( !( gl_button & 1 ) )
-		  goto h_2;
+		if ( !( gl_button & 1 ) ) {
+		  message = (w_handle == gl_topw) ? WM_BOTTOMED : WM_TOPPED;
+		  break;
+		}
 
 	        if ( kind & MOVER )
 		{
@@ -324,8 +327,9 @@ do_cpt:
 		  c_clipdraw( pwin, cpt, NULLPTR );
 		  r_set( ( WORD *)&f, 0, gl_hbox,(gl_rscreen.g_w + w - gl_wbox - 6), 10000);
 		  graf_dragbox( w, h, x, y, f.g_x, f.g_y, f.g_w, f.g_h, &x, &y );
-		  if ( ( mx == gl_xrat ) && ( my == gl_yrat ) )
+		  if ( ( mx == gl_xrat ) && ( my == gl_yrat ) ) {
 		    message = 0;
+		  }
 		  else 
 		    message = WM_MOVED;
 		}
@@ -334,12 +338,33 @@ do_cpt:
 	    case W_SIZER:
 	       if ( kind & SIZER )	/* fix 10/21/85	*/
 	       {
+	         GRECT t;
+		 long ssp;
+
 		 obj[cpt].ob_state |= SELECTED;		  
 		 c_clipdraw( pwin, cpt, NULLPTR );
 		 wm_min( pwin, &wm, &hm );
+#if 0
 		 w += pwin->curr.g_w + 1;
 		 h += pwin->curr.g_h + 1;
-		 graf_rubbox( x, y, wm, hm, &w, &h );		/* it uses to be gr_rubwind */
+		 graf_rubbox( x, y, wm, hm, &w, &h );
+#else
+		 wind_get(w_handle, WF_WORKXYWH, &t.g_x, &t.g_y, &t.g_w,
+			  &t.g_h);
+	  	 t.g_x -= x;
+		 t.g_y -= y;
+		 t.g_w -= w;
+		 t.g_h -= h;
+/* kludge: we really ought to make a graf_rubwind AES call, so that
+ * SCREEN can go through trap #2 to get at it. Until we do, we'll have
+ * to make sure we're in supervisor mode before doing this stuff
+ */
+		 ssp = Super(0L);
+		 waitforaes();
+		 gr_rubwind(x, y, wm, hm, &t, &w, &h);
+		 releaes();
+		 Super(ssp);
+#endif
 		 if ( ( mx != cu_xrat ) || ( my != cu_yrat ) )
 		   message = WM_SIZED;
 	       }
@@ -431,7 +456,7 @@ do_cpt:
 		break;
 	      }
 
-h_2:	      if ( w_handle != gl_topw )
+	      if ( w_handle != gl_topw )
 	      {
 		if ( w_handle )		/* Not the top window	*/
 	          message = (kshift & 3) ? WM_BOTTOMED : WM_TOPPED;
@@ -465,7 +490,7 @@ h_2:	      if ( w_handle != gl_topw )
 	    
 	    do
 	    {
-	      if ( buttonset )	/* Genuie ARROW messages	*/
+	      if ( buttonset )	/* Genuine ARROW messages	*/
 	      {
 	        if ( !inside( gl_xrat, gl_yrat, &real ) )
 		  break;

@@ -33,7 +33,7 @@
 
 #include "machine.h"
 #include "dispvars.h"
-#include "aesmint.h"
+#include "mintbind.h"
 #include "signal.h"
 
 #define TCHNG 0

@@ -19,7 +19,7 @@
 #include "machine.h"
 #include "obdefs.h"
 #include "vdidefs.h"
-#include "aesmint.h"
+#include "mintbind.h"
 
 #include "pgem.h"
 #include "pmisc.h"
@@ -103,7 +103,7 @@ GLOBAL WORD	cu_font;	/* current font type used	*/
 				/*  3 = System Font		*/
 				/*  5 = Small Font		*/
 				
-GLOBAL WORD	cu_font_id;	/* current font id (GDOS)	*/	
+GLOBAL WORD	cu_fntid;	/* current font id (GDOS)	*/	
 GLOBAL WORD	cu_wchar;	/* current char width		*/
 GLOBAL WORD	cu_hchar;	/* current char height		*/
 GLOBAL WORD	cu_space;	/* current char space		*/
@@ -496,7 +496,7 @@ s_pntsize( buffer )
 gsx_lfont( buffer )
 	BYTE	*buffer;
 {
-	WORD	id,i,num,type;
+	WORD	id,i,type;
 	BYTE	name[40];
 	LONG	l;
 
@@ -558,8 +558,10 @@ gsx_start()
 
 	if ( aescookie( 0x46534d43L, (LONG *)&l ) )	/* FSMC */
 	{
-	  if ( *l == 0x5F535044L ) /* _SPD */
-	    gl_spd = 1;
+	  if ( (*l++ == 0x5F535044L) && 
+	  (((WORD)(*l >> 16)) >= 0x0411) ) { /* _SPD */
+	    	gl_spd = 1; /* at least Version 4.11 */
+	  }
 	}
 
 	Debug1( "Number of planes is " );
@@ -641,7 +643,7 @@ gsx_start()
 
 	/* Set up current font information, +++ HMK 05/18/93  */
 	cu_font		= IBM;
-	cu_font_id	= gl_fid;
+	cu_fntid	= gl_fid;
 	cu_wchar	= gl_wchar;
 	cu_hchar	= gl_hchar;
 	cu_space	= gl_space;
@@ -757,7 +759,7 @@ WORD	size;
 		if (v_setfont(font_id) != font_id)
 			goto GO_IBM;
 		cu_font = font;
-		cu_font_id = font_id;
+		cu_fntid = font_id;
 		cu_prop = FALSE;
 		cu_spd = TRUE;
 		if (size == -1)
@@ -776,7 +778,7 @@ WORD	size;
 			goto GO_IBM;
 		cu_font = font;
 		cu_prop = TRUE;
-		cu_font_id = font_id;
+		cu_fntid = font_id;
 		if (size == -1)
 			size = (gl_size) ? gl_size : 10;
 		if (gl_spd && (font == GDOS_PROP)) {
@@ -807,7 +809,7 @@ GO_IBM:
 				cu_prop = TRUE;
 			}
 		}
-		cu_font_id = gl_fid;
+		cu_fntid = gl_fid;
 		cu_wchar = gl_wchar;
 		cu_hchar = gl_hchar;
 		cu_space = gl_space;
@@ -817,7 +819,7 @@ GO_IBM:
 
 	case SMALL:		/* small system font */
 		cu_font = font;
-		cu_font_id = 1;
+		cu_fntid = 1;
 		cu_wchar = gl_wschar;
 		cu_hchar = gl_hschar;
 		cu_space = gl_wschar;
@@ -984,7 +986,7 @@ REG	UBYTE *s;
 
 	ip = (WORD *) ad_intin;
 
-	if ((cu_font_id > 1)) {
+	if ((cu_fntid > 1)) {
 		bitstmap = TRUE ;
 		t = ATable;
 		for (i = 0; *s; i++) {

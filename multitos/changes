@@ -1,3 +1,17 @@
+Changes made 6/15/93:
+
+gemctrl.c:
+	Made single clicks on the mover send a WM_BOTTOMED message if
+	the window is on top.
+	Made the sizer code display two lines (giving the work area and total
+	size of the window).
+desktop.c:
+	Changed fntmn_b1 and fntmn_b2 to fntmnb1 and fntmnb2, again
+	thank you DRI.
+apgsxif.c:
+	Changed cu_font_id to cu_fntid to avoid conflicts thanks to
+	DRI's brain dead linker.
+
 Changes made 6/14/93:
 
 desk*.rsc:

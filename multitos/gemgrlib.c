@@ -27,7 +27,7 @@
 #include "machine.h"
 #include "dispvars.h"
 #include "rslib.h"
-#include "aesmint.h"
+#include "mintbind.h"
 #include "gemusa.h"
 
 

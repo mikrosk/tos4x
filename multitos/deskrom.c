@@ -69,12 +69,11 @@
 
 #include "machine.h"
 #include "objaddr.h"
-#include "aesmint.h"
+#include "mintbind.h"
 #include "rslib.h"
+#include "osbind.h"
 #include "gemdos.h"
 
-#undef UBYTE
-#define UBYTE unsigned char
 
 EXTERN	LONG	rs_global;
 EXTERN	LONG	rs_hdr;
@@ -294,9 +293,9 @@ rsc_read( VOID )
 MLOCAL VOID
 die_with_msg( BYTE *s )
 {
-	trap(9, s);
-	trap(9, "Please reboot the machine!");
-	while (!trap13( 1,2 ) );
+	Cconws(s);
+	Cconws("Please reboot the machine!");
+	while (!Bconstat( 2 ) );
 }
 
 #define GLUEHEADERSIZE 12
@@ -391,9 +390,9 @@ LONG rsc_load()
 	     if (vers != (GEMRSVER | 0x80)) {
 #if 0
 					/* wrong version number */ 
-			trap(0x9, "> Incorrect version of GEM.RSC in\r\n");
-			trap(0x9, "> MULTITOS directory. Using ROM\r\n");
-			trap(0x9, "> version of GEM.RSC instead.\r\n");
+			Cconws("> Incorrect version of GEM.RSC in\r\n");
+			Cconws("> MULTITOS directory. Using ROM\r\n");
+			Cconws("> version of GEM.RSC instead.\r\n");
 			Fselect(3000, 0L, 0L, 0L); 
 #endif
 			goto rs_end;
@@ -424,7 +423,7 @@ LONG rsc_load()
 	     {
 						/* read it all in 	*/
 	        dos_lseek( fd, SMODE, 0x0L );
-	        if ( trap( X_READ, fd, rslsize, rsl_hdr ) == rslsize )
+	        if ( Fread( fd, rslsize, rsl_hdr ) == rslsize )
 		{
 	       		;
 		}

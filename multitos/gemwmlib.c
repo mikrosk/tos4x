@@ -50,7 +50,7 @@
 #include "dispvars.h"
 #include "message.h"
 #include "windlib.h"
-#include "aesmint.h"
+#include "mintbind.h"
 #include "gemusa.h"
 
 
@@ -1533,7 +1533,8 @@ wfdagain:
 
 		    setcol( wp, which, (wp->handle == gl_topw) ); 
 
-		    if (wp->status.opened)
+	    /* BUG: iconified windows can't be redrawn, w_clipdraw loses */
+		    if (wp->status.opened && !wp->iconflag)
 		        w_clipdraw( wp, which, (GRECT *)NULLPTR );
 		}
 	    }

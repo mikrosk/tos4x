@@ -71,7 +71,9 @@ EXTERN	WORD	d_multi;
 EXTERN	WORD	win_alliconified;
 
 WORD	all_icontop;	/* "All Iconify" Window is top */
+#ifdef OBSOLETE_CODE
 WORD	icn_whandle;
+#endif
 WORD	d_exit;		/* desktop exit flag	*/
 BYTE	mentable[MAXMENU];
 /*	Arrow keys table	*/
@@ -327,9 +329,10 @@ hd_keybd( key, keystate )
 	BYTE		buffer[14];
 	WORD		i, ctrl;
 	APP		*app;
+#ifdef OBSOLETE_CODE
 	WORD		x,y,w,h;
 	ICONBLK		*iblk;
-
+#endif
 	if ( app = app_key( key ) )
 	{
 	  exec_file( app->a_name, (WINDOW*)0, 0, Nostr );
@@ -474,6 +477,7 @@ hx_1:	  strcpy( wildext, buffer );
 	    up_win( win, TRUE );
 	}
 
+#ifdef OBSOLETE_CODE
 	if ( key == 0x071e )		/* control 6	*/
 	{
 	  icn_whandle = wind_create( MOVE|CLOSE|NAME, 50, 50, 32, 32 );
@@ -502,6 +506,7 @@ hx_1:	  strcpy( wildext, buffer );
 
 	  form_alert( 1, "[1][ Failed to put newdesk | to sleep! ][ OK ]" ); 	
 	}
+#endif /* OBSOLETE_CODE */
 }
 
 
@@ -975,6 +980,7 @@ hd_menu( msgbuff )
 }
 
 
+#ifdef OBSOLETE_CODE
 /*	Handle the special sleep window	*/ 
 
 	VOID
@@ -1011,6 +1017,7 @@ hd_wicon( msgbuff )
 		      &obj->ob_height );   	
 	}
 }
+#endif /* OBSOLETE_CODE */
 
 
 
@@ -1027,11 +1034,13 @@ hd_window( msgbuff )
 	GRECT		pt,px;
 	GRECT		*pc;
 
+#ifdef OBSOLETE_CODE
 	if ( ( icn_whandle != -1 ) && ( msgbuff[3] == icn_whandle ) )
 	{
 	  hd_wicon( msgbuff );
 	  return;
 	}
+#endif /* OBSOLETE_CODE */
 
 	if ( msgbuff[0] != AP_DRAGNDROP && !( win = get_win( msgbuff[3] ) ) )
 	    return;		/* illegal window handle */
@@ -1336,6 +1345,7 @@ actions( VOID )
 
 	  if ( event & MU_BUTTON )
 	  {
+#ifdef OBSOLETE_CODE
 	    if ( ( icn_whandle != -1 ) && ( clicks > 1 ) )
 	    {	
 	      msgbuff[0] = WM_TOPPED;
@@ -1346,6 +1356,9 @@ actions( VOID )
 	      Debug1("NEWDESK: actions: button event\r\n");
 	      hd_button( clicks, kstate, mx, my );
 	    }
+#else
+	      hd_button( clicks, kstate, mx, my );
+#endif
 	  }
 
 	  if ( event & MU_KEYBD )

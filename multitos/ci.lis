@@ -76,7 +76,6 @@ gemsclib.c
 gemshlib.c
 gemsigna.c
 gemstart.s
-gemtcpip.c
 gemvari.c
 gemwmlib.c
 gsx2.s
@@ -93,6 +92,7 @@ mn_index.c
 mn_mbar.c
 mn_menu.c
 mn_popup.c
+mn_slide.c
 mn_submn.c
 mn_tools.c
 mn_tools.h

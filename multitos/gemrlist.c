@@ -13,7 +13,7 @@
 #include "machine.h"
 #include "dispvars.h"
 #include "windlib.h"
-#include "aesmint.h"
+#include "mintbind.h"
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui

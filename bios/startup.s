@@ -3,17 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/12/13 16:35:41 $
+* $Date: 88/12/21 11:01:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.24  88/12/21  11:01:45  apratt
+* Fixed two places where (a5) was used when a5 wasn't clear.
+* Oops.  Also updated some comments before 'reset2' with cleverer
+* reset-handler instructions (just comment change here).
+*
 * Revision 1.23  88/12/13  16:35:41  apratt
 * Added lots of (a5)'s for otherwise-long addresses, both low RAM
 * and high I/O space.
-*
+* 
 * Revision 1.22  88/12/13  14:43:44  apratt
 * Added some code for STPLUS: more proper use of the low-byte-of-video-base
 * register (and an equate for it: dbasell), and DMASND code which works
@@ -129,7 +134,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.23 $
+* $Revision: 1.24 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -936,6 +941,9 @@ reseth:
  endc
 
 
+* because dumb as68 doesn't use the .w addressing form when it could...
+	clr.l	a5			; quick zeropage
+
  ifeq systype-rom
 *+
 *  [ROM based system]
@@ -964,10 +972,9 @@ reset1:
 .endif
 
 ret_1:	bne	reset2			; (invalid -- don't set anything up)
-	move.b	memcntlr,memconf	; initialize memory controller
+	move.b	memcntlr(a5),memconf(a5)	; initialize memory controller
  endc
 *  controller configuration register so that
-
  ifeq systype-rom
 *  the reset-bailout vector has something to
 *  [ROM based system]
@@ -978,10 +985,19 @@ ret_1:	bne	reset2			; (invalid -- don't set anything up)
 *-
 *  NOTE THAT THE "RETURN ADDRESS" IN A6 IS WRONG.  It points to reset2,
 
-*  sake.  The workaround is to return via "jmp $24(a6)"
+.if TT
+	btst.b	#0,ttscu1		; this bit set?
+	beq	reset3			; no, this is a cold boot.
+.endif
+
+	lea	ret_1(pc),a6		; load return addr
+	bra	val_memval		; check memory configuration validity
+*	the code below, starting at reset2.
+	move.b	memcntlr.w,memconf	; initialize memory controller
+reset2:
+
 *+
-reset2:	clr.l	a5			; quick zeropage
-	cmp.l	#resmagic,resvalid(a5)	; is resvalid the magic	number?
+reset2:	cmp.l	#resmagic,resvalid(a5)	; is resvalid the magic	number?
 * if STPAD, read the switches register to learn the state of top closed &
 	move.l	resvector(a5),d0	; d0 = reset bailout vector
 	tst.b	resvector(a5)		; bits 24..31 must be zero
@@ -993,7 +1009,6 @@ reset2:	clr.l	a5			; quick zeropage
 * There is new code elsewhere that makes this less important: bus error etc.
  endc
 
-
 	move.w	conf_switches,d0	; get conf switches & buttons.
 	cmp.b	#$fc,d0			; check just top-closed and power.
 	beq	resv2			; if both are down, clobber resvalid
@@ -1001,7 +1016,8 @@ reset2:	clr.l	a5			; quick zeropage
 	and.b	#%00000110,d0		; test for both STylus buttons
 	bne	resv1			; if either is up, don't clobber
 	cmp.l	#resmagic,resvalid.w	; is resvalid the magic	number?
-reset3:	lea	giselect,a0		; a0 -> giselect, giwrite-2
+reset3:	clr.l	a5			; reset handler might have hit a5
+	lea	giselect(a5),a0		; a0 -> giselect, giwrite-2
 	move.l	resvector.w,d0		; d0 = reset bailout vector
 .if (M68030 == 0)
 	move.b	#$e,(a0)		; deselect disks
@@ -1067,7 +1083,6 @@ notpal:	lea	color0(a5),a1		; a1 ->	hardware reg
 sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 	dbra	d0,sysic1		; (loop for more colors)
 * controller, and tells other things besides: the byte at 8006 (or the high
-	clr.l	a5			; quick zeropage
 	move.b	memcntlr(a5),d6		; d6 = memory controller configuration
 	move.l	phystop(a5),d5		; d5 ->	(possible) top of physical mem
 * On Sparrow, detected cold boot.  So determine memory size.
@@ -1165,14 +1180,15 @@ mt_done:
 *  Clear memory from $400 to 'd5' (phystop).
 	cmp.l	#$01000000,a0		; was there any RAM at all?
 *-
+	clr.l	a5
 	move.l	d5,d0			; d0 = phystop - 32K
 	sub.l	#$8000,d0
 	lsr.w	#8,d0
-	move.b	d0,dbasel		; dbasel = d0 >> 8
+	move.b	d0,dbasel(a5)		; dbasel = d0 >> 8
 	swap	d0
-	move.b	d0,dbaseh		; dbaseh = d0 >> 16
+	move.b	d0,dbaseh(a5)		; dbaseh = d0 >> 16
  .ifne STPLUS
-	clr.b	dbasell
+	clr.b	dbasell(a5)
  .endc
 	move.l	d5,a0			; start at the end
 	move.l	#$400,d4		; where to end
@@ -1692,8 +1708,8 @@ nullenv: dc.b	0,0			; null string (and enviroment)
 *-
 dmaboot:
 	moveq	#0,d7		; start with dev #0
-	clr.l	a4
-dmb_1:	bsr	dmaread		; attempt to read boot sector
+dmb_1:	clr.l	a4		; quick zeropage (inside loop!)
+	bsr	dmaread		; attempt to read boot sector
 	bne	dmb_2		; (failed -- try next dev)
 	move.l	_dskbufp(a4),a0	; a0 -> disk buffer
 	move.w	#$00ff,d1	; checksum $100 words
@@ -1727,7 +1743,7 @@ dmb_2:	add.b	#$20,d7		; next devno
 * Changed 5/88 by Allan Pratt: always retry the operation on a read error.
 * This is because some removable media signal media change this way.
 * This code does NOT retry on a timeout from the DMA or drive controller.
-* (Should it? TBD.)
+* (Should it? TBD.) (This code uses a4 as quick zeropage, not a5.)
 *-
 dmaread:
 	moveq	#1,d5		; set for two iterations (dbra at end)
@@ -2616,9 +2632,9 @@ f5r:	rts
 _setpalette:
 	move.l	4(sp),colorptr.w	; set software pointer
 _term:
-	bsr	savp_2			; stack PC
-	nop				; (never executed)
-savp_2:	move.l	(sp)+,proc_pc(a5)	; save bogus PC + exception number
+	jsr	savp_2			; stack PC, then zero hi byte of PC
+savp_2:	clr.l	a5
+	move.l	(sp)+,proc_pc(a5)	; save bogus PC + exception number
 	movem.l	d0-d7/a0-a7,proc_regs(a5) ; common registers
 	move.l	usp,a0			; save USP
 	move.l	a0,proc_usp(a5)

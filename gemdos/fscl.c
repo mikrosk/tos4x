@@ -1,12 +1,18 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 10:56:38 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.20  1991/06/20  10:56:38  apratt
+* Added new media-change code from other GEMDOS.  When media-change
+* state is 1, clean buffers are invalidated.  Thus changing disks
+* can only get you in trouble if you have files open (because if
+* you have no files open there are no dirty buffers).
+*
 * Revision 2.19  1991/06/18  17:52:02  apratt
 * Updated to DB release 3 (new print)
 *
@@ -51,6 +57,81 @@
 * 
 *************************************************************************
 */
+
+/*
+ * Media-change processing (new as of 6/91):
+ * 
+ * A long-time complaint about the ST is that you can use a disk in one machine,
+ * pop it out, modify it elsewhere, and put it back in the original machine, and
+ * the result is that old cached info about the disk is used.  This is because
+ * the only indication of media-change is the serial number on the disk, and it
+ * doesn't change in this case.  Furthermore, all PC disks with a given vendor
+ * ID appear to have the same serial number, so you always get in trouble when
+ * using multiple disks formatted on the same PC.
+ * 
+ * The action on seeing "media definitely changed" has always been to invalidate
+ * all buffers on that drive and close/invalidate all handles.  Thus, if you
+ * have open handles with dirty buffers and you change media, you lose.  But
+ * if the media state is "maybe changed" an actual read operation is done to
+ * determine the true state.  If the true state is "not changed" then cached
+ * buffers and handles are kept.
+ * 
+ * The rationale for keeping cached buffers valid across the "maybe changed"
+ * state of the media is twofold: first, write-protected media goes "maybe
+ * changed" all the time, and second, it gives you a "second chance:" you can
+ * pop a disk (forcing the state to "maybe changed"), then put that same disk
+ * back in and not lose your cached buffers or handles.  This is crucial in one
+ * case: a write to write-protected media should give the user a chance to see
+ * the critical error box, pop the media, write-enable it, and put it back in
+ * without losing his files.
+ * 
+ * A way to maintain this "second chance" but also to avoid using stale data
+ * when a disk has been changed elsewhere, or when multiple disks have the same
+ * "serial number" (vendor ID on PC disks) is to invalidate CLEAN buffers when
+ * "maybe changed" is seen.  This never results in loss of data, only loss of
+ * time to re-read data which is still valid.  The possible situations are:
+ * 
+ *     1. Media and serial number changed,
+ *     2. Media truly unchanged,
+ *     3. Media appears unchanged but is truly changed.
+ * 
+ * In case 1, there is no change in media-change processing. In case 2,
+ * invalidating clean buffers results in losing the time savings involved in
+ * having a cache, but never results in losing data.  In case 3, invalidating
+ * clean buffers results in (correctly) forgetting about stale data.
+ * 
+ * By not invalidating DIRTY buffers we maintain the "second chance."  However,
+ * this does expose us to stale data in the following circumstances:
+ * 
+ *     1. Start with a good disk, media definitely not changed. 
+ *     2. Fcreate a file or Fopen one for writing. 
+ *     3. Fwrite the file, creating dirty cache buffers. 
+ * 
+ *     4. Remove the disk, replace it with another that has the same serial 
+ *        number. 
+ * 
+ *     5. Fclose the file.  Clean buffers will be invalidated because the
+ *        media-change state is "maybe" but the dirty buffers will not be
+ *        invalidated.  The dirty buffers will be written to this new disk and
+ *        you will be sorry.
+ * 
+ * This is no worse than the old way, and it is substantially better: the only
+ * way to get stale data is to have open files on a disk, pop it out, and put in
+ * a different (or changed) disk with the same serial number.  Previously, you
+ * could get burned even without open files.
+ * 
+ * Note that we don't bother checking for the maybe-changed state if we're
+ * about to write a dirty buffer to the disk anyway, i.e. in flush() and
+ * flushall() and so on.  If you write a dirty buffer then either you're in
+ * state 1 above, in which case you get e_change, or you're in state 2, in
+ * which case you get success, or in state 3, in which case you're going to
+ * trash the media anyway and invalidating clean buffers won't save you.
+ *
+ * This new code is conditional on NEW_MC in this file.
+ * 
+ */
+
+#define NEW_MC 1
 
 #include "fs.h"
 
@@ -108,14 +189,40 @@ uint dev;
     }
 }
 
+#if NEW_MC
 /*
- *  Flush a buffer
+ * New media-change processing: when the state is "maybe changed" we
+ * invalidate all clean buffers on this drive.  See the rationale in the
+ * comments at the top of the file.
+ */
+
+invclean(xdev)
+int xdev;
+{
+    REG int dev;
+    REG BCB *p;
+    REG BCB **pp;
+
+    dev = xdev;
+    for (pp = &bufl[0]; pp < &bufl[2]; pp++) {
+	for (p = *pp; p; p = p->b_link) {
+	    if (p->b_bufdrv == dev && p->b_dirty == 0) {
+		p->b_bufdrv = -1;
+	    }
+	}
+    }
+}
+#endif
+
+/*
+ * Flush a buffer.
  *
- *  5/90: flush is only called from this source file (fscl.c), and it's
- *  only called when the buffer in question is actually dirty.  Therefore
- *  it doesn't check the validity or dirtiness of the buffer.
+ * Flushing any buffer writes all buffers on that drive and that list.
  *
- *  Flushing any buffer writes all buffers on that drive and that list.
+ * NEW_MC note: we do NOT handle the "maybe changed" state here; since
+ * you're writing to the disk in any case, it's too late to consider that
+ * you might want to invalidate clean buffers.
+ *
  */
 
 voidfn
@@ -231,6 +338,11 @@ DMD *dmd;
 	strt += dmd->m_recdata;
 	end = strt+num;
 
+#if NEW_MC
+	/* first, invalidate all clean buffers if read and "maybe changed" */
+	if (rwflag == 0 && (trap13(9,d) == 1)) invclean(d);
+#endif
+
 	/* flush all data blocks which overlap this write */
 	for (b = bufl[1]; b; b = b->b_link) {
 	    if ((b->b_bufdrv == d) &&
@@ -334,6 +446,22 @@ BCB **pbcb;
 	q = lastq;
     }
 
+#if NEW_MC
+    /*
+     * Cache miss.  Before writing the victim or reading the block, call
+     * mediac() to see if the media "maybe changed."  If it is "maybe" and
+     * we don't check now, we'll never see it and we won't invalidate clean
+     * buffers.  We only care about the "maybe" state here; the longjmp in
+     * rwabs takes care of "definitely."
+     *
+     * Note: b is a victim.  If b is valid & dirty, we're going to write it
+     * to its drive, and possibly lose the "maybe changed" state on that
+     * drive.  That's OK; since we're writing, it's too late to worry about
+     * invalidating clean buffers.
+     */
+
+    if (trap13(9,dmd->m_drvnum) == 1) invclean(dev->m_drvnum);
+
     /* 
      * b is last buf or empty buf, q is link field of b's prev.
      * The label doio is used to actually do the I/O when there's a
@@ -363,7 +491,7 @@ doio:
 	/* &b appears in this DBCMD so it doesn't go in a register. */
 	/* I only hope it goes in (- `a6 4) since it's the first auto. */
 	rwabs(0,b->b_bufr,1,recn,dmd->m_drvnum);
-	DBCMD(0x400,"print did read;bcb (lpeek (`a6 - 4)) `bufdump;_c");
+	DBCMD(0x400,(&b,"print did read;bcb (lpeek (`a6 - 4)) `bufdump;_c"));
     }
     else {
     	DBCMD(2,"print 'did not read; dont really need to';_c");

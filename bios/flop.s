@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/12 19:41:34 $
+* $Date: 1991/10/03 17:53:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.33  1991/10/03  17:53:24  apratt
+* Added code for high-density selection on STPAD, which is different from
+* other high-density select code.
+*
 * Revision 2.32  1991/09/12  19:41:34  apratt
 * Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
 * So we use (TT == 0) instead.  Sigh.
@@ -102,7 +106,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.32 $
+* $Revision: 2.33 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $
@@ -670,7 +674,12 @@ fwr5:	subq.w	#1,retrycnt.w		; decrement retry count
 *	 $4(sp)	dma address
 *	 $0(sp)	[return]
 *
-denok:	move.w	d0,denselect
+* Returns:	EQ: track successfully written.  Zero.W-terminated list of
+*		bad sectors left in buffer (they might /all/ be bad.)
+*
+*		NE: could not write track (write-protected, drive failure,
+*		or something catastrophic happened).
+*
 * Note: if the number of sectors is less than 13, assume low density;
 * else assume high density.  (Don't know of a drive or controller
 * that can handle 12 sectors, but what the heck.)
@@ -1290,8 +1299,12 @@ reseek:
 	bsr	flopcmds		; seek w/o verify (can't fail)
 
 * a seek with no verify can't fail! Why do we bother to check?
+
+	bne	go2trr			; return error on seek failure
+
+* at this point we don't really know that dcurtrack is 5 - the seek could
 * have failed and we wouldn't know.
-	move.w	d0,ddenflags(a1)	; to control register and to dsb
+
 	move.w	#5,dcurtrack(a1)	; set current track#
 
 *+
@@ -1372,9 +1385,15 @@ restore:
 	clr.w	dcurtrack(a1)		; set current track#
 res_r:	rts
 
+
+
+*+
+* flopcmds - floppy command (or-in seek	speed bits from	database)
 * Passed:	d6.w = 1770 command
 * Sets-up:	seek bits (bits 0 and 1) in d6.w
 * Falls-into:	flopcmd
+* Returns:	EQ/NE on success/failure
+*-
 
 .if HI_DEN
 .if (QD == 0)
@@ -1398,6 +1417,33 @@ nomap:
 .endif
 
 	or.b	d0,d6			; OR the rate into the command
+.if HI_DEN
+	or.b	dspinflag(a1),d6	; OR in the spinup flag
+.endif
+
+*+
+* flopcmd - execute 1770 command (with timeout)
+* Passed:	d6.w = 1770 command
+*
+* Returns:	EQ/NE on success/failure
+*		d7 = 1770 status bits
+*
+*-
+flopcmd:
+	bsr	do_hiden
+.if (TT | SPARROW)
+	move.w	ddenflags(a1),denselect
+.else
+	tst.b	_iamanst
+	bne	noden3
+	move.w	ddenflags(a1),denselect
+noden3:
+.endif
+.endif
+.endif
+
+	move.l	_hz_200.w,d7
+	add.l	#timeout,d7		; setup	timeout	count (assume short)
 	move.w	#cmdreg,(a6)		; select 1770 command register
 	bsr	rdiskctl		; read it to clobber READY status
 	btst	#7,d0			; is motor on?

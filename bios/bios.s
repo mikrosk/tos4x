@@ -3,17 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/20 15:45:17 $
+* $Date: 89/07/27 18:01:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.5  89/07/27  18:01:56  apratt
+* Added kcl_hook and bell_hook usage here (usu. they're def_click
+* and def_bell).
+*
 * Revision 2.4  89/07/20  15:45:17  apratt
 * Added code to initialize TTMFP (to totally disabled) and make
 * its interrupt vectors start at $140, right after STMFP.
-*
+* 
 * Revision 2.3  89/07/19  14:15:55  apratt
 * Added TT flag, added call to ttwait in ikbdws, moved ringbel
 * so VDI's bsr to there is closer.  (VDI should really jsr.)
@@ -118,7 +122,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.4 $
+* $Revision: 2.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -188,8 +192,9 @@ osconf		equ	%11001
 *-
 	.globl	_iamanst		;nonzero when you are ST, not STe
 	.globl	reseth			;used by keyboard-reset routine (AKP)
+	.globl	_timr_ms		;timer C calibration
+	.globl	etv_timer		;system timer handoff vector
 	.globl	_hz_200			;timer c raw tick
-
 .if TT
 	.globl	ttwait			;wait for some time
 .endif
@@ -2726,14 +2731,18 @@ ari18	cmpi.b	#$c7,d0		;is it a "home" break-code?
 	move.b	d1,keyrep.w
 	move.b	d1,kdelay1.w
 	move.b	d1,kdelay2.w
-ari18a	btst.b	#KBALT,kbshift(a5)	;early "ALT" test to prevent double "nulls"
+ari18a	btst.b	#KBALT,kbshift(a5) ;early "ALT" test to prevent double "nulls"
 ari18:	cmpi.b	#$c7,d0		;is it a "home" break-code?
 	beq.b	ari18a		;yes...allow it to pass
 ari16	btst.b	#0,conterm(a5)
 	bne	ari14		;no...regular break junk...
-	move.l	#keyclk,cursnd(a5)
-	move.b	#0,timer(a5)
 ari18a:	btst.b	#KBALT,kbshift.w ;early "ALT" test to prevent double "nulls"
+	beq	ari14		;no ALT...so exit now...
+
+	move.l	kcl_hook(a5),a1
+	beq.b	ari16a		;no click please!
+
+* key click: go through the hook (as of 7/89); normally def_click.
 ari16a	move.l	a0,-(sp)	;store kbufrec pointer
 	move.l	kcl_hook.w,a1
 	jsr	(a1)
@@ -3325,6 +3334,12 @@ ari14z	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
 	btst.b	#$3,conterm.w
 ari14	rts
 	andi.l	#$00ffffff,d0	;mask off KBSHIFT byte portion..."sigh"
+ari14z:	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
+	move.l	d0,0(a2,d1.l)	;store the data
+	move.l	#keyclk,cursnd(a5)
+	move.b	#0,timer(a5)
+
+	.globl	def_click
 def_click:
 	move.l	#keyclk,cursnd.w
 	move.b	#0,timer.w
@@ -4062,6 +4077,12 @@ snd6:
 *  still within loop, reset sound pointer to iterate for next irq
 	btst.b	#$2,conterm(a5)
 	subq	#4,a0			;back up sound ptr to repeat this command
+	bra.b	snd4			;update ptr & exit
+*
+*  set delay timer
+*
+snd5:
+	move.b	(a0)+,timer.w		;set delay timer from next byter in stream
 	move.l	#bellsnd,cursnd(a5)
 	move.b	#0,timer(a5)
 snd4:

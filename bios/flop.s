@@ -1,29 +1,25 @@
-****
-* PAD NOTE: inexplicably, you get a bus error writing to 8604 in
-* the prototype PADs we've got on 2/28/91, even when you DO have
-* an ACSI DMA chip.  So we catch that case, too, even though it
-* "shouldn't happen."
-****
-
 .super
 ******************* Revision Control System *****************************
 *
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/03/27 12:36:54 $
+* $Date: 91/04/11 12:12:05 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.23  91/04/11  12:12:05  apratt
+* Changed MAXACSI for TT to 10MB, not 4MB.  Should it be 10 for STe?
+*
 * Revision 2.22  91/03/27  12:36:54  apratt
 * Added a check for the dma chip and the 1772 if STPAD.  The missing-ACSI-chip
 * test is only necessary for prototype PADs, and may go away soon.
-*
-* Made fast-ram handling (actually non-ACSI-ram) happen for any machine.
-*
+* 
+* Made fast-ram handling (actually non-ACSI-ram) happen for any machine.  
+* 
 * Revision 2.21  90/11/20  18:20:27  apratt
 * Removed the one place that reads the denselect register: it's
 * WRITE ONLY in Mega STE.  It's shadowed anyway in the DSB, so
@@ -173,7 +169,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.22 $
+* $Revision: 2.23 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1762,7 +1758,11 @@ getspinup:
 *	eor.b	#7,d0
 *	bsr	setporta	; (d2 = old bits)
 *	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
+.ifeq TT
 *	sne.b	d0		; d0 = $00 or $ff
+*	move.b	d0,(a0)		; wpstatus = $00 or $ff
+*	move.b	d2,d0		; d0 = old bits
+.endc
 *
 *	move.w	_wpstatus.w,d0
 *	or.w	d0,_wplatch.w	; (catch WP transitions)

@@ -4,21 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/10/15 12:04:40 $
+* $Date: 90/11/12 16:23:51 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.60  90/11/12  16:23:51  apratt
+* Changed date & version number, changed code to test result of
+* _iclock correctly, and added code to clobber Timer A after
+* the boot-up sequence is done with it (for compatibility with
+* programs that do enabling steps in an unsafe order).
+*
+* the boot-up sequence is done with it (for compatibility with
+* programs that do enabling steps in an unsafe order).
+* 
 * Revision 2.59  90/10/15  12:04:40  apratt
 * Changed all version numbers, and changed all dates to Oct 12, 1990.
-*
+* 
 * Also removed PC-relative addressing because MAS has a bug: PC-relative
 * addressing to a label that's BEFORE the PC, with arithmetic, generates
-* incorrect code.  Example: "move.b label+1(PC),d0" when 'label' is before
-* the current PC generates "move.b label+3(PC),d0"
-*
 * incorrect code.  Example: "move.b label+1(PC),d0" when 'label' is before
 * the current PC generates "move.b label+3(PC),d0"
 * 
@@ -39,7 +45,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.59 $
+* $Revision: 2.60 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -103,21 +109,21 @@ DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
-version		equ	$0202		; version number
-date		equ	$10121990	; STPLUS date, $MMDDYYYY @check@
+version		equ	$0203		; version number
+date		equ	$11121990	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101001100 ; October 12, 1990
+dosdate		equ	%0001010101101100 ; November 12, 1990
 .else
 .ifne TT
-version		equ	$0302		; version number (need not be even)
-date		equ	$10121990	; TT date, $MMDDYYYY @check@
+version		equ	$0303		; version number (need not be even)
+date		equ	$11121990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101001100 ; October 12, 1990
+dosdate		equ	%0001010101101100 ; November 12, 1990
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
 version		equ	$0144
-date		equ	$10121990
+date		equ	$11121990
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101001100 ; October 12, 1990
+dosdate		equ	%0001010101101100 ; November 12, 1990
 .endc
 .endc
 
@@ -2020,10 +2026,10 @@ nostop:
 .if M68030
 	jmp	_term			; jmp to bomb handler
 .else
-* by AKP and KBAD 11/2/88.  Note that _iclock returns Carry Set on error.
+* 					; jump to non-TT bomb handler
 	jmp	_term+$08000000		; strange but true!
-	bcc	noikbdclk		; if cc, don't bother with ikbd
-	bsr	gettime			; but if cs, get IKBD time
+.endif
+
 priv2:
 
 
@@ -2032,6 +2038,16 @@ priv2:
 * NOW WE'RE COOKING!
 *	Initialize GEMDOS;
 *	Set system date to date the system was built;
+*	Initialize clock chip;
+*	Attempt to boot from floppy;
+* [rom]	Attempt to boot from the DMA bus (hard disk or network);
+*	if (_cmdload) is nonzero, then exec COMMAND.PRG from boot volume
+*		(turns on the cursor first);
+*	otherwise, exec \AUTO\*.PRG;
+*	kludge up an enviroment string;
+*	exec the desktop;
+*	if the desktop ever exits to us (or COMMAND.PRG exits)
+*		then go back to RESETH and start over ....
 *
 
 .if crcstride == 4

@@ -1,15 +1,19 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.7 $	$Source: fscl.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:29:54 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/01/23 17:09:42 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.8  1991/01/23  17:09:42  apratt
+* Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
+* d_scan, m_fatofd, m_ofl, and d_dirfil.
+*
 * Revision 2.7  91/01/23  14:29:54  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 
@@ -46,7 +50,6 @@ int drv;
     dm->m_dtl = MGET(DND);
 
     dm->m_dtl->d_ofd = MGET(OFD);
-    dm->m_fatofd = MGET(OFD);
     return dm;
 }
 
@@ -60,7 +63,6 @@ log(b,drv)			/* log in a media b on drive drv */
 BPB *b;
 int drv;
 {
-  OFD *fo;
   OFD *f;
   DND *d;
   DMD *dm;
@@ -100,17 +102,11 @@ int drv;
   ncl = (n + cs - 1)/cs;
   d->d_strtcl = f->o_strtcl = -1 - ncl;
   fcl = (fs + cs - 1)/cs;
-  fo = dm->m_fatofd;			/* fat "file" */
-  fo->o_strtcl = d->d_strtcl - fcl;
-  fo->o_dmd = dm;
-  dm->m_recoff[0] = b->fatrec - (fo->o_strtcl * cs);
+  dm->m_recoff[0] = b->fatrec - ((d->d_strtcl - fcl) * cs);
   dm->m_recoff[1] = (b->fatrec + fs) - (d->d_strtcl * cs);
   
   /* 2 is first data cluster */
   dm->m_recoff[2] = b->datrec - (2 * cs);
-  fo->o_bytnum = 3;
-  fo->o_curbyt = 3;
-  fo->o_fileln = fs * rsiz;
   
   return (0L);
 }

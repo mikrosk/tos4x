@@ -1,15 +1,19 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.7 $	$Source: sup.c,v $
+* $Revision: 2.8 $	$Source: sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:30:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 17:08:56 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.8  91/01/23  17:08:56  apratt
+* Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
+* d_scan, m_fatofd, m_ofl, and d_dirfil.
+*
 * Revision 2.7  91/01/23  14:30:36  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 
@@ -202,8 +206,8 @@ DND *d;
 {
 REG	int i;
 
-	if (d->d_left) freetree(d->d_left);
-	if (d->d_right) freetree(d->d_right);
+	if (d->d_child) freetree(d->d_child);
+	if (d->d_next) freetree(d->d_next);
 	if (d->d_ofd) xmfreblk(d->d_ofd);
 	for (i = 0; i < NCURDIR; i++)
 		if (dirtbl[i] == d) dirtbl[i] = 0;
@@ -596,8 +600,6 @@ long rc;
 	 */
 	dn = drvtbl[drv]->m_dtl;
 	offree(drvtbl[drv]);
-	if(drvtbl[drv]->m_fatofd)
-		xmfreblk(drvtbl[drv]->m_fatofd);
 
 	for (i = 0; i < NCURDIR; ++i)
 	    if (diruse[i] &&

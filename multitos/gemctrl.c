@@ -506,11 +506,10 @@ hctl_rect( mx, my )
 
 	  if ( idtopd( gl_kbid )->p_mobj != -1 )
 	  {
-	    xdo_chg( mn_addr, idtopd( gl_kbid)->p_mobj, CHECKED, TRUE, FALSE, TRUE );
-
 	    /* clean up all the check mark in the menu */
 	    for( i = 0; i <= obj[0].ob_tail; i++ )
 	      xdo_chg( obj, i, CHECKED, FALSE, FALSE, TRUE  );
+	    xdo_chg( mn_addr, idtopd( gl_kbid)->p_mobj, CHECKED, TRUE, FALSE, TRUE );
 	  }
 	  kill = FALSE;		/* assume we will not kill the process */
 

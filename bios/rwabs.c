@@ -4,17 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/20 17:02:21 $
+* $Date: 88/04/22 15:30:11 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 1.5  88/04/22  15:30:11  apratt
+* Went back to 5-sector FATs thanks to a bug in the dual-drive code
+* (that is, the logical A/B code for single-drive systems).  I don't
+* know what the bug is yet, but it causes big trouble with differing
+* FAT sizes.  This explains why PC disks don't always work on ST's.
+* 						-- Allan
+*
 * Revision 1.4  88/04/20  17:02:21  apratt
 * Added initializing bflags in getbpb to zero -- 12-bit FATs.
 * (Previously, this field went uninitialized... Just lucky, I guess.)
-*
+* 
 * Revision 1.3  88/04/05  17:47:24  apratt
 * Removed unsigned declarations (they don't work in old Alcyon)
 * 
@@ -28,7 +35,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 1.4 $
+* $Revision: 1.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -45,6 +52,11 @@
  * (C)1985 Atari Corp.
  *
  *----
+ * 22-Apr-1988 akp	Changed back to 5 sec/FAT because of big bug
+ *			in the dual-logical-to-lone-physycal mapping code.
+ *			Haven't found the bug itself, but this sure
+ *			manifested it.  This also explains why PC disks
+ *			don't always work on ST's.
  * 26-Feb-1988 akp	Changed boot params to match MSDOS better.
  *			Floppies get 3 sec/FAT, media byte F9.
  *			Also changed to look for a boot sector on floppy 0
@@ -635,20 +647,21 @@ char proto_tab[] =
 	0xfd,0x02,0x00,0x09,0x00,0x02,0x00,0x00,0x00,
 
  /* AKP: these (below) had five sectors/fat -- changed to 3 */
+ /* AKP: Changed back to 5 because of big bug in single-drive switch code */
 
 		/* 80 tracks single sided */
  /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
 	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0x70,0x00, 0xd0,0x02,
 
  /*      MD    sec/fat   sec/track  nsides      N hidden */
-	0xf9, 0x03,0x00, 0x09,0x00, 0x01,0x00, 0x00,0x00,
+	0xf9, 0x05,0x00, 0x09,0x00, 0x01,0x00, 0x00,0x00,
  /* was 0xf8 -- AKP 2/88 */
 
 		/* 80 tracks double sided */
  /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
 	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0x70,0x00, 0xa0,0x05,
  /*      MD    sec/fat   sec/track  nsides      N hidden */
-	0xf9, 0x03,0x00, 0x09,0x00, 0x02,0x00, 0x00,0x00
+	0xf9, 0x05,0x00, 0x09,0x00, 0x02,0x00, 0x00,0x00
 };
 
 

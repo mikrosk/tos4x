@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.12 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.12  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.11  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -100,20 +103,24 @@
 #define swp68l(x)	s68l(&(x))
 #define MGET(x)		((x*)getbig())
 #define GETMD()		((MD *)getsmall())
+#define MFREE(p)	freebig(p)
 #define xmfreblk(p)	freebig(p)
 #define bconstat(a)	trap13(1,a)
 #define bconin(a)	trap13(2,a)
 #define bconout(a,b)	trap13(3,a,b)
 #define bconostat(a)	trap13(8,a)
-#define getbpb(a)	trap13(7,a)
-#define getmpb(a)	trap13(0,a)
-#define mediach(a)	trap13(9,a)
+#define getbpb(a)	(BPB *)trap13(7,a)
+#define getmpb(a)	(void)trap13(0,a)
+#define mediach(a)	(int)trap13(9,a)
+#define setexc(e,h)	(void (*)())trap13(5,e,h)
 #define min(a,b)	(((a)<(b))?(a):(b))
 
 #define rwabs(a,b,c,d,e) if(rwerr=trap13(4,a,b,c,d,e)){errdrv=e;\
 /* ------------------------------------------ */	longjmp(errbuf,rwerr);}
 
-#define cl2rec(cl,dm) (!(cl) ? 0 : (((cl) * (dm)->m_clsiz) + (dm)->m_recoff[2]))
+#define cl2rec(cl,dm) (!(cl) ? 0 : ((cl) << (dm)->m_clrlog))
+#define realcl2rec(cl,dm) (!(cl) ? 0 : \
+			    (((cl) << (dm)->m_clrlog) + (dm)->m_recoff[2]))
 
 #define	Panic()		panic()
 
@@ -261,11 +268,11 @@ OFD
 	int	o_use;		/* use count */
         int     o_mode;		/* mode file opened in (r, w, r/w) */
 	DFD	*o_dfd;		/* DFD this OFD refers to */
-	long	o_bytnum;	/* byte pointer within file */
+	ulong	o_bytnum;	/* byte pointer within file */
 	uint	o_curcl;	/* current cluster pointer */
 	uint	o_currec;	/* rec number of current cluster */
-	uint	o_curbyt;	/* byte offset in current cluster */
 };
+
 
 /*
  * Disk File Descriptor
@@ -319,7 +326,7 @@ DIR
 
 #define dirfirst(dir,dmd) \
     (((dir)->dir_curcl = (dir)->dir_clust), \
-     ((dir)->dir_recno = cl2rec((dir)->dir_clust,(dmd))), \
+     ((dir)->dir_recno = realcl2rec((dir)->dir_clust,(dmd))), \
      ((dir)->dir_recoffs = 0), \
      dir2dir(dir))
 
@@ -390,18 +397,18 @@ DMD
 #define m_recrd m_recoff[1]
 #define m_recdata m_recoff[2]
 
-	int	m_drvnum;	/* drive number */
-	int	m_fsiz;		/* fat size (records?) */
-	int	m_clsiz;	/* cluster size in records */
-	int	m_clsizb;	/* cluster size in bytes */
-	int	m_recsiz;	/* record size in bytes */
-	int	m_numcl;	/* #clusters on media */
-	int	m_clrlog;	/* log2 of clsiz */
-	int	m_clrm;		/* mask: (2^clrlog)-1 */
-	int	m_rblog;	/* log2 of recsiz */
-	int	m_rbm; 		/* mask: (2^rblog)-1 */
-	int	m_clblog;	/* log2 of clsizb */
-	int	m_16;		/* 16 bit fat flag */
+	uint	m_drvnum;	/* drive number */
+	uint	m_fsiz;		/* fat size (records?) */
+	uint	m_clsiz;	/* cluster size in records */
+	uint	m_clsizb;	/* cluster size in bytes */
+	uint	m_recsiz;	/* record size in bytes */
+	uint	m_numcl;	/* #clusters on media */
+	uint	m_clrlog;	/* log2 of clsiz */
+	uint	m_clrm;		/* mask: (2^clrlog)-1 */
+	uint	m_rblog;	/* log2 of recsiz */
+	uint	m_rbm; 		/* mask: (2^rblog)-1 */
+	uint	m_clblog;	/* log2 of clsizb */
+	uint	m_16;		/* 16 bit fat flag */
 };
 
 
@@ -415,10 +422,10 @@ DMD
 BCB
 {
 	BCB	*b_link;	/* -> next BCB */
-	int	b_bufdrv;	/* drive (or -1 if block is invalid) */
-	int	b_buftyp;	/* buffer type */
-	int	b_bufrec;	/* record# this block caches */
-	int	b_dirty;	/* 1: dirty (must be written) */
+	uint	b_bufdrv;	/* drive (or -1 if block is invalid) */
+	uint	b_buftyp;	/* buffer type */
+	uint	b_bufrec;	/* record# this block caches */
+	uint	b_dirty;	/* 1: dirty (must be written) */
 	DMD	*b_dmd;		/* -> DMD for this block's drive */
 	char	*b_bufr;	/* -> 512-byte buffer */
 };
@@ -428,12 +435,9 @@ BCB
 /*
  * File Table entry
  * Pointed at OFDs when necessary.
+ *
+ * Empty ones have a zero own field.
  */
-FTAB
-{
-	PD	*f_own;		/* file's owner */
-	OFD	*f_ofd;		/* -> the OFD */
-};
 
 /* macros for handling the OFD field of an sft entry */
 
@@ -441,6 +445,11 @@ FTAB
 #define ofddevno(ofd) ((short)((((unsigned long)(ofd)) >> 1)))
 #define ofdmaketty(ofd,devno) ((ofd) = (OFD *)(((devno) << 1) | 1))
 
+FTAB
+{
+	PD	*f_own;		/* file's owner */
+	OFD	*f_ofd;		/* -> the OFD */
+};
 
 struct block {
     struct block *b_next;	/* next block in the heap */
@@ -477,19 +486,20 @@ struct block {
 long trap13 _P(( int,... ));
 long trap14 _P(( int,... ));
 
-int uc _P(( int ));
 int setjmp _P(( long *jmpbuf ));	/* takes three longs */
 voidfn longjmp _P(( long *jmpbuf,int error ));
-long trap13 _P(( int,... ));
+
+#ifdef REAL
+/* these are in testbed.c until they are (more) real */
+int uc _P(( int ));
 voidfn s68 _P(( void *word_to_swap ));
 voidfn s68l _P(( void *long_to_swap ));
 voidfn clear _P(( void *start, void *last_plus_1 ));
 voidfn usr2xfr _P(( int n, void *d, void *s ));
 voidfn xfr2usr _P(( int n, void *s, void *d ));
+voidfn upd_tod _P(( void ));
+#endif
 
 volatile void gouser _P(( void ));
 voidfn dojmp _P(( long addr ));
 voidfn clksync _P(( void ));
-voidfn osinit _P(( void ));
-long oscall _P(( int,... ));
-voidfn upd_tod _P(( void ));

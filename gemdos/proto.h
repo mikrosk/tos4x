@@ -1,11 +1,11 @@
 
 /* con.c */
-long constat _P((int h));
 long xconstat _P((void));
 long xconostat _P((void));
 long xprtostat _P((void));
 long xauxistat _P((void));
 long xauxostat _P((void));
+long constat _P((int h));
 void conbrk _P((int h, int block));
 void buflush _P((int h));
 void qins _P((int h, long ch));
@@ -30,19 +30,21 @@ long readline _P((char *p));
 long cgets _P((int h, int maxlen, char *buf));
 
 /* fscl.c */
-int log2 _P((uint n));
-voidfn log _P((BPB *b, int drv));
-void flush _P((BCB *b));
-void flushall _P((void));
-voidfn usrio _P((uint rwflg, uint num, uint strt, void *ubuf, DMD *dm));
-char *getrec _P((uint recn, DMD *dmd, int wrtflg));
+uint log2 _P((uint n));
+voidfn dirdirty _P((DIR *dir));
+voidfn fatdirty _P((uint dev));
+voidfn flush _P((BCB *b));
+voidfn flushall _P((void));
+voidfn usrio _P((uint rwflg, uint num, uint strt, void *ubuf, DMD *dmd));
+void *getrec _P((uint recn, DMD *dmd, int wrtflg, BCB **pbcb));
 char *getfat _P((unsigned int s, DMD *dmd, int wflag));
-void clfix _P((uint cl, uint link, DMD *dmd));
-int getcl _P((uint cl, DMD *dmd));
-int nextcl _P((uint cl, DMD *dmd, int extflag, int *extended));
-int fastcl _P((DMD *dmd, int lastcl, int freeflag));
-long xrw _P((int wrtflg, OFD *p, long len, void *ubufr, void (*bufxfr )()));
+voidfn clfix _P((uint cl, uint link, DMD *dmd));
+uint getcl _P((uint cl, DMD *dmd));
+uint nextcl _P((uint cl, DMD *dmd, int extflag, int *extended));
+uint fastcl _P((DMD *dmd, int freeflag));
+long xrw _P((int wrtflg, OFD *ofd, long len, void *ubufr, void (*bufxfr )()));
 long ckdrv _P((uint d));
+voidfn log _P((BPB *b, int drv));
 long xgetfree _P((long *buf, uint drv));
 
 /* fscomm.c */
@@ -72,7 +74,7 @@ long xrename _P((int n, char *p1, char *p2));
 long xlseek _P((long n, int h, int flg));
 
 /* fshand.c */
-voidfn hand_init _P((void));
+voidfn handinit _P((void));
 int sftprobe _P((void));
 int syshnd _P((int h));
 long xdup _P((int h));
@@ -83,21 +85,13 @@ long dfd_close _P((DFD *dfd));
 long ofd_close _P((OFD *ofd));
 long xread _P((int h, long len, void *ubufr));
 long xwrite _P((int h, long len, void *ubufr));
+long char_write _P((int h, long len, char *buf));
 long xcreat _P((char *name, int attr));
 long xgetdta _P((void));
 long xsetdta _P((DTA *addr));
-long xsetdrv _P((int drv));
+long xsetdrv _P((uint drv));
 long xgetdrv _P((void));
 voidfn xmovs _P((int n, void *s, void *d));
-
-/* fsproc.c */
-int ncmps _P((int n, char *s, char *d));
-volatile void xtermres _P((long blkln, int rc));
-volatile void xterm _P((unsigned int rc));
-volatile void x0term _P((void));
-void ixterm _P((PD *r));
-long xexec _P((int mode, char *s, char *t, char *v));
-long xpgmld _P((PRG *prg, int h, PD *lp));
 
 /* mem.c */
 void xminit _P((void));
@@ -117,7 +111,7 @@ long xaddalt _P((void *blk, long siz));
 volatile void panic _P((void));
 
 /* pool.c */
-void poolinit _P((void));
+voidfn poolinit _P((void));
 void addheap _P((void *ptr, long size));
 void *getbig _P((void));
 struct block *newpool _P((void));
@@ -138,20 +132,21 @@ int wmatch _P((FCB *pat, FCB *fcb));
 long name2fcb _P((char *name, char *end, FCB *fcb));
 
 /* setup.c */
-void osi _P((void));
+voidfn osi _P((void));
 
-/* sup.c */
-long ni _P((void));
-long xgetver _P((void));
-void cinit _P((void));
-void freetree _P((char *d));
-void offree _P((DMD *d));
-long osif _P((int *pw));
-void tikfrk _P((int n));
-long xmediach _P((int drv));
+/* testbed.c */
+voidfn main _P((int argc, char *argv[]));
+int uc _P((int c));
+voidfn s68 _P((void *w));
+voidfn s68l _P((void *w));
+long xterm _P((int code));
+voidfn clear _P((void *start, void *end));
+void xfr2usr _P((long n, void *s, void *d));
+void usr2xfr _P((long n, void *d, void *s));
+voidfn upd_tod _P((void));
 
 /* time.c */
 long xgetdate _P((void));
 long xsetdate _P((int d));
 long xgettime _P((void));
-long xsettime _P((int t));
+long xsettime _P((uint t));

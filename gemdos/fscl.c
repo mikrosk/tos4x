@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.10 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.10  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.9  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -39,7 +42,7 @@
  * compute log base 2 of n
  */
 
-int
+uint
 log2(n)
 uint n;
 {
@@ -49,31 +52,31 @@ uint n;
 }
 
 /*
- * Login `drv' given BPB `b'.
- *
+ * dirdirty(dir), fatdirty(dev): write the indicated part of the disk out.
+ * In the case of dirdirty, the dir's bcb field is passed to flush.
+ * For fatdirty, we actually have to look for a dirty FAT sector to write.
  */
-voidfn
-log(b,drv)			/* log in a media b on drive drv */
-BPB *b;
-int drv;
-{
-    DMD *dmd = &drvtbl[drv];
 
-    dmd->m_recfat = b->fatrec;
-    dmd->m_recrd = b->fatrec + b->fsiz;
-    dmd->m_recdata = b->datrec;
-    dmd->m_drvnum = drv;
-    dmd->m_fsiz = b->fsiz;
-    dmd->m_clsiz = b->clsiz;
-    dmd->m_clsizb = b->clsizb;
-    dmd->m_recsiz = b->recsiz;
-    dmd->m_numcl = b->numcl;
-    dmd->m_clrlog = log2(b->clsiz);
-    dmd->m_clrm = b->clsiz - 1;
-    dmd->m_rblog = log2(b->recsiz);
-    dmd->m_rbm = b->recsiz - 1;
-    dmd->m_clblog = log2(b->clsizb);
-    dmd->m_16 = b->b_flags;
+voidfn
+dirdirty(dir)
+DIR *dir;
+{
+    dir->dir_bcb->b_dirty = 1;
+    flush(dir->dir_bcb);
+}
+
+voidfn
+fatdirty(dev)
+uint dev;
+{
+    BCB *b;
+
+    for (b = bufl[0]; b; b = b->b_link) {
+	if (b->b_bufdrv == dev && b->b_dirty) {
+	    flush(b);
+	    break;
+	}
+    }
 }
 
 /*
@@ -87,7 +90,7 @@ int drv;
  *  Flushing any buffer writes all buffers on that drive and that list.
  */
 
-void
+voidfn
 flush(b)
 BCB *b;
 {
@@ -111,7 +114,7 @@ BCB *b;
   for (b = bufl[i]; b; b = b->b_link) {
     if (b->b_bufdrv == d && b->b_dirty) {
     	n = b->b_buftyp;	/* n gets THIS BUFFER's type */
-	b->b_bufdrv = -1;	/* invalidate now in case of error */
+	b->b_bufdrv = B_INVALID; /* invalidate now in case of error */
 	rwabs(1,b->b_bufr,1,b->b_bufrec,d);
 	/* if FAT operation, flush to both FATs */
 	if (!n) 
@@ -141,7 +144,7 @@ BCB *b;
  *		break;    (back to "for each list")
  */
 
-void
+voidfn
 flushall()
 {
     REG BCB *b;
@@ -192,7 +195,7 @@ DMD *dmd;
 		(b->b_bufrec >= strt) &&
 		(b->b_bufrec < end)) {
 		    if (!rwflg && b->b_dirty) flush(b);
-		    b->b_bufdrv = -1;	/* invalidate the buffer */
+		    b->b_bufdrv = B_INVALID;	/* invalidate the buffer */
 	    }
 	}
 
@@ -202,6 +205,7 @@ DMD *dmd;
 
 /*
  * getrec: return pointer to buffer representing a record on disk.
+ * Also fills in a BCB pointer if pbcb is nonnull.
  *
  * The record number is absolute. All buffer management goes here.
  * Buffers are managed LRU, and written using flush() when the victim is
@@ -212,11 +216,12 @@ DMD *dmd;
  * security, zero the buffer before returning it.)
  */
 
-char
-*getrec(recn,dmd,wrtflg)
+void
+*getrec(recn,dmd,wrtflg,pbcb)
 uint recn;
 DMD *dmd;
 int wrtflg;
+BCB **pbcb;
 {
 	BCB *b;
 	uint n;
@@ -249,7 +254,7 @@ int wrtflg;
 		}
 
 		/* empty buffer? remember it */
-		if (b->b_bufdrv == -1) {
+		if (b->b_bufdrv == B_INVALID) {
 			mtbuf = b;
 		}
 	}
@@ -276,10 +281,10 @@ doio:
 		b = p;
 
 		/* if our victim is in use & dirty, flush him */
-		if (b->b_bufdrv != -1 && b->b_dirty) flush(b);
+		if (b->b_bufdrv != B_INVALID && b->b_dirty) flush(b);
 
 		/* INVALIDATE this buffer because the rwabs might fail! */
-		b->b_bufrec = -1;
+		b->b_bufdrv = B_INVALID;
 
 		/* do the read if doread, or mediach was/is nonzero */
 
@@ -317,9 +322,9 @@ doio:
 	if (wrtflg)
 		b->b_dirty = 1;
 
+	if (pbcb) *pbcb = b;
 	return(b->b_bufr);
 }
-
 
 /***********************************************************************
  * New FAT code by AKP 17-Sep-1987
@@ -375,7 +380,7 @@ int wflag;
 {
 	/* get the buffer the sector is in */
 	newcl = TRUE;		/* do this in case getrec longjmp's */
-	clsave = getrec(s+dmd->m_recfat,dmd,wflag);
+	clsave = getrec(s+dmd->m_recfat,dmd,wflag,NULL);
 	clsector = s;
 	cldev = dmd;
 	clwrite = wflag;
@@ -387,7 +392,7 @@ int wflag;
 #define hibyte(w) (((w) >> 8) & 0xff)
 #define lobyte(w) ((w) & 0xff)
 
-void
+voidfn
 clfix(cl,link,dmd)
 uint cl;
 uint link;
@@ -467,7 +472,7 @@ DMD *dmd;
     }
 }
 
-int
+uint
 getcl(cl,dmd)
 uint cl;
 DMD *dmd;
@@ -524,7 +529,7 @@ DMD *dmd;
 }
 
 
-int
+uint
 nextcl(cl,dmd,extflag,extended)
 uint cl;
 DMD *dmd;
@@ -534,6 +539,7 @@ int *extended;
 	uint xcl, lastcl, cl2, rover, i;
 
 	if (extended) *extended = 0;
+	lastcl = dmd->m_numcl + 2;
 
 	if (!cl) {
 	    if (!extflag) return 0;
@@ -551,9 +557,8 @@ int *extended;
 
 extend:
 	    /* extend the chain, return the new cl */
-	    lastcl = dmd->m_numcl + 2;
 	    if (!cl && dmd->m_16) {
-		cl2 = fastcl(dmd,lastcl,FALSE);
+		cl2 = fastcl(dmd,FALSE);
 		if (!cl2) return 0;
 	    }
 	    else {
@@ -601,10 +606,9 @@ gotone:
  * Note that little-g getfat() is used, for low overhead.
  */
 
-int
-fastcl(dmd,lastcl,freeflag)
+uint
+fastcl(dmd,freeflag)
 DMD *dmd;
-int lastcl;
 int freeflag;
 {
     uint *buf;
@@ -613,8 +617,10 @@ int freeflag;
     uint cl;
     uint i;
     uint clpersec;	    /* clusters represented by each sector of FAT */
+    uint lastcl;
 
     clpersec = dmd->m_recsiz >> 1;
+    lastcl = dmd->m_numcl + 2;
 
     free = 0;
 
@@ -740,6 +746,24 @@ void (*bufxfr)();
 	curcl = ofd->o_curcl;
 	currec = ofd->o_currec;
 
+	if (!curcl) {
+	    /* our r/w pointer is not valid */
+	    curcl = ofd->o_dfd->dfd_strtcl;
+	    swp68(curcl);
+	    if (!curcl) {
+		/* file is empty */
+		if (!wrtflg) return 0;
+		if (!(curcl = nextcl(0,dmd,wrtflg,NULL))) {
+		    /* can't extend file from zero size */
+		    return 0;
+		}
+		ofd->o_dfd->dfd_strtcl = curcl;
+		swp68(ofd->o_dfd->dfd_strtcl);
+		/* don't waste time marking it dirty */
+	    }
+	    currec = cl2rec(curcl,dmd);
+	}
+
 	recoffs = bytnum & dmd->m_rbm;
 
 	if (!recoffs) lenhead = 0;
@@ -749,7 +773,7 @@ void (*bufxfr)();
 
 	/* do the head.  If there is one, then curcl is valid. */
 	if (lenhead) {
-	    bufp = getrec(currec+dmd->m_recdata,dmd,wrtflg);
+	    bufp = getrec(currec+dmd->m_recdata,dmd,wrtflg,NULL);
 	    (*bufxfr)(lenhead,bufp+recoffs,ubufr);
 	    ubufr += lenhead;
 	    bytnum += lenhead;
@@ -814,7 +838,10 @@ void (*bufxfr)();
 		currec = cl2rec(curcl,dmd);
 	    }
 	    /* getrec for the record; if extended, don't read it in */
-	    bufp = getrec(currec + dmd->m_recdata,dmd,(extended ? 2 : wrtflg));
+	    bufp = getrec(currec + dmd->m_recdata,
+			  dmd,
+			  (extended ? 2 : wrtflg),
+			  NULL);
 	    (*bufxfr)(lentail,bufp,ubufr,wrtflg);
 	}
 
@@ -862,6 +889,34 @@ uint d;
 	return E_OK;
 }
 
+/*
+ * Login `drv' given BPB `b'.
+ *
+ */
+voidfn
+log(b,drv)			/* log in a media b on drive drv */
+BPB *b;
+int drv;
+{
+    DMD *dmd = &drvtbl[drv];
+
+    dmd->m_recfat = b->fatrec;
+    dmd->m_recrd = b->fatrec + b->fsiz;
+    dmd->m_recdata = b->datrec;
+    dmd->m_drvnum = drv;
+    dmd->m_fsiz = b->fsiz;
+    dmd->m_clsiz = b->clsiz;
+    dmd->m_clsizb = b->clsizb;
+    dmd->m_recsiz = b->recsiz;
+    dmd->m_numcl = b->numcl;
+    dmd->m_clrlog = log2(b->clsiz);
+    dmd->m_clrm = b->clsiz - 1;
+    dmd->m_rblog = log2(b->recsiz);
+    dmd->m_rbm = b->recsiz - 1;
+    dmd->m_clblog = log2(b->clsizb);
+    dmd->m_16 = b->b_flags;
+}
+
 
 /*
  * Dfree()
@@ -884,13 +939,12 @@ long *buf;
 	dmd = &drvtbl[drv];
 	free = 0;
 	newcl = TRUE;
+	end = dmd->m_numcl + 2;
 
-	end = dmd->m_numcl+2;
-
-	if (dmd->m_16) free = fastcl(dmd,end,TRUE);
+	if (dmd->m_16) free = fastcl(dmd,TRUE);
 	else {
 	    for (i = 2; i < end; i++) 
-		if (!getcl(i,dmd)) 
+		if (!getcl(i,dmd))
 		    free++;
 	}
 

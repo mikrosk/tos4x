@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.5 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
+* $Revision: 2.6 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.6  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.5  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -25,7 +28,7 @@
 char biosdev[NUMSTD] = { -1, -1, -2, -3, -1, -1 };
 
 voidfn
-hand_init()
+handinit()
 {
     int i;
     for (i=0; i<NUMSTD; i++) {
@@ -270,8 +273,8 @@ DFD *dfd;
 
 	if (dfd->dfd_dirty) {
 		dir.dir_dev = dfd->dfd_dev;
-		dir.dir_cl = dfd->dfd_dircl;
-		dir.dir_rec = dfd->dfd_dirrec;
+		dir.dir_clust = dfd->dfd_dircl;
+		dir.dir_recno = dfd->dfd_dirrec;
 		dir.dir_recoffs = dfd->dfd_diroffs;
 		if (err = dir2dir(&dir)) return err;
 		dir.dir_fcb->f_attrib = dfd->dfd_attrib;
@@ -306,7 +309,7 @@ OFD *ofd;
  *  read 'count' bytes from 'handle' to 'buffer'
  *
  * May be called with 'handle' -ve or referring through PD to a BIOS dev.
- * Calls char_read or xrw as appropriate.
+ * Calls cgets or xrw as appropriate.
  * Cuts the request down so it doesn't fall of EOF before calling xrw.
  */
 
@@ -321,10 +324,15 @@ void *ubufr;
 
 	if ((h = syshnd(h)) == -NUMBIOS) return EIHNDL;
 	if (!len) return 0;
-	if (h < 0) return char_read(h+3,len,ubufr);
+	if (h < 0) {
+	    if (len > 32767) len = 32767;
+	    return cgets(h+3,len,ubufr);
+	}
 	p = sft[h].f_ofd;
-	if (ofdisatty(p)) 
-	    return char_read(ofddevno(p),len,ubufr);
+	if (ofdisatty(p)) {
+	    if (len > 32767) len = 32767;
+	    return cgets(ofddevno(p),(int)len,ubufr);
+	}
 
 	if (len > (maxlen = (p->o_dfd->dfd_fileln - p->o_bytnum)))
 	    len = maxlen;
@@ -348,6 +356,7 @@ long len;
 void *ubufr;
 {
 	OFD	*p;
+	long err;
 
 	if ((h = syshnd(h)) == -NUMBIOS) return EIHNDL;
 	if (!len) return 0;
@@ -359,14 +368,35 @@ void *ubufr;
 	if (!(p->o_flag & O_WRITE)) return EACCDN;
 #endif
 
-	/* update date, time, and archive bit on all writes */
-	p->o_dfd->dfd_date = date;
-	p->o_dfd->dfd_time = time;
-	swp68(p->o_dfd->dfd_date);
-	swp68(p->o_dfd->dfd_time);
-	p->o_dfd->dfd_attrib |= FA_ARCHIVE;
-	p->o_dfd->dfd_dirty = 1;
-	return xrw(1,p,len,ubufr,usr2xfr);
+	err = xrw(1,p,len,ubufr,usr2xfr);
+
+	/* update date, time, and archive bit on writes which write   */
+	/* (this means a write which succeeds partway doesn't update) */
+	if (err > 0) {
+	    p->o_dfd->dfd_date = date;
+	    p->o_dfd->dfd_time = time;
+	    swp68(p->o_dfd->dfd_date);
+	    swp68(p->o_dfd->dfd_time);
+	    p->o_dfd->dfd_attrib |= FA_ARCHIVE;
+	    p->o_dfd->dfd_dirty = 1;
+	}
+	return err;
+}
+
+long
+char_write(h,len,buf)
+int h;
+long len;
+char *buf;
+{
+    long orig_len = len;
+    if (h == 2) {
+	while (len--) tabout(h,*buf++);
+    }
+    else {
+	while (len--) bconout(h,*buf++);
+    }
+    return orig_len;
 }
 
 /*
@@ -422,8 +452,9 @@ DTA *addr;
  */
 long
 xsetdrv(drv)
-int drv;
+uint drv;
 {
+	if (drv > MAXDEVS) return EDRIVE;
 	run->p_curdrv = drv;
 	return( trap13(0x0A) );	/* return Drvmap() */
 }

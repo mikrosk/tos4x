@@ -1,12 +1,15 @@
 /*
 ***************************     CON.C      ******************************
 *
-* $Revision: 2.6 $	$Source: e:/tos/gd2\RCS\con.c,v $
+* $Revision: 2.7 $	$Source: e:/tos/gd2\RCS\con.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
 * =======================================================================
 *
 * $Log: con.c,v $
+* Revision 2.7  1991/02/12  18:20:10  apratt
+* *** empty log message ***
+*
 * Revision 2.6  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -49,22 +52,9 @@ int glbcolumn[3];			/* column position */
 
 #define warmboot() xterm(-32)
 
-/*
- * Console Input Status.
- */
-long
-constat(h)
-int h;
-{
-	/* AKP: printer never has input pending.  Stupid BIOS. */
-	return( kbchar[h] ? -1L : (h ? bconstat(h) : 0) );
-}
+/* TOP LEVEL CALLS: call only when you know run->p_uft[x] is a BIOS dev */
 
-
-/*
- * Console Input Status
- * (another level up...).
- */
+/* Console Input Status */
 long
 xconstat()
 {
@@ -72,9 +62,7 @@ xconstat()
 }
 
 
-/*
- * Console Output Status.
- */
+/* Console Output Status. */
 long
 xconostat()
 {
@@ -82,9 +70,7 @@ xconostat()
 }
 
 
-/*
- * Printer Output Status.
- */
+/* Printer Output Status. */
 long
 xprtostat()
 {
@@ -92,9 +78,7 @@ xprtostat()
 }
 
 
-/*
- * Auxillary Input Status.
- */
+/* Auxillary Input Status. */
 long
 xauxistat()
 {
@@ -102,13 +86,25 @@ xauxistat()
 }
 
 
-/*
- * Auxillary Output Status.
- */
+/* Auxillary Output Status. */
 long
 xauxostat()
 {
 	return(bconostat(run->p_uft[2]+3));
+}
+
+
+/* LOWER-LEVEL CALLS */
+
+/*
+ * Input status for Bios device h
+ */
+long
+constat(h)
+int h;
+{
+	/* AKP: Bconstat(0) is unimplemented in BIOS */
+	return( kbchar[h] ? -1L : (h ? bconstat(h) : 0) );
 }
 
 
@@ -148,8 +144,7 @@ int block;
     while ((block && kbchar[h] == 0) || (h && bconstat(h))) {
 	do {
 	    c = (ch = bconin(h)) & 0xFF;
-	    if ( c == ctrlc )
-	    {
+	    if ( c == ctrlc ) {
 		buflush(h);	/* flush BDOS & BIOS buffers */
 		warmboot();	/* (this never returns) */
 	    }
@@ -157,14 +152,12 @@ int block;
 		    stop = 1;
 	    else if ( c == ctrlq )
 		stop = 0;
-	    else if ( c == ctrlx )
-	    {
+	    else if ( c == ctrlx ) {
 		/* THIS IS STUPID BEHAVIOR */
 		buflush(h);
 		qins(h,ch);
 	    }
-	    else
-	    {
+	    else {
 		qins(h,ch);
 	    }
 	} while (stop);
@@ -271,8 +264,7 @@ int ch;
     if (ch == tab) s = tabout(h,ch);	/* if tab, expand it */
     else
     {
-	if ( ch < ' ' )
-	{
+	if ( ch < ' ' ) {
             conout( h,'^' );
 	    ch |= 0x40;
 	}
@@ -324,8 +316,7 @@ int h;
 {
 	REG long temp;
 
-	if (kbchar[h])
-	{
+	if (kbchar[h]) {
 		temp = *remptr[h]++;
 		kbchar[h]--;
 		if (remptr[h] == &glbkbchar[h][KBBUFSZ]) {
@@ -413,8 +404,7 @@ int parm;
 {
 REG	int i;
 
-	if (parm == 0xFF)
-	{
+	if (parm == 0xFF) {
 		i = run->p_uft[0]+3;
 		return(constat(i) ? getch(i) : 0L);
 	}
@@ -465,8 +455,7 @@ REG int h;
 {
     conout(h,cr);			/* go to new line */
     conout(h,lf);
-    while(startcol)
-    {
+    while(startcol) {
 	conout(h,' ');
 	startcol -= 1;		/* start output at starting column */
     }
@@ -495,8 +484,7 @@ int col;			/* starting console column	*/
     while (i--)			/* calculate column position 	*/
     {				/*  across entire char buffer	*/
 	ch = *p++;		/* get next char		*/
-	if ( ch == tab )
-	{
+	if ( ch == tab ) {
 	    col += 8;
 	    col &= ~7;		/* for tab, go to multiple of 8 */
 	}
@@ -504,8 +492,7 @@ int col;			/* starting console column	*/
 				/* control chars put out 2 printable chars */
 	else col += 1;
     }
-    while (glbcolumn[h] > col)
-    {
+    while (glbcolumn[h] > col) {
 	conout(h,bs);		/* backspace until we get to proper column */
 	conout(h,' ');
 	conout(h,bs);
@@ -541,11 +528,9 @@ char *buf;
 	REG int retlen;
 
 	stcol = glbcolumn[h];		/* set up starting column */
-	for (retlen = 0; retlen < maxlen; )
-	{
+	for (retlen = 0; retlen < maxlen; ) {
 		conbrk(h,1);	/* use block mode to handle ^C and ^S/^Q */
-		switch(ch = getch(h))
-		{
+		switch(ch = getch(h)) {
 			case cr:
 			case lf: conout(h,cr); goto getout;
 			case bs:

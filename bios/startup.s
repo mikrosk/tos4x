@@ -4,13 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/24 02:24:54 $
+* $Date: 1991/09/29 23:59:46 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.83  1991/09/29  23:59:46  apratt
+* Added hooks for _waketime XBIOS call in clock.s.  Also commented
+* out the code that does a RAM test when you use RAM TOS.
+*
+* Added hooks for _waketime XBIOS call in clock.s.  Also commented
+* out the code that does a RAM test when you use RAM TOS.
+*
 * Revision 2.82  1991/09/24  02:24:54  apratt
 * STPAD: memory sizing for either 1MB or 4MB.  Also, STylus button bits are
 * one when they're UP, not when they're DOWN.
@@ -24,9 +31,6 @@
 *
 * ALL: WVBL now only clears the '4' bit of IPL so it won't drop below 3 if it
 * isn't already.  LONG discussion on "when is it safe" at noblank.
-*
-* This is 2/3.06p, and hopefully the final release for 2/3.06.
-*
 *
 * This is 2/3.06p, and hopefully the final release for 2/3.06.
 *
@@ -210,7 +214,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.82 $
+* $Revision: 2.83 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\startup.s,v $
@@ -356,6 +360,9 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	_ramtop			; exports for memtest.s
 	.globl	end_os
 	.globl	phystop
+
+*--------------	Imports:
+.if systype == rom
 	.globl	endaesbss
 .if TT
 	.globl	_resetscsi
@@ -3351,14 +3358,14 @@ dmaloop:
 * STPAD and STe-PLUS have IDE busses.  On other STPLUSes (Mega STe and
 .else
 * this is the RAM-loaded version of dmaboot, for testing.
-* All it does is test RAM.
-.globl	mem_test_next
-.globl	mem_abort
+* All it does is test RAM.  (or it doesn't...)
+*.globl	mem_test_next
+*.globl	mem_abort
 * STe), the IDEbus doesn't exist, and the reads from those devices will all
 dmaboot:
-dmab_loop:
-	bsr	mem_test_next
-	beq	dmab_loop
+*dmab_loop:
+*	bsr	mem_test_next
+*	beq	dmab_loop
 	rts
 *
 * Note 9/91: since ST and STPLUS are now the same ROM, we start at IDE in
@@ -3908,7 +3915,11 @@ trp14tab:
 .endif
 	dc.l	initmous		; 0: initialize mouse
 	dc.l	_rts			; 1: (reserved)
-	dc.l	unimpl			; 47: unused ($2f)
+	dc.l	_physbase		; 2: get physical screen base
+	dc.l	_logbase		; 3: get logical screen base
+	dc.l	_getrez			; 4: get screen resolution
+	dc.l	_setscreen		; 5: set video parameters
+	dc.l	_setpalette		; 6: set palette
 	dc.l	_setcolor		; 7: set single color
 	dc.l	_floprd			; 8: read floppy sector(s)
 	dc.l	_flopwr			; 9: write floppy sector

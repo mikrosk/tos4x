@@ -1,5 +1,5 @@
 #
-# $Header: /home/mikro/atari/tos/work/bios/rcs/rcs-repaired/makefile,v 1.2 88/10/03 15:07:07 kbad Exp $
+# $Header: /home/mikro/atari/tos/work/bios/rcs/rcs-repaired/makefile,v 1.3 88/10/12 14:44:51 kbad Exp $
 #
 # Author Slavik Lozben
 # This makefile builds the bios object files
@@ -42,3 +42,4 @@ allbios.o:	$(STARTUP) $(SFILES) $(CFILES) allbios.aln
 prtblk.o:	prtblkc.h
 
 rwabs.o:	portab.h
+

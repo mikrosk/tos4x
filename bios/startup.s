@@ -4,19 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/12/08 15:45:14 $
+* $Date: 89/12/28 15:35:09 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.37  89/12/28  15:35:09  apratt
+* Moved the line which sets the refresh rate for fast RAM.  Now
+* it's outside the ROM/RAM conditional, and most of all outside
+* the coldboot/warmboot conditional.  Turns out fast RAM
+* decays faster, so it might not be valid even when slow RAM is.
+* This won't hurt anything, since nothing in fast RAM is presumed
+* valid across a warm boot.  Not by the OS, anyway.
+*
+* Also added 'moveq.l #0,d0' to some of Slavik's calls so they
+* don't return garbage in the high parts of d0.
+*
 * Revision 2.36  89/12/08  15:45:14  apratt
 * Fixed Lozben's fatfinger in _setscreen concerning wvbl.
 * Also changed TT background color to blue: it's nonwhite, so you
 * know this is not the final ROM (per LT), but it's not black,
 * so you can tell your TT is doing something.
-*
+* 
 * Revision 2.35  89/12/06  14:03:49  apratt
 * In the reset-bailout vector test, there are some sanity checks.
 * One of them checks to be sure that the high byte of the vector is 00.
@@ -357,7 +368,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.36 $
+* $Revision: 2.37 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1332,6 +1343,21 @@ notpal:	lea	color0,a1		; a1 ->	hardware reg
 * Pad is always mono and needs power control, and we want a picture early
 * in the boot sequence so as not to (A) drain power, (B) possibly damage LCD,
 * and (C) look bad, so we set it up here, not later as we do for other 
+.ifne TT
+* again later when other machines' shiftmds are set.  Note that we don't
+* Start refreshing fast RAM.  This
+* involves catching the bus error it causes.  $E0 is the proper
+* refresh rate, so we write to $FFD000E0.  See TT spec for this.
+*-
+
+refresh	equ	$e0
+
+	move.l	#mt_berr,$8
+	move.w	#0,$ffd00000+refresh	; write don't-care data here
+
+mt_berr:
+.endc
+
  ifeq systype-rom
 *+
 *  On a ROM system, put the screen (temporarily)
@@ -1552,17 +1578,7 @@ mt_3:	cmp.w	-(a1),d0		; compare word in RAM with ours
 *  - screen size and clear from top down. Now leaves screen where it is (at
 .ifne TT
 *  preserve d5 = phystop and d6 = mem controller program byte.
-* We're still in ifeq systype-rom ... start refreshing fast RAM.  This
-* involves catching the bus error it causes.  $E0 is the proper
-* refresh rate, so we write to $FFD000E0.  See TT spec for this.
-
-refresh	equ	$e0
-
-	move.l	#mt_berr,$8
-	move.w	#0,$ffd00000+refresh	; write don't-care data here
-
-mt_berr:
-
+* We're still in ifeq systype-rom.
 	move.w	#$400,a0
 	move.l	d5,d4
 * contrary: that's dual-purpose, slow, compatibility-mode RAM.  Primary
@@ -4346,6 +4362,7 @@ crctab:
 	dc.w	$3653,$2672,$1611,$0630,$76d7,$66f6,$5695,$46b4
 	dc.w	$b75b,$a77a,$9719,$8738,$f7df,$e7fe,$d79d,$c7bc
 	dc.w	$48c4,$58e5,$6886,$78a7,$0840,$1861,$2802,$3823
+	dc.w	$5af5,$4ad4,$7ab7,$6a96,$1a71,$0a50,$3a33,$2a12
 	bsr	wvbl			; wait for start of vertical-blank
 	dc.w	$dbfd,$cbdc,$fbbf,$eb9e,$9b79,$8b58,$bb3b,$ab1a
 	dc.w	$6ca6,$7c87,$4ce4,$5cc5,$2c22,$3c03,$0c60,$1c41
@@ -4367,6 +4384,7 @@ crctab:
 	dc.w	$fd2e,$ed0f,$dd6c,$cd4d,$bdaa,$ad8b,$9de8,$8dc9
 	dc.w	$7c26,$6c07,$5c64,$4c45,$3ca2,$2c83,$1ce0,$0cc1
 	dc.w	$ef1f,$ff3e,$cf5d,$df7c,$af9b,$bfba,$8fd9,$9ff8
+	dc.w	$6e17,$7e36,$4e55,$5e74,$2e93,$3eb2,$0ed1,$1ef0
 .text
 
 .endif
@@ -4381,6 +4399,7 @@ crctab:
 *******
 ESHIFTMD	equ	$ffff8262	; EST video shift mode regiter
 ELUTBANK	equ	$ffff8263	; EST bank select register
+ESTLUT		equ	$ffff8400	; start of EST color lookup table regs
 
 
 * - High byte (bits 16..23), middle byte (bits 8..15), low byte (bits 0..7)
@@ -4400,6 +4419,7 @@ ESTVBL		equ	$ffff820d	; EST Video Base Low Byte
 _EsetShift:
 	bsr	noblank1		; wait until not blanking
 	moveq.l	#0,d0			; pre-clear return code
+	move.w	shiftmd,-(sp)		; save return value
 	move.w	6(sp),shiftmd		; set shift mode register
 	move.w	shiftmd,d0		; d0 <- curr rez
 	and.w	#7,d0			; mask off unwanted bits
@@ -4492,6 +4512,7 @@ _EsetPalette:
 
 eset_ok:
 	move.l	8(sp),a1		; a1 <- palettePtr (source)
+	lea	ESTLUT(a0),a0		; a0 <- lutPtr (destination)
 	bra	eset_dec
 
 eset_loop:
@@ -4515,6 +4536,7 @@ _EgetPalette:
 	move.w	4(sp),d0		; d0 <- colorNum
 	and.w	#$ff,d0			; colorNum  must be < 256
 	move.w	d0,a0			; a0 becomes index for source.
+	adda.w	a0,a0			; make a0 a word index
 	sub.w	#256,d0			; d0 = colorNum - 256
 	neg.w	d0			; d0 <- maxCount
 	move.w	6(sp),d1		; d1 <- count (set by the user)

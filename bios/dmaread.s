@@ -3,20 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/25 16:45:32 $
+* $Date: 89/08/25 16:49:18 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.2  89/08/25  16:49:18  apratt
+* Moved lastacstm from text seg to bss.
+*
 * Revision 1.1  89/08/25  16:45:32  apratt
 * Initial revision
-*
+* 
 *
 * =======================================================================
 *
-* $Revision: 1.1 $
+* $Revision: 1.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -61,8 +64,13 @@ EUNDEV	equ	(-15)		; error code for unknown device
 EREADF	equ	(-11)		; error code for read error
 
 
+;+
+; Declarations
+;-
 .bss
-_cmdblk:	ds.b	10	; command block
+_cmdblk:	ds.b	10		; command block
+lastacstm:	ds.l	1		; controller last accessed time
+
 
 .text
 
@@ -157,12 +165,6 @@ GPIP		equ	$fffffa01
 ;-
 ACLTMOUT	equ	600		; long-timeout (3 s)
 ACSTMOUT	equ	20		; short-timeout (100 ms)
-
-
-;+
-; Declarations
-;-
-lastacstm:	dc.l	0		; controller last accessed time
 
 
 ;+

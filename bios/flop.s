@@ -3,17 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/10/12 17:23:15 $
+* $Date: 88/12/22 12:56:27 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.10  88/12/22  12:56:27  apratt
+* Added (a5)'s to save some words & some time (as if it mattered in 
+* floppy code...)
+*
 * Revision 1.9  88/10/12  17:23:15  apratt
 * Added the Floprate call: oldrate = Floprate(devno,newrate) where
 * newrate == -1 if you don't want to change it.
-*
+* 
 * Revision 1.8  88/06/28  16:27:21  apratt
 * Removed extra index information because it made 10-sector
 * formatting not work.  Better to be compatible with our own
@@ -52,7 +56,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.9 $
+* $Revision: 1.10 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -297,7 +301,7 @@ fdcprobe:
 	move.l	#timeout,d7		; set timeout count
 * Returns:	EQ, the read won (on all sectors),
 .if STPAD
-frd2:	btst.b	#5,gpip			; 1770 done yet?
+frd2:	btst.b	#5,gpip(a5)		; 1770 done yet?
 	beq	noflop1			; no floppies!
 	subq.l	#1,d7			; decrement timeout counter
 	bne	frd2			; (not timed-out yet)
@@ -406,7 +410,7 @@ fwr1a:	move.w	#e_error,curr_err(a5)	; set general error#
 	or.w	cside.w,d0		; side 0
 	move.l	#timeout,d7		; d7 = timeout count
 	bsr	setdmode		; (boy, is this /ugly/)
-fwr2:	btst.b	#5,gpip			; done yet?
+fwr2:	btst.b	#5,gpip(a5)		; done yet?
 fwr1:	bsr	select			; select drive
 	subq.l	#1,d7			; decrement timeout count
 	bne	fwr2			; (still tickin')
@@ -547,8 +551,8 @@ ot1:	move.w	#12-1,d1		; 12 x $00
 	move.b	#$f5,d0
 *	bsr	wmult
 *
-	move.b	ctrack+1,(a2)+		; track#
-	move.b	cside+1,(a2)+		; side#
+	move.b	ctrack+1(a5),(a2)+	; track#
+	move.b	cside+1(a5),(a2)+	; side#
 *	bsr	wmult
 *
 *	move.b	#$f6,d0			; 3 x $C2 as IAM preamble
@@ -593,9 +597,9 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	moveq	#3-1,d1			; 3 x $f5
 	moveq	#$fffffff5,d0		; (really just $f5; mas complains)
 	bsr	wmult
-	move.b	cdma+3(a5),dmalow	; load dma pointer
-	move.b	cdma+2(a5),dmamid
-	move.b	cdma+1(a5),dmahigh
+	move.b	cdma+3(a5),dmalow(a5)	; load dma pointer
+	move.b	cdma+2(a5),dmamid(a5)
+	move.b	cdma+1(a5),dmahigh(a5)
 	move.w	#$190,(a6)		; toggle R/W flag and
 	move.w	#$090,(a6)		; select sector-count register
 	move.w	#$190,(a6)
@@ -607,7 +611,7 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	move.l	#timeout,d7		; d7 = timeout value
 etok:
 	moveq	#$4e,d0			; end-of-track trailer
-otw1:	btst.b	#5,gpip			; is 1770 done?
+otw1:	btst.b	#5,gpip(a5)		; is 1770 done?
 
 	subq.l	#1,d7			; if(--d7) continue;
 	bne	otw1
@@ -698,9 +702,9 @@ tvrlp:	move.w	#retries,retrycnt(a5)	; init sector-retry count
 .if STPAD
 	bsr	fdcprobe
 	beq	noflop1			; no floppies!
-tvr1:	move.b	cdma+3(a5),dmalow	; load dma pointer
-	move.b	cdma+2(a5),dmamid
-	move.b	cdma+1(a5),dmahigh
+tvr1:	move.b	cdma+3(a5),dmalow(a5)	; load dma pointer
+	move.b	cdma+2(a5),dmamid(a5)
+	move.b	cdma+1(a5),dmahigh(a5)
 	move.w	#$090,(a6)		; toggle R/W (leave in W state)
 	moveq	#e_read,d0		; set default error#
 	move.w	#$090,(a6)
@@ -712,7 +716,7 @@ tvr1:	move.b	cdma+3(a5),dmalow	; load dma pointer
 	move.l	#timeout,d7		; set timeout value
 *
 * Enviroment:	Head seeked to the correct track;
-tvr2:	btst.b	#5,gpip			; test for 1770	done
+tvr2:	btst.b	#5,gpip(a5)		; test for 1770	done
 *		Motor should be spinning (go2track and fmttrack do this).
 	subq.l	#1,d7			; decrement timeout count
 	bne	tvr2			; (still counting down)
@@ -756,13 +760,13 @@ tvr5:	subq.w	#1,retrycnt(a5)		;	to the current track...
 	move.l	_hz_200.w,d7
 	add.l	#timeout,d7		; d7 = _hz_200 value to die at
 	clr.l	a5			; a5 -> zeropage base
-	lea	fifo,a6			; a6 -> fifo
+	lea	fifo(a5),a6		; a6 -> fifo
 	st.b	_motoron(a5)		; assume motor is on
 	tst.w	flock(a5)		; floppies locked?
 	bhi	tvr2			; (still counting down)
 	bsr	reset1770		; reset	controller and return error
 	bra	tvre
-	move.l	_frclock,d0		; check a drive every 8 jiffies
+	move.l	_frclock(a5),d0		; check a drive every 8 jiffies
 *--- got "done" interrupt, check DMA status:
 tvr4:	move.w	#$090,(a6)		; read DMA error status
 	move.w	(a6),d0
@@ -774,14 +778,14 @@ tvr4:	move.w	#$090,(a6)		; read DMA error status
 	lea	_wpstatus(a5),a0	; a0 -> write-protect status table
 	bsr	err_bits		; set error# from 1770 register
 	and.b	#$1c,d0			; check	for record-not-found, crc-err,
-	cmp.w	_nflops,d0		; if(d0 == _nflops == 1)
+	cmp.w	_nflops(a5),d0		; if(d0 == _nflops == 1)
 
 *--- read next sector (or return if done)
 tvr6:	addq.w	#1,csect.w		; bump sector count
 	subq.w	#1,ccount.w		; while(--count) read_another;
 	bne	tvrlp
 	sub.l	#$200,cdma.w		; readjust DMA pointer
-	move.w	diskctl,d0		; get 1770 status
+	move.w	diskctl(a5),d0		; get 1770 status
 	btst	#6,d0			; test Write-Protect status bit
 *--- read failure: retry or record bad sector
 tvre:	cmp.w	#midretry,retrycnt.w	; re-seek head?
@@ -826,8 +830,8 @@ fvbl2:	addq.b	#1,d0			; turn into drive-select bits
 
 fvbl1:	move.w	_wpstatus.w,d0		; or _wpstatus into _wplatch
 	clr.l	a5			; a5 -> zeropage base
-	lea	fifo,a6			; a6 -> fifo
-	st	_motoron		; kludge motor state = ON
+	lea	fifo(a5),a6		; a6 -> fifo
+	st	_motoron(a5)		; kludge motor state = ON
 	move.w	d0,def_error(a5)	; set default error number
 	move.w	d0,curr_err(a5)		; set current error number
 	move.w	#1,flock(a5)		; tell vbl not to touch floppies
@@ -885,16 +889,16 @@ flock1	move.w	#recal,dcurtrack(a1)	; complete failure (what can we do?)
 	move.w	#retries,retrycnt.w	; setup retry count
 	bsr	flopcmds		; do it
 *--- pick a DSB:
-	move.w	cdev,d0			; set last-access time for 'cdev'
+	move.w	cdev(a5),d0		; set last-access time for 'cdev'
 
-	lea	_acctim,a0
+	lea	_acctim(a5),a0
 	move.l	_hz_200(a5),(a0,d0.w)
-	cmp.w	#1,_nflops		; if (nflops == 1) set other time, too
+	cmp.w	#1,_nflops(a5)		; if (nflops == 1) set other time, too
 *
 	move.l	_hz_200(a5),4(a0)	; set last-accessed time for floppy 1
 flopfail:
 	moveq	#m_unsure,d0		; disk change mode = UNSURE
-	movem.l	regsave,d3-d7/a3-a6	; restore C registers
+	movem.l	regsave(a5),d3-d7/a3-a6	; restore C registers
 	move.w	curr_err.w,d0		; get current error number
 	bra	unlok1			; clobber floppy lock & return
 
@@ -1066,9 +1070,9 @@ reset1770:
 .if TT
 	move.w	csect(a5),d7		;	caller's parameters
 	move.w	#$0114,d0		; 25 * 1.6us > 32us
-	move.b	cdma+3(a5),dmalow	; setup	DMA chip's DMA pointer
-	move.b	cdma+2(a5),dmamid
-	move.b	cdma+1(a5),dmahigh
+	move.b	cdma+3(a5),dmalow(a5)	; setup	DMA chip's DMA pointer
+	move.b	cdma+2(a5),dmamid(a5)
+	move.b	cdma+1(a5),dmahigh(a5)
 *
 * Wait >32us using a trick:  assume that Timer C is still as BIOS 
 * programmed it, counting down 5ms in 192 ticks.  Each tick is then
@@ -1175,7 +1179,7 @@ rwd2:	cmp.b	tcdr,d1
 .endif
 *+
 * change - check to see if the "right" floppy has been inserted
-	lea	_diskmode,a0		; a0 -> disk mode table
+	lea	_diskmode(a5),a0	; a0 -> disk mode table
 *	$10(sp) - dev.W (device#)
 	move.w	cdev(a5),d0		; d0.w = drive# (index into table)
 	move.b	(sp)+,(a0,d0.w)		; set drive's mode

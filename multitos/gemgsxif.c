@@ -34,10 +34,8 @@
 
 #include "machine.h"
 #include "vdidefs.h"
-
-EXTERN LONG	trap();
-EXTERN LONG	trap13();
-EXTERN LONG	trap14();
+#include "osbind.h"
+#include "vdomode.h"
 
 
 EXTERN	MFORM	gl_cmform;
@@ -325,7 +323,14 @@ gsx_wsopen( VOID )
 	if ( ( gl_vdo & HIGHWORD ) == FALCON )
 	{
 	  intin[0] = 5;		/* FALCON special res handle */
-	  a_rezword = (WORD)trap14( 95, a_rezword );	/* massage the res mode word */
+
+
+	  a_rezword = Validmode( a_rezword );	/* massage the res mode word */
+
+/* 80 column true color is not supported on VGA */
+	  if ((a_rezword & VGA) && (a_rezword & NUMCOLS) == BPS16)
+		a_rezword &= ~COL80;
+ 
 	  gl_ws.ws_pts0 = b_rezword = a_rezword;	
 	}
 
@@ -334,11 +339,11 @@ gsx_wsopen( VOID )
 	v_opnwk( &intin[0], &gl_handle, ( WORD *)&gl_ws, &gl_ws.ws_pts0 );
 
 	if ( ( gl_vdo & HIGHWORD ) == FALCON )
-	  a_rezword = (WORD)trap14( 88, -1 );	
+	  a_rezword = (WORD)setmode( -1 );	
 	
-	trap13( 3, 2, ' ' );		/* put system in raw mode */
+	Bconout( 2, ' ' );		/* put system in raw mode */
 
-	res = (WORD)trap14( 4 );
+	res = (WORD)Getrez();
 
 	gl_restype = res + 2;
 /*	gl_restype = res_type( res );	*/
@@ -856,4 +861,4 @@ vqt_width( inchar, space, dummx, dummy )
 	*dummx = ptsout[2];
 	*dummy = ptsout[4];
 }
-
+	

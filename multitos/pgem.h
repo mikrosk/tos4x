@@ -948,8 +948,8 @@ VOID	w_tooldraw(WINDOW *wp, WORD obj, GRECT *pc);
 
 BYTE	*allocIcnslots(VOID);
 VOID	freeIcnslots(BYTE *);
-WORD	findIcnslot(BYTE *, BYTE *, WORD *, WORD *, BYTE *);
-VOID	retIcnslot(BYTE *, BYTE *, BYTE *);
+WORD	findIcnslot(BYTE *, BYTE *, WORD *, WORD *, WORD *);
+VOID	retIcnslot(BYTE *, WORD *, BYTE *);
 
 
 /* FILE: MN_EVENT.C

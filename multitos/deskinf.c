@@ -454,7 +454,7 @@ inf_scan( buffer )
 						/* window's iconified status */
 		pcurr = scan_2( pcurr, &pws->w_iconified );
 
-		if (pws->w_iconified & 0x01) {
+		if (pws->w_iconified == 0x01) {
 						/* icon window's x position */
 			pcurr = scan_2( pcurr, &pws->w_sizes.g_x );
 			if ( pws->w_sizes.g_x >= gl_ncols )
@@ -475,8 +475,9 @@ inf_scan( buffer )
 						/* icon window's height	*/
 			pcurr = scan_2( pcurr, &pws->w_sizes.g_h );
 
+		} else {
+			pws->w_iconified = 0;
 		}
-
 		ptr = scasb( pcurr, '@' );
 		*ptr = 0;		/* take out the @ */	
 

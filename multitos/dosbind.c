@@ -35,7 +35,7 @@ EXTERN	WORD	gl_multi;
 /*  I know what this does, but I don't
 *  know why it's supposed to do it.
 */
-	WORD
+	LONG
 isdrive( VOID )
 {
 	return( dos_sdrv( dos_gdrv() ) );
@@ -262,11 +262,11 @@ dos_free(maddr)
 }
 
 
-	WORD
+	LONG
 dos_sdrv(newdrv)
 	WORD		newdrv;
 {
-	return( ( WORD )trap(X_SETDRV,newdrv) );
+	return( trap(X_SETDRV,newdrv) );
 }
 
 

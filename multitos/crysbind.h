@@ -71,6 +71,7 @@
 #define FORM_KEYBD 	55
 #define FORM_BUTTON 	56
 				/* Graphics Manager			*/
+#define GRAF_RWIN	69
 #define GRAF_RUBBOX 	70
 #define GRAF_DRAGBOX 	71
 #define GRAF_MBOX 	72
@@ -117,7 +118,8 @@
 #define SHEL_FIND 	124
 #define SHEL_ENVRN 	125
 
-
+/* extended functions:	APPL_GETINFO	130
+ */
 
 					/* max sizes for arrays		*/
 

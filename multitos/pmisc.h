@@ -106,7 +106,7 @@ WORD 	wind_update(WORD mode);
 /* FILE: DOSBIND.C
  * --------------------------------------------------------------------
  */
-WORD	isdrive( VOID );
+LONG	isdrive( VOID );
 
 LONG	dos_pexec( WORD mode, BYTE *name, BYTE *tail, BYTE *envr );
 
@@ -146,7 +146,7 @@ LONG	dos_chdir( LONG pdrvpath );
 
 WORD	dos_free( LONG maddr );
 
-WORD	dos_sdrv( WORD newdrv );
+LONG	dos_sdrv( WORD newdrv );
 
 WORD	do_cdir( WORD drive, BYTE *path );
 

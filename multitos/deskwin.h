@@ -32,9 +32,9 @@
 #define LFARROW		0x0200
 #define RTARROW		0x0400
 #define HSLIDE		0x0800
-#define SMALLER 	0x2000
+#define SMALLER 	0x4000
 
-#define ALLITEMS 0x2FFF
+#define ALLITEMS 0x4FFF
 
 #if 0
 typedef struct	grect
@@ -132,7 +132,7 @@ typedef	struct	window
 #define LFARROW 0x0200
 #define RTARROW 0x0400
 #define HSLIDE  0x0800
-#define SMALLER 0x2000
+#define SMALLER 0x4000
 
 						/* wind_create flags	*/
 #define WC_BORDER 	0

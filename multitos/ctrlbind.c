@@ -299,6 +299,27 @@ graf_mkstate(pmx, pmy, pmstate, pkstate)
 
 
 	WORD
+graf_rwind(xorigin, yorigin, wmin, hmin, grec, pwend, phend)
+	WORD		xorigin, yorigin, wmin, hmin;
+	GRECT		*grec;
+	WORD		*pwend, *phend;
+{
+	GR_I1 = xorigin;
+	GR_I2 = yorigin;
+	GR_I3 = wmin;
+	GR_I4 = hmin;
+	GR_I5 = grec->g_x;
+	GR_I6 = grec->g_y;
+	GR_I7 = grec->g_w;
+	GR_I8 = grec->g_h;
+	crys_if( GRAF_RWIN );
+	*pwend = GR_O1;
+	*phend = GR_O2;
+	return( RET_CODE );
+}
+
+
+	WORD
 graf_rubbox(xorigin, yorigin, wmin, hmin, pwend, phend)
 	WORD		xorigin, yorigin, wmin, hmin;
 	WORD		*pwend, *phend;

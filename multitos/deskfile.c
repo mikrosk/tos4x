@@ -221,23 +221,40 @@ sort_file( win, mode )
 	  {
 	    for( j = i - gap; j >= 0; j -= gap )
 	    {
-	      if ( mode == S_NO )
-		goto ss_1;
-		
-	      if ( ( dir[j+gap].d_att & SUBDIR ) && ( dir[j].d_att & SUBDIR ) )
-		goto ss_1;
-	
-	      if ( dir[j+gap].d_att & SUBDIR )
-		goto ss_2;
-	
-	      if ( dir[j].d_att & SUBDIR )
-		break;
-ss_1:
+#ifdef OUR_OPTIMIZER_WORKS
 	      dir1 = &dir[j];	      
 	      dir2 = &dir[j+gap];
 	      ps1 = &dir[j].d_name[0];
 	      ps2 = &dir[j+gap].d_name[0];
+#else
 
+/* thanks lattice -- your optimizer is broken, and you're also entirely
+ * too clever about the "sizeof" operator
+ * make sure SIZE_DIR_X is the same number as sizeof(DIR), but without
+ * using "sizeof"
+ */
+#define SIZE_DIR_X 28
+#if SIZE_DIR_X != sizeof(DIR)
+# error optimizer kludge broken, please check definitions
+#endif
+	      dir1 = (void *)(((BYTE *)dir)+j*SIZE_DIR_X);	      
+	      dir2 = (void *)(((BYTE *)dir1)+gap*SIZE_DIR_X);
+
+	      ps1 = dir1->d_name;
+	      ps2 = dir2->d_name;
+#endif
+	      if ( mode == S_NO )
+		goto ss_1;
+		
+	      if ( ( dir2->d_att & SUBDIR ) && ( dir1->d_att & SUBDIR ) )
+		goto ss_1;
+	
+	      if ( dir2->d_att & SUBDIR )
+		goto ss_2;
+	
+	      if ( dir1->d_att & SUBDIR )
+		break;
+ss_1:
 	      switch ( mode )
 	      {
 		case S_NO:
@@ -285,9 +302,16 @@ ss_1:
 	      if ( ret <= 0 )
 	        break;
 		
-ss_2:	      buff = dir[j];
+ss_2:
+#ifdef OUR_OPTIMIZER_WORKS
+	      buff = dir[j];
 	      dir[j] = dir[j+gap];
-	      dir[j+gap] = buff;		      	      	 
+	      dir[j+gap] = buff;
+#else
+	      buff = *dir1;
+	      *dir1 = *dir2;
+	      *dir2 = buff;
+#endif
 	    }
 	  }
 	}

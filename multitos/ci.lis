@@ -83,7 +83,7 @@ interrup.s
 kballoc.c
 large.s
 machine.h
-makefile
+makegem
 mediach.s
 message.h
 mintbind.h

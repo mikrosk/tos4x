@@ -34,9 +34,9 @@
 #define HSLIDE	0x0800
 
 /* added 4/22/93 ERS; */
-/* changed from 0x1000 to 0x2000 for PC compatibility, 7/19/93 */
+/* changed from 0x1000 to 0x4000 for PC compatibility, 7/19/93 */
 /* (0x1000 is used under PC GEM for repeat fct on Close Box)   */
-#define SMALLER	0x2000
+#define SMALLER	0x4000
 
 #if 0
 /* Added Jul 23 91 for new window manager - ml. */

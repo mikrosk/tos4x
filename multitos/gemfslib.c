@@ -117,13 +117,13 @@ VOID	AbbrevMask( BYTE *source, BYTE *dest, WORD width );
 WORD	fs_formdo( OBJECT *tree, WORD start_fld );
 VOID	CleanFSDirt( OBJECT *dialog_tree, WORD obj, OBJECT *fs_tree );
 
-WORD	DoFullMaskDialog( VOID );
-VOID	MaskTailEnd( WORD mn_item );
-WORD	BuildFullMask( VOID );
-VOID	FullMaskHandler( WORD ClearFnameFlag, UWORD *count );
-WORD	ParseFullMask( VOID );
-VOID	SetupSelFile( BYTE *fname );
-WORD	IsFullMaskEmpty( VOID );
+MLOCAL WORD	DoFullMaskDialog( VOID );
+MLOCAL VOID	MaskTailEnd( WORD mn_item );
+MLOCAL WORD	BuildFullMask( VOID );
+MLOCAL VOID	FullMaskHandler( WORD ClearFnameFlag, UWORD *count );
+MLOCAL WORD	ParseFullMask( VOID );
+MLOCAL VOID	SetupSelFile( BYTE *fname );
+MLOCAL WORD	IsFullMaskEmpty( VOID );
 
 WORD	FindFSFile( BYTE *str, BYTE attrib, WORD count );
 
@@ -203,7 +203,9 @@ GLOBAL  BYTE	*TitleCopy;		/* Copy fo File Extension	*/
 
 GLOBAL	BYTE 	*ad_back;		/* backup Ptr to FDIRECTO text  */
 GLOBAL	OBJECT  *fs_menu;		/* OBJECT tree for dynamic menu */
-GLOBAL	MENU    Menu, MData;		/* Popup Menu Data Structures   */
+MLOCAL	MENU    Menu, MData;		/* Popup Menu Data Structures   */
+					/* must be MLOCAL, same names are used
+					   in the desktop */
 
 GLOBAL  BYTE    UsedPaths[ MAX_USED_PATHS ][ LPATH ];		/* Store the last 8 paths used */
 GLOBAL  BYTE	FullMaskText[ MAX_MULTI_LIMIT ][ LEN_FSNAME ];  /* Store 6 8.3 masks.	       */
@@ -325,7 +327,7 @@ fs_input( pipath, pisel, pbutton, lstring )
 	WORD		*pbutton;
 	BYTE		*lstring;
 {
-REG	UWORD	i,j;
+REG	LONG	i,j;
 REG	LONG	tree;
 	OBJECT	*obj;
 	LONG	addr,mul,savedta,savepath;
@@ -339,6 +341,7 @@ REG	LONG	tree;
 	GRECT	clip;
 	OBJECT	*xtree;
 	WORD    newend, oldend;
+	LONG	drives;
 
 	WORD	xpos, ypos;		/* x and y pos for popup menus */
 	BYTE	*sptr, *dptr;		/* BYTE *ptrs for string funcs */
@@ -456,7 +459,7 @@ REG	LONG	tree;
 	fs_sset( tree, FSELECTI, ( LONG )"", &ad_select, ( WORD *)&addr );
 
 						/* get the current drive */
-	count = isdrive();
+	drives = isdrive();
 	j = 1;
 						/* start from A drive	*/
 						/* set the button	*/
@@ -468,7 +471,7 @@ REG	LONG	tree;
 	 * -------------------------------------------------------------
 	 */
 	 for( i = DRIVEA; i <= DRIVEZ; i++ ) {	/* CJG use A-Z		*/
-	    if ( count & j )			/* drive present	*/
+	    if ( drives & j )			/* drive present	*/
 	      ad_drives[i].ob_state &= ~DISABLED;
 	    else
 	      ad_drives[i].ob_state |= DISABLED;
@@ -2563,7 +2566,7 @@ CleanFSDirt( OBJECT *dialog_tree, WORD obj, OBJECT *fs_tree )
  * Display the 8.3 Mask Editing Dialog Box.
  * Build a mask based upon the multiple masks.
  */
-WORD
+MLOCAL WORD
 DoFullMaskDialog( VOID )
 {
     WORD flag;
@@ -2629,7 +2632,7 @@ DoFullMaskDialog( VOID )
  * ====================================================================
  * The EBUTTON Switch tail end code - created to avoid GOTOs
  */
-VOID
+MLOCAL VOID
 MaskTailEnd( WORD mn_item )
 {
      REG BYTE *sptr;
@@ -2675,7 +2678,7 @@ MaskTailEnd( WORD mn_item )
  *	MaskTemplate - String array holding the global multiple mask string
  *	ad_fmask     - OBJECT *ptr to the multiple mask dialog tree
  */
-WORD
+MLOCAL WORD
 BuildFullMask( VOID )
 {
     REG  WORD i,j;
@@ -2836,7 +2839,7 @@ BuildFullMask( VOID )
  *	     ad_fstree - file selector tree
  *	     fs_count  - global counter for # of files to display.
  */
-VOID
+MLOCAL VOID
 FullMaskHandler( WORD ClearFnameFlag, UWORD *count )
 {
     WORD out;
@@ -2882,7 +2885,7 @@ FullMaskHandler( WORD ClearFnameFlag, UWORD *count )
  *		CurSort      - Current Sorting Value
  *		MaskTemplate - String Array holding Multiple Mask String
  */
-WORD
+MLOCAL WORD
 ParseFullMask( VOID )
 {
       REG   WORD  i;
@@ -2923,7 +2926,7 @@ ParseFullMask( VOID )
  * Setup the file selector to display the filename.  We adjust the
  * index to display the filename within the scroll area if it exists.
  */
-VOID
+MLOCAL VOID
 SetupSelFile( BYTE *fname )
 {
       WORD out;
@@ -2954,7 +2957,7 @@ SetupSelFile( BYTE *fname )
  * ====================================================================
  * Check to see if the Full 8.3 Masks are empty. If so, return TRUE.
  */
-WORD
+MLOCAL WORD
 IsFullMaskEmpty( VOID ) 
 {
    REG WORD i;

@@ -12,7 +12,7 @@
 /*	Fix ob_format to not right justify	2/25/93 H.M.Krober	*/
 /*	Fix trans_cicon() and free_cicon()	4/30/93 C.Gee and E.Smith */
 /*	Add GDOS font support to TEDINFO	5/21/93 H.M.Krober	*/
-
+/*	Fix problem with char mode		7/15/93 H.M.Krober	*/
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
 *	Copyright (C) 1992 
@@ -35,7 +35,6 @@
 #include "dispvars.h"
 #include "objaddr.h"
 
-#define USE_OB_GCLIP	1
 
 #define ADJOUTLPIX 	3
 #define ADJSHADPIX 	SHADOW
@@ -60,6 +59,7 @@ EXTERN LONG	gl_mntree;
 EXTERN WORD	mn_fontid;
 EXTERN WORD	mn_fsize;
 
+EXTERN GRECT	gl_rzero;
 
 /* This is the color table of RGB values that VDI expects in pixel-
  * packed mode (This whole table can be moved to a separate file).
@@ -337,9 +337,9 @@ WORD	    icol;	/* interior color */
     gsx_1code(15, 7);
     gsx_1code(113, -1);			/* solid line style */
 
-    if (clip)
+    if (clip) {
 	gsx_sclip(prect);
-
+    }
     rc_copy( ( WORD *)prect, ( WORD *)&r);
 
     if (th > 0) {			/* if border is inside,	    */
@@ -693,9 +693,8 @@ just_draw(tree, obj, sx, sy)
 		    }
 		    else icol = xor16(icol);
 		  }
-
-		  gr_rect(icol, ipat, pt);
-		  gr_inside(pt, -tmpth);
+		   gr_rect(icol, ipat, pt);
+		   gr_inside(pt, -tmpth);
 
 		}
 		break;
@@ -727,6 +726,8 @@ just_draw(tree, obj, sx, sy)
 		  D.g_fmtstr[1] = NULL;
 		  edblk.te_just = TE_CNTR;
 		  edblk.te_font = IBM;
+		  edblk.te_fontid = 0;
+		  edblk.te_fontsize = 0;
 		}
 						/* fall thru to gr_gtext*/
 	    case G_TEXT:
@@ -739,10 +740,10 @@ just_draw(tree, obj, sx, sy)
  		    pt->g_w -= (ADJ3DPIX << 1);
 		    if (!(state & SELECTED) && mvtxt) {
 			pt->g_x -= 1;
-			pt->g_y -= 1; 
+			pt->g_y -= 1;
 			gr_gtext(edblk.te_just, edblk.te_ptext, pt, tmode);
 			pt->g_x += 1;
-			pt->g_y += 1;
+			pt->g_y += 1; 
 		    } else {
 			gr_gtext(edblk.te_just, edblk.te_ptext, pt, tmode);
 		    }
@@ -802,6 +803,10 @@ just_draw(tree, obj, sx, sy)
 	     (obtype == G_TITLE) ||
              (obtype == G_BUTTON) )
 	{
+	  set_cufont(IBM, 0, 0); 	/* moved up, 7/15/93 HMK 	 */
+					/* because of char map mode, the */
+					/* setting of the font has to	 */
+					/* happen before the str2intin   */
 	  len = str2intin(( BYTE *)spec);
 	  if (len)
 	  { 				/* 8/3/92 */
@@ -825,7 +830,9 @@ just_draw(tree, obj, sx, sy)
 	    } else {
 	      tmpx = pt->g_x;
 	    }
-	    set_cufont(IBM, 0, 0);
+#if 0
+	    set_cufont(IBM, 0, 0);  /* move up a few lines, HMK */
+#endif
 	    gsx_tblt(tmpx, tmpy, len);
 	  }
 	}
@@ -886,8 +893,8 @@ just_draw(tree, obj, sx, sy)
 	  if ( state & CHECKED )
 	  {
 	    gsx_attr(TRUE, MD_TRANS, BLACK);
+	    set_cufont(IBM, 0, 0);		/* moved before str2intin, HMK */
 	    str2intin("\010");			/* a check mark	*/
-	    set_cufont(IBM, 0, 0);
 	    gsx_tblt(pt->g_x+2, pt->g_y, 1);
 	  }
 
@@ -925,7 +932,9 @@ just_draw(tree, obj, sx, sy)
 	    draw_hi(&c, NORMAL, FALSE, thick, icol);
 /**/
 	}
+#if 0
 	set_cufont(IBM, 0, 0);		/* just to make sure ... */
+#endif
 } /* just_draw */
 
 
@@ -1035,7 +1044,7 @@ doobfind(tree, currobj, depth, mx, my, just_inside)
 	  if (!just_inside)
 	  {
 	    state = LWGET(OB_STATE(currobj));
-
+#if 0
 	    if ( state & SHADOWED )
 	    {	
 	      ob_relxywh(tree, currobj, pt);
@@ -1043,6 +1052,7 @@ doobfind(tree, currobj, depth, mx, my, just_inside)
 	      pt->g_y += o.g_y;
 	    }
 	    else
+#endif
 	      ob_gclip( tree, currobj, &dummy, &dummy, &pt->g_x, &pt->g_y,
 		      &pt->g_w, &pt->g_h );
 	  }

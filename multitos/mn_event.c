@@ -61,6 +61,10 @@
  *		     Handles UP, DOWN, SHIFT-UP and SHIFT-DOWN for the
  *		     scrolling menus and drop-down menus. Scrolling menus
  *		     only do UP and DOWN tho...
+ * 07/16/93  cjg   - Adjusted width of a DropDown List to be 
+ *		     4 character widths wider than normal for Pop_Blit().
+ * 08/05/93  cjg   - Fixed Pop_Blit() - added 2L to the size of the malloc.
+ *		     and 2L to blit as an offset.
  */
 
 
@@ -1276,7 +1280,7 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
     * the sliders if we're a drop down list.
     */
    if( DListFlag )
-      clip.g_w += ( gl_wchar * 3 );
+      clip.g_w += ( gl_wchar * 4 );
 
    rc_intersect( &gl_rfull, &clip );	/* clip to the work area*/
    gsx_sclip( &clip );			/* set the clip		*/
@@ -1286,7 +1290,7 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
        size = (LONG)(( LONG ) ((LONG)( ((LONG)clip.g_w + 15L )/16L )*2L)*
               (LONG)clip.g_h * (LONG)gl_nplanes );
                
-       MBUFFER( MenuPtr ) = ( LONG *)dos_xalloc( size, 3 );
+       MBUFFER( MenuPtr ) = ( LONG *)dos_xalloc( size + 2L, 3 );
    }
    if( !MBUFFER( MenuPtr ) )	 /* No memory - FAILURE        */
    {
@@ -1295,7 +1299,7 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
    }
 
    /* Setup the Destination MFDB */
-   ObjMFDB.fd_addr    = (LONG)MBUFFER( MenuPtr ) + 1L;
+   ObjMFDB.fd_addr    = (LONG)MBUFFER( MenuPtr ) + 2L;
    ObjMFDB.fd_w       = clip.g_w;
    ObjMFDB.fd_h       = clip.g_h;
    ObjMFDB.fd_wdwidth = ( clip.g_w + 15 ) / 16;       

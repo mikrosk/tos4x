@@ -1,47 +1,48 @@
 # The official makefile for GEM compiled with Alcyon and Lattice
-# makefile for Lattice C 5.5
+# makefile for GNU C 2.2.2
+# make sure that gcc and gnu2dri are on your path
+# also, make sure the following environment variables are
+# set:
 #
-
+# setenv GCCEXEC f:\gnu\bin\gcc-
+# setenv GNULIB f:\gnu\lib
+# setenv GNUINC f:\gnu\inc
+# setenv TEMP m:
+# setenv UNIXMODE /cud
 
 #
 # Compiler options
 #
 
-DEFINES	= #-pr # makes prototypes, leave off for now
+DEFINES	= 
 
-# Flags for lc.ttp
+# Flags for gcc.ttp
 #
-# -w	16-bit ints
-# -b0	full 32-bit addressing
-# -bn	unknown
-# -r0	subroutine calls will use absolute 32-bit relocated address
-# -d 	Just enables debug info from line number/offset table
-# -v	disable stack checking
-# -rs	standard stack params
-# -z2	generate DRI format objects
-# -cf	force prototype checking
-# NOTE: 3 files do not like the optimizer: deskdisk.c gemfslib.c deskfile.c
+# -mshort	16-bit ints
+# -O2		optimize highly (-O might be safer)
+# -fomit-frame-pointer	don't use A6 as a frame pointer unless
+#		necessary; bad for debugging, good for production
+# -m68020	use 68020 opcodes
+# -mpcrel	use PC relative addressing when possible
+# -Wall		emit warnings
 
-CMODEL	= -w -b0 -bn -r0 -v -rs -m3 -z2 -cf #-O
+CMODEL	= -mshort -m68020 -mpcrel -Wall -O2 -fomit-frame-pointer
 CFLAGS	= $(DEFINES) $(CMODEL)  
 
-##LCC_OPT=-C -cefishtu -q- -v -.
 
-# Flags for just linking, see target
-#
-# -N	don't compile, just link
-# -Labg	a	cause extended debug info in executable
-#	b	batch option of the linker
-#	g	search the AES and VDI library first
-LDFLAGS	= -N $(CMODEL) -d -Labg 
+# Flags for just linking; not used for now, since we use
+# aln to link.
 
-# Assembly flags
+LDFLAGS	= $(CMODEL)
+
+# Assembly flags for mac, I guess
 #
 ASFLAGS = $(DEFINES) -ic:\lc5\i
 
 .c.o:
-	lc -c $(CFLAGS) -o$@ $<
-
+	gcc $(CFLAGS) -o temp.xxx -c $<
+	gnu2dri temp.xxx $@
+	rm temp.xxx
 
 .s.o:
 	mas -us $*.s
@@ -83,7 +84,7 @@ RSC6 = 		glue.spa
 #
 
 AB = 		gemctrl.o ctrlbind.o mn_event.o mn_mbar.o mn_popup.o\
-		mn_tools.o mn_index.o mn_menu.o mn_submn.o
+		mn_tools.o mn_index.o mn_menu.o mn_submn.o mn_slide.o
 
 STARTUP =	gemstart.o
 
@@ -91,7 +92,7 @@ AESOBJ =	gemaints.o gemaplib.o gembase.o gemcli.o\
 		gemdisp.o gemevlib.o gemflag.o gemfmalt.o gemfmlib.o\
 		gemfslib.o gemsigna.o \
 		gemobjop.o gemqueue.o gemrlist.o gemrom.o\
-		gemsclib.o gemshlib.o gemtcpip.o gemwmlib.o romcart.o\
+		gemsclib.o gemshlib.o gemwmlib.o romcart.o\
 		apgrlib.o apgsxif.o gembind.o gemgrlib.o gemgsxif.o\
 		dosbind.o utility.o \
 		gemmnlib.o gemasync.o \
@@ -110,7 +111,7 @@ DESKOBJ = 	deskact.o deskapp.o deskvdi.o deskbutt.o \
 		aesbin73
 
 LCFILES = deskact.o gemrom.o gemrslib.o gemsclib.o gemwmlib.o gemsclib.o \
-gemshlib.o gemsigna.o gemtcpip.o mn_event.o mn_index.o mn_mbar.o mn_menu.o \
+gemshlib.o gemsigna.o mn_event.o mn_index.o mn_mbar.o mn_menu.o mn_slide.o \
 mn_popup.o mn_submn.o mn_tools.o deskshow.o desktop.o deskupda.o deskvari.o \
 deskvdi.o deskwin.o gemmnlib.o gemobed.o gemobjop.o gemoblib.o gempd.o \
 gemqueue.o utility.o romcart.o geminit.o gemgrlib.o gemgsxif.o gemaplib.o \
@@ -158,7 +159,6 @@ gemwmlib.o: $(STGEM.H) $(GEMPD.H) $(GEMOLIB.H) aesmint.h
 gemsclib.o: $(STGEM.H) $(GEMPD.H) $(GEMOLIB.H)
 gemshlib.o: $(STGEM.H) $(GEMPD.H) $(GEMOLIB.H) objaddr.h gemdos.h aesmint.h signal.h
 gemsigna.o: $(STGEM.H) $(GEMPD.H) $(GEMOLIB.H) aesmint.h
-gemtcpip.o: $(STGEM.H) $(GEMPD.H) $(GEMOLIB.H) aesmint.h
 gemmnlib.o: $(STGEM.H) $(GEMPD.H) $(GEMOLIB.H) objaddr.h aesmint.h signal.h
 gemobed.o:  $(STGEM.H) $(GEMPD.H) $(GEMOLIB.H) objaddr.h
 gemobjop.o: $(STGEM.H) $(GEMPD.H) $(GEMOLIB.H) objaddr.h vdidefs.h

@@ -1,3 +1,61 @@
+Changes made 6/23/93:
+
+desk*.rsc:
+	Modified the "SET FONT" popup in SSCREEN so that the scrolling
+	font list will always appear completely on the screen in 400
+	and 200 pixel high resolutions.
+deskmenu.c:
+	Don't allow scrolling of iconified windows with the cursor
+	keys.
+ 
+Changes made 6/22/93:
+
+makegem:
+	Included explicit dependencies for the glue files, so that
+	they'll be made automatically.
+utility.c,deskinf.c,geminit.c:
+	Provide sanity checking for Falcon video modes, and also
+	try to provide some backwards compatibility with old .INF
+	files. Make TTs and STs save a video mode in the NEWDESK.INF
+	file that will approximate what a Falcon would want.
+
+Changes made 6/21/93:
+
+desktop.c, apgsxif.c:
+	Only load fonts if the control key is *not* down.
+
+Changes made 6/18/93:
+
+deskbutt.c:
+	Made it impossible to "scroll" an iconified window with a rubber
+	band (i.e. by holding down the mouse button inside the window but
+	not over the icon, and then sweeping a rectangle out).
+deskmem.c:
+	Made optimizer-friendly by removing a goto.
+
+Changes made 6/17/93:
+
+*.c,aestrap.s:
+	Changed cli/sti pairs to spl7/spl pairs; the advantage of
+	spl is that it doesn't use a global variable, and hence is
+	re-entrant; plus, it's inlined in pgem.h and so is faster.
+gemfmalt.c:
+	In eralert(), wait for the button to come up before responding
+	to clicks in critical error alerts.
+desktop.c:
+	Moved the "deskerr" call before the resource load; that way
+	we avoid the "Drive A: is not responding" error when looking
+	for A:\DESKTOP.RSC and no disk is in drive A:.
+
+Changes made 6/16/93:
+
+gemwmlib.c:
+	16 colors is >= 4 planes, not 2 planes.
+desktop.c:
+	Fixed d_maxcolor definition.
+*.o:
+	More optimization fixes.
+
 Changes made 6/15/93:
 
 gemctrl.c:

@@ -1351,7 +1351,7 @@ currxywh:
 	
 	    w_adjust(wp, &rect, FALSE);  
 					 /* above fct. messes up sliders, so */
-	    if (field == WF_UNICONIFY) { /* restore slider pos. HMK 7/15/93  */
+	    if (TRUE || field == WF_UNICONIFY) { /* restore slider pos. HMK 7/15/93  */
 		    if (wp->kind & HSLIDE)
 			    w_setslide( wp, WF_HSLIDE );
 		    if (wp->kind & VSLIDE)
@@ -3308,10 +3308,11 @@ findIcnslot(slots, curr_icnmax, x, y, slotnr)
 	REG BYTE *slots;
 	BYTE	 *curr_icnmax;
 	WORD	 *x, *y;
-	BYTE	 *slotnr;
+	WORD	 *slotnr;
 {
 	REG WORD i, c, r;
 	WORD	 rows, cols;
+	WORD	 max;
 
 	rows = gl_rfull.g_h / WINICON_H;
 	cols = gl_rfull.g_w / WINICON_W;
@@ -3319,16 +3320,21 @@ findIcnslot(slots, curr_icnmax, x, y, slotnr)
 Debug1("find: rows="); Ndebug1((LONG) rows);
 Debug1("find: cols="); Ndebug1((LONG) cols);
 
+	max = 0;
 	do {
+	   do {
 		for (r = rows - 1; r >= 0; r--) {
 			for (c = 0; c < cols; c++) {
 				i = (r * cols) + c;
-				if ((slots[i] <= *curr_icnmax) && 
+Debug1("slot nr="); Ndebug1((LONG) i);
+Debug1("slots[i]="); Ndebug1((LONG) slots[i]);
+				if ((slots[i] <= max) && 
 				    (slots[i] < 127)) {
-					slots[i] += 1;
+					slots[i]++;
 					*x = c * WINICON_W;
-					*y = ((r+1) * WINICON_H) - gl_rfull.g_y;
-					*slotnr = (BYTE) i;
+					*y = gl_rfull.g_y + gl_rfull.g_h - 
+						((rows - r) * WINICON_H);
+					*slotnr = i;
 Debug1("slot nr="); Ndebug1((LONG) i);
 Debug1("row="); Ndebug1((LONG) r);
 Debug1("col="); Ndebug1((LONG) c);
@@ -3339,7 +3345,9 @@ Debug1("curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
 				}
 			}
 		}
-		(*curr_icnmax)++;
+		max++;
+	    } while (max <= *curr_icnmax);
+	    (*curr_icnmax)++;
 	} while (*curr_icnmax < 127);
 	
 	return FALSE;
@@ -3348,20 +3356,28 @@ Debug1("curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
 	VOID
 retIcnslot(slots, slotnr, curr_icnmax)
 	BYTE	*slots;
-	BYTE	*slotnr;
+	WORD	*slotnr;
 	BYTE	*curr_icnmax;
 {
 	WORD		flag;
 	REG WORD	i, n;
 	WORD		rows, cols;
+	WORD		dummy = 0;
+	REG BYTE	*sp;
 
 Debug1("ret: slotnr="); Ndebug1((LONG) *slotnr);
 
-	if (*slotnr == (BYTE) -1)
+	if (*slotnr == -1)
 		return;
 
-	slots[*slotnr] -= 1;
-	*slotnr = (BYTE) -1;
+Debug1("ret: - slots[*slotnr]="); Ndebug1((LONG) slots[*slotnr]);
+	slots[*slotnr]--;
+	slots[*slotnr] = (slots[*slotnr] < 0) ? 0 : slots[*slotnr];
+
+Debug1("ret: + slots[*slotnr]="); Ndebug1((LONG) slots[*slotnr]);
+	dummy++;
+	*slotnr =  -1;
+
 
 	rows = gl_rfull.g_h / WINICON_H;
 	cols = gl_rfull.g_w / WINICON_W;
@@ -3369,12 +3385,14 @@ Debug1("ret: slotnr="); Ndebug1((LONG) *slotnr);
 Debug1("ret: before curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
 	n = rows * cols;
 	flag = TRUE;
-	for (i = 0; i < n; i++, slots++) {
-		if (*slots >= *curr_icnmax)
-			flag = FALSE;	 
-	}
-	if (flag)
-		(*curr_icnmax)--;
+	do {
+		for (i = 0, sp = slots; i < n; i++, sp++) {
+			if (*sp >= *curr_icnmax)
+				flag = FALSE;	 
+		}
+		if (flag)
+			(*curr_icnmax)--;
+	} while (flag && (*curr_icnmax > 0));
 
 	Debug1("ret: after curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
 }

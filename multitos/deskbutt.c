@@ -155,8 +155,11 @@ hd_button( WORD clicks, WORD kstate, WORD mx, WORD my )
 	       if ( !keypress )		/* shift key down?	*/
 		clr_xwin( win, FALSE );
 		
-	       r_box( win->w_id, win );
-	       winfo( win );
+	       if (!win->w_iconified)
+	       {
+	         r_box( win->w_id, win );
+	         winfo( win );
+	       }
 	       return;
 	     }
 	     else			/* hit something	*/

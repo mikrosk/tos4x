@@ -161,18 +161,25 @@ gr_xor(clipped, cnt, cx, cy, cw, ch, xstep, ystep, dowdht)
 	REG WORD		xstep, ystep;
 	WORD		dowdht;
 {
+	GRECT crect;
+
+	crect.g_x = cx;
+	crect.g_y = cy;
+	crect.g_w = cw;
+	crect.g_h = ch;
+
 	do
 	{
 	  if (clipped)
-	    gsx_xcbox( ( GRECT *)&cx);
+	    gsx_xcbox( &crect );
 	  else
-	    gsx_xbox( ( GRECT *)&cx);
-	  cx -= xstep;
-	  cy -= ystep;
+	    gsx_xbox( &crect );
+	  crect.g_x -= xstep;
+	  crect.g_y -= ystep;
 	  if (dowdht)
 	  {
-	    cw += (2 * xstep);
-	    ch += (2 * ystep);
+	    crect.g_w += (2 * xstep);
+	    crect.g_h += (2 * ystep);
 	  }
 	} while (cnt--);
 }

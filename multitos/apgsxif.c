@@ -20,6 +20,8 @@
 #include "obdefs.h"
 #include "vdidefs.h"
 #include "mintbind.h"
+#include "osbind.h"
+#include "gemdos.h"
 
 #include "pgem.h"
 #include "pmisc.h"
@@ -27,6 +29,7 @@
 EXTERN	VOID 	gsx2( VOID );
 
 EXTERN	WORD	min();
+EXTERN	WORD	ctldown;
 EXTERN	BYTE	AE_PNTSIZE[];
 EXTERN	BYTE	AE_FONTID[];
 
@@ -37,6 +40,7 @@ GLOBAL	WORD	gl_fsm;		/* 0 system font 	*/
 GLOBAL	WORD	gl_spd;		/* Speedo engine	*/
 
 GLOBAL	WORD	gl_numfonts;
+GLOBAL	WORD	scnd_load;
 
 GLOBAL	WORD	gl_size;
 GLOBAL	WORD	gl_width;
@@ -104,6 +108,7 @@ GLOBAL WORD	cu_font;	/* current font type used	*/
 				/*  5 = Small Font		*/
 				
 GLOBAL WORD	cu_fntid;	/* current font id (GDOS)	*/	
+GLOBAL WORD	cu_size;	/* current font size 		*/
 GLOBAL WORD	cu_wchar;	/* current char width		*/
 GLOBAL WORD	cu_hchar;	/* current char height		*/
 GLOBAL WORD	cu_space;	/* current char space		*/
@@ -116,6 +121,9 @@ GLOBAL WORD	cu_prop;	/* current font uses 		*/
 
 WORD	bitstmap;		/* TRUE = use Bitstream char map*/
 				/* FALSE = use ATARI char map   */
+
+WORD	gl_bitstmap;
+
 
 /*
  *	Bitstream character mapping table
@@ -171,9 +179,10 @@ gsx_sclip(pt)
 	  ppts[2] = gl_xclip + gl_wclip - 1;
 	  ppts[3] = gl_yclip + gl_hclip - 1;
 	  vst_clip( TRUE, &ppts[0]);
-	}
-	else
+	} 
+	else 
 	  vst_clip( FALSE, &ppts[0]);
+
 	return( TRUE );
 }
 
@@ -508,11 +517,12 @@ gsx_lfont( buffer )
 	  for ( i = 0; i < gl_numfonts; i++ )
 	  {
 	    id = v_font_name( i, name, &type );
-
+	
 	    if ( id == (WORD)l )
 	    {
 	      gl_fid = id;
 	      gl_fsm = type;
+	      gl_bitstmap = bitstmap = type;
 	      v_setfont( gl_fid );
 	      s_pntsize("10");	/* set default point size */	
 	      break;
@@ -541,7 +551,8 @@ gsx_start()
 	gl_fsm = 0;
 	gl_fid = 1;
 	gl_numfonts = 1;
-	  
+	gl_bitstmap = bitstmap = 0;
+  
 	for (i = 0; i < 10; i++)
 		work_in[i] = 1;
 	work_in[10] = 2;	/* RC */
@@ -556,10 +567,10 @@ gsx_start()
 
 	gl_spd = 0;
 
-	if ( aescookie( 0x46534d43L, (LONG *)&l ) )	/* FSMC */
+	if (aescookie( 0x46534d43L, (LONG *)&l ) )	/* FSMC */
 	{
 	  if ( (*l++ == 0x5F535044L) && 
-	  (((WORD)(*l >> 16)) >= 0x0411) ) { /* _SPD */
+	  (((WORD)(*l >> 16L)) >= 0x0411) && !ctldown) { /* _SPD */
 	    	gl_spd = 1; /* at least Version 4.11 */
 	  }
 	}
@@ -580,17 +591,20 @@ gsx_start()
 	
 	gl_size = 0;
 	gl_ws.ws_chmaxh = gl_hptschar;	/* max height of character	*/
+					/* Set the small char height size	*/
+	vst_height( gl_ws.ws_chminh, &gl_wsptschar, &gl_hsptschar, &gl_wschar, &gl_hschar );
 					/* Set the default char height size	*/
 	vst_height( gl_ws.ws_chmaxh, &gl_wptschar, &gl_hptschar, &gl_wchar, &gl_hchar );
 
-					/* Set the small char height size	*/
-	vst_height( gl_ws.ws_chminh, &gl_wsptschar, &gl_hsptschar, &gl_wschar, &gl_hschar );
 
 					/* Load AES font type	*/
-	if (gl_spd) 
+	if (gl_spd) {
+		if (!scnd_load)
+			Cconws("Loading GDOS fonts.\r\n");
+		scnd_load = TRUE;
 		gl_numfonts = v_load_fonts();	/* +++ HMK 5/18/93*/
-
-	Debug1( "Set font\r\n" );
+	}
+	Debug7( "Set font\r\n" );
 
 	(VOID) s_aescnf( AE_FONTID,  (WORD (*)()) &gsx_lfont );
 	(VOID) s_aescnf( AE_PNTSIZE, (WORD (*)()) &s_pntsize );
@@ -644,13 +658,17 @@ gsx_start()
 	/* Set up current font information, +++ HMK 05/18/93  */
 	cu_font		= IBM;
 	cu_fntid	= gl_fid;
+
 	cu_wchar	= gl_wchar;
 	cu_hchar	= gl_hchar;
 	cu_space	= gl_space;
 	cu_wptschar	= gl_wptschar;
 	cu_hptschar	= gl_hptschar;
-	cu_prop		= 0;
-	cu_spd		= gl_spd;
+#if 0					/* done in gsx_lfont() */
+	gl_bitstmap = bitstmap = (cu_fntid > 1);	
+#endif
+	cu_prop		= TRUE;		/* for system font, use v_gtext */
+	cu_spd		= gl_fsm;
 
 Debug1("gsx_start: GL_HCHAR    ="); Ndebug1((LONG)gl_hchar);
 Debug1("gsx_start: GL_HPTSCHAR ="); Ndebug1((LONG)gl_hptschar);
@@ -741,8 +759,16 @@ WORD	size;
 	WORD		dummy;
 	WORD		buf;
 	
+	if (((font == IBM) || (font == SMALL)) && (cu_font == font)) {
+		return cu_font;
+	} else if ((font == cu_font) && (font_id == cu_fntid) && (cu_size == size)) {
+		if (font < 2)	/* SPEEDO FONT */
+			bitstmap = TRUE;
+		return cu_font;
+	}
+
 	buf = intin[0];
-	
+
 	Debug7("set_cufont: font = ");  Ndebug7((LONG) font);
 	Debug7("set_cufont: fontid = ");  Ndebug7((LONG) font_id);
 	Debug7("set_cufont: fontsize = ");  Ndebug7((LONG) size);
@@ -760,6 +786,8 @@ WORD	size;
 			goto GO_IBM;
 		cu_font = font;
 		cu_fntid = font_id;
+		cu_size = size;
+		bitstmap = TRUE;
 		cu_prop = FALSE;
 		cu_spd = TRUE;
 		if (size == -1)
@@ -771,14 +799,17 @@ WORD	size;
 		cu_wchar = cu_space;
 		break;
 
-	case GDOS_BITM:		/* old GDOS bitmap font       */
-	case GDOS_PROP:		/* PROPORTIONAL FONT (SPEEDO) */
+	case GDOS_BITM:		/* old GDOS bitmap font       		  */
+	case GDOS_MBITM:	/* old GDOS bitmap font (monospaced)      */
+	case GDOS_PROP:		/* PROPORTIONAL FONT (SPEEDO) 		  */
 
 		if (v_setfont(font_id) != font_id)
 			goto GO_IBM;
-		cu_font = font;
+		cu_font = font;		
 		cu_prop = TRUE;
 		cu_fntid = font_id;
+		cu_size = size;
+		bitstmap = (font == GDOS_PROP);
 		if (size == -1)
 			size = (gl_size) ? gl_size : 10;
 		if (gl_spd && (font == GDOS_PROP)) {
@@ -800,16 +831,22 @@ GO_IBM:
 		if (!gl_size) {
 				vst_height( gl_ws.ws_chmaxh, &dummy, &dummy, &dummy, &dummy );
 				cu_prop = TRUE;  /* use v_gtext */	
+				cu_spd = FALSE; 
 		} else {
 			if ( gl_fsm ) {
 	  			vst_arbpt( gl_size, &dummy, &dummy, &dummy, &dummy );
 				cu_prop = FALSE;
+				cu_spd = TRUE; 
 	    		} else {
 				v_setpoint( gl_size, &dummy, &dummy, &dummy, &dummy );
 				cu_prop = TRUE;
+				cu_spd = FALSE; 
 			}
 		}
 		cu_fntid = gl_fid;
+		cu_size = size;
+		bitstmap = gl_bitstmap;
+
 		cu_wchar = gl_wchar;
 		cu_hchar = gl_hchar;
 		cu_space = gl_space;
@@ -820,6 +857,8 @@ GO_IBM:
 	case SMALL:		/* small system font */
 		cu_font = font;
 		cu_fntid = 1;
+		cu_size = size;
+		bitstmap = FALSE;
 		cu_wchar = gl_wschar;
 		cu_hchar = gl_hschar;
 		cu_space = gl_wschar;
@@ -827,6 +866,7 @@ GO_IBM:
 	  	cu_wptschar = gl_wsptschar;	
 	  	cu_space = gl_sspace;
 		cu_prop = TRUE;			/* use v_gtext */
+		cu_spd = FALSE;
 		v_setfont(1);			/* always ROM system font !!! */
 		vst_height( gl_ws.ws_chminh, &dummy, &dummy, &dummy, &dummy ); 
 		break;
@@ -858,11 +898,12 @@ gsx_tcalc(ptext, ptextw, ptexth, pnumchs)
 	*pnumchs = str2intin((BYTE*)ptext); 
 					/* figure out the min width of  text	*/
 	if ((cu_font == GDOS_PROP) || (cu_font == GDOS_BITM)) {
-		WORD	pptw = 0;
+		WORD	pptw = 0;			/* system font is mono spaced, HACK!!! */
 		REG	BYTE *s;
-		
+
 		buf = intin[0];
 		snum = *pnumchs;
+
 		for (s = (BYTE *) ptext; *s ; s++) {
 			vqt_width(*s, &wc, &dummy, &dummy);
 			pptw += wc;
@@ -871,8 +912,8 @@ gsx_tcalc(ptext, ptextw, ptexth, pnumchs)
 				break;
 			}
 		}
-		
 		intin[0] = buf;
+
 		*ptextw = min(*ptextw, pptw);
 	} else {
 		*ptextw = min(*ptextw, *pnumchs * wc );
@@ -882,7 +923,7 @@ gsx_tcalc(ptext, ptextw, ptexth, pnumchs)
 
 			/* if the height and width are big enough to put	*/
 	if (*ptexth / hc) {		/* the text then do it			*/	
-	  if (cu_font == 0)
+	  if ((cu_font == GDOS_PROP) || (cu_font == GDOS_BITM))
 		*pnumchs = min(*pnumchs, snum);
 	  else
 		*pnumchs = min(*pnumchs, *ptextw / wc );
@@ -902,8 +943,8 @@ gsx_tblt(x, y, tb_nc)
 
 	Debug7("gsx_tblt: cu_font = "); Ndebug7((LONG) cu_font);
 
-Debug7("gsx_tblt: GL_HCHAR    ="); Ndebug7((LONG)gl_hchar);
-Debug7("gsx_tblt: GL_HPTSCHAR ="); Ndebug7((LONG)gl_hptschar);
+	Debug7("gsx_tblt: GL_HCHAR    ="); Ndebug7((LONG)gl_hchar);
+	Debug7("gsx_tblt: GL_HPTSCHAR ="); Ndebug7((LONG)gl_hptschar);
 
 	if (cu_font == IBM)
 	{
@@ -940,7 +981,7 @@ Debug7("gsx_tblt: GL_HPTSCHAR ="); Ndebug7((LONG)gl_hptschar);
 	else
 	  v_monotext( x, y, tb_nc, space );
 
-	if (bitstmap && (cu_font != SMALL)) {
+	if (bitstmap && (cu_font < 2)) {
 		vst_charmap(1);		/* Use ATARI char map */
 		bitstmap = FALSE;
 	}
@@ -986,15 +1027,14 @@ REG	UBYTE *s;
 
 	ip = (WORD *) ad_intin;
 
-	if ((cu_fntid > 1)) {
-		bitstmap = TRUE ;
+	if (bitstmap) {
+		Debug7("Bitstream charset: "); Debug7(s); Debug7("\r\n");
 		t = ATable;
 		for (i = 0; *s; i++) {
 			*ip++ = t[*s++];
 		} 
-
 	} else {
-		bitstmap = FALSE;
+		Debug7("ATARI charset: "); Debug7(s); Debug7("\r\n");
 		i = LBWMOV((BYTE *)ip, (BYTE *)s); 
 	}
 	return i;

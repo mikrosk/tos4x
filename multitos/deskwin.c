@@ -85,9 +85,9 @@ draw_loop( handle, obj, start, depth, x, y, w, h )
 	
 	while( pt.g_w && pt.g_h )
 	{
-	  if ( rc_intersect( &px, &pt ) )
+	  if ( rc_intersect( &px, &pt ) ) {
 	    objc_draw( (LONG)obj, start, depth, pt.g_x, pt.g_y, pt.g_w, pt.g_h );
-
+	  }
 	  wind_get( handle, WF_NEXTXYWH, &pt.g_x, &pt.g_y, &pt.g_w, &pt.g_h );
 	}
 d_l1:
@@ -1143,6 +1143,7 @@ WORD	icn;
 {
 	LONG	 	size;
 	REG OBJECT	*obj1;
+	WORD		w;
 
 	size = 0L;
 	size += (LONG)(2 * sizeof( OBJECT ) ); 	/* form + one icon */
@@ -1170,6 +1171,17 @@ WORD	icn;
 
 		((CICONBLK *)obj1)->monoblk.ib_ptext  = 
 			(LONG) (obj1) + sizeof(CICONBLK);
+		/*
+		 *	Fix slider width and height
+		 *	(needed when sys char height == 8)!
+		 */
+
+		w = ((ICONBLK *)obj1)->ib_wicon;
+		w = (((ICONBLK *)obj1)->ib_wtext > w) ? 
+				((ICONBLK *)obj1)->ib_wtext : w;
+		win->w_icnobj[1].ob_width = w;
+		win->w_icnobj[1].ob_height = ((ICONBLK *)obj1)->ib_hicon + 
+				((ICONBLK *)obj1)->ib_htext;
 
 		objc_add(win->w_icnobj, 0, 1);
 	} else {

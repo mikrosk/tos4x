@@ -4,17 +4,33 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/12 19:41:34 $
+* $Date: 1991/09/24 02:24:54 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.81  1991/09/12  19:41:34  apratt
-* Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
-* So we use (TT == 0) instead.  Sigh.
+* Revision 2.82  1991/09/24  02:24:54  apratt
+* STPAD: memory sizing for either 1MB or 4MB.  Also, STylus button bits are
+* one when they're UP, not when they're DOWN.
 *
+* ST: "when is it safe" changed to old-old wait-for-vblank trick after boot;
+* during boot, it's "any tick on Timer B."  This is only done if (TT == 0)
+* because it's always safe on TT (?).
+*
+* RAM: we now bra dmaboot even if systype == ram; this lets us do a memory
+* test there.
+*
+* ALL: WVBL now only clears the '4' bit of IPL so it won't drop below 3 if it
+* isn't already.  LONG discussion on "when is it safe" at noblank.
+*
+* This is 2/3.06p, and hopefully the final release for 2/3.06.
+*
+*
+* This is 2/3.06p, and hopefully the final release for 2/3.06.
+*
+* Revision 2.81  1991/09/12  19:41:34  apratt
 * Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
 * So we use (TT == 0) instead.  Sigh.
 *
@@ -194,7 +210,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.81 $
+* $Revision: 2.82 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\startup.s,v $
@@ -1129,14 +1145,27 @@ sp_cold:
 	move.w	SPAR_CONF,d0	; read again just for fun
 	lsr.w	#8,d0		; get switches in low word: d0=vvmmrrbf
 	lsr.b	#1,d0		; d0=0vvmmrrb
-* STPAD is always 1MB, memory controller config value $a.
-* (This means "two 2MB banks, of which only the first actually exists,
-* and of that only 1MB exists.)
+	move.b	d0,d1
+	and.b	#1,d1		; just keep low bit -- d1=b
+	lsr.b	#2,d0		; d0=000vvmmr
 	and.b	#6,d0		; d0=00000mm0
-	move.b	#$0a,memconf
 	or.b	d0,d1		; d1=00000mmb
-	move.l	#$100000,d5
+	move.l	#$80000,d0	; 512KB
+	asl.l	d1,d0		; 512K << d1 is the memory size
+	cmp.b	#5,d1		; unless mmb was 5
+	bne	gotmem		; (no)
+	move.l	#1024*1024*14,d0	; ...in which case we cap at 14MB.
+gotmem:	move.l	d0,d5		; d5 is phystop
+
+** end of Sparrow clause; we jump to "clear memory from $400 to..." **
+	bra	mem_sized
+
+.else
+* (TT == 0) && (SPARROW == 0)
+
 	move.b	memcntlr.w,d6		; d6 = memory controller configuration
+	move.b	d6,memconf		; program memory controller with this
+					; just in case it's valid
 	move.l	phystop.w,d5		; d5 ->	(possible) top of physical mem
 	lea	ret_2(pc),a6		; load return address
 	bra	val_memval		; get memory controller validation
@@ -2188,8 +2217,9 @@ ikbdlp1:
 * look less like a toy machine with only 40 columns.
 *
 * The STPAD part of this moved to the place where the sync mode and
-	bsr	noblank1		; wait until we're NOT in a vblank
-* this is endif for bsr to noblank1
+* palette registers are initialized, to get a screen on pad sooner.
+* However, we do that stuff again here, too, and write "shadow shadow"
+* now, after the code which cleared all of low RAM.
 *-
 
 .if STPAD
@@ -2782,9 +2812,7 @@ crcdone:
 *
 * But first... If you're on TT and the ALT key is down, go into ST LOW rez.
 .endif
-.if systype == rom
 
-.endif
 	move.l	#$0808,d0
 	movec	d0,cacr
 norezchg:
@@ -3161,9 +3189,13 @@ dmab_sp:
 
 dmab_sp2:
 	move.w	#' ',4(sp)
+	move.l	#$00030002,(sp)
+	trap	#$d
+	dbra	d3,dmab_sp2
 
+* restore normal video
 	move.w	#27,4(sp)
-	bne	dmab_abrt		; yes, abort
+	move.l	#$00030002,(sp)
 	trap	#$d
 	move.w	#'q',4(sp)
 	move.l	#$00030002,(sp)
@@ -3317,6 +3349,17 @@ dmaloop:
 *  SPARROW:	10-17, 8-F	(IDE, then SCSI; sigh)
 *
 * STPAD and STe-PLUS have IDE busses.  On other STPLUSes (Mega STe and
+.else
+* this is the RAM-loaded version of dmaboot, for testing.
+* All it does is test RAM.
+.globl	mem_test_next
+.globl	mem_abort
+* STe), the IDEbus doesn't exist, and the reads from those devices will all
+dmaboot:
+dmab_loop:
+	bsr	mem_test_next
+	beq	dmab_loop
+	rts
 *
 * Note 9/91: since ST and STPLUS are now the same ROM, we start at IDE in
 * all non-TT systems.  It will fail fast for all machines with no IDEbus.
@@ -3641,10 +3684,12 @@ swmon3:
 
 *--- reload color palettes
 	tst.l	colorptr.w		; if(colorptr != NULL)....
+	beq	vbl1			; (its NULL, so	don't reload)
+	move.l	colorptr.w,a0
 	lea	color0,a1
 	move.w	#8-1,d1
 vbl2:	move.l	(a0)+,(a1)+
-	and.w	#$ffff-$700,sr		; enable vbl interrupts
+	dbra	d1,vbl2
 	clr.l	colorptr.w		; zap colorptr
 vbl1:
 *--- reload display base register
@@ -4161,7 +4206,7 @@ _get_mpb:
 	bls	nottram
 
 	lea.l	ttmd.w,a2
-	tst.w	_iamanst		; see if we're an ST
+	move.l	a2,(a1)			; themd.m_link = ttmd;
 	clr.l	(a2)			; ttmd.m_link = 0;
 	move.l	#$01000001,4(a2)	; ttmd.m_start = start of fast RAM +1
 	move.l	_ramtop,d0
@@ -4373,7 +4418,7 @@ _term:
 savp_2:	move.l	(sp)+,proc_pc.w		; save bogus PC + exception number
 	movem.l	d0-d7/a0-a7,proc_regs.w ; common registers
 .else
-	tst.w	_iamanst		; are we an ST?
+
 * for M68030, we determine exception number differently: the frame word
 * on the stack contains the vector offset.
 
@@ -4762,19 +4807,44 @@ p_masks:	ds.l	1		; -> halftone masks
 
 *+
 *  Form to display on system catastrophe
-* Test version: this code is replaced with old code called vwait from an
-* old TOS.  It waits for at least 240 ticks on timer B, and then waits for
-* a period time time to pass with no ticks on timer B. The period of time
-* is 615 loops, with the comment "2ms timeout," but I don't guarantee that.
-* From this code we can deduce that it thinks a "safe" period is "just
-* after the last tick of Timer B, i.e. just after the last DE pulse of a
-* frame."  I don't *know* this this is correct.  From the commented-out
-* version below, we see that it thinks a "safe" period is "right after any*
-* DE pulse."  The basis of this is that the UNSAFE period is just
-* before/during VSYNC, and if you get a DE then you know you're pretty far
-* from the previous and next VSYNCs.
-* 
+*
 *-
+mushroom:				; (sic)
+	dc.w	%0000011000000000
+	dc.w	%0010100100000000
+	dc.w	%0000000010000000
+	dc.w	%0100100001000000
+	dc.w	%0001000111110000
+	dc.w	%0000000111110000
+	dc.w	%0000011111111100
+	dc.w	%0000111111111110
+	dc.w	%0000110111111110
+	dc.w	%0001111111111111
+	dc.w	%0001111111101111
+	dc.w	%0000111111101110
+* count 240 ticks on Timer B, then wait for "2ms" without any ticks on
+* Timer B.  "2ms" is in quotes because it's a number of times through a
+* loop, and I haven't counted the cycles. THEORY 1 states that it's safe if
+* you get a tick on Timer B at all.
+	dc.w	%0000000011100000
+* What these theories have in common is the idea that the unsafe period is
+*+
+*  This function replaces 'vwait' -- it is not to return until
+*  it's sure we are NOT in a vblank.  This is accomplished by
+* get DE's, because if you get a DE then you know you're far from VBLANK."
+*  at least a little time before vblank: long enough.
+*
+*  Passed:	A6 -> return address
+*  Returns:	when sure no vblank is in progress
+*  Uses:	no registers; clobbers TBDR
+*
+* Noblank1 is the same thing, but returns via RTS, and...
+*-
+* enable the interrupt, *then* call Setscreen to change rez.  You can't
+* noblank: use THEORY 1, it's safe any time you get a tick on timer B.
+* This code can clobber the heck out of Timer B, because it's only
+* used in the boot sequence.  This code works 9/91 2.06m but it didn't
+* work in an earlier version that implemented the same thing...?
 
 *
 * Sigh... Saving the iera is probably only half the battle; now I save the
@@ -4784,7 +4854,10 @@ p_masks:	ds.l	1		; -> halftone masks
 *
 * Background first: Timer B ticks based on the falling edge of DE,
 * around VBLANK.  THEORY 3 most clearly states "it's safe just after
+* VBLANK."  THEORY 2 states "it's safe just BEFORE vblank; that is, just
+* after the last DE of a trace."  THEORY 1 states "it's safe any time you
 * get DE's, because if you get (a rising edge of) DE then you know you're
+* far from VBLANK, and you're in HBLANK during which it's safe."
 *
 * There is also a possible interaction with syncmode; the code I inherited
 * which sets syncmode to 50hz waits until it is safe before doing so.
@@ -4800,34 +4873,43 @@ p_masks:	ds.l	1		; -> halftone masks
 * by Setscreen(), but by then it's too late.
 
 * noblank: use THEORY 3, it's safe any time you get no ticks on Timer B
-* begin test code with a different meaning of "when is it safe."
-	jmp	(a6)
-	movem.l	d1/d3/d4,-(sp)
-	move.b	iera,d1			; save old Timer B interrupt enable
-	and.b	#1,d1
+* for 2ms after the last tick you did get.
+*
+* This code can clobber the heck out of Timer B, because it's only used in
+* the boot sequence.  For TT it doesn't really count 2ms, but I don't think
+* the TT shifter has this problem.  Does it?
+
+.if TT
+* TT: wait for any horiz. blanking pulse.
+noblank:
+	clr.b	tbcr			; halt the timer
+	clr.b	tbdr			; load a zero there
+	move.b	#$08,tbcr		; start timer B in event-count mode
+tb_0:	tst.b	tbdr			; changed yet?
+	beq	tb_0			; (not yet)
+	jmp	(a6)			; return
+.else
+* ST, STe, etc: wait for end of screen (2ms with no hblank pulses)
+noblank:
+	lea	tbdr,a0
+	lea	tbcr,a1
 	bclr	#0,iera			; disable Timer B interrupt
-	swap	d1
-	move.b	tbcr,d1			; save old Timer B control reg
 	moveq	#1,d4			; d4 = number we want
-	clr.b	tbcr			; reset timer B
-	move.b	#240,tbdr		; number of lines to wait for
-	move.b	#$08,tbcr		; startup timer B, in event-count mode
-tb_1:	move.b	tbdr,d0			; get contents of data reg
-	cmp.b	d4,d0			; down to desired value?
+	clr.b	(a1)			; reset timer B
+	move.b	#240,(a0)		; number of lines to wait for
+	move.b	#$08,(a1)		; startup timer B, in event-count mode
+tb_1:	cmp.b	(a0),d4			; down to desired value?
 	bne	tb_1			; (not yet)
-tb_2:	move.b	tbdr,d4			; get current value
+tb_2:	move.b	(a0),d4			; get current value
 	move.w	#615,d3			; 2ms timeout
-tb_3:	cmp.b	tbdr,d4			; has timer changed?
+tb_3:	cmp.b	(a0),d4			; has timer changed?
 	bne	tb_2			; (yes, not a vbl)
 	dbra	d3,tb_3			; wait for 2ms w/o change
-	move.b	#$10,tbcr		; reset timer B
-	move.b	d1,tbcr			; restore the old control value
-	swap	d1
-	or.b	d1,iera			; restore the old interrupt enable
-	movem.l	(sp)+,d1/d3/d4
-	rts
+	move.b	#$10,(a1)		; reset timer B
+	jmp	(a6)
+.endif
 
-* End of test code
+* noblank1: see which theory is un-commented.
 
 noblank1:
 * THEORY 1: if you get any ticks on Timer B, it's safe.

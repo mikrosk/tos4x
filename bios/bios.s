@@ -4,16 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/03 13:21:50 $
+* $Date: 90/08/03 15:18:09 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.24  90/08/03  15:18:09  apratt
+* Fixed an oops in Norway's keyboard table: REAL TTOS FINAL RELEASE!
+*
 * Revision 2.23  90/08/03  13:21:50  apratt
 * TTOS FINAL RELEASE
-*
+* 
 * Revision 2.22  90/07/19  14:46:56  apratt
 * Fixed a bug in rsconf: -2 for TT MFP's port always returned rate
 * for ST MFP.  Now it is right.  Also sped up memory clearing in
@@ -240,7 +243,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.23 $
+* $Revision: 2.24 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -6173,7 +6176,7 @@ keycl:
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 
 .endif
-	.dc.b	"ASDFGHJKL",$b2,$92,"'",0,$5c'ZXCVBNM,.-',0,0,0,space,0
+
 
 .if country == norway
 

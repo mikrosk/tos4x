@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.15 $	$Source: e:/tos/gd2\rcs\mem.c,v $
+* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/05 18:39:26 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.16  1991/04/05  18:39:26  apratt
+* debugging message change
+*
 * Revision 2.15  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -432,7 +435,7 @@ long
 xmalloc(amount)
 long amount;
 {
-    DBCMD(1,"print xmalloc amt: (lpeek (+ `a6 8));_c");
+    DBCMD(1,"print -n xmalloc amt: (lpeek (+ `a6 8)) >>;_c");
 
     if (run->p_hflags & P_RAMALLOC) return xfmalloc(amount,3);
     else return xfmalloc(amount,0);

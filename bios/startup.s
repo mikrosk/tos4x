@@ -1,16 +1,19 @@
 .super
 ****************** Revision Control System *****************************
 *
-* $Author: unknown $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/05/20 22:12:18 $
+* $Date: 1992/07/01 21:48:18 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.97  1992/07/01  21:48:18  kbad
+* last akp revision
+*
 * Revision 2.96  1992/05/20  22:12:18  unknown
 * Added NVMaccess for Sparrow and waketime for all.
 *
@@ -347,7 +350,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.96 $
+* $Revision: 2.97 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -2463,6 +2466,73 @@ sfpdone:
 	move.l	d0,_membot.w		; write new _membot
 	move.l	d0,end_os.w		; write new end_os
 nofrb:
+.endif
+
+********************
+*
+* Pull user preferences out of NVRAM, and set _AKP and _IDT cookies.
+*
+* The Advanced Keyboard Preference cookie indicates keyboard and
+* language preference.  The initial value comes out of NVRAM
+* on those machines that have NVRAM.
+*
+* If you don't have NVRAM you don't get this cookie.
+*
+* The low byte of the cookie value is the keyboard preference code:
+*
+*	0	usa
+*	1	germany
+*	2	france
+*	3	uk
+*	4	spain
+*	5	italy
+*	6	sweden
+*	7	swiss french
+*	8	swiss german
+*
+* Other values are reserved for our use.
+*
+* The second-lowest byte of the cookie value is the language preference:
+*
+*	0	English
+*	1	German
+*	2	French
+*	3	<reserved>
+*	4	Spanish
+*	5	Italian
+*	6	Swedish
+* 
+* If NVRAM is invalid you get zeros (USA).
+*
+* If (for instance) an AUTO folder program is run to change the keyboard
+* layout and/or country preference, it should change the value of this
+* cookie.  It can also call a variant of Bioskeys() called Bioskset(code)
+* to load up the indicated keyboard map.  This call returns 0 on success,
+* and -1 on failure (i.e. 'code' is not known to this BIOS).
+*
+* Additional info: the Keytrans(unshift,shift,caps) BIOS call still
+* returns the base address of a table of keyboard-table pointers, but
+* now that table is SIX pointers long; the second three point to
+* tables of scan-code/ASCII-code pairs for use when the ALT key is
+* down in the unshift, shift, and caps-lock cases, respectively.
+*
+********************
+.if (TT|SPARROW)
+	subq	#2,sp
+	move.l	sp,a0
+	move.l	a0,-(sp)
+	move.w	#2,-(sp)
+	move.w	#2,-(sp)
+	move.w	#0,-(sp)
+	bsr	NVMaccess
+	add.w	#10,sp
+	move.w	(sp)+,d1
+	tst.w	d0
+	beq	nvok
+	moveq	#0,d1
+nvok:	rol.w	#8,d1
+	move.l	#"_AKP",(a0)+
+	move.l	d1,(a0)+
 .endif
 
 * Mark the end of the cookie jar; all done.

@@ -4,20 +4,36 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/12 01:31:40 $
+* $Date: 1992/02/28 01:22:40 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.89  1992/02/28  01:22:40  apratt
+* The rev 2.88 log should have looked like this:
+*
+* Changed version number to 2.08/3.08. (Maintain even version numbers for
+* compatibility with nasty old stuff.)
+*
+* Added tons of Sparrow stuff: initalize memory, video, etc. New MCH, VDO.
+*
+* Changed the dma boot code to cycle through a table of device numbers to
+* attempt, rather than the stupid stuff that was there before.
+*
+* Here's the log message for revision 2.89:
+*
+* Vector nasty exceptions during boot to coldboot. Also backed out
+* sparrow-special in MicroWire handling, because that HW bug is fixed.
+*
+* Vector nasty exceptions during boot to coldboot. Also backed out
+* sparrow-special in MicroWire handling, because that HW bug is fixed.
+*
 * Revision 2.88  1992/02/12  01:31:40  apratt
 * ci -u startup.s <slog
 * ci -u '-mMuch Sparrow stuff. Also fixed a bug in slow ACSI devices.' dmaread.s
 * ci -u '-mAdded SPARROW, removed STPLUS.' mkswitch.e
-* ci -u '-mAdded loops .if SPARROW to check the SDMA status bit.' flop.s
-* ci -u '-mFixed an RTS/CTS bug in SCC code. See scc_sender.' bios.s
-*
 * ci -u '-mAdded loops .if SPARROW to check the SDMA status bit.' flop.s
 * ci -u '-mFixed an RTS/CTS bug in SCC code. See scc_sender.' bios.s
 *
@@ -263,10 +279,10 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.88 $
+* $Revision: 2.89 $
 * =======================================================================
 *
-* $Source: d:/tos/bios\rcs\startup.s,v $
+* $Revision: 2.89 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -1629,9 +1645,19 @@ mt_pr:
 * non-TT ST's, of course).
 *
 
+	move.l	d5,_ramtop.w		; store ramtop value
+	move.l	#rammagic,_ramvalid.w	; mark as valid
+
+* validate next reset as warm, not cold.
+
+	bset.b	#0,ttscu1
+
 .else
 
 * not TT: set the fast-RAM system variables to indicate "no fast RAM"
+
+	clr.l	_ramtop			; store zero value: no fast RAM
+	move.l	#rammagic,_ramvalid.w	; mark as valid
 .endif
 
 *
@@ -1669,6 +1695,7 @@ reset4:
 * 
 * Also, touch ST color palette because that puts us in ST video mode.
 *
+
 	move.b	SPAR_CONF,d0	; d0=vvmmrrbf
 	move.b	d0,d1		; d1=vvmmrrbf
 	lsl.b	#6,d1		; d1=bf000000
@@ -1703,24 +1730,15 @@ reset4:
 	clr.w	dmasndc		; reset sound chip, bus error if missing
 	st	_hasdmasnd	; no bus error; set the flag
 
-.if SPARROW
-vtloop:	move.w	d0,mwdata
-vtl1:	cmp.w	mwmask,d1		; wait for the mask to change
-	beq	vtl1
-vtl2:	cmp.w	mwmask,d1		; wait for it to be the init. value
-	bne	vtl2
-vtend:	move.w	(a0)+,d0
-	bne	vtloop
-.else
 * program the volume/tone controller for a sane volume & tone, and
 * mix the GI sound in with the DMA sound so it comes out the speaker.
 
 	lea.l	vtpgm(pc),a0
 	move.w	(a0)+,d1	; get into a reg for sparrow
-.endif
 	move.w	d1,mwmask
 	bra	vtend
 
+* data for the MicroWire interface...  The low high bit is set for
 * each of these so we can tell when it's shifted completely out.
 
 *		  addr  cmd  data   lobit
@@ -2217,52 +2235,39 @@ xfpudone:
 
 .if TT
 * If there's fast RAM, put the _FRB cookie in the cookie jar. It points to
-*  If a diagnostic cartridge is inserted, the "random" vectors
-*  (for Bus Error, Address Error, and so on) are left alone.
-	tst.l	_ramtop.w		; any fast RAM?
-*  Otherwise, the random vectors are pointed to the system critical
-*  error handler (_term).  The high byte of the vector (bits 24..31)
-*  contains the exception number.  [Yes, this will lose on a 68020.]
+* 64K of space available for anybody to do copies when attempting a Rwabs
+* between TT RAM and an ACSI device. Don't change this size: RAM-loaded
+* drivers use the same buffer.
 
-*  Trap 2 and Divide-by-zero are pointed at an RTE.
-*
+	tst.l	_ramtop.w		; any fast RAM?
+	beq	nofrb			; no - forget it.
+
 *
 * There is some fast RAM, so must allocate a 64K disk buffer
 * and add its cookie here.  I don't necessarily like allocating the
+* buffer here, but it's really the best place for that code. It must
+* be after _membot is set, and before the jsr through _hdv_boot.
+*
+
+	move.l	#"_FRB",(a0)+		; write cookie ("Fast RAM buffer")
+	move.l	_membot.w,d0
 	move.l	d0,(a0)+		; write pointer to buffer
 	add.l	#$10000,d0		; move up by 64K
 	move.l	d0,_membot.w		; write new _membot
 	move.l	d0,end_os.w		; write new end_os
-* diagnostic cartridge check removed 6/91 by AKP: it was a lose from the
-* start, but nobody realized it.  There's no chance for a diag cart to set
-* useful vectors in a way that won't get trashed by memory sizing, and not
-* installing any bomb vectors is bad too.  If you're desperate you can set
-* a bit to get control later and install your vectors then.
-*
-*	cmp.l	#diagmagic,cartbase	; check cartridge magic
-*	beq	sei2			; (it's there -- leave vectors alone)
+nofrb:
 .endif
-*--- setup 62 vectors:
-.if (TT == 0)
-	lea	_term(pc),a1		; a1 -> "terminate process" handler
-	add.l	#$02000000,a1		; a1 += vector number (high byte)
-	lea	8,a0			; a0 -> interrupt RAM
-	move.w	#64-2-1,d0		; d0 = count
+
+* Mark the end of the cookie jar; all done.
+
 	clr.l	(a0)+			; last entry is null
-	add.l	#$01000000,a1		; bump vector number in bits 24..31
 	move.l	#DEFCSIZE,(a0)+		; with size for its value
-.else
-* TT: point all exceptions to _term, because the ex number is on
-* the stack, in the exception frame type word.
-	lea	_term(pc),a1
-	lea	8,a0
-	move.w	#64-2-1,d0
-sei1:	move.l	a1,(a0)+
-	dbra	d0,sei1
-.endif
+
+*+
+*  Initialize interrupt vectors
 *
 *  Exception vectors are pointed to the system critical error handler
-* Vector NMI to RTE; it's possible to get NMI on STPAD when the
+*  (_term).  On ST's, the high byte of the vector (bits 24..31) contains
 *  the exception number.  If TT, the exception number comes off the stack
 *  in the frame word.
 *
@@ -2287,7 +2292,6 @@ sei1:	move.l	a1,(a0)+
 	lea	$8,a0			; a0 -> interrupt RAM
 	move.w	#64-1,d0		; d0 = count
 sei1:	move.l	a1,(a0)+		; write vector
-
 	dbra	d0,sei1			; (loop to write more vectors)
 
 * Divide by zero -> RTE.
@@ -3009,6 +3013,7 @@ eok2:
 .endif
 
 	move.l	#crcmsg1,2(sp)
+	move.w	#9,(sp)
 	trap	#1			; Cconws(".\r\n");
 
 	addq	#6,sp			; clean stack
@@ -3040,6 +3045,39 @@ crcdone:
 *
 * For M68030 that isn't TT, we just turn off the cache if ALT is down
 * at this point.
+*
+* Flow (combination of compile-time and run-time checks):
+* 	if (TT | M68030) {
+* 		if (TT) {
+* 			if (TT HIGH monitor) goto norezchg;
+* 		}
+* 		if (!(Kbshift(-1) & ALT_KEY)) goto norezchg;
+* 		if (TT) {
+* 			Setscreen(0,-1L,-1L);
+* 		}
+* 		clear cache;
+* norezchg:
+*	}
+*-
+
+.if (TT | M68030)
+
+.if TT
+	cmp.b	#$6,sshiftmd.w		; TT HIGH monitor?
+	beq	norezchg		; yes - don't even check.
+.endif
+
+	move.l	#$000bffff,-(sp)
+	trap	#$d			; Kbshift(-1);
+	addq	#4,sp
+	btst	#3,d0			; ALT key down?
+	beq	norezchg		; no.
+.if TT
+	clr.w	-(sp)
+	pea	$ffffffff.w
+	pea	$ffffffff.w
+	move.w	#$5,-(sp)
+	trap	#$e			; Setscreen(-1L,-1L,0);
 	add.w	#12,sp
 .endif
 

@@ -4,13 +4,16 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/04 17:58:30 $
+* $Date: 1992/02/28 01:21:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.20  1992/02/28  01:21:56  apratt
+* Oops. When STPAD boots we *do* want to disable off the alarm.
+*
 * Revision 2.19  1991/10/04  17:58:30  apratt
 * This version folds in those things which are new since I put most of clock.s
 * into power.prg for quick-turnaround testing.  The key difference is that
@@ -116,10 +119,10 @@
 *
 * =======================================================================
 *
-* $Revision: 2.19 $
+* $Revision: 2.20 $
 * =======================================================================
 *
-* $Source: e:/tos/bios\RCS\clock.s,v $
+* $Source: d:/tos/bios\rcs\clock.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -250,13 +253,20 @@ iclfai:	rts
 * was added 2/6/89 by AKP.  Don't know why the above comment
 * refers to bus errors but doesn't implement them.
 *
+* Feb 92: for STPAD we do NOT need to preserve the alarm registers or the
+* alarm enable.  In fact we want to turn OFF the alarm enable. The alarm
+* will be made pending during shutdown.  If your system is on then you
+* don't need the alarm output, and in fact you don't want it.  STPADs
+* with old ROMs need an AUTO folder program to write %1000 to RTMODE.
+*
 
 clktest:
 .if STPAD
 	move.w	#RTCBASE,a0		; fulfill return requirement
 	move.b	#0,RTTEST(a0)		; clobber test register
 	move.b	#%1100,RTRES(a0)	; and turn off periodic outputs
-	bclr	#0,RTMODE(a0)		; select time bank, not alarm
+	move.b	#%1000,RTMODE(a0)	; select time bank, timer enable
+					; this disables alarm! See above.
 	moveq.l	#0,d0			; clear the carry bit - clock exists.
 	rts
 .else

@@ -4,18 +4,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/22 16:42:55 $
+* $Date: 90/03/01 17:27:00 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.5  90/03/01  17:27:00  apratt
+* Checkin of Minna's changes, including adding better spin-up delays
+* and the dmawrite call.
+*
 * Revision 1.4  89/09/22  16:42:55  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
 * require Alcyon's AS68 assembler.
-*
+* 
 * Revision 1.3  89/09/07  16:30:02  apratt
 * Added delay after (potentially) resetting ACSI DMA chip; see SLOWACSI
 * code in flop.s.
@@ -29,7 +33,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.4 $
+* $Revision: 1.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -41,78 +45,98 @@
 
 .include "switches.s"
 
+UPTIME	equ	12000	; 60 sec
+
 ;+
-; DMAREAD() - an XBIOS call to read from hard disk on the ACSI or SCSI
-;		bus.  This is a low-level read which does not do a lot
-;		of checking.  Amount of data requested on each ACSI read 
-;		_must_ be smaller than or equal to 254 sectors.  On SCSI,
-;		all I/O are done by handshaking.
+; DMAREAD(), DMAWRITE() - 
+;	New XBIOS calls to read from or write to hard disk on the
+; ACSI or SCSI bus.  This is a low-level read/write which does not
+; do a lot of checking.  Amount of data requested on each ACSI read
+; or write _must_ be smaller than or equal to 254 sectors.  On SCSI,
+; all I/O are done by handshaking.
 ;
 ; Jul-24-1989	ml.	Started this from AHDI 3.50 of Jul 24 1989.
 ; Aug-23-1989	ml.	Added in code to do hand-shake I/O, instead of
 ;			DMA.
+; Dec-11-1989	ml.	Adjusted timeouts.
+; Feb-08-1990	ml.	Updated according to corrections made to the
+;			TT driver (DRIVER.PRG v3.63)
+;			Renamed as dmarw() after adding code to handle
+;			writes also.
+; Feb-28-1990	ml.	Split dmarw() to become dmaread() and dmawrite()
+;			as requested by AKP.
 ;
 ;-
 
 .globl	_dmaread
+.globl	_dmawrite
 .globl	_resetscsi
 
-
-.macro	movecacrd0
-	dc.w	$4E7A
-	dc.w	$0002
-.endm
-
-.macro	moved0cacr
-	dc.w	$4E7B
-	dc.w	$0002
-.endm
 
 flock	equ	$43e		; FIFO lock variable
 _hz_200	equ	$4ba		; system 200hz timer
 READ	equ	$08		; opcode for Read
+WRITE	equ	$0a		; opcode for Write
 NCMD	equ	6		; normal command length (6 bytes)
-MAXSCSI	equ	14		; highest SCSI unit#
+MAXSCSI	equ	15		; highest SCSI unit#
 MAXACSI	equ	7		; highest ACSI unit#
 EUNDEV	equ	(-15)		; error code for unknown device
-EREADF	equ	(-11)		; error code for read error
+EREADF	equ	(-11)		; error code for read fault
+EWRITF	equ	(-10)		; error code for write fault
 
 
 ;+
 ; Declarations
 ;-
 .bss
-_cmdblk:	ds.b	10		; command block
-lastacstm:	ds.l	1		; controller last accessed time
-
+_cmdblk:	ds.b	10	; command block
+lastacstm:	ds.l	1	; controller last accessed time
+cachexst:	ds.b	1	; 0: no cache	1: cache exists
+rwflag:		ds.b	1	; 0: read	1: write
+.even
 
 .text
 
 ;+
 ; dmaread() - read from a DMA device.
-;	    - right now, only ACSI and SCSI devices are supported.
+; dmawrite() - write to a DMA device.
 ;
-; dmaread(sectnum, count, buf, pdev)
-; LONG	sectnum		4(sp).l
-; WORD	count		8(sp).w
+; LONG	sectnum		$4(sp).l
+; WORD	count		$8(sp).w
 ; BYTE	*buf;		$a(sp).l	$b(sp)=high $c(sp)=mid $d(sp)=low
 ; WORD	pdev;		$e(sp).w
 ;
-; Returns 0 for success, a negative number for failure: EREADF (-11L)
-; for read failure or EUNDEV (-15L) for unknown device (bad dev number).
+; Returns 0 for success.
+; Returns a negative number for failure: 
+;	EUNDEV (-15L) for unknown device (bad dev number)
+;	EREADF (-11L) for read failure
+;	EWRITF (-10L) for write failure
+;
+; Comments:
+;	Right now, only ACSI and SCSI devices are supported.
 ;-
+	.globl	_dmaread
 _dmaread:
-	moveq	#EUNDEV,d0		; assume it's an unknown device
+	move.b	#0,rwflag		; rwflag = 0 => a read
+	move.w	#READ,d1		; d1 = opcode for READ
+	bra.b	dmarw
+	
+	.globl	_dmawrite
+_dmawrite:
+	move.b	#1,rwflag		; rwflag = 1 => a write
+	move.w	#WRITE,d1		; d1 = opcode for WRITE
+	
+dmarw:	moveq	#EUNDEV,d0		; assume it's an unknown device
+
 .ifeq TT
-	cmp.w	#MAXACSI,$e(sp)
+	cmpi.w	#MAXACSI,$e(sp)		; unit# > ACSI unit# 0-7?
+.else
+	cmpi.w	#MAXSCSI,$e(sp)		; unit# > SCSI unit# 8-15?
 .endc
-.ifne TT
-	cmpi.w	#MAXSCSI,$e(sp)		; unit# > SCSI unit# 8 - 14?
-.endc
-	bhi	rdend			; if so, return with error
+	bhi.b	rwend			; if so, return with error
 
 	lea	_cmdblk,a0		; a0 -> beginning of command block
-	move.b	#READ,(a0)+		; byte 0 = READ opcode
+	move.b	d1,(a0)+		; byte 0 = opcode
 	move.b	5(sp),(a0)+		; byte 1 = msb of logical block addr
 	move.b	6(sp),(a0)+		; byte 2 = logical block addr
 	move.b	7(sp),(a0)+		; byte 3 = lsb of logical block addr
@@ -125,19 +149,29 @@ _dmaread:
 	add.l	d1,d1
 	moveq	#NCMD,d2		; d2 = length of command
 	movea.l	$a(sp),a0		; a0 = read buffer
-	bsr	_dorcmd			; send the command
+	tst.b	rwflag			; read or write?
+	bne.b	rw0			; it's a write
+	bsr	_dorcmd			; send a receive data command
+	bra.b	rw1
+rw0:	bsr	_dowcmd			; send a write data command
 
-	move.l	d0,-(sp)		; save the status
+rw1:	
+.ifne	TT
 	move.w	sr,-(sp)		; go to IPL 7
 	ori	#$700,sr		; no interrupts right now please
-	movecacrd0			; d0 = (cache control register)
-	ori.w	#$0808,d0		; dump both the I and D cache
-	moved0cacr			; update cache control register
+	movec	cacr,d1			; d1 = (cache control register)
+	ori.w	#$0808,d1		; dump both the I and D cache
+	movec	d1,cacr			; update cache control register
 	move.w	(sp)+,sr		; restore interrupt state
-	move.l	(sp)+,d0		; restore the return value
-	beq	rdend			; if no error, return
-	moveq	#EREADF,d0		; else put in read error code
-rdend:	rts
+.endc
+	tst.w	d0			; successful?
+
+	beq.b	rwend			; if no error, return
+	moveq	#EREADF,d0		; assume it's a read error
+	tst.b	rwflag			; read or write?
+	beq.b	rwend			; if read, done
+	moveq	#EWRITF,d0		; else, it's a write error
+rwend:	rts
 
 
 ;+
@@ -152,13 +186,34 @@ rdend:	rts
 _dorcmd:
 .ifne TT
 	cmp.w	#MAXACSI,d0		; unit# > ACSI unit# 0 - 7?
-	bls	rcacsi			; if not, it's an ACSI device
+	bls.b	rcacsi			; if not, it's an ACSI device
 	bsr	_rcvscsi		; else, it's a SCSI device
 	rts
 .endc
 rcacsi:	bsr	_rcvacsi		; it's an ACSI device
 	rts
 
+
+;+
+; dowcmd() - send a command which will write data to the target
+;
+; Passed:
+;	d0.w = physical unit number
+;	d1.l = transfer length (in bytes)
+;	d2.w = command length (NCMD or LCMD)
+;	a0.l = buffer address
+;-
+_dowcmd:
+.ifne	TT
+	cmp.w	#MAXACSI,d0		; unit# > ACSI unit# 0 - 7?
+	bls.b	wracsi			; if not, it's an ACSI device
+	bsr	_wrtscsi		; else, it's a SCSI device
+	rts
+.endc
+wracsi:	bsr	_wrtacsi		; it's an ACSI device
+	rts
+
+	
 
 ;+++++++++++++++++++++++++++++++;
 ;				;
@@ -198,13 +253,12 @@ ACSTMOUT	equ	20		; short-timeout (100 ms)
 ; Uses:		D0
 ;
 ;-
-_fdone:	move.l	_hz_200,d0
-	add.l	#ACLTMOUT,d0
-	bra	qd1
+_fdone:	move.l	#ACLTMOUT,d0
+	bra	qd0
 
-_qdone:	move.l	_hz_200,d0
-	add.l	#ACSTMOUT,d0
+_qdone:	move.l	#ACSTMOUT,d0
 
+qd0:	add.l	_hz_200,d0
 qd1:	cmp.l	_hz_200,d0		; timeout?
 	bcs	qdq			; (i give up, return NE)
 	btst	#5,GPIP			; interrupt?
@@ -231,6 +285,15 @@ qdq:	moveq	#-1,d0
 _endcmd:
 	bsr	_fdone			; wait for operation complete
 	bmi	endce			; (timed-out, so complain)
+
+.ifne	TT				; dump D cache
+	move.w	sr,-(sp)		; go to IPL 7
+	ori.w	#$700,sr		; no interrupts right now kudasai
+	movec	cacr,d0			; d0 = (cache control register)
+	ori.w	#$800,d0		; dump the D cache
+	movec	d0,cacr			; update cache control register
+	move.w	(sp)+,sr		; restore interrupt state
+.endc
 
 	move.w	d1,WDL
 	move.w	WDC,d0			; get the result
@@ -264,7 +327,7 @@ wait:	cmp.l	_hz_200,d0		; while (_hz_200 <= lastacstm)
 
 
 ;+
-; rcvacsi() - send a ACSI command which receives data back.
+; rcvacsi() - send a ACSI command which receives data from target.
 ;
 ; Passed:
 ;	d0.w = physical unit number
@@ -281,22 +344,44 @@ _rcvacsi:
 	bsr	_delay			; delay if necessary
 	movea.l	#WDC,a1			; a1 = pointer to DMA chip
 
-	move.w	#$190,XWDL(a1)	;WDL	; toggle DMA chip to direction
-	tst.b	GPIP
-	tst.b	GPIP
-	tst.b	GPIP
-	tst.b	GPIP
-	move.w	#$90,XWDL(a1)	;WDL	;  for receiving data
-	tst.b	GPIP
-	tst.b	GPIP
-	tst.b	GPIP
-	tst.b	GPIP
 	bsr	setadma			; set DMA pointer
+	move.w	#$190,XWDL(a1)	;WDL	; toggle DMA chip to direction
+	bsr	rstdelay		; delay
+	move.w	#$090,XWDL(a1)	;WDL	;  for receiving data
+	bsr	rstdelay		; delay
 	bsr	setacnt			; set DMA count
+
 	lea	_cmdblk,a0		; a0 = address of command block
 	moveq	#0,d1			; direction of DMA is IN
 	bsr	sblkacsi		; send the command block
 raend:	bra	_hdone			; cleanup after IRQ
+
+
+;+
+; wrtacsi() - send an ACSI command which will write data to the target
+;
+; Passed:
+;	d0.w = physical unit number
+;	d1.l = transfer length (in bytes)
+;	d2.w = command length (NCMD or LCMD)
+;	a0.l = buffer address
+;-
+_wrtacsi:
+	st	flock			; lock FIFO
+	bsr	_delay
+	movea.l	#WDC,a1			; a1 = pointer to DMA chip
+
+	bsr	setadma			; set DMA pointer
+	move.w	#$90,XWDL(a1)	;WDL	; toggle DMA chip for "send"
+	bsr	rstdelay		; delay 
+	move.w	#$190,XWDL(a1)	;WDL
+	bsr	rstdelay		; delay
+	bsr	setacnt			; set DMA count
+	
+	move.l	#$0100,d1		; d1 = direction of DMA is OUT
+	bsr	sblkacsi		; send the command block
+
+waend:	bra	_hdone			; cleanup after IRQ
 
 
 ;+
@@ -330,18 +415,15 @@ sblkacsi:
 	move.l	d1,(a1)		;WDCWDL
 
 ; end time for ack of 1st command byte is the LATER of
-; (10 sec from power up) and (100ms from now)
-	move.l	d1,-(sp)		; save d1
-	move.l	#2000,d0		; 2000 ticks is 10 sec
+; (UPTIME ticks from power up) and (ACSTMOUT ticks from now)
+	move.l	#UPTIME,d0		; d0 = minimum system up time
 	sub.l	_hz_200,d0		; if d0 > #ACSTMOUT, use d0
-	move.l	#ACSTMOUT,d1
-	cmp.l	d1,d0
+	cmpi.l	#ACSTMOUT,d0
 	bgt	sa0
-	move.l	d1,d0
-sa0:	move.l	(sp)+,d1		; restore d1
-	add.l	_hz_200,d0		; d0.l = expiration time
+	move.l	#ACSTMOUT,d0
+sa0:	add.l	_hz_200,d0		; d0.l = expiration time
 	bsr	qd1
-	bmi	sbaend			; if timedout, returns
+	bmi	sbaend			; if timed-out, returns
 					; 1st and control byte are sent
 	subq.w	#3,d2			; seperately and dbra likes one less 
 sa1:	swap	d1			; d1.hw = operand
@@ -389,12 +471,27 @@ setadma:
 setacnt:
 	move.l	d1,-(sp)		; save transfer length (in bytes)
 	lsr.l	#8,d1			; find transfer length (in blocks)
-	lsr.l	#1,d1			; d1 >>= 9 = transfer len (in blocks)
+	add.l	d1,d1			; d1 >>= 9 = transfer len (in blocks)
 	move.w	d1,(a1)		;WDC	; set DMA count
 	move.l	(sp)+,d1		; restore transfer length (in bytes)
 sacend:	rts
 
 
+;+
+; Rstdelay()
+;	After talking to the DMA chip in a way that may reset it, 
+; we need a 8 8Mhz clocks (ie. 1 microsec) delay, before we can
+; talk to the chip again.
+;-
+rstdelay:
+	tst.b	GPIP			; delay for 1 microsec
+	tst.b	GPIP			; this amounts to 16 16Mhz clocks
+	tst.b	GPIP
+	tst.b	GPIP
+	rts
+
+
+.ifne	TT
 
 ;+++++++++++++++++++++++++++++++;
 ;				;
@@ -452,7 +549,7 @@ _rcvscsi:
 	bsr	sblkscsi		; send command block
 	movea.l	(sp)+,a0		; restore buffer address
 	tst.w	d0			; successful?
-	bmi	rsend			; if not successful, return
+	bmi.b	rsend			; if not successful, return
 
 	movea.l	a0,a1			; a1 -> buffer to read into
 	movea.l	#bSCSI,a2		; a2 -> 5380
@@ -460,27 +557,71 @@ _rcvscsi:
 	move.b	SCSIREI,d0		; clear potential interrupt
 
 ; end time for ack of 1st data byte is the LATER of 
-; (40 sec after power up) and (2 sec from now).
+; (UPTIME ticks after power up) and (SCSTMOUT ticks from now).
 
-	lea	_hz_200,a0		; a0 -> 200 hz clock
-	move.l	#8000,d1		; 8000 is 40 sec
-	sub.l	(a0),d1			; d1 = (2000 - _hz_200)
-	move.l	#400,d0
-	cmp.l	d0,d1
-	bgt	ra0			; if d1 > 400 use d1 (signed compare!)
-	move.l	d0,d1
-ra0:	add.l	(a0),d1			; d1 = expiration time
-	bra	ra3			; go wait for REQ
+	lea	_hz_200,a0		; a0 -> 200hz clock
+	cmpi.l	#UPTIME,(a0)		; power has been up long enough?
+	bgt.b	rs2			; if yes - use short timeout
+	move.l	#UPTIME,d1		; else use minimum system uptime
+	add.l	(a0),d1			; d1 = timeout value
+	bra.b	rs3			; go wait for REQ
 	
-ra2:	bsr	setscstmout		; set up short timeout
-ra3:	bsr	w4req			; wait for REQ to come
-	bmi	rsend			; if timed out, returns
+rs2:	bsr	setscstmout		; set up short timeout
+rs3:	bsr	w4req			; wait for REQ to come
+	bmi.b	rsend			; if timed out, returns
 	btst	#3,5*REGSTEP(a2)	; still in data in phase?
 	beq	w4stat			; no, go get status
 	move.b	(a2),(a1)+		; read the data byte
 	bsr	doack
-	bra	ra2			; do next byte
+	bra.b	rs2			; do next byte
 rsend:	rts
+
+
+;+
+; wrtscsi() - send a SCSI command which will write data to the target
+;
+; Passed:
+;	d0.w = physical unit number
+;	d1.l = transfer length (in bytes)
+;	d2.w = command length (NCMD or LCMD)
+;	a0.l = buffer address
+;-
+_wrtscsi:
+	andi.w	#7,d0			; mask off the flags to get unit num
+	move.l	a0,-(sp)		; save beginning buffer address
+	move.w	d2,-(sp)		; save command length
+	bsr	sblkscsi		; send command block
+	move.w	(sp)+,d2		; restore command length
+	move.l	(sp)+,a0		; a0 = where DMA ends
+	tst.w	d0			; successful?
+	bpl.b	ws1			; if successful, go on
+	rts				; else return
+
+ws1:	movea.l	a0,a1			; a1 -> buffer to write from
+	movea.l	#bSCSI,a2		; a2 -> 5380
+	move.b	#0,SCSITCR		; set data out phase
+	move.b	SCSIREI,d0		; clear potential interrupt
+
+; end time for ack of 1st data byte is the LATER of 
+; (UPTIME ticks after power up) and (SCSTMOUT ticks from now).
+
+	lea	_hz_200,a0		; a0 -> 200hz clock
+	cmpi.l	#UPTIME,(a0)		; power has been up long enough?
+	bgt.b	ws2			; if yes - use short timeout
+	move.l	#UPTIME,d1		; else use minimum system uptime
+	add.l	(a0),d1			; d1 = timeout value
+	bra.b	ws3			; go wait for REQ
+					; hand shake over the bus
+ws2:	bsr	setscstmout
+ws3:	bsr	w4req			; wait for REQ to come
+	bmi.b	wsend			; if timed out, returns
+	btst	#3,5*REGSTEP(a2)	; still in data out phase?
+	beq	w4stat			; no, go get status
+	move.b	(a1)+,(a2)		; write the data byte
+	bsr	doack
+	bra.b	ws2			; do next byte
+wsend:	rts
+
 
 
 ;+
@@ -493,48 +634,37 @@ rsend:	rts
 ; Returns:
 ;	d0.l =  0 if successful
 ;	d0.l = -1 if timeout
-;
-; Comments:
-;	Aug-11-89 ml.  An extra 8 bytes are added to the count
-; because the hardware has a bug.  For detail, see comments in
-; driver.
 ;-
 sblkscsi:
 	move.l	d2,-(sp)		; save command length
 	move.w	d0,-(sp)		; physical unit #
 	bsr	selscsi			; select the unit
-	addq.l	#2,sp			; clean up stack
+	addq	#2,sp			; clean up stack
 	move.l	(sp)+,d2		; restore command length
 	tst.w	d0			; selection successful?
-	bmi	sbsend			; if timed out, return
+	bmi.b	sbsend			; if timed out, return
 					; else proceed
 	move.b	#2,SCSITCR		; assert C/D
 	move.b	#1,SCSIICR		; assert data bus
 
 	lea	_cmdblk,a1		; a1 -> command block
+	subq.w	#1,d2			; dbra likes one less
 
-; end time for ack of 1st command byte is the LATER of 
-; (10 sec after power up) and (10 ticks from now).
+; end time for ack of 1st data byte is the LATER of 
+; (UPTIME ticks after power up) and (SCSTMOUT ticks from now).
 
-	lea	_hz_200,a0		; a0 -> 200 hz clock
-	move.l	#2000,d1		; 2000 is 10 sec
-	sub.l	(a0),d1			; d1 = (2000 - _hz_200)
-	moveq	#10,d0
-	cmp.l	d0,d1
-	bgt	ss0
-	move.l	d0,d1
-ss0:	add.l	(a0),d1			; d1 = expiration time
-	move.b	(a1)+,d0		; d0.b = 1st command byte
-	bsr	hshake			; write that byte
-	tst.w	d0
-	bmi	sbsend			; if timed-out, returns
-					; else send rest of command
-	bsr	setscstmout		; set a short timeout
-	subq.w	#2,d2			; dbra likes one less & (- 1st byte)
+	lea	_hz_200,a0		; a0 -> 200hz clock
+	cmpi.l	#UPTIME,(a0)		; power has been up long enough?
+	bgt.b	ss0			; if yes - use short timeout
+	move.l	#UPTIME,d1		; else use minimum system uptime
+	add.l	(a0),d1			; d1 = timeout value
+	bra.b	ss1			; go wait for REQ
+	
+ss0:	bsr	setscstmout		; set a short timeout
 ss1:	move.b	(a1)+,d0		; d0.b = byte to be sent
 	bsr	hshake			; write that byte
 	tst.w	d0
-	bmi	sbsend			; if timed-out, returns
+	bmi.b	sbsend			; if timed-out, returns
 	dbra	d2,ss1			; until whole command block is sent
 	moveq	#0,d0			; all operations successful
 sbsend: rts				; heading home
@@ -569,23 +699,24 @@ sels1:	move.b	#0,SCSITCR		; data out phase
 * the following computations take at least that long before we read
 * SCSICR again.
 
-; end time for ack of controller of unit is the LATER of 
-; (3 sec after power up) and (250ms from now).
-	lea	_hz_200,a0		; a0 -> _hz_200 clock
-	move.l	#601,d1			; 600 ticks is 3 sec
-	sub.l	(a0),d1			; d1 = (2000 - _hz_200)
-	moveq	#51,d2			; 51 ticks is 250ms
-	cmp.l	d2,d1
-	bgt	sels2
-	move.l	d2,d1
-sels2:	add.l	(a0),d1			; d1 = expiration time
+; amout of time to wait for bus to get busy is the LATER of 
+; (UPTIME ticks after power up) and (SCSTMOUT ticks from now).
+
+	lea	_hz_200,a0		; a0 -> 200hz clock
+	cmpi.l	#UPTIME,(a0)		; power has been up long enough?
+	bgt.b	sels2			; if yes - use short timeout
+	move.l	#UPTIME,d1		; else use minimum system uptime
+	add.l	(a0),d1			; d1 = timeout value
+	bra.b	sels3			; go wait for REQ
+	
+sels2:	bsr	setscstmout		; use short timeout
 sels3:	btst	#6,SCSICR		; wait for bus to be busy
-	bne	sels5
+	bne.b	sels5
 	cmp.l	(a0),d1
-	bhi	sels3
+	bhi.b	sels3
 
 sels4:	moveq	#-1,d0			; time out
-	bra	sels6
+	bra.b	sels6
 	
 sels5:	clr.w	d0			; selection successful
 sels6:	move.b	#$0,SCSIICR		; clear SEL and data bus assertion
@@ -603,25 +734,26 @@ w4stat:	bsr	setscstmout		; set up time-out for REQ and ACK
 	move.b	SCSIREI,d0		; clear potential interrupt
 
 	bsr	w4req			; wait for status byte
-	bmi	w4iend			; if timed-out, returns
+	bmi.b	w4iend			; if timed-out, returns
 	moveq	#0,d0			; clear d0
 	move.b	SCSIDB,d0		; get the status byte
+	bsr	setscstmout		; set up time-out for REQ and ACK
 	move.l	d0,-(sp)		; save the status byte
 	bsr	doack			; signal that status byte is here
 	tst.w	d0			; timed-out?
-	beq	ws4			; if not, wait for message byte
+	beq.b	wst4			; if not, wait for message byte
 
-ws3:	addq.l	#4,sp			; else clean up stack
-	bra	w4iend			; and return
+wst3:	addq.l	#4,sp			; else clean up stack
+	bra.b	w4iend			; and return
 
-ws4:	bsr	setscstmout		; set up timeout for REQ and ACK
+wst4:	bsr	setscstmout		; set up timeout for REQ and ACK
 	bsr	w4req			; wait for message byte
-	bmi	ws3			; if timed-out, returns
+	bmi.b	wst3			; if timed-out, returns
 
 	move.b	SCSIDB,d0		; get and ignore message byte
 	bsr	doack			; signal that message byte is here
 	tst.w	d0			; timed-out?
-	bmi	ws3			; if so, return timeout
+	bmi.b	wst3			; if so, return timeout
 w4i5:	move.l	(sp)+,d0		; recall the status byte
 w4iend:	rts
 
@@ -639,11 +771,11 @@ w4iend:	rts
 ;-
 w4req:
 wr0:	btst	#5,SCSICR		; waiting for REQ to come
-	bne	wr1			; if REQ comes, done
+	bne.b	wr1			; if REQ comes, done
 	cmp.l	(a0),d1			; time's up?
-	bhi	wr0			; if not, wait some more
+	bhi.b	wr0			; if not, wait some more
 	moveq	#-1,d0			; else, returns timed out
-	bra	w4rend
+	bra.b	w4rend
 wr1:	moveq	#0,d0			; returns successful
 w4rend:	rts
 
@@ -661,11 +793,11 @@ w4rend:	rts
 ;-
 doack:	ori.b	#$11,SCSIICR		; assert ACK (and data bus)
 da0:	btst	#5,SCSICR		; wait for REQ to go away
-	beq	da1			; if REQ goes away, done
+	beq.b	da1			; if REQ goes away, done
 	cmp.l	(a0),d1			; time's up?
-	bhi	da0			; if not, wait some more
+	bhi.b	da0			; if not, wait some more
 	moveq	#-1,d0			; else returns timed out
-	bra	doaend
+	bra.b	doaend
 da1:	moveq	#0,d0			; returns successful
 doaend:	andi.b	#$ef,SCSIICR		; clear ACK
 	rts
@@ -686,7 +818,7 @@ doaend:	andi.b	#$ef,SCSIICR		; clear ACK
 ;-
 hshake:	move.w	d0,-(sp)		; preserve d0.w
 	bsr	w4req			; wait for REQ to come
-	bmi	hsend			; if timed out, returns
+	bmi.b	hsend			; if timed out, returns
 	move.b	1(sp),SCSIDB		; write a byte out to data bus
 	bsr	doack			; assert ACK
 hsend:	addq.l	#2,sp			; clean up stack
@@ -700,12 +832,12 @@ hsend:	addq.l	#2,sp			; clean up stack
 _resetscsi:
 	move.b	#$80,SCSIICR	; assert RST
 	bsr	setscstmout	; wait (at least) 250 ms
-rs0:	cmp.l	(a0),d1
-	bhi	rs0
+rst0:	cmp.l	(a0),d1
+	bhi.b	rst0
 	move.b	#$00,SCSIICR
 	bsr	setscltmout	; wait (at least) 1000 ms
-rs1:	cmp.l	(a0),d1
-	bhi	rs1
+rst1:	cmp.l	(a0),d1
+	bhi.b	rst1
 	rts
 
 
@@ -717,9 +849,9 @@ rs1:	cmp.l	(a0),d1
 ;	d1.l = expiration time
 ;-
 setscstmout:
-	movea.l	#_hz_200,a0		; a0 -> 200 hz clock
-	move.l	#SCSTMOUT,d1		; d0 = SCSTMOUT _hz_200 clicks
-	add.l	(a0),d1			; d0 = curr time + # clicks to wait
+	movea.l	#_hz_200,a0	; a0 -> 200 hz clock
+	move.l	#SCSTMOUT,d1	; d0 = SCSTMOUT _hz_200 clicks
+	add.l	(a0),d1		; d0 = curr time + # clicks to wait
 	rts
 
 
@@ -731,10 +863,11 @@ setscstmout:
 ;	d1.l = expiration time
 ;-
 setscltmout:
-	movea.l	#_hz_200,a0		; a0 -> 200 hz clock
-	move.l	#SCLTMOUT,d1		; d0 = SCLTMOUT _hz_200 clicks
-	add.l	(a0),d1			; d0 = curr time + # clicks to wait
+	movea.l	#_hz_200,a0	; a0 -> 200 hz clock
+	move.l	#SCLTMOUT,d1	; d0 = SCLTMOUT _hz_200 clicks
+	add.l	(a0),d1		; d0 = curr time + # clicks to wait
 	rts
 	rts
+.endc
 
 

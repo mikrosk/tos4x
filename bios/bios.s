@@ -4,19 +4,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/12/08 15:46:16 $
+* $Date: 90/02/02 13:37:53 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.10  90/02/02  13:37:53  apratt
+* Added conmap code, and TTMFP serial port code.  The conmap code
+* should really be dependent on a separate conditional, not TT
+* as it is now, because it will go in new STe's.  SCC serial-port
+* driver doesn't exist here yet.
+*
+* Also changed coldboot to clobber fast RAM, too, again up to
+* a bus error.
+*
 * Revision 2.9  89/12/08  15:46:16  apratt
 * Changed rsconf so it enables & disables tx and rx just by
 * changing the one bit, not by setting and clearing the whole
 * tsr/rsr.  This preserves the $5 mode set previously,
 * so reset & baud-rate changes don't cause spurious chars to be sent.
-*
+* 
 * Revision 2.8  89/10/03  10:03:02  apratt
 * Changed initialization of MFP's TSR to make the output state
 * "High" not "Hi-Z" (open collector) when the transmitter is idle.
@@ -147,7 +156,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.9 $
+* $Revision: 2.10 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -224,12 +233,24 @@ osconf		equ	%11001
 	.globl	_timr_ms		;timer C calibration
 	.globl	etv_timer		;system timer handoff vector
 	.globl	_hz_200			;timer c raw tick
+.ifne TT
+	.globl	_dumpflg		;flag to signal a screen dump(alt-HELP)
+.endc
+
+.ifne TT
+	.globl	ttmfpvectr		;interrupt handlers (from ttmfp.s)
+.endc
+
 .if TT
 	.globl	ttwait			;wait for some time
 .endif
 	.globl	dowait			;wait (usable only at boot time)
 
 *+ (dbg)
+.ifne TT
+* Exports:
+*
+.endc
 	.globl	kbshift
 	.globl	maptab			; startup.s uses these in Bcon*
 	.globl	maptabsize
@@ -517,6 +538,10 @@ txderr	equ	$124	;transmitter error interrupt
 txbufe	equ	$128	;transmitter buffer empty interrupt
 rxderr	equ	$12C	;receiver error interrupt
 rxbufe	equ	$130	;receiver buffer full interrupt
+.ifne TT
+rng232	equ	$138	;ring indicator rs-232		(i6)
+.endc
+
 .if TT
 ttmfpibase	equ	$140
 ttmfp	equ	$fffffa81
@@ -536,8 +561,8 @@ buflow	equ	10	;amount of space in buffer before an "xon" may
 bufhigh	equ	12	;amount of space used in buffer that trigger's
 *			;the sending of a "xoff" signal to the host
 status	equ	28	;copy of midi acia status
+rxoff	equ	30	* "xoff" Sent Flag
 rsmode	equ	32	* bit 0 = Xon/Xoff Flow Control Enabled
-
 *			* bit 1 = RTS/CTS Flow Control Enabled
 sendnow	equ	33	* Buffer Bypass Flag/Data
 brate	equ	34	* saved baud rate: returned by Rsconf(-2)
@@ -550,11 +575,6 @@ minsize		equ	$80
 
 *************************************************************************
 *		operating system memory space				*
-*	Baud rate shadow variable -- returned by Rsconf(-2)
-*
-baudrate:	ds.w	1
-
-*
 *************************************************************************
 
 	.bss
@@ -585,9 +605,10 @@ robuftail:	ds.w	1
 robuflow:	ds.w	1
 robufhigh:	ds.w	1
 
-*					* Bit 1 = Handshake (0=Disabled)
-risendnow:	ds.b	1
+rsrbyte:	ds.b	1		* Other Associated Variables
+auxbrate:	ds.w	1		* saved brate value for Rsconf(-2)
 ritxoff:	ds.b	1
+rirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 risendnow:	ds.b	1		* flag/char to send NOW
 auxbrate:	ds.b	1		* saved brate value for Rsconf(-2)
 auxmask:	ds.b	1		* unused
@@ -1227,6 +1248,9 @@ lst1:	rts
 *		auxillary port input status routine			*
 *									*
 	lea	ribufptr,a0	* ptr to RS232 input buffer record
+
+	.globl	auxistat
+
 auxistat:
 	lea	ribufptr.w,a0	* ptr to RS232 input buffer record
 
@@ -1249,6 +1273,10 @@ instxit:
 *		from the head. The tail points to the LAST char to	*
 *		enter the buffer.					*
 	lea	ribufptr,a0	* ptr to RS232 input buffer record
+	lea	kickstart(PC),a2
+	.globl	auxin
+* entry point used by ttin
+	lea	ribufptr.w,a0	* ptr to RS232 input buffer record
 	lea	mfp,a2		* ptr to MFP
 
 * entry point used by ttin, auxin; a0=iorec, a2=mfp (used by kickstart)
@@ -1268,7 +1296,7 @@ incommon:
 	bsr	rtson		* THEN Assert RTS (Ready to Receive)
 	bra	xinxit
 	clr.b	rxoff(a0)
-	bsr	kickstart	* ELSE Send "xon"
+	jsr	(a2)		* ELSE Send "xon"
 xinxit:
 	move.w	(sp)+,d0
 	rts
@@ -1283,6 +1311,9 @@ xinxon:	move.b	#xon,sendnow(a0)
 *		auxillary port output status routine			*
 *									*
 	lea	robufptr,a0	* ptr to RS232 output buffer record
+
+	.globl	_auxostat
+
 _auxostat:
 	lea	robufptr.w,a0	* ptr to RS232 output buffer record
 
@@ -1303,6 +1334,7 @@ ostxit:	rts
 *************************************************************************
 	lea	robufptr,a0	* ptr to RS232 output buffer record
 	.globl	_auxout
+	move.w	6(sp),d0	* get data
 	lea	robufptr.w,a0	* ptr to RS232 output buffer record
 	bsr	putbyte
 	lea	ribufptr.w,a0	* set up regs for kickstart
@@ -1329,6 +1361,7 @@ ostxit:	rts
 *	Externals:
 *		sender
 *
+	lea	ribufptr,a0	* load up queue pointer for sender
 kickstart:
 	tst.b	tsr(a2)
 	bpl	kikxit		* IF (MFP Empty) THEN
@@ -1537,7 +1570,7 @@ ttmfp	equ	$fffffa81
 	bsr	initint
 
 *	init the "d" timer
-	move.w	#$1,baudrate	;9600 is baud rate number 1 - shadow this.
+	move.w	#$1,brate+ribufptr	;9600 is baud rate number 1
 	moveq	#dtimer,d0	;select the d timer
 	moveq	#c9600,d1	;init for /4 for 9600 baud
 	moveq	#d9600,d2	;init for 9600 baud
@@ -1563,6 +1596,7 @@ ttmfp	equ	$fffffa81
 
 .if TT
 	lea.l	ttmfp,a0
+	move.w	#1,brate+ttribufptr	; save in ttmfp's iorec
 .endc
 
 	tst.b	_iamanst		; if you're an ST don't do this
@@ -1577,6 +1611,14 @@ ttmfp	equ	$fffffa81
 
 	bsr	lbmove		;do block move and return
 
+.ifne TT
+	lea	rs232init,a1
+	moveq	#rssize,d0
+	bsr	lbmove		;do block move
+
+.if TT
+.endc
+	lea	ttribufptr.w,a0
 	lea	ttrs232init,a1
 	moveq	#rssize,d0
 	bsr	lbmove
@@ -1609,8 +1651,14 @@ ttmfp	equ	$fffffa81
 
 	move.b	#%00000111,conterm.w	;enable keyclick,repeat key,bell functions, disable the KBSHIFT concatenation.
 
+	move.l	#jdostime,clkintvec.w
+.ifne TT
+	move.l	#genrts,d0	;generalized rts for ikbd subsystems
+	move.l	d0,statintvec.w
+.endc
+	move.l	d0,msintvec.w	;init user mouse interrupt adr to rts
 	move.l	d0,joyintvec.w
-*  Sound routine initialization - uses the pre-init'ed d0.l=0000 !!
+
 * init the Bconmap system
 	bsr	mapinit
 
@@ -1662,6 +1710,21 @@ st1:     move.l  d1,d2
 	lea	midikey,a2
         moveq   #$6,d0          ;load in interrupt # to setup
         bsr     initint         ;go to service routine
+.ifne TT
+	lea	ctsint,a2	;point to the CTS interrupt routine...
+	moveq	#$2,d0		;point to the CTS interrupt number
+	bsr	initint
+
+.if TT
+* initialize TTMFP interrupts
+
+	move.l	#ttmfpvectr,a3
+	move.w	#ttmfpibase+$24,a0	; +$24 is rs232 tx err vector
+
+	move.l	(a3)+,(a0)+		; copy four vectors
+	move.l	(a3)+,(a0)+
+.endc
+	move.l	(a3)+,(a0)+
 
 	or.b	#%00011110,ttmfp+iera	; enable RS232 ints
 	or.b	#%00011110,ttmfp+imra	; and unmask them
@@ -2021,6 +2084,9 @@ bslct0:	addq.l	#2,a1		* ELSE Point to Alternate Register Set
 * 02/18/87	Conform to old spec where we put at tail and pull	*
 	lea	ribufptr,a0
 *		enter the buffer.					*
+*************************************************************************
+rcvrint:
+	movem.l	d0-d1/a0-a2,-(sp)
 	lea	ribufptr.w,a0
 	lea	mfp,a2
 
@@ -2061,6 +2127,7 @@ rcvr2:	cmp.w	bufhigh(a0),d0
 	btst.b	#0,rsmode(a0)
 	bne	rcvxof		* IF (RTS/CTS Flow Control)
 	bsr	rtsoff		* THEN Withdraw RTS (NOT Ready to Receive)
+	bra	rcvrxit
 rcvxof:	move.b	#xoff,sendnow(a0)	* ELSE Send "Xoff"
 rcvrkick:
 	tst.b	tsr(a2)
@@ -2076,6 +2143,10 @@ rcvrxit:
 *************************************************************************
 *									*
 *	transmit buffer empty interrupt routine				*
+	lea	ribufptr,a0	* load up queue pointer for sender
+*************************************************************************
+txrint:
+	movem.l	d0-d1/a0-a2,-(sp)
 	lea	mfp,a2
 	lea	ribufptr.w,a0	* load up queue pointer for sender
 
@@ -2102,6 +2173,7 @@ ctsint:
 	beq	ctsxit		* IF (RTS/CTS Flow Control Enabled) THEN
 
 	btst.b	#2,gpip(a2)
+	bne	ctsoff		* IF (CTS Asserted)
 	clr.b	txoff(a0)	* THEN Re-Enable Transmission
 	bset.b	#2,aer(a2)	* Falling Edge Trigger
 	tst.b	tsr(a2)
@@ -2120,6 +2192,9 @@ ctsxit:
 	rte
 
 *************************************************************************
+*	routines to handle tx or rx errors				*
+*************************************************************************
+rxerror:
 	movem.l	d0/a0,-(sp)
 	lea	mfp,a0
 
@@ -2130,6 +2205,9 @@ rxecommon:
 *	bclr	#$3,isra(a0)	* Clear Interrupt
 	move.b	#%11110111,isra(a0)	; was bclr but that's wrong
 	movem.l	(sp)+,d0/a0
+	rte
+
+txerror:
 	move.l	a0,-(sp)
 	lea	mfp,a0
 
@@ -2141,13 +2219,14 @@ txecommon:
 	move.l	(sp)+,a0
 	tst.b	tsr+mfp			; dummy read per 68901 book
 	rte
+
 *
 *	SENDER   Send a Byte from the Output Buffer to the MFP
 *
 *	Given:
 *		a0 = iorec base pointer
 *		a2 = MFP Base Pointer
-*		d0, d1, a0 and a1 destroyed
+*
 *	Returns:
 *		Data Sent as Needed
 *
@@ -2155,7 +2234,6 @@ txecommon:
 *		d0, d1, and a1 destroyed
 *
 *		getbyte
-	lea	ribufptr,a0
 	beq	sendbuf
 	clr.b	sendnow(a0)
 	bra	sendwt
@@ -2165,7 +2243,7 @@ txecommon:
 	clr.b	sendnow(a0)	* THEN Clear Flag & Send It Now!
 	bra	sendwt
 sendbuf:
-	lea	robufptr,a0	* ELSE Send Char From Output Buffer
+sendbuf:
 	move.b	rsmode(a0),d0
 	and.b	txoff(a0),d0
 	bne	sendone		* IF (Flow-Control AND Xoff) THEN Skip
@@ -2338,7 +2416,7 @@ bumxit:	rts
 *	word	device							*
 *									*
 *	returns pointer to the device's buffer record table		*
-*			3 - parallel					*
+*									*
 *		device - buffer identification number			*
 *			0 - rs232					*
 *			1 - ikbd					*
@@ -2358,16 +2436,32 @@ bumxit:	rts
 *		output buffer size		word			*
 *		output buffer head		word			*
 *		output buffer tail		word			*
+*		output buffer low-water mark	word			*
+*		output buffer high-water mark	word			*
+*									*
+*************************************************************************
+
 *
 * For TT, if the argument is 0 (for RS232), we read the current mapping
 * from the variable mapiorec, which is maintained by Bconmap.
 *
-	asl.l	#2,d1		;x4=index into devtab space
+.ifne TT
+
+.endc
+	.globl	iorec
 
 iorec:
 	move.w	4(sp),d1
+.ifne TT
+.globl mapiorec
 
-	dc.l	ribufptr
+	beq	auxiorec
+	asl.l	#2,d1			;x4=index into devtab space
+	move.l	devtab(pc,d1.w),d0	;get device bufrec pointer
+.endc
+	rts
+
+auxiorec:
 	move.l	mapiorec.w,d0
 	rts
 
@@ -2404,12 +2498,27 @@ devtab:
 *	(No other arguments are needed, and no changes are made.)	*
 * cause loss of a pending character, but only if it arrives while at	*
 * IPL 7.  This is not likely, and when you're fooling with Rsconf you	*
+* aren't in a critical section anyway.  Some rationalization!)  This	*
+* involves no code change.						*
+* 									*
+*************************************************************************
+
+*
+* For TT, to accomodate Bconmap, rsconf is a stub which dispatches to
 * the function pointer in maprsconf.  For the STMFP port (default),
 * is called rsconf.
 *
+.ifne TT
+	.globl	maprsconf
+
+
+	.globl	rsconf
+
+.endc
+
 * RETURNS: see above for rsconf return values
 *
-	move.w	baudrate,d0
+	move.w	auxbrate,d0
 rscommon:
 	moveq.l	#0,d0		;pre-clear hi word of return value
 	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
@@ -2457,7 +2566,7 @@ auxc1:
 	bclr.b	#0,tsr(a1)	;disable the transmitter
 *
 *	next, we disable the receiver and transmitter enable bits
-	move.w	d1,baudrate	;shadow baud rate value now
+	move.w	d1,auxbrate	;shadow baud rate value now
 	lea	baudctrl,a2	;point to baudrate control register settings
 	move.b	0(a2,d1.w),d0	;get control mask
 	lea	bauddata,a2	;point to baudrate data register settings
@@ -2507,7 +2616,600 @@ baudctrl:
 
 bauddata:
 	dc.b	d19200,d9600,d4800,d3600
+	dc.b	d2400,d2000,d1800,d1200
+	dc.b	d600,d300,d200,d150
+	dc.b	d134,d110,d75,d50
+.ifne TT
+
+
+
+* newcon.s: new console device routines
+.text
+
+**********************************************************************
+*
+* new console device routines (collectively called BCONMAP)
+*
+* There are new Bconin/out/stat/ostat device numbers on a TT: 
+*
+*     devno	meaning
+*
+*	9	SCC Channel A (full handshake, not normally wired).
+*
+* (On Mega STe, 8 is SCC Channel A, and there is no 9.  On other 
+* machines, there is no 7-9.)
+*
+* Bcon calls on device 1 (normally AUX) might actually refer to
+* any of these devices, or to a user-installed device (with an
+* even higher devno).  You use Bconmap to change the mapping of
+* device 1.  Bconmap also changes the mapping of Rsconf() calls, 
+* and of Iorec calls with Iorec device number 0.
+*
+* LONG Bconmap(devno)
+* WORD devno;
+*
+* Map "devno" in as Bcon* device number 1.  Return the old mapping.
+* If devno is -1, there's no change; the current mapping is simply
+* returned.  Legal values (currently) are 6-9. (9 is the maximum
+* device number in ROM; you can have other values if you expand the
+* table.)  
+*
+* If devno is -2, a pointer to the device mapping structure is returned.
+* This is only used by programs which need to install new mappable
+* handlers.
+*
+* Other values don't change anything, and return 0.
+*
+* The mapping is accomplished by writing into the (published) vector 
+* table in low memory.  In addition, new indirect pointers are available
+* for Iorec and Rsconf.
+*
+* Here's how it works:
+* 
+* The device vector tables for Bconin, out, etc. are in low RAM. Bconmap
+* changes the contents of those vectors for device 1 (AUX). Bconmap's
+* mapping structure is as follows:
+* 
+* 	struct bconmap {
+* 		LONG *maptab;		/* ptr to map table (see below)	*/
+* 		WORD maptabsize;	/* number of lines in the table	*/
+* 		WORD curmap;		/* device currently mapped in	*/
+* 		LONG maprsconf;		/* procedure pointer for Rsconf	*/
+* 		LONG mapiorec;		/* value returned by Iorec(0)	*/
+* 	};
+* 
+* The last three entries of this table are private; all users need to
+* know about are the first two.
+*
+* The map table contains a line for each device.  Each line contains
+* pointers to the Bconstat, Bconin, Bcostat, and Bconout routines, plus
+* the Rsconf routine, plus the Iorec pointer.  The table's size (the
+* number of devices) is in maptabsize.  maptabsize is used by all Bcon calls
+* to range-check the device number.
+* 
+* ----------------------------------------------------------------------
+*
+* A Bconmappable driver must have Bconstat, Bconin, Bcostat, and Bconout
+* entry points, plus an iorec, plus an Rsconf function pointer.  You
+* install it by writing it into the table pointed to by maptab.  You can
+* either overwrite an existing driver (not recommended) or expand the
+* table and add your driver. You can expand the table by copying
+* it into a larger space, then changing maptab and maptabsize.  You should
+* watch out for installing a driver which is already the one currently
+* installed.  When installing a brand new driver this isn't a problem,
+* but when clobbering an existing driver you should use Bconmap to
+* be sure that isn't the current one.
+*
+* Rsconf args are interpreted for the new devices; the bits which make
+* sense are used, the others discarded.  Nothing is returned
+* (except in the -2 case, where the last baud rate is returned).
+*
+* The bits in the Rsconf args which we emulate on the SCC are as follows:
+*
+* UCR:	bits 6-5: word-length (00=8, 01=7, 10=6, 11=5)
+* 	bits 4-3: start/stop (00=n/a, 01=1/1, 10=1/1.5, 11=1/2)
+*	bit 2:	  parity (0=no, 1=yes)
+*	bit 1:	  parity (0=odd, 1=even)
+*
+* RSR:	(none: only enable & synch strip are read-write)
+*
+* TSR:	bit 3:	  break (sends break while 1)
+*	(bits 2-1 are transmitter-idle state, bit 0 is enable)
+*
+* SCR:	(none: this is the synch character register)
+*
+**********************************************************************
+
+* imports
+
+.globl xconstat
+
+* exports
+
+.globl _bconmap
+
+*
+* The bconmap structure:
+*
+
+.bss
+maptab:		ds.l	1	; pointer to map table
+maptabsize:	ds.w	1	; size of map table (number of devices)
+curmap:		ds.w	1	; currently-mapped device
+maprsconf:	ds.l	1	; current Rsconf procedure pointer
+mapiorec:	ds.l	1	; current return value for Iorec(0)
+
+* initially, the map table goes here.  It's filled in by mapinit
+defmaptab:	ds.l	$18 * deftabsize
+
+*
+* Rom-default filling for maptab.
+*
+* These get stuffed into the area at xconstat in (published) low RAM.
+* Rsconf gets stuffed into maprsconf, and that's used to dispatch
+* Rsconf calls.
+*
+* The last entry here is not a routine pointer, it's an iorec pointer.
+*
+
+	dc.l	bistat,bin,bostat,bout,brsconf,biorec
+
+	dc.l	aistat,ain,aostat,aout,arsconf,aiorec
+imapvecs:
+	dc.l	auxistat,auxin,_auxostat,_auxout,auxrsconf,ribufptr
+	dc.l	bistat,bin,bostat,bout,brsconf,chbibufptr
+	dc.l	ttistat,ttin,_ttostat,_ttout,ttrsconf,ttribufptr
+
+deftabsize	equ	3
+defmap		equ	0
+.endif
+
+**********************************************************************
+
+_bconmap:
+	moveq.l	#0,d0		; clear hi word of d0
+	move.w	4(sp),d1	; get argument
+	move.w	curmap.w,d0	; preload return value for -1
+	cmp.w	#-1,d1		; Bconmap(-1) returns current map device
+	beq	mapend		; just return old number if -1
+	move.l	#maptab,d0	; preload return value for -2
+	cmp.w	maptabsize.w,d0
+	bhi	mapend		; error if greater than maptabsize
+	moveq.l	#0,d0		; preload error code (zero)
+	subq.w	#6,d1
+	bmi	mapend		; error if < 6
+	cmp.w	maptabsize.w,d1
+	bhs	mapend		; error if >= maptabsize
+
+* no error; unmap current device (copy pointers into maptab)
+
+	move.w	curmap.w,d1	; d2 = d1 * $18
+	subq.w	#6,d1
+	asl.w	#3,d1
+	move.w	d1,d2
+	add.w	d1,d1
+	add.w	d1,d2
+
+	move.l	maptab.w,a0
+	add.w	d2,a0		; a0 -> base of old vectors
+
+	lea.l	(xconstat+4).w,a1 ; a1 -> dev 1 constat vector
+	move.l	(a1),(a0)+
+	move.l	$20(a1),(a0)+
+	move.l	$40(a1),(a0)+
+	move.l	$60(a1),(a0)+
+	move.l	maprsconf,(a0)+
+	move.l	mapiorec.w,(a0)+
+
+* now map in the new device
+
+	move.w	4(sp),d1	; get new device number again
+	subq.w	#6,d1		; d2 = d1 * $18
+	asl.w	#3,d1
+	move.w	d1,d2
+	add.w	d1,d1
+	add.w	d1,d2
+
+	move.l	maptab.w,a0
+	add.w	d2,a0		; a0 -> base of vectors
+
+* a1 already points to dev 1 vector
+
+	move.l	(a0)+,(a1)		; write Bconstat vector
+	move.l	(a0)+,$20(a1)		; conin
+	move.l	(a0)+,$40(a1)		; costat
+	move.l	(a0)+,$60(a1)		; conout
+	move.l	(a0)+,maprsconf.w	; rsconf
+	move.l	(a0)+,mapiorec.w	; iorec
+
+	move.w	curmap.w,d0		; get previous value for returning
+	move.w	4(sp),curmap.w		; stuff in new curmap value
+
+* old mapping value or error code must be in d0 now for returning
+
+mapend:	rts
+
+*
+* mapinit: initialize the whole mapping system.
+*
+* This (re-)initializes xconstat etc. for device 1 (the mappable one).
+*
+
+	move.l	a1,sp
+	move.l	a2,$8
+	move.w	d0,maptabsize.w		; set maptabsize to the right value
+.endif
+
+	lea.l	imapvecs(PC),a1
+
+	move.w	#(6*deftabsize)-1,d0	; number of longs to move - 1
+	lea.l	(imapvecs+(defmap*$18))(PC),a1
+	dbra	d0,iloop
+
+	move.w	#(defmap+6),curmap.w
+
+	lea.l	(imapvecs+(defmap*$18)),a1	; MAS BUG: don't use (PC)
+	lea.l	(xconstat+4).w,a0
+	move.l	(a1)+,(a0)
+	move.l	(a1)+,$20(a0)
+	move.l	(a1)+,$40(a0)
+
+
+*
+* stubs for unimplemented devices
+*
+
+bistat: bin: bostat: bout: brsconf: biorec:
+aistat: ain: aostat: aout: arsconf: aiorec:
+	moveq.l	#0,d0			; at least "stat" won't return TRUE!
+	rts
+.endc
+	move.l	(a1)+,$60(a0)
+.ifne TT
+	move.l	(a1)+,mapiorec.w
+
+	rts
+
+.if TT
+
+**********************************************************************
+*
+* 
+* This section contains the code to hook the TTMFP serial port in to the
+* BIOS. It shares a lot of code with BIOS, including some utility
+* routines (getbyte, bumptr) and some major routines (interrupt-level
+* receive, transmit).  The common routines always use base registers
+* which point to the appropriate MFP or IOREC structure.  Even though the
+* code is common, the RTS/CTS code in the mainstream BIOS will never be
 * used because it's disabled in the (TT-specific) Rsconf() call.  That
+*									*
+*		ttmfp auxillary port input status routine		*
+*									*
+*************************************************************************
+* takes care of the problem of having hard-coded PSG usage in the common
+* code.
+* 
+
+	lea	ttribufptr,a0	* ptr to RS232 input buffer record
+
+	.globl	ttistat
+
+*									*
+*		ttmfp auxillary input routine				*
+*									*
+* 02/18/87	Conform to old spec where we put at tail and pull	*
+*		from the head. The tail points to the LAST char to	*
+*		enter the buffer.					*
+*************************************************************************
+ttistat:
+	lea	ttribufptr.w,a0	* ptr to RS232 input buffer record
+	bra	inscommon
+
+	lea	ttribufptr,a0	* ptr to RS232 input buffer record
+	lea	ttkickstart(PC),a2
+	.globl	ttin
+
+ttin:
+*									*
+*		ttmfp auxillary port output status routine		*
+*									*
+*************************************************************************
+	lea	ttribufptr.w,a0	* ptr to RS232 input buffer record
+	lea	ttmfp,a2
+	bra	incommon
+
+	lea	ttrobufptr,a0	* ptr to RS232 output buffer record
+
+	.globl	_ttostat
+
+*									*
+*		ttmfp auxillary output routine				*
+*									*
+*************************************************************************
+_ttostat:
+	lea	ttrobufptr.w,a0	* ptr to RS232 output buffer record
+	bra	ostcommon
+
+*************************************************************************
+	lea	ttrobufptr,a0	* ptr to RS232 output buffer record
+	.globl	_ttout
+*
+*	NOTE: Fall Thru to KICKSTART for Exit!!
+*
+
+
+*
+*	KICKSTART   Start Transmission as Needed
+*
+*	Given:
+*		nothing
+*
+*	Returns:
+*		Transmitter Enabled
+*
+*	Register Usage:
+*		d0, d1, a0, a1 and a2 destroyed
+*
+*	Externals:
+*		sender
+*
+ttkickstart:
+_ttout:
+	tst.b	tsr(a2)
+	bpl	kikxit		* IF (MFP Empty) THEN
+	move	sr,-(sp)
+	ori	#$700,sr	* Lock-Out Interrupts
+	lea.l	ttribufptr,a0
+	bsr	sender		* Kick-Start the MFP Interrupt Channel
+	move	(sp)+,sr
+ttkikxit:	rts
+	lea	ttrobufptr.w,a0	* ptr to RS232 output buffer record
+
+	bsr	putbyte
+	lea	ttribufptr.w,a0
+	lea	ttmfp,a2
+	bra	kickstart
+
+	.data
+	.even
+
+.globl ttmfpvectr
+ttmfpvectr:
+	dc.l	tttxerror
+	dc.l	tttxrint
+	dc.l	ttrxerror
+	dc.l	ttrcvrint
+
+ttrs232init:
+	dc.l	ttribuffer	;ibufptr
+	dc.w	rbufsize	;ibufsiz
+	dc.w	0		;ibufhead
+	dc.w	0		;ibuftail
+	dc.w	rbufsize/2	;ibuflow
+	dc.w	rbufsize*3/4	;ibufhigh
+
+	dc.l	ttrobuffer	;obufptr
+	dc.w	rbufsize	;obufsiz
+	dc.b	0		;rsrbyte
+	dc.w	0		;obuftail
+	dc.w	rbufsize/2	;obuflow
+	dc.w	rbufsize*3/4	;obufhigh
+
+	dc.b	0		* sendnow
+	dc.b	0		;txoff
+	dc.b	1		;rsmode -- Flow Control ON
+	dc.b	0		;sendnow
+	dc.b	1		;initial baud rate
+	dc.b	$ff		;initial mask
+
+        .even
+	.text
+
+* 02/18/87	Conform to old spec where we put at tail and pull	*
+*		from the head. The tail points to the LAST char to	*
+*		enter the buffer.					*
+*************************************************************************
+*									*
+*		ttmfp receiver buffer full interrupt routine		*
+	lea	ttribufptr,a0
+*									*
+*************************************************************************
+ttrcvrint:
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea	ttribufptr.w,a0
+	lea	ttmfp,a2
+	bra	rcvrcommon
+
+*************************************************************************
+*									*
+*	ttmfp transmit buffer empty interrupt routine			*
+	lea	ttribufptr,a0
+*************************************************************************
+tttxrint:
+	movem.l	d0-d1/a0-a2,-(sp)
+	lea	ttmfp,a2
+	lea	ttribufptr.w,a0
+	bra	txrcommon
+
+*************************************************************************
+*	routines to handle ttmfp tx or rx errors			*
+*************************************************************************
+ttrxerror:
+	movem.l	d0/a0,-(sp)
+	lea	ttmfp,a0
+	bra	rxecommon
+
+tttxerror:
+*									*
+*		configure rs-232 port of TTMFP				*
+*									*
+*	entry:								*
+*									*
+*	long	rsconf(baudrate,flow,ucr,rsr,tsr,scr)			*
+*									*
+*	word	baudrate - baud rate setting (table index to get	*
+*		value for timer D control and data registers) 		*
+*									*
+*	word	flow -	flow control:	xxxxxxhs			*
+*			h - cts/rts/dtr (DISABLED FOR TTMFP)		*
+*			s - software xon/xoff				*
+*			1 - on, 0 - off					*
+*	word	ucr -	MFP ucr register setting			*
+*	word	rsr -	MFP rsr register setting			*
+*	word	tsr -	MFP tsr register setting			*
+*	word	scr -	MFP scr register setting			*
+*									*
+*	Arguments with value -1 mean "no change" to the corresponding	*
+*	setting.							*
+*									*
+*	If baudrate is -2, the current baud rate is returned.  That is,	*
+*	the last nonnegative baudrate value passed to this function.	*
+*	(No other arguments are needed, and no changes are made.)	*
+*									*
+*	Otherwise, returns the old ucr,rsr,tsr,src settings in the	*
+*	four bytes of D0.L.						*
+*	(THIS WAS ALWAYS THE CASE but was only documented for 4/88.)	*
+*									*
+*************************************************************************
+	move.l	a0,-(sp)
+	lea	ttmfp,a0
+	bra	txecommon
+
+	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
+	bne	ttauxnorm	;no: act normally
+	move.w	ttbrate,d0
+	rts
+
+ttauxnorm:
+	ori.w	#$700,sr	;no interrupts for now (restored at rte)
+
+	lea	ttribufptr,a0
+	lea	ttmfp,a1
+
+*
+*	first, we grab the old ucr,rsr,tsr,scr contents
+*
+	lea	ttribufptr.w,a0
+	movep.l	ucr(a1),d7
+
+*
+*	set flow control mode(s)
+*
+* I broke this code in TOS 1.4 such that you could never set CTS/RTS
+* flow control.  The behavior of this code now is that 0 sets no flow
+* control, 1 sets XON/XOFF, 2 sets RTS/CTS, 3 sets XON/XOFF (all as before).
+* ANY OTHER VALUE IS NO-OP.  Previously, some other values set XON/XOFF
+* and others set no flow control. -1 is the only documented,
+* guaranteed no-op, though.
+*
+* Enabling tx and rx now means setting only the enable bit, not the whole
+* byte.  This preserves the status of the other mode bits.
+*
+
+	move.w	$6(sp),d0
+	bclr	#1,d0		; never set RTS/CTS flow control
+*				; TTMFP's serial port lacks the hw support
+	cmp.w	#3,d0
+	bhi	ttauxc1		; if d0 unsigned greater than 3 then no-op.
+	bne	ttauxc0		; if d0 not equal to 3 then set mode to d0.
+	moveq.l	#1,d0		; else it's three, so set XON/XOFF as before.
+ttauxc0:
+	move.b	d0,rsmode(a0)
+
+*	set timer baud rate
+
+ttauxc1:
+	tst.w	$4(sp)		;if -1 then don't change
+	bmi.b	ttauxc2
+*
+*	next, we disable the receiver and transmitter enable bits
+*
+	bclr.b	#0,rsr(a1)	;disable the receiver
+	bclr.b	#0,tsr(a1)	;disable the transmitter
+
+	move.w	$4(sp),d1
+	move.w	d1,ttbrate	;shadow baud rate value now
+	lea	baudctrl,a2	;point to baudrate control register settings
+	move.b	0(a2,d1.w),d0	;get control mask
+	lea	bauddata,a2	;point to baudrate data register settings
+	move.b	0(a2,d1.w),d2	;get data reg value
+
+	and.b	#%01110000,tcdcr(a1)	; stop the timer before resetting it
+	move.b	d2,tddr(a1)		; set data
+	or.b	d0,tcdcr(a1)		; set control
+*
+*	finally we re-enable the receiver and transmitter enable bits
+*
+	bset.b	#0,rsr(a1)	;enable the receiver
+	bset.b	#0,tsr(a1)	;enable the transmitter
+
+*	set rs-232 registers
+
+ttauxc2:
+	tst.w	$8(sp)		;if -1 then don't change
+	bmi.b	ttauxc3
+	move.b	$9(sp),ucr(a1)
+ttauxc3:
+	tst.w	$a(sp)		;if -1 then don't change
+	bmi.b	ttauxc4
+	move.b	$b(sp),rsr(a1)
+ttauxc4:
+	tst.w	$c(sp)		;if -1 then don't change
+	bmi.b	ttauxc5
+	move.b	$d(sp),tsr(a1)
+ttauxc5:
+	tst.w	$e(sp)		;if -1 then don't change
+	bmi.b	ttauxc6
+	move.b	$f(sp),scr(a1)
+ttauxc6:
+
+	move.l	d7,d0		;move old contents of rs-232 registers to d0.l
+
+	rts
+
+	lea	ttmfp,a2
+	bra	rscommon
+
+**********************************************************************
+
+.bss
+
+*
+*	TTMFP RS-232 Buffers and I/O Buffer Record
+*
+ttribuffer:	ds.b	rbufsize	;rs-232 input buffer
+ttrobuffer:	ds.b	rbufsize	;rs-232 output buffer
+
+*
+*	TTMFP RS-232 I/O Buffer Record
+*
+.globl ttribufptr
+ttribufptr:	ds.l	1		* Input Buffer Record
+ttribufsiz:	ds.w	1
+ttribufhead:	ds.w	1
+ttribuftail:	ds.w	1
+ttribuflow:	ds.w	1
+ttribufhigh:	ds.w	1
+*
+*	NOTE: THESE TWO BUFFERS MUST REMAIN CONTIGUOUS
+*		(Don't Thank Me, Thank Dave!)
+*
+ttrobufptr:	ds.l	1		* Output Buffer Record
+ttrobufsiz:	ds.w	1
+ttrobufhead:	ds.w	1
+ttrobuftail:	ds.w	1
+ttrobuflow:	ds.w	1
+ttrobufhigh:	ds.w	1
+
+ttrsrbyte:	ds.b	1		* Other Associated Variables
+tttsrbyte:	ds.b	1
+ttbrate:	ds.w	1		* saved baud rate for Rsconf(-2)
+ttrirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
+*					* Bit 1 = Handshake (0=Disabled)
+ttrisendnow:	ds.b	1
+.endc
+ttmask:		ds.b	1		; not used
+
 *	revised 05/01/86	Mike Schmal
 *	Worked in spanish key board
 * of STPAD.
@@ -3488,50 +4190,65 @@ keymaus:
 mauskey1:
 	dc.b	$47
 	dc.b	$c7
-* COLD cold boot code: copy a bit of code to $8, then jump to it.	*
+	dc.b	$52
 	dc.b	$d2
-* gets a bus error.  Then it branches to reseth.			*
+
+*************************************************************************
+*
 * COLD cold boot code: copy a bit of code to $C, then jump to it.
+* The bit of code clears RAM starting from its own end, until it
+* gets a bus error.  On a TT, it then clears all of fast RAM, too.
+* In either case, the bus error vector gets set to point to the
 * get here either, so don't worry about it.
 *
 * compile in the limit of 1MB and clear it from ROM.
 *
-	lea.l	cstart(PC),a0
-	move.w	#$f,d0			; move 64 bytes (should be enough)
-	move.w	#$8,a1
-rloop:	move.l	(a0)+,(a1)+
-	dbra	d0,rloop
-	jmp	$8.w
-.text
-* this code is copied to address $8, and jumped to
-* at IPL 7.  It sets the bus error vector and clears RAM
-* until it gets a bus error, then jumps to the reset vector,
-* found at address $4.  If it's more than 64 bytes long, you'll
-* have to change d0 above.
-.endif
-cstart:
-	lea.l	berr(PC),a0
-	move.l	a0,$8.w
-	lea.l	cend(PC),a0
-	moveq.l	#0,d0
-	move.l	d0,d1
-	move.l	d0,d2
-	move.l	d0,d3
-	move.l	d0,d4
-	move.l	d0,d5
-	move.l	d0,d6
-	move.l	d0,d7
-	dbra	d1,cploop
-* loop forever (until bus error)
+.ifne TT
+.if M68030
 	move.l	#$808,d0		; clobber the cache
-cloop:	movem.l	d0-d7,(a0)
-	add.w	#(4*8),a0
-	bra	cloop
-	move.l	#$c,a1
-berr:	move.l	$4.w,a0
-	jmp	(a0)
-cend:	dc.w	0
+	movec	d0,cacr			; (clear & disable)
+	moveq.l	#0,d0
+	movec	d0,vbr			; write 0 to the vector base address
+	pmove	tdis,tc
+	dc.l	$f0390800,tdis		; pmove tdis,tt0
+	dc.l	$f0390c00,tdis		; pmove tdis,tt1
+.data
+tdis:	dc.l	0
+.text
+.endc
+.endif
 
+	move.l	$4,$8			; set bus error to reset vector
+	move.l	#$c,a0			; start clearing at $c
+	moveq.l	#0,d0
+	move.l	#$00040000-1,d1		; clear 1MB or to bus error
+cploop:	move.l	d0,(a0)+
+	dbra	d1,cploop
+	move.l	$4,a0
+	jmp	(a0)
+.else
+.if M68030
+	move.l	#$808,d0		; clobber the cache
+	movec	d0,cacr			; (clear & disable)
+.ifne TT
+	movec	d0,vbr			; write 0 to the vector base address
+	pmove	tdis,tc
+	dc.l	$f0390800,tdis		; pmove tdis,tt0
+	dc.l	$f0390c00,tdis		; pmove tdis,tt1
+.endc
+tdis:	dc.l	0
+.text
+
+	lea.l	coldcode(PC),a0
+	move.l	#$c,a1
+.ifne TT
+	dbra	d0,mloop
+	jmp	$c			; with no cache this is safe
+
+* 
+.endc
+coldcode:
+.if TT
 	move.l	a0,$8
 .else
 	move.l	$4,$8		; not TT: bus error jumps to reset vector

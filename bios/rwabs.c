@@ -1,19 +1,22 @@
 /*
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/21 17:22:52 $
+* $Date: 89/11/27 14:50:03 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.2  89/11/27  14:50:03  apratt
+* Added a fourth Protobt() disk type: 1.44MB (18 sec/2side/80trk).
+*
 * Revision 2.1  89/02/21  17:22:52  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
-*
+* 
 * Revision 1.6  89/02/06  23:10:32  kbad
 * mediach() used to use the 200Hz timer for the grace period, now uses
 * the video frame counter (frclock).  This way, mediach() will work even
@@ -43,7 +46,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.1 $
+* $Revision: 2.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -679,7 +682,14 @@ char proto_tab[] =
  /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
 	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0x70,0x00, 0xa0,0x05,
  /*      MD    sec/fat   sec/track  nsides      N hidden */
-	0xf9, 0x05,0x00, 0x09,0x00, 0x02,0x00, 0x00,0x00
+	0xf9, 0x05,0x00, 0x09,0x00, 0x02,0x00, 0x00,0x00,
+
+ /* AKP: Added type 4: 80 tracks double sided 1.44MB (hi density) */
+ /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
+	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0xe0,0x00, 0x40,0x0b,
+ /*      MD    sec/fat   sec/track  nsides      N hidden */
+	0xf9, 0x06,0x00, 0x12,0x00, 0x02,0x00, 0x00,0x00
+
 };
 
 

@@ -1,12 +1,15 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\sup.c,v $
+* $Revision: 2.10 $	$Source: e:/tos/gd2\RCS\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.10  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.9  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *
@@ -21,21 +24,6 @@
 */
 
 #include "fs.h"
-
-extern char kbchar[3];	/* # of elements in typeahead buffer */
-extern long *remptr[3];	/* remove ptr from typeahead buffer */
-extern long *insptr[3];	/* insert ptr into typeahead buffer */
-extern long glbkbchar[3][KBBUFSZ];	/* typeahead buffer */
-
-static long domediach();
-
-long uptime;
-int msec;
-long errbuf[3];
-char nday[] = 
-	/*0 J  F  M  A  M  J  J  A  S  O  N  D  */
-	{ 0,31,28,31,30,31,30,31,31,30,31,30,31 } ;
-
 
 /*
  * Function-table entry
@@ -68,7 +56,6 @@ xgetver()
 	return(VERS_NUM);
 }
 
-
 /*
  * Function "jump" table.
  */
@@ -84,13 +71,13 @@ FND funcs[0x58] = {
 	/* The code for this was broken, is fixed. (AKP) */
 
 	/* 0x01 */	/* 0x02 */	/* 0x03 */
-	&xconin,0x80,	&xtabout,0x81,	&xauxin,0x82,
+	&xconin,0x80,	&xconout,0x81,	&xauxin,0x82,
 	/* 0x04 */	/* 0x05 */	/* 0x06 */
-	&xauxout,0x82,	&xprtout,0x83,	&rawconio,0x80,
+	&xauxout,0x82,	&xprtout,0x83,	&xrawio,0x80,
 	/* 0x07 */	/* 0x08 */	/* 0x09 */
-	&x7in,0x80,	&x8in,0x80,	&xprt_line,0x81,
+	&xrawcin,0x80,	&xnecin,0x80,	&xconws,0x81,
 	/* 0x0A */	/* 0x0B */
-	&readline,0x80,	&xconstat,0x80,
+	&xconrs,0x80,	&xconstat,0x80,
 
 	/* disk functions */
 	/* on these functions the 0x80 flag indicates whether a handle */
@@ -164,75 +151,38 @@ FND funcs[0x58] = {
 } ;
 
 /*
- * Initialize GEMDOS;
- * called early-on by the BIOS.
- */
-void
-cinit()
-{
-REG	PD *r;
-REG	int i;
-REG	long *p;
-
-	poolinit();
-	xminit();
-	r = run = &rootpd;
-
-	/* clear the rootpd -- for compatibility with old ROMs which	*/
-	/* got it from ospool (and therefore got it clear).		*/
-
-	for (p = (long *)r, i = (sizeof(PD)/4); i; i--) {
-		*p++ = 0;
-	}
-
-	for (i=0; i<NUMSTD; i++) r->p_uft[i] = biosdev[i];
-
-	kbchar[0] = kbchar[1] = kbchar[2] = 0;
-	remptr[0] = insptr[0] = &(glbkbchar[0][0]);
-	remptr[1] = insptr[1] = &(glbkbchar[1][0]);
-	remptr[2] = insptr[2] = &(glbkbchar[2][0]);
-	callno = 0;
-}
-
-
-/*
- * Free a tree of DNDs.
- */
-void
-freetree(d)
-char *d;
-{
-REG	int i;
-
-	if (d->d_child) freetree(d->d_child);
-	if (d->d_next) freetree(d->d_next);
-	if (d->d_ofd) xmfreblk(d->d_ofd);
-	for (i = 0; i < NCURDIR; i++)
-		if (dirtbl[i] == d) dirtbl[i] = 0;
-	xmfreblk(d);
-}
-
-
-/*
- * Free open files on a drive.
+ * Free open files on a drive.  Part of the media-change procedure.
+ * Frees open files without flushing them or properly closing their
+ * DFD's.
  *
- * This function DIDN'T WORK AT ALL: q_d (dev being changed) was ignored,
- * and local variable 'DMD *d' was uninitialized but compared against!
  */
 void
 offree(d)
 DMD *d;
 {
-REG	int i;
-REG	OFD *f;
+	int i;
+	OFD *ofd;
+	uint dev = d->m_dev;
+	PD *pd;
 
-    for (i=0; i < OPNFILES; i++)
-	if ((((long) (f = sft[i].f_ofd)) > 0L) && (f->o_dmd == d))
-	{
-		xmfreblk(f);
-		sft[i].f_ofd = 0;
+	for (i=0; i < OPNFILES; i++) {
+	    ofd = sft[i].f_ofd;
+	    if (sft[i].f_own && !ofdisatty(ofd) && ofd->o_dfd->dfd_dev == dev) {
+		if (--ofd->o_use == 0) {
+		    if (--ofd->o_dfd->dfd_use == 0) {
+			MFREE(ofd->o_dfd);
+		    }
+		    MFREE(ofd);
+		}
+		/* go into the owner's basepage to see if any std handles */
+		/* referred to this device; if so, nuke them back to the */
+		/* stone age (make them refer to sft[n], which is a bios dev) */
+		pd = sft[i].f_own;
+		for (n = NUMSTD-1; n; --n) {
+		    if (pd->p_uft[n] == i) pd->p_uft[n] = n;
+		}
 		sft[i].f_own = 0;
-		sft[i].f_use = 0;
+	    }
 	}
 }
 
@@ -463,13 +413,15 @@ rawout:			xwrite(h,1L,((char *)&pw[1])+1);
  * called every so often by the BIOS's
  * timer interrupt handler.
  */
+
+int msec;
+
 void
 tikfrk(n)
 int n;
 {
-REG int curmo;
+	int curmo;
 
-	uptime += n;
 	msec += n;
 	if (msec >= 2000)
 	{

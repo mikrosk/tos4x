@@ -1,11 +1,14 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.11 $	$Source: e:/tos/gd2\RCS\makefile.,v $
+# $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $     $Locker:  $
+# $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.12  1991/02/15  18:45:40  apratt
+# CI at the end of the week...
+#
 # Revision 2.11  1991/02/12  18:20:10  apratt
 # *** empty log message ***
 #
@@ -18,7 +21,7 @@ TMPDIR	=	m:
 .SUFFIXES: .o .c .s
 
 # un-comment this whole section to compile with GCC
-CC=gcc
+CC=c:\gnu\bin\gcc.ttp
 CFLAGS=-O -Wall -mshort -fstrength-reduce
 #.c.o:
 #	$(CC) $(CFLAGS) -S $*.c
@@ -33,7 +36,7 @@ CFLAGS=-O -Wall -mshort -fstrength-reduce
 
 ################
 
-FRAG =		con.o fscl.o fscomm.o fsdir.o fsfs.o fshand.o scan.o \
+FRAG =		fscl.o fscomm.o fsdir.o fsfs.o fshand.o scan.o \
 		setup.o time.o panic.o mem.o pool.o
 
 frag.prg: testbed.o $(FRAG) traps.o
@@ -42,7 +45,7 @@ frag.prg: testbed.o $(FRAG) traps.o
 traps.o: traps.s
 	gcc-as -o traps.o traps.s
 
-NOTYET =	fsproc.o sup.o
+NOTYET =	fsproc.o sup.o con.o
 
 DS=dossys
 LDOBJS	=	$(DS)\self.o $(DS)\ld_dos.o $(DS)\clear.o $(DS)\clock.o \

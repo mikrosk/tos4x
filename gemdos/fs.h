@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.12 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.13  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.12  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -40,8 +43,10 @@
 #if __STDC__
 #define _P(x) x
 #define ASSERT(exp) ((exp) ? 0 : __assert (#exp, __FILE__, __LINE__))
-#define __assert(exp,file,line) \
-	DBMSG("Failed assert \"" exp "\" file " #file " line " #line)
+#define __assert(exp,file,line) ( \
+	sprintf(assertbuf,"Failed assert: \"" exp "\" file %s line %ld",\
+		file,(long)line), \
+	DBMSG(assertbuf))
 #define voidfn void
 #else
 #define _P(x) ()
@@ -76,16 +81,15 @@
 #define NULPTR	((void *) 0)
 #define TRUE	1
 #define FALSE	0
-#define	MAXDEVS	16		/* max number of block devices */
-#define SLASH	'\\'		/* path character */
 
 /*
  *  Fundamental(?) constants
  */
 
+#define	MAXDEVS	16		/* max number of block devices */
+#define NUMPDS 32		/* max number of unterminated processes */
 #define SUPSIZ	(1024+512)	/* common supervisor stack size (in words) */
-#define OPNFILES	75	/* max open files in system */
-#define NCURDIR		40	/* max current directories in use in system */
+#define OPNFILES	25	/* size of root process's uft */
 #define NUMSTD		6	/* number of standard files */
 #define NUMBIOS		3	/* number of BIOS dev handles -1, -2, -3 */
 #define	KBBUFSZ		80	/* size of typeahead buffer */
@@ -113,28 +117,18 @@
 #define getmpb(a)	(void)trap13(0,a)
 #define mediach(a)	(int)trap13(9,a)
 #define setexc(e,h)	(void (*)())trap13(5,e,h)
+#define gettime()	(ulong)trap14(0x17)
+
 #define min(a,b)	(((a)<(b))?(a):(b))
 
 #define rwabs(a,b,c,d,e) if(rwerr=trap13(4,a,b,c,d,e)){errdrv=e;\
 /* ------------------------------------------ */	longjmp(errbuf,rwerr);}
 
-#define cl2rec(cl,dm) (!(cl) ? 0 : ((cl) << (dm)->m_clrlog))
-#define realcl2rec(cl,dm) (!(cl) ? 0 : \
-			    (((cl) << (dm)->m_clrlog) + (dm)->m_recoff[2]))
+#define cl2rec(cl,dm) (!(cl) ? 0 : (((cl)-2) << (dm)->m_clrlog))
+#define realcl2rec(cl,dm) (!(cl) ? (dm)->m_recrd : \
+			    ((((cl)-2) << (dm)->m_clrlog) + (dm)->m_recoff[2]))
 
 #define	Panic()		panic()
-
-/*
- * divmod: "returns" quotient, sets remainder, for byte -> sect/offs
- * usage:
- *   sector = divmod(&offset,bytenum,dm->m_rblog);
- *
- * bytenum is LONG, and is the byte offset from the start of the section
- * (from start of FAT, Root dir, etc.).
- */
-
-#define divmod(p_rem,divdnd,divsor) \
-	(*(p_rem) = ((divdnd)&logmsk[(divsor)]), (divdnd) >> (divsor))
 
 /*
  * Structure Names
@@ -149,7 +143,6 @@
 #define MD	struct _md
 #define MPB	struct _mpb
 #define PD	struct _pd
-#define FTAB	struct _ftab
 #define DTA	struct _dta
 #define PRG	struct _prg
 
@@ -196,10 +189,10 @@ PD
 	long	p_hflags;	/* process flags (see P_ below) */
 	char	*p_env;		/* at offset 2ch (eat your heart out, Lee) */
 /* 0x30 */
-	char	p_uft[NUMSTD];	/* index into sys file table for std files */
-	char	p_minfast;	/* minimum allowable fast RAM (x64K) */
-	char	p_curdrv;	/* current drive */
 	long	p_1fill[2];	/* (junk) */
+	uint	p_curdrv;	/* current drive */
+	uint	p_uftsize;	/* number of OFD pointers at p_uft */
+	OFD	**p_uft;	/* ptr to my uft (allocated after env.) */
 /* 0x40 */
 	uint	p_curdir[MAXDEVS];	/* startcl of cur dir on each drive */
 /* 0x60 */
@@ -210,6 +203,11 @@ PD
 	char	p_cmdlin[0x80];	/* commandline image */
 };
 
+/* macros for handling the OFD field a uft entry */
+
+#define ofdisatty(ofd) (((long)(ofd)) & 1)
+#define ofddevno(ofd) (~((short)((((unsigned long)(ofd)) >> 1))))
+#define ofdtty(devno) ((OFD *)((~(devno) << 1) | 1))
 
 /*
  * PRG, the header of an executable file
@@ -321,23 +319,6 @@ DIR
 #define FN_EMPTYOK 3
 
 /*
- * dirfirst macro: initialize dir to the first slot in the dir from the dev/cl 
- */
-
-#define dirfirst(dir,dmd) \
-    (((dir)->dir_curcl = (dir)->dir_clust), \
-     ((dir)->dir_recno = realcl2rec((dir)->dir_clust,(dmd))), \
-     ((dir)->dir_recoffs = 0), \
-     dir2dir(dir))
-
-/* dirnext macro; see scan.c */
-
-#define dirnext(dir,dmd) \
-    (((dir)->dir_fcb++), \
-     ((dir)->dir_recoffs += sizeof(FCB)), \
-     (((dir)->dir_recoffs < (dmd)->m_recsiz) ? E_OK : _dirnext((dir),(dmd))))
-
-/*
  * File Control Block
  * as it appears on the disk.
  */
@@ -432,25 +413,6 @@ BCB
 
 #define B_INVALID -1	/* invalid flag; goes in b_bufdrv */
 
-/*
- * File Table entry
- * Pointed at OFDs when necessary.
- *
- * Empty ones have a zero own field.
- */
-
-/* macros for handling the OFD field of an sft entry */
-
-#define ofdisatty(ofd) (((long)(ofd)) & 1)
-#define ofddevno(ofd) ((short)((((unsigned long)(ofd)) >> 1)))
-#define ofdmaketty(ofd,devno) ((ofd) = (OFD *)(((devno) << 1) | 1))
-
-FTAB
-{
-	PD	*f_own;		/* file's owner */
-	OFD	*f_ofd;		/* -> the OFD */
-};
-
 struct block {
     struct block *b_next;	/* next block in the heap */
     char b_type;		/* see Bis* predicates below */
@@ -489,11 +451,11 @@ long trap14 _P(( int,... ));
 int setjmp _P(( long *jmpbuf ));	/* takes three longs */
 voidfn longjmp _P(( long *jmpbuf,int error ));
 
-#ifdef REAL
+#if REAL
 /* these are in testbed.c until they are (more) real */
-int uc _P(( int ));
 voidfn s68 _P(( void *word_to_swap ));
 voidfn s68l _P(( void *long_to_swap ));
+int uc _P(( int ));
 voidfn clear _P(( void *start, void *last_plus_1 ));
 voidfn usr2xfr _P(( int n, void *d, void *s ));
 voidfn xfr2usr _P(( int n, void *s, void *d ));
@@ -503,3 +465,39 @@ voidfn upd_tod _P(( void ));
 volatile void gouser _P(( void ));
 voidfn dojmp _P(( long addr ));
 voidfn clksync _P(( void ));
+
+/*
+ * Macros and inlines
+ */
+
+/* move 'count' bytes from 's' to 'd' - count must be >0 */
+static inline voidfn
+xmovs(count, s, d)
+int count;
+void *s, *d;
+{
+  /* this loop is constructed a la dbra */
+  --count;
+  do {
+    *(char *)d++ = *(char *)s++;
+  } while (--count >= 0);
+}
+
+/*
+ * dirfirst macro: initialize dir to the first slot in the dir from the dev/cl 
+ */
+
+#define dirfirst(dir,dmd) \
+    (((dir)->dir_curcl = (dir)->dir_clust), \
+     ((dir)->dir_recno = realcl2rec((dir)->dir_clust,(dmd))), \
+     ((dir)->dir_recoffs = 0), \
+     dir2dir(dir))
+
+/* dirnext macro; see scan.c */
+
+#define dirnext(dir,dmd) \
+    (((dir)->dir_fcb++), \
+     ((dir)->dir_recoffs += sizeof(FCB)), \
+     (((dir)->dir_recoffs < (dmd)->m_recsiz) ? E_OK : _dirnext((dir),(dmd))))
+
+

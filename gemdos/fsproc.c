@@ -1,12 +1,15 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.14 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
+* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.15  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.14  1991/02/11  19:56:48  apratt
 * Checkin lest I lose work (again)
 *

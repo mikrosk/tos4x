@@ -1,12 +1,15 @@
 /*
 ***************************    POOL.C      ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\RCS\pool.c,v $
+* $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\pool.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: pool.c,v $
+* Revision 2.12  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.11  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -138,7 +141,6 @@ void
     REG struct block *ptr;
     REG MD *md;
     REG int i;
-    REG char *ptmp;
     REG int count;
     REG int lfree;	/* free small blocks in the whole pool */
 
@@ -196,9 +198,7 @@ gotone:
     Bmakeused(ptr);
 
     /* clear block before returning it */
-
-    for (ptmp = (char *)(&(ptr->b_data)); ptmp < (char *)(ptr+1); ptmp += 4)
-    	*(long *)ptmp = 0L;
+    clear(&ptr->b_data,((char *)(&ptr->b_data))+64);
 
     return (void *)(&ptr->b_data);
 }
@@ -279,7 +279,6 @@ MD
     REG struct block *ptr;
     REG struct block *free;
     REG MD *md;
-    char *ptmp;
     REG int i;
 
     Debug("print enter getsmall");
@@ -480,7 +479,7 @@ notdone:
  ***********************************************************************/
 
 /*
- * These are the four list headers which the md might be on
+ * These are the two list headers which the md might be on
  */
 
 static MD **mplist[] = {

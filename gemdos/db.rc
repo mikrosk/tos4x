@@ -1,3 +1,6 @@
+exec off
+set eightbit 0
+bind "echo \e8s\r" 1d ; # ^] bury window, Mint/MGR style
 load c:\apratt\db.rc
 
 # b_link ........ b_bufdrv . b_buftyp . b_bufrec .... b_dirty . 
@@ -13,6 +16,9 @@ procedure bcb a
   print -n b_dmd (lpeek `a);xa (+ `a 4)
   print b_bufr (lpeek `a);xa (+ `a 4)
 .
+
+alias allbcbs "echo LIST 0:;xt0 (lpeek .bufl);_allbcbs;echo LIST 1:;xt0 (lpeek (+ .bufl 4));_allbcbs"
+alias _allbcbs "if `t0 'bcb `t0;xt0 (lpeek `t0);_allbcbs'"
 
 # recsiz xxxx clsiz xxxx clsizb xxxx rdlen xxxx fsiz xxxx 
 # fatrec xxxx datrec xxxx numcl xxxx b_flags xxxx
@@ -54,7 +60,7 @@ procedure dfd a
 # dir_dev xx dir_clust xxxx dir_curcl xxxx dir_recno xxxx dir_recoffs xxxx
 # dir_bcb xxxxxxxx dir_fcb xxxxxxxx
 
-procedure dir a
+procedure dirx a
   print -n dir_dev (wpeek `a);xa (+ `a 2)
   print -n dir_clust (wpeek `a);xa (+ `a 2)
   print -n dir_curcl (wpeek `a);xa (+ `a 2)
@@ -62,7 +68,7 @@ procedure dir a
   print dir_recoffs (wpeek `a);xa (+ `a 2)
 
   print -n dir_bcb (lpeek `a);xa (+ `a 4)
-  print -n dir_fcb (lpeek `a);xa (+ `a 4)
+  print dir_fcb (lpeek `a);xa (+ `a 4)
 .
 
 
@@ -111,7 +117,7 @@ procedure dta a
 
 
 procedure fcb a
-  print -n f_name -s11 `a;xa (+ `a 4)
+  print -n f_name -s11 `a;xa (+ `a b)
   print -n f_attrib (peek `a);xa (+ `a 1)
   print f_fill {a};xa (+ `a a)
 
@@ -121,11 +127,6 @@ procedure fcb a
   print f_fileln (lpeek `a);xa (+ `a 4)
 .
 
-
-procedure ftab a
-  print -n f_own (lpeek `a);xa (+ `a 4)
-  print f_ofd (lpeek `a);xa (+ `a 4)
-.
 
 procedure md a
   print -n m_link (lpeek `a);xa (+ `a 4)
@@ -157,38 +158,29 @@ procedure ofd a
 # p_lowtpa xxxxxxxx p_hitpa xxxxxxxx p_tbase xxxxxxxx p_tlen xxxxxxxx
 # p_dbase xxxxxxxx p_dlen xxxxxxxx p_bbase xxxxxxxx p_blen xxxxxxxx
 # p_xdta xxxxxxxx p_parent xxxxxxxx p_hflags xxxxxxxx p_env xxxxxxxx
-# p_uft xx xx xx xx xx xx xx xx p_minfast xx p_curdrv xx p_1fill {8}
+# p_1fill {8} p_curdrv x p_uftsize xxxx p_uft xxxxxxxx
 # p_curdir xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
 # ======== xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
 # p_3fill {8} p_dreg xxxxxxxx p_areg {5}
-# p_cmdlin xx ...
+# p_cmdlin xx (string)
 
 procedure pd a
   print -n p_lowtpa (lpeek `a);xa (+ `a 4)
   print -n p_hitpa (lpeek `a);xa (+ `a 4)
   print -n p_tbase (lpeek `a);xa (+ `a 4)
   print p_tlen (lpeek `a);xa (+ `a 4)
-
   print -n p_dbase (lpeek `a);xa (+ `a 4)
   print -n p_dlen (lpeek `a);xa (+ `a 4)
   print -n p_bbase (lpeek `a);xa (+ `a 4)
   print p_blen (lpeek `a);xa (+ `a 4)
-
   print -n p_xdta (lpeek `a);xa (+ `a 4)
   print -n p_parent (lpeek `a);xa (+ `a 4)
   print -n p_hflags (lpeek `a);xa (+ `a 4)
   print p_env (lpeek `a);xa (+ `a 4)
-
-  print -n p_uft 
-  print -n -x02 (peek `a) ;xa (+ `a 1)
-  print -n -x02 (peek `a) ;xa (+ `a 1)
-  print -n -x02 (peek `a) ;xa (+ `a 1)
-  print -n -x02 (peek `a) ;xa (+ `a 1)
-  print -n -x02 (peek `a) ;xa (+ `a 1)
-  print -n -x02 (peek `a) ;xa (+ `a 1)
-  print -n p_minfast (peek `a);xa (+ `a 1)
-  print -n p_curdrv (peek `a);xa (+ `a 1)
-  print p_1fill {8};xa (+ `a 8)
+  print -n p_1fill {8};xa (+ `a 8)
+  print -n p_curdrv (wpeek `a);xa (+ `a 2)
+  print -n p_uftsize (wpeek `a);xa (+ `a 2)
+  print p_uft (lpeek `a);xa (+ `a 4)
 
   print -n p_curdir -x04 (wpeek `a);xa (+ `a 2)
   print -n -x04 (wpeek `a);xa (+ `a 2)
@@ -206,15 +198,13 @@ procedure pd a
   print -n -x04 (wpeek `a);xa (+ `a 2)
   print -n -x04 (wpeek `a);xa (+ `a 2)
   print -n -x04 (wpeek `a);xa (+ `a 2)
-  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -x04 (wpeek `a);xa (+ `a 2)
 
   print -n p_3fill {8};xa (+ `a 8)
   print -n p_dreg (lpeek `a);xa (+ `a 4)
-  print p_areg {5};xa (+ `a a)
-  print p_cmdlin (peek `a) -s (+ `a 1);xa (+ `a 80)
+  print p_areg {5};xa (+ `a 14)
+  print p_cmdlin (peek `a) -s (+ `a 1)
 .
-
-
 
 # g_magic xxxx g_tsize xxxxxxxx g_dsize xxxxxxxx g_bsize xxxxxxxx
 # g_ssize xxxxxxxx g_junk1 xxxxxxxx g_hflags xxxxxxxx g_absflag xxxx
@@ -246,43 +236,59 @@ procedure pmd
 	if `a "dl`a[10];xa (lpeek `a);goto loop2"
 .
 
-procedure pmdfast
-  local a
-  echo ***** PMDFAST
-  dl.pmd[c]
-  set a (lpeek (+ .pmd 4))
-  echo ***** ALLOCATED LIST
-#:loop
-	if `a "dl`a[10];xa (lpeek `a);goto loop"
+alias allpmds "pmd"
 
-  set a (lpeek .pmd)
-  echo ***** FREE LIST
-#:loop2
-	if `a "dl`a[10];xa (lpeek `a);goto loop2"
+# uft: given a pd (like (lpeek `run)) lists the uft.
+
+procedure uft a
+  local uft size count ofd
+  set count 0
+  set size (wpeek (+ `a 3a))
+  set uft (lpeek (+ `a 3c))
+#:loop
+  set ofd (lpeek `uft)
+  print handle -d2 `count -x8 `ofd
+  if (&& `ofd (! (& `ofd 1))) do_ofd `ofd
+  set uft (+ `uft 4)
+  set count (+ `count 1)
+  if (< `count `size) goto loop
 .
 
-alias showall "pmd;pmdfast"
-
-procedure sft
-	local sft sftend
-	set sft .sft
-	set sftend (+ .sft (* @10 8))
-
+procedure allofds
+  local a
+  set a (lpeek .ofd_head)
 #:loop
-	print -n slot `sft :
-	ftab `sft
-	if (&& (lpeek `sft) (! (& (lpeek (+ `sft 4)) 1))) do_ofd (lpeek (+ `sft 4))
-	set sft (+ `sft 8)
-	if (< `sft `sftend) goto loop
+  if (= `a 0) goto end
+  do_ofd `a
+  set a (lpeek `a)
+  goto loop
+#:end
 .
 
 procedure do_ofd ofd
 	local dfd
 
-	echo >
+	print > OFD `ofd
 	ofd `ofd
-	echo >>
+	echo >> DFD `dfd
 	dfd (lpeek (+ `ofd 8))
 	echo <<
 	echo <
 .
+
+procedure block a
+  local type
+  print -n b_next (lpeek `a);xa (+ `a 4)
+  set type (peek `a)
+  print -n b_type `type;xa (+ `a 1)
+  print -n b_callno (peek `a);xa (+ `a 1)
+  print -n b_data is `a
+  if (= `type 0) print free
+  if (= `type 1) print cut
+  if (= `type ff) print used
+.
+
+alias allblocks "xt0 (lpeek .blockhead);_blocks"
+alias _blocks "if `t0 'block `t0;xt0 (lpeek `t0);_blocks'"
+
+alias a "dw`sp[f]"

@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.12 $	$Source: e:/tos/gd2\RCS\mem.c,v $
+* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.13  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 2.12  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -94,7 +97,7 @@ This code gets rid of the dumb "rover" idea.  What a dog!
  * odd boundary!
  */
 
-#define QUANTUM (2L)
+#define QUANTUM (4L)	/* longword-align everything */
 
 /*
  * initialize memory allocator

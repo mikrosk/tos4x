@@ -1,12 +1,15 @@
 /*
-***************************    DIR.C     ********************************
+***************************    SCAN.C     ********************************
 *
-* $Revision: 1.2 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.3 $	$Source: e:/tos/gd2\rcs\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/12 18:20:10 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.3  1991/02/15  18:45:40  apratt
+* CI at the end of the week...
+*
 * Revision 1.2  1991/02/12  18:20:10  apratt
 * *** empty log message ***
 *
@@ -157,11 +160,11 @@ int flags;
     int earlyflag = (flags == FN_EARLY);
     int m = 0;			/* this shuts up GCC, not really necessary */
     long err;
-    FCB fcb;
+    FCB fcb, *pfcb;
 
     if (!*name) return EBADRQ;
     if (*(name+1) == COLON) {
-	dev = uc(*name);
+	dev = (uc(*name) - 'A');
 	name += 2;
 	if (!*name) return EBADRQ;
     }
@@ -211,28 +214,34 @@ int flags;
 	fcb.f_attrib = FA_ALL;
 
 	/* do the scan */
-	for (err = dirfirst(dir,dmd);
-	     !err && dir->dir_fcb->f_name[0] && !(m = match(&fcb,dir->dir_fcb));
-	     err = dirnext(dir,dmd)) /* empty loop */;
+	/* (believe me, this loop is better than the first one!) */
 
-	if (err) return err;
-	if (!m) {
-	    /* no match; if not last component then EPTHNF */
-	    if (*end) return EPTHNF;
-	    else {
-		/* last component not found; fill in *pname; yield EFILNF */
-		*pname = name;
-		return EFILNF;
-	    }
+	if (err = dirfirst(dir,dmd)) return err;
+	while (1) {
+	    pfcb = dir->dir_fcb;
+	    c = pfcb->f_name[0];
+	    if (!c) goto nomatch;
+	    if (match(&fcb,pfcb)) goto didmatch;
+	    if (err = dirnext(dir,dmd)) return err;
 	}
 
+nomatch:
+	/* no match; if not last component then EPTHNF */
+	if (*end) return EPTHNF;
+	else {
+	    /* last component not found; fill in *pname; yield EFILNF */
+	    *pname = name;
+	    return EFILNF;
+	}
+
+didmatch:
 	/* got a match */
 
 	oname = name;
 	name = end;
 	if (*name == SLASH) {
 	    /* fail if found a file but not at end of path */
-	    if (!(dir->dir_fcb->f_attrib & FA_SUBDIR)) return EPTHNF;
+	    if (!(pfcb->f_attrib & FA_SUBDIR)) return EPTHNF;
 	    name++;
         }
     } while (*name);
@@ -344,12 +353,14 @@ DMD *dmd;
     uint cl, rec, i;
 dirslot(dir)
 DIR *dir;
-    do {
-	if (dir->dir_fcb->f_name[0] == 0 ||
-	    dir->dir_fcb->f_name[0] == ERASED) return E_OK;
-    } while ((err = dirnext(dir,dmd)) == 0);
+    long err;
+    DMD *dmd = &drvtbl[dir->dir_dev];
+    uint cl, rec;
+    int i;
+	    if (err == ENMFIL) break;
+    if (err = dirfirst(dir,dmd)) return err;
 
-    if (err != ENMFIL) return err;
+    DBCMD(0x20,"print dirslot: dir after dirfirst:;dirf (lpeek (`a6 + 8));_c");
 
     while (1) {
 	if (err = dirnext(dir,dmd)) {
@@ -367,7 +378,7 @@ DIR *dir;
 	return ERROR;
     }
 
-	/* and clfix(dir->dir_curcl,-1) */
+    rec = realcl2rec(cl,dmd);
 	fcb = getrec(rec+i,dmd,0,&bcb);
     /* zero out that cluster */
 	bcb->b_dirty = 1;
@@ -404,7 +415,9 @@ DIR *dir;
  */
 
 int
-    if (fcb->f_attrib & FA_LABEL) return 0;
+match(pat,fcb)
+FCB *pat;
+FCB *fcb;
 {
     int *p, *f;
 
@@ -533,6 +546,8 @@ gotdot:
 
 	if (*name == '.') name++;
 	count = 3;
+	fill = ' ';
+	while (name < end && count) {
 		if (*name == '*') {
 			fill = '?';
 			break;

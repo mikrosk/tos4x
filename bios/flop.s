@@ -4,20 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/05/21 16:56:53 $
+* $Date: 91/05/22 14:56:07 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.27  91/05/22  14:56:07  apratt
+* Expanded comments about QD switch and TURNED IT OFF because
+* it's just for debugging.
+*
 * Revision 2.26  91/05/21  16:56:53  apratt
 * Changed so the motor spin-up delay is disabled if the BIOS sets the
 * nospindelay flag.  Startup.s sets this flag if the switch is thrown. Also
 * increased the "absurd" sector count because 36 is not absurd for quad
 * density.  QD is slightly implemented here, based on the assembly-time
 * switch QD.
-*
+* 
+* 
 * Revision 2.25  91/04/26  17:44:01  apratt
 * Added a drop-dead deselect timeout in Vblank after 5 seconds, motor-on or
 * not.  This way empty drives do get turned off.
@@ -190,7 +195,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.26 $
+* $Revision: 2.27 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -255,9 +260,12 @@
 
 .include "switches.s"
 
-* QD switch enables some quad-density test code
+* the reset, then delay for four external bus cycles, then write the other
+* value, then delay again.  Now this is unconditional, because it doesn't
+* hurt and it takes a compile-time conditional out of this file.
+*
 
-QD	equ	1
+* QD switch enables some quad-density test code: as of 5/91 it turns off
 * write precomp on HD and QD writes, and remaps the step rate to 12ms
 * nominal in HD and QD mode (resulting in 6 or 3).  It's really just for
 * test and shouldn't be used in general.

@@ -65,7 +65,7 @@ desk_pref()
 	if ( m_st )
 	{
 	  for( i = SPEXT1; i <= SPEXT3; i++ )
-	    obj[i].ob_flags = HIDETREE;
+	    obj[i].ob_flags |= HIDETREE;
 	}
 
 	if ( restable[4] )		/* TT high res	*/		
@@ -148,7 +148,7 @@ col_pa_pref( )
 	last = ret = obj[DESKPREF].ob_state & SELECTED ? DESKPREF : WINPREF;
 
 	for ( j = COLOR0,i = d_maxcolor; i < 16; i++ )
-	  obj[j+i].ob_flags = HIDETREE;	
+	  obj[j+i].ob_flags |= HIDETREE;	
 
 	fm_draw( SSCREEN );
 

@@ -140,8 +140,7 @@ ob_center(tree, pt)
 
 	if ( LWGET(OB_STATE(ROOT)) & SHADOWED )
 	{
-	  /* June 28 1992 - ml.  Added one more &iword for xobtype */
-	  ob_sst( tree, ROOT, &ilong, &iword, &iword, &iword, &iword, &rec, &th );
+	  ob_sst( tree, ROOT, &ilong, &iword, &iword, &iword, &rec, &th );
 	  th = ( th > 0 ) ? th : -th;
 	  th = 2 * th;
 	  wd += th;
@@ -267,7 +266,8 @@ curfld(tree, obj, new_pos, dist)
 
         pxl_rect(tree, obj, new_pos, &t);
 	if (dist)
-	  t.g_w += (dist - 1) * gl_wchar;
+	  t.g_w += (dist - 1) * gl_wchar + 1;	/* the "+1" is necessary or the cursor isn't always
+						   redrawn properly	++ERS 1/19/93 */
 	else
 	{
 	  gsx_attr(FALSE, MD_XOR, BLACK);

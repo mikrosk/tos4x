@@ -4,22 +4,34 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/02 14:17:54 $
+* $Date: 90/02/16 16:50:17 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.39  90/02/16  16:50:17  apratt
+* Fixed an oops in the startup code which made RAM TOSes not work. Also,
+* initialize ssp to its ultimate destination (_supstk+supsiz) rather than
+* $8000 at reset4.  Also, after reset4, changed to clear from the start
+* of the BSS which needs clearing (that is, endosbss) to the true end of
+* the BSS: endaesbss in ROM systems, ostext in RAM.
+*
+* Default boot-up rez code changed: if no mono detect, ST LOW; else
+* ST HIGH or TT HIGH as appropriate.
+*
+* MMU code works, and is now enabled.
+*
 * Revision 2.38  90/02/02  14:17:54  apratt
 * Reordered entire startup sequence to improve clarity and
 * function.  Cold boot for TT is defined as "ttscu1 bit 0 is clear."
 * This happens on power-up only, not on reset-button or keyboard
 * reset.  (Keyboard cold boot clears the bit, though.)  The
 * distinction is not well tested.
-*
+* 
 * Also added code necessary for Bconmap functions to work.
-*
+* 
 * Revision 2.37  89/12/28  15:35:09  apratt
 * Moved the line which sets the refresh rate for fast RAM.  Now
 * it's outside the ROM/RAM conditional, and most of all outside
@@ -377,7 +389,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.38 $
+* $Revision: 2.39 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1255,7 +1267,7 @@ reset1:
 
 	moveq.l	#0,d0
 *	pmove	tdis,tt1
-.ifne systype-rom
+.ifeq systype-rom
 	dc.l	$f0390c00,tdis		; has bugs...
 .ifne TT
 
@@ -1715,49 +1727,48 @@ mt_pr:
 
 .else
 
+* not TT: set the fast-RAM system variables to indicate "no fast RAM"
 .endif
-	move.l	#$8000,sp		; set up SSP again
+	bne	vtloop
+
+nodmasnd:
+	move.l	a6,sp			; restore SP in case of bus error.
+	move.l	a5,$8
+.endif
+
+* Set the variable "I am an ST." For STPAD, no.  For TT, no.  For Sparrow,
+* no.  Otherwise, in the ST/STe case, check to see if the low byte video
+* address register (dbasell) is RAM.  This is a repeat of the test we did
+* to determine the shadow addresses for memory sizing; see that code for
+* comments.
+
+.if (TT | STPAD | SPARROW)
+	sf	_iamanst
+.else
+.ifeq systype-rom
+	tst.b	dbasel			; read another register to destroy
+					; capacitance effects; dbasel is 00.
+	move.b	dbasell,d0		; read; don't say cmp.b because that
+					; would put $5a on the bus.
+	cmp.b	#$5a,d0			; NOW cmp.b
+	bne	iset
+
+	clr.b	dbasell			; try the test again using zero
+	tst.w	color0			; color0 is $FFF; read to zap the bus
 	tst.b	dbasell			; read back - should be zero.
 .ifne TT
 
 .endif
 
 *+
+*  Clear the memory used by the rest of BIOS, GEMDOS, and AES/VDI.
+*  GEMDOS and AES/VDI expect their BSSes to be clear when they start.
 *
 *  In this file there's a symbol, endosbss, which marks the end
 *  of the system variable region.  Since some of these variables
 .endc
 *  historical reasons, the "BSS clearing" portion of our program
-.ifeq systype-rom
 *  starts after this point.
-*  [ROM only]
-*  Clear bottom 64K (or so) of memory.
-*  (this is sufficient for GEMDOS and the AES,
-*   which require their BSS to be zero when
-*   they are started up).
-*
-*-
-	move.l	#endosbss,a0		; a0 -> start
-	move.l	#$10000,a1		; a1 -> end
-.else
-*+
-*  [RAM only]
-*  Clear OS bss (from 'endosbss' to 'ostext')
-*
-*-
-	move.l	#endosbss,a0		; a0 -> start
-	move.l	#ostext,a1		; a1 -> end
-.endc
-
-
-*--- common code to clear memory:
-	moveq	#0,d0			; quick zero
-clrm_1:	move.w	d0,(a0)+		; clobber a word
-	cmp.l	a0,a1			; at end?
-	bne	clrm_1			; (no -- loop for more words)
-
-
-*+
 *
 *  TOS builds include a symbol, endaesbss, which is the last RAM address
 *  used anywhere in the OS.  For a RAM TOS, that's not the one we want:
@@ -1788,14 +1799,11 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *  If TT, we allow an extra 256 bytes after the screen, before the end
 *  of memory.  The reasoning is bogus: it makes some stupid programs
 *  run better, and makes SCSI DMA work.  If you DMA right up to the 
-
 *  end of memory, the controller reports a bus error because it prefetched
-*  Initialize all kinds of OS variables and SSP
+*  too far.  Second, many double-buffering programs (read games) 
 *  only know about the two middle bytes of the screen address, and don't
 *  use the Setscreen call, which writes all three.  They think they
 *  need to align their screens on 256-byte boundaries, so the low byte
-	lea.l	_supstk+supsiz,sp	; setup supervisor stack
-
 *  of the address is zero.  
 *
 *  Backing off by 256 bytes means the defualt low byte is zero, and the
@@ -2148,56 +2156,42 @@ ikbdlp1:
 *
 * NOTE: Furture systems may require a delay BEFORE we preform the software
 *	reset. Problems with the ikbd require a 1/200 of a second delay
+*	AFTER the ikbd has received a character from the acia. See bios.s
+*	ikdbwc for details.
+*
+	move.w	#$0400,d0	; divide by 50, count 256 = 5ms
+	bsr	dowait		; (this is ttwait or stwait as appropriate)
+	move.l	#ikbreset,-(sp)	; ikbd reset string
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
 TBDR	equ	$fffffa21		; timer B data reg
 TBCR	equ	$fffffa1b		; timer B control reg
 	dbra	d1,ikbdlp1
-	move.b	shiftmd,d0		; copy hardware rez bits to
+	moveq.l	#0,d0			; pre-select low rez
+*+
+	bne	nomono			; no mono - d0 is fine
 .ifeq TT
-	and.b	#3,d0			;   software shadow
-	cmp.b	#3,d0
-	bne	tb_x
-	moveq	#2,d0			; 3 illegal; make it 2 (hirez)
-.endc
-.ifne TT
-	and.b	#7,d0
-	cmp.b	#3,d0
-	bne	tb_x
-	cmp.b	#5,d0
-	bne	tb_x
-	moveq	#6,d0			; 3 and 5 illegal; make it 6 (hirez)
-.endc
-tb_x:	move.b	d0,sshiftmd.w		; set software rez
+	moveq	#2,d0			; st/mono: choose mode 2 (ST HIGH)
+*
+	moveq	#6,d0			; tt/mono: choose mode 6 (TT HIGH)
+.endif
 
-	move.b	gpip,d0			; monochrome monitor attached?
-	bmi	nomono			; (no)
+* a mono monitor, in which case we set high rez (read "ST LOW" at "TT HIGH"
+* when on a TT).
 .ifeq TT
-* don't wait if TT: vwait doesn't work and it's not necessary.
+* on ST, wait for a vblank, then set the shift mode; for some reason
+* this is necessary when changing from low to high, but we do it here
+* regardless.
 	lea	vwt_r(pc),a6		; a6 -> ret addr
 	bra	vwait			; wait for vblank
-
-vwt_r:	move.b	#2,shiftmd		; set hardware highrez
-	move.b	#2,sshiftmd.w		; set software highrez
+vwt_r:
 .endc
-.ifne TT
-	move.b	shiftmd,d0		; get shift reg
-	and.b	#$f8,d0			; clear mode bits
-	or.b	#6,d0			; set mode 6 (hirez)
-	move.b	d0,shiftmd		; set hardware hirez
-	move.b	#6,sshiftmd.w		; set software hirez
-.endc
+	move.b	d0,shiftmd		; set hardware
+	move.b	d0,sshiftmd.w		; set software
 	move.b	#$80,$ffff827f		; write LCD and power control
-nomono:
 	move.b	#$80,$889		; $889 is "shadow shadow"
 	moveq.l	#2,d1			; STPAD is always mono
 .else
 .if (TT == 0)
-
-*--- if in medium rez, hack color3 := color15 (for GSX)
-	cmp.b	#1,sshiftmd.w		; in medium rez?
-	bne	setvb2			; (no, so don't fiddle)
-	move.w	color0+$1e,color0+6	; copy color 15 to color 3
-
 setvb2:	move.l	#reseth,swv_vec.w	; RESET system on monitor change
 .else
 	moveq.l	#4,d1			; pre-select TT MED rez
@@ -2217,7 +2211,7 @@ setvb2:	move.l	#reseth,swv_vec.w	; RESET system on monitor change
 	bsr	cartscan		; execute cartridge aps
 .if STPAD
 	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
-* bus error, not privelege violation... Slightly harder to debug.  
+.endif
 	move.w	#$2300,sr		; go to IPL 3
 	moveq	#1,d0			; magic bit# = 1
 	bsr	cartscan		; execute cartridge aps
@@ -2797,7 +2791,7 @@ ca_r:	rts
 colors:	dc.w	$777			; 0 white
 .endc
 .ifne TT
-colors:	dc.w	$077			; 0 blue (says "this is not final")
+colors:	dc.w	$770			; 0 yellow (says, "newer than blue!")
 .endc
 	dc.w	$700			; 1 red
 	dc.w	$070			; 2 green
@@ -4308,14 +4302,14 @@ cphbra:	bra	cphjmp
 *	6	 unused, may be 0 or 1
 *	7..14	 reserved for future use
 *	15	 must be 0
-	or.w	#$0700,sr		;; turn off interrupts
-	move.l	8(a0),a1		;; A1 -> old bus error handler
-	move.l	#TB_e,8(a0)		;; install temp bus error handler
-	tst.w	BLASTER(a0)		;; touch blitter
-	moveq	#2,d0			;; no bus error: indicate chip exists
+*
+*    If an attempt is made to place the machine in hard blit mode
+*    and no blit chip exists (BLITCHIP is zero) then the mode is
+*    forced to soft.
+*
 *    The reserved fields are for future blitter capabilities and
-TB_e:	move.l	a1,8(a0)		;; restore original bus error vector
-	move.w	d1,sr			;; restore IPL
+*    other graphics chips.  They should be treated as "don't cares"
+*    and should be maintained (intact) because they will acquire
 *    meaning in the future.
 *
 * BUG reported: if you don't have a blitter, Blitmode(-1) returns 0. If you
@@ -4537,12 +4531,13 @@ clr4:	movem.l	(sp)+,d3-d7/a3		; restore registers
 * 
 * $0 points to level B's first table.
 * $1 through $7 hold "direct map, cache enable" page descriptors.  
-* You can copy this table into RAM, and add arbitrary 32K pages for
-* mapping any way you like, with a pretty simple BIOS call or something.
+* $8 through $E hold "direct map, cache inhibit" page descriptors.
+* $F points to level B's second table.
+* 
 * Level B's first table (from level A's $0 entry):
 * 
 * $0 holds a pointer to level C.
-tce	equ	0	; enable
+* $1 through $F hold "direct map, cache enable" page descriptors.
 * 
 * Level B's second table (from level A's $F entry):
 * 
@@ -4552,18 +4547,28 @@ tce	equ	0	; enable
 * Level C's (single) table: (maps $00x and $FFx):
 * 
 * $0 through $E hold "direct map, cache enable" page descriptors.
-tte	equ	0	; enable
+* $F holds a "direct map, cache inhibit" page descriptor.
 * 
-.text
+.bss
+.align $10
+levelA:		ds.b	$40
+levelB1:	ds.b	$40
+levelB2:	ds.b	$40
+levelC:		ds.b	$40
+rootptr:	ds.b	$8
+	
+* ATC. TT0 is set up to map %0xxx xxx1 addresses with cache enabled, and
 * TT1 transparently maps %1xxx xxx0 addresses with cache inhibited. 
+*
 * Ensure 16-byte alignment of all tables.  This only works if this source
-* file is .include'd in the source file with the first text segment of the
+* file is in the source file with the first text segment of the
 * link. Each table has to be on a 16-byte boundary; alignment of other
 * things doesn't matter, as they are just moved into PMMU registers.
+*
+* Even that won't matter in RAM TOS unless the BSS ends up aligned.
+*
 
-.align	16
-
-levelA:
+* These handle (primarily) TT fast RAM, and the first 16MB of
 * non-cacheable VME space.  Other megabytes happen to be lumped in there,
 * too, but those are the main targets.  TT1 might be re-used to map %0xxx
 * xx10 since covers the second 16MB of VME RAM (along with other 16MB
@@ -4581,7 +4586,7 @@ levelA:
 * The translation table is in ROM because that way it can't be corrupted.
 * 
 * You must copy this table into RAM, since the MMU writes "updated"
-levelB1:
+* bits to it unconditionally.  You even have to do the copy if you have
 * a RAM TOS, since the tables won't be aligned properly otherwise.
 *
 *************************************************************************
@@ -4599,7 +4604,7 @@ tctid	equ	5	; five bits in (unused!) D level
 tte	equ	1	; enable for TT registers
 
 * NOTE: these tables are copied into RAM at the labels levelA,
-levelB2:
+* levelB1, levelB2, levelC.  These labels are found just after
 	dc.l	$00000000+%01000001	; $f0 - inhibit
 	dc.l	$01000000+%01000001	; $f1 - inhibit
 	dc.l	$02000000+%01000001	; $f2 - inhibit
@@ -4615,9 +4620,9 @@ levelB2:
 	dc.l	$0c000000+%01000001	; $fc - inhibit
 	dc.l	$0d000000+%01000001	; $fd - inhibit
 	dc.l	$0e000000+%01000001	; $fe - inhibit
-	dc.l	levelC+%0010		; translates $FF byte
+
 .data
-levelC:
+
 _levelA:
 	dc.l	levelB1+%0010		; translates $0 nybble
 	dc.l	$10000000+%00000001	; $1 - cacheable
@@ -4635,8 +4640,11 @@ _levelA:
 	dc.l	$d0000000+%01000001	; $D - cache inhibit
 	dc.l	$e0000000+%01000001	; $E - cache inhibit
 	dc.l	levelB2+%0010		; translates $F nybble
+	dc.l	levelC+%0010		; translates $00 byte
+	dc.l	$01000000+%00000001	; $01 - cacheable
+	dc.l	$02000000+%00000001	; $02 - cacheable
 	dc.l	$03000000+%00000001	; $03 - cacheable
-* starting here, things need not be aligned anywhere special
+tabsize	equ	*-_levelA
 
 	dc.l	$04000000+%00000001	; $04 - cacheable
 	dc.l	$05000000+%00000001	; $05 - cacheable
@@ -4645,12 +4653,10 @@ _levelA:
 	dc.l	$08000000+%00000001	; $08 - cacheable
 	dc.l	$09000000+%00000001	; $09 - cacheable
 	dc.l	$0a000000+%00000001	; $0a - cacheable
-tt0val:	dc.b	%00000001, %10000001, %00000001 + (tte << 7), %00000000
-tt1val:	dc.b	%10000000, %10000001, %00000101 + (tte << 7), %00000000
+	dc.l	$0b000000+%00000001	; $0b - cacheable
+	dc.l	$0c000000+%00000001	; $0c - cacheable
 	dc.l	$0d000000+%00000001	; $0d - cacheable
-rootptr:
-	dc.w	$8000,$0002	; limit is unused, Level A=short format
-	dc.l	levelA
+	dc.l	$0e000000+%00000001	; $0e - cacheable
 	dc.l	$0f000000+%00000001	; $0f - cacheable
 
 _levelB2:
@@ -4660,6 +4666,14 @@ _levelB2:
 	dc.l	$f3000000+%01000001	; $f3 - inhibit
 	dc.l	$f4000000+%01000001	; $f4 - inhibit
 	dc.l	$f5000000+%01000001	; $f5 - inhibit
+	dc.l	$f6000000+%01000001	; $f6 - inhibit
+	dc.l	$f7000000+%01000001	; $f7 - inhibit
+	dc.l	$f8000000+%01000001	; $f8 - inhibit
+	dc.l	$f9000000+%01000001	; $f9 - inhibit
+	dc.l	$fa000000+%01000001	; $fa - inhibit
+	dc.l	$fb000000+%01000001	; $fb - inhibit
+	dc.l	$fc000000+%01000001	; $fc - inhibit
+
 	pmove	rootptr,crp
 	dc.l	$00000000+%00000001	; $000/ff0 - enable
 	dc.l	$00100000+%00000001	; $000/ff1 - enable

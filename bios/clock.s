@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/01 20:12:52 $
+* $Date: 1991/10/03 17:53:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.18  1991/10/03  17:53:24  apratt
+* More revs; this is the last rev before putting Waketime in power.prg
+* for testing.  It'll get folded back into here soon... :-)
+*
 * Revision 2.17  1991/10/01  20:12:52  apratt
 * When you try to set the alarm (Waketime(1)), we now return
 * zero for success (i.e. no time to set, or time is in the past,
@@ -106,7 +110,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.17 $
+* $Revision: 2.18 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\clock.s,v $
@@ -632,25 +636,34 @@ _waketime:
 * sooner than the current value of waketime.  If the new time wins,
 * set waketime to that value.
 *
+* The new time can only win if it is actually IN THE FUTURE, as opposed to
+* being NOT IN THE PAST.  If you try to set the alarm for THIS MINUTE, you
+* will fail.  This gets us out of some problems that happen when you try to
+* shut down in the same minute that the alarm is set for.
+*
 
-	move.w	_date,d1
-	swap	d1
-	move.w	_time,d1
+	bsr	_getclock
+	cmp.l	#-1,d0
+	beq	noalarm		; a handy RTS: really "can't happen"
+
+	move.l	4(sp),d1	; get your desired alarm time back
+	and.b	#%11100000,d0	; round "now" down to a minute boundary
+	and.b	#%11100000,d1	; round your desired time down, too
 	cmp.l	d1,d0
-	blo	inpast		; (d0 => now): it's in the future
+	bhs	inpast		; now >= ask: don't do it.
 
 * OK, it's in the future.  But is it sooner than waketime?
 
 	move.l	waketime,d2
 	beq	youwin		; no waketime: you win.
-	cmp.l	d2,d1		; is waketime in the past?
+	cmp.l	d2,d0		; is waketime in the past?
 	bhi	youwin		; yes: you win.
-	cmp.l	d2,d0		; is the new time same or sooner than waketime?
+	cmp.l	d2,d1		; is the new time same or sooner than waketime?
 	bhs	islater		; no: you lose.
 
 * You win!
 youwin:
-	move.l	d0,waketime
+	move.l	d1,waketime	; set waketime to your request
 	moveq.l	#0,d0		; return 0: you won.
 	rts
 
@@ -704,7 +717,7 @@ setalarm:
 	and.b	#%11100000,d0		; round "now" (from _getclock) down
 	cmp.l	d0,d1
 	beq	badnews			; you're trying to set alarm to "now"
-	
+
 *
 *  Convert time to chip format
 *
@@ -746,7 +759,13 @@ noalarm:
 	moveq.l	#0,d0			; return 0 "I set the alarm."
 	rts
 
+* Bad News: You are trying to set the alarm, but the alarm would be set for
+* the very minute you're in.  We clear waketime and return a flag saying
+* this happened.  (We clear waketime because that way, if nobody calls
+* Waketime and you shut down, you don't fall into this case again.)
+
 badnews:
+	clr.l	waketime
 	moveq.l	#-1,d0			; Return -1: you tried to set alarm
 	rts				; for "this minute" and I won't.
 

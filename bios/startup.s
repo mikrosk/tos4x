@@ -3,16 +3,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/03/09 08:32:06 $
+* $Date: 89/03/22 13:48:22 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.4  89/03/22  13:48:22  apratt
+* Changed monochrome detect code in vblank -- it would wait until GPIP
+* read the same way twice, which might *never* happen.  Now it waits
+* until bit 7 of GPIP reads the same way twice, which is more common.
+*
 * Revision 2.3  89/03/09  08:32:06  apratt
 * Fixed priv handler -- correct one got lost in folding-in process. (TT only)
-*
+* 
 * Revision 2.2  89/03/08  15:59:37  apratt
 * Contains Slavik's Xbios calls & other changes for TT.  Insignificant
 * changes if not TT.  Some things are conditional on STPLUSVIDEO+TT,
@@ -189,7 +194,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.3 $
+* $Revision: 2.4 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2223,16 +2228,27 @@ hbl:	move.w	d0,-(sp)		; save d0
 *** doesn't end with a label, which is a no-no in old as68)
 hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
  .ifne DMASND
+*-
+vbl:
 	addq.l	#1,_frclock		; bump frame clock
 	move.b	dmasndc+1(a5),d0	; read sound state once
 	move.b	gpip(a5),d1		; get gpip with monomon
-	cmp.b	gpip(a5),d1		; still the same?
+
+	movem.l	d0-d7/a0-a6,-(sp)	; save registers
+	cmp.b	gpip(a5),d2		; still the same?
+
+*------	Call deferred interrupt	vectors:
+	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
 	bne.s	v_read1			; no - start over
 	cmp.b	dmasndc+1(a5),d0	; sound state still the same?
 	move.l	_vblqueue.w,a0		; a0 ->	vectors
+vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
+	cmp.l	#0,a1			; if(a1	== NULL) continue;
+	beq	vbl11
+	movem.l	d7/a0,-(sp)		; save registers
 	tst.b	d0			; was sound active?
 	bne.s	v_read2			; yes - don't invert monomon
-	bchg	#7,d1			; no - invert it to get true MONOMON
+vbl11:	dbra	d7,vbl10		; loop for more	vectors
 v_read2:
 	move.b	shiftmd(a5),d0		; get current rez
  .endc

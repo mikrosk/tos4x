@@ -4,16 +4,15 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/11 17:27:30 $
+* $Date: 1991/10/15 15:04:18 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
-* Revision 1.25  1991/10/11  17:27:30  apratt
-* Special case for Conner's IDE drives.  Turned out to be a big drag
-* getting them to change their firmware.  Sigh.
+* Revision 1.26  1991/10/15  15:04:18  apratt
+* Fixed a bug in the caller of strcmp.
 *
 * Revision 1.24  1991/09/30  18:04:38  apratt
 * Previous version worked very badly.  One theory: Conner says that
@@ -126,7 +125,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.25 $
+* $Revision: 1.26 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\dmaread.s,v $

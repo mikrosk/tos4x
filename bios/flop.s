@@ -4,18 +4,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/22 16:43:05 $
+* $Date: 89/11/27 14:48:57 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.7  89/11/27  14:48:57  apratt
+* Added support for 1.44MB floppies ifne HI_DEN.  HI_DEN is
+* set to the same value as the TT flag, for now.
+*
 * Revision 2.6  89/09/22  16:43:05  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
 * require Alcyon's AS68 assembler.
-*
+* 
 * Revision 2.5  89/09/07  16:28:11  apratt
 * Added SLOWACSI code.  Seems to work, but I'm not happy with it.
 * 
@@ -86,7 +90,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.6 $
+* $Revision: 2.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -161,6 +165,10 @@
 
 SLOWACSI	equ	1	; set to 1 for TT(?) @check@
 
+HI_DEN		equ	TT	; 1.44MB flag same as TT flag.
+* to speed.								*
+denselect	equ	$ffff860e	; density bits (in TT only)
+
 HI_DEN		equ	1		; always enable this code
 
 denselect	equ	$ffff860e	; density bits (WRITE ONLY)
@@ -218,14 +226,21 @@ e_rnf		equ	-8		; record (sector) not found
 e_write		equ	-10		; generic write error
 e_read		equ	-11		; generic read error
 e_wp		equ	-13		; write on write-protected media
+e_undev		equ	-15		; unknown device
+.ifne HI_DEN
 dcurtrack	equ	0		; current track#
+ddenflags	equ	dcurtrack+2	; density flags (usu 0 or 3)
+dseekrt		equ	ddenflags+2	; floppy's seek-rate
+dsbsiz		equ	dseekrt+2	; (size of a DSB)
+
+.if HI_DEN
 dspinflag	equ	0		; spinup-delay flag (in hi byte)
 dcurtrack	equ	2		; current track#
+.endc
 dseekrt		equ	6		; floppy's seek-rate
 dsbsiz		equ	8		; (size of a DSB)
 .else
 dcurtrack	equ	0		; current track#
-
 dseekrt		equ	dcurtrack+2	; floppy's seek-rate
 dsbsiz		equ	dseekrt+2	; (size of a DSB)
 .endif
@@ -297,6 +312,9 @@ gpip	equ	mfp+1			; general purpose I/O
 	moveq	#10,d7			; attempt seek to track 10
 	bsr	hseek1			; (hard seek to 'd7')
 	bne	fi_nok			; (failed: drive unusable)
+.ifne HI_DEN
+fi_ok:	beq	flopok			; return OK (on win)
+.endc
 
 .if STPAD
 .ifne TT
@@ -374,13 +392,13 @@ fdcprobe:
 *	 $0(sp)	return address
 *
 * Returns:	EQ, the read won (on all sectors),
-	move.l	_hz_200,d7
+*		NE, the read failed (on some sector).
 *-
 _floprd:
 .if STPAD
 	bsr	fdcprobe
 	beq	noflop1			; no floppies!
-	cmp.l	_hz_200,d7
+.endif
 
 	bsr	change			; test for disk change
 	moveq	#e_read,d0		; set default error#
@@ -508,12 +526,12 @@ _flopwr:
 .endif
 
 	or.w	cside.w,d0		; side 0
-	move.l	_hz_200,d7
+	bne	fwr1			; if not boot sector, then OK
 	moveq	#m_changed,d0		; set media change mode to unsure
 	bsr	setdmode		; (boy, is this /ugly/)
 
 fwr1:	bsr	select			; select drive
-	cmp.l	_hz_200,d7
+	bsr	go2track		; seek
 	bcs	flopfail		; EMPTY DRIVE - FAIL NOW
 	bne	fwre1			; (retry on seek failure)
 fwr1a:	move.w	#e_error,curr_err.w	; set general error#
@@ -560,6 +578,10 @@ fwr2:	btst.b	#5,gpip			; done yet?
 
 fwr4:	move.w	#$180,(a6)		; get 1770 status
 	bsr	rdiskctl
+	bsr	err_bits		; compute 1770 error bits
+	btst	#6,d0			; if write protected, don't retry
+	bne	flopfail		; (can't write, so punt)
+	and.b	#$5c,d0			; check	WriteProt+RecNtFnd+CHKSUM+LostD
 	bne	fwre			; retry on error
 
 	move.w	#retries,retrycnt.w	; setup retry count
@@ -581,6 +603,19 @@ fwr5:	subq.w	#1,retrycnt.w		; decrement retry count
 * Passed (on the stack):
 *	$1a(sp)	initial sector data
 *	$16(sp)	magic number
+.ifne HI_DEN
+*	$12(sp)	side
+*	$10(sp)	track
+*	 $e(sp)	spt
+*	 $c(sp)	drive
+*	 $8(sp)	NOT USED		;* skew table if interleave -1
+*	 $4(sp)	dma address
+*	 $0(sp)	[return]
+*
+denok:	move.w	d0,denselect
+* Note: if the number of sectors is less than 13, assume low density;
+.endc
+* that can handle 12 sectors, but what the heck.)
 *-
 
 _flopfmt:
@@ -731,13 +766,13 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	ble	ot1			; proto	more sectors this pass
 	cmp.w	interlv.w,d3		; if(d3	<= interlv) then_continue;
 	cmp.w	#13,spt.w
-	move.l	_hz_200,d7
+	bhs	etok
 	move.w	#1400,d1		; low-density value
 etok:
 	moveq	#$4e,d0			; end-of-track trailer
 	bsr	wmult
 
-	cmp.l	_hz_200,d7
+*--- setup to write the track:
 	move.b	cdma+3.w,dmalow		; load dma pointer
 	move.b	cdma+2.w,dmamid
 	move.b	cdma+1.w,dmahigh
@@ -859,13 +894,13 @@ _flopver:
 *		ccount = number of sectors to verify
 *		cdma -> 1K buffer (at least)
 *
-	move.l	_hz_200,d7
+* Returns:	NULL.W-terminated list of bad sectors (in the buffer)
 *		(buffer+$200..buffer+$3ff used as DMA buffer)
 *
 * Enviroment:	Head seeked to the correct track;
 *		Drive and side already selected;
 *		Motor should be spinning (go2track and fmttrack do this).
-	cmp.l	_hz_200,d7
+*
 * Uses:		Almost everything.
 *
 * Called-by:	_flopfmt, _flopver
@@ -1117,24 +1152,53 @@ unlok2:	move.l	(sp)+,d0		; restore return value
 * Uses:		d7, d6, ...
 * Jumps-to:	flopcmds
 * Called-by:	_flopfmt, _flopini
+*
+.ifne HI_DEN
+hseek:	move.w	ctrack,d7		; dest track = 'ctrack'
+hseek1:	move.w	#e_seek,curr_err	; possible error = "seek error"
+	bfexts	denselect{14:2},d1
+	move.l	d1,([$44e])		; set first screen line for den
+.endc
 	bsr	wdiskctl
 	move.w	#$10,d6			; execute "seek" command
 	bra	flopcmds		; (without verify...can't fail)
 
 
 *+
-	bne	go2trr			; return error on seek failure
+* reseek - home	head, then reseek track
+.ifeq HI_DEN
+	bne	go2trr
+	bsr	restore			; restore head
+	beq	go2ok			; success
+	clr.w	d7
+	bsr	wdiskctl
+
+	move.w	#datareg,(a6)		; seek out to track five
+	move.w	denselect,d0		; set the other density
+	eor.w	#3,d0
+	move.w	d0,denselect
+	move.w	d0,ddenflags(a1)
+	move.w	#5,dcurtrack(a1)	; set current track#
+	bne	go2trr			; really failed! (den changed twice)
+*+
+* go2track - seek proper track
+* Passed:	Current floppy parameters (ctrack, et al.)
+* Returns:	EQ/NE on success/failure
+.endc
+*-
 go2track:
 	and.b	#$18,d7			; check	for RNF, CRC_error, lost_data
 .if HI_DEN
 	move.w	#1,go2count		; init hi-den retry count
 go2retry:
-
 .endif
 	move.w	#e_seek,curr_err	; set "seek error"
 	move.w	#datareg,(a6)		; set destination track# in
 	move.w	ctrack.w,d7		;  1770's data register
-* Falls-into:	flopcmds
+	bsr	wdiskctl		; (write track#)
+	moveq	#$14,d6			; execute 1770 "seek_with_verify"
+	bsr	flopcmds		; (include seek-rate bits)
+
 	bcs	go2trr			; return CS NOW if empty drive
 
 .if (HI_DEN == 0)
@@ -1155,9 +1219,22 @@ go2retry:
 go2bad:
 	move.w	d0,denselect		; write back new value
 	move.w	d0,denselect
+.else
+.ifne HI_DEN
+	move.w	d0,denselect
+.endc
+	bne	go2trr			; really failed! (return NE)
 	bsr	restore			; try again, but restore first.
 	bra	go2retry
 	and.b	#3,d0			; OR into command
+go2ok:
+.ifne HI_DEN
+
+	move.w	ctrack.w,dcurtrack(a1)	; update current track number
+	clr.w	d7			; return EQ for no error
+	move.b	rtmap(PC,d0.w),d0	; remap the rate
+
+.endc
 	or.b	d0,d6
 * restore - home head
 * bit is 1.  It doesn't actually read anything.
@@ -1169,17 +1246,23 @@ restore:
 	btst	#2,d7			; test TRK00 bit
 	eor	#$04,ccr		; flip Z bit (return NE if bit is zero)
 	bne	res_r			; punt if didn't win
-	move.l	_hz_200,d7
+	clr.w	dcurtrack(a1)		; set current track#
+.ifne HI_DEN
+
+* Passed:	d6.w = 1770 command
+.endc
+* Falls-into:	flopcmd
+
 .if HI_DEN
 .if (QD == 0)
 rtmap:	dc.b	1,1,0,0			; see _floprate for mode on this
 .else
 rtmap:	dc.b	1,1,1,1			; QD table: gives 6ms at HD, 3ms at QD
-	move.l	_hz_200,d7
+.endif
 .endif
 
 flopcmds:
-flopc1:	cmp.l	_hz_200,d7
+	move.w	dseekrt(a1),d0		; get floppy's seek rate bits
 	and.w	#3,d0
 
 .if HI_DEN
@@ -1375,25 +1458,32 @@ change:
 
 *--- ask the user to stick in the other floppy (via critical error handler)
 	move.w	d0,-(sp)		; push disk# we want inserted
-*	00	 6 ms
-*	01	12 ms
-*	02	 2 ms
-*	03	 3 ms
 	move.w	#e_insert,-(sp)		; push "INSERT_A_DISK" error number
+*     VALUE    LOW-DEN	      HIGH-DEN
+*	00	 6 ms		3 ms
+*	01	12 ms		6 ms
+*	02	 2 ms		1 ms
+*	03	 3 ms	      1.5 ms
+	lea.l	_acctim,a0		; set last-access time to "long ago"
 	clr.l	(a0)+			; so the grace period in mediach
 	clr.l	(a0)			; is always expired.
+
+* FOR TT WITH HIGH-DENSITY DRIVES:  The seek rate parm is taken to
+* be a LOW-DEN seek rate; when there is a HIGH-DEN disk in the drive,
+* we map the input value to the appropriate 1772 value, with errors
+* on the slow side: 3->0, 2->0, 1->1 (what can you do?), and 0->1.
 setdmode:
 	lea	_diskmode.w,a0		; a0 -> disk mode table
 	move.b	d0,-(sp)		; (save mode)
-	lea.l	dsb0,a0			; get dsb0 first
+	move.w	cdev.w,d0		; d0.w = drive# (index into table)
 	cmp.w	#1,_nflops		; one floppy?
 	bne	dmode1			; no - d0 is fine
-	lea.l	dsb1,a0			; no - use dsb1
-rate1:	move.w	dseekrt(a0),d0		; get the old rate
+	move.w	_curflop,d0		; yes - d0 must come from _curflop
+dmode1:	move.b	(sp)+,(a0,d0.w)		; set drive's mode
 	rts
 
 
-	move.w	d1,dseekrt(a0)		; no - do change it.
+* This call is new with TOS 1.4.  You have to do this by hand for older TOSes:
 *	DRIVE	RAM TOS		11/20/85	4/22/87
 *	  A	 6cb		  a09		  a4f
 *	  B	 6cf		  a0d		  a53
@@ -1548,6 +1638,10 @@ tmpdma:		ds.l	1		; temp for hardware DMA image
 *
 * routine to get the _FRB cookie if there is one (see cookie jar spec)
 *
+
+.ifne HI_DEN
+	tst.l	_frb			; already done this?
+.endc
 	move.l	_p_cookie,a0		; no; get base of cookie jar
 .ifne TT
 	beq	getf2			; yow! no cookie jar! bail out.

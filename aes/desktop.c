@@ -566,6 +566,13 @@ ch_1:	  if ( ( temp = trap14( 64, -1 ) ) & 0x2 )
 
 
 /* adjust object colors if it is invalid */
+/* This routine should no longer be necessary, but is left
+ * in for the TOS 4.02 release as a precautionary measure.
+ * objc_draw now understands that "hollow, white, 3D" objects
+ * should be drawn in the appropriate 3D color, or white if
+ * there aren't enough colors, and the resources have been
+ * updated accordingly	++ERS 1/19/93
+ */
 
 	VOID
 adjdcol(color)

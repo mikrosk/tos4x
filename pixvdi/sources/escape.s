@@ -1196,8 +1196,14 @@ end_o_line:
 	add.l	d1,a1			; a1 -> beginning of last line
 
 	clr.w	d1			; scroll from top of screen.
-	pea	save_it(pc)		; return to "save_it"
-	bra	p_sc_up			; do the scroll.
+	movem.l d0/a1,-(sp)		; SAVE ME!!!!!
+	
+;	pea	save_it(pc)		 return to "save_it"
+;	bra	p_sc_up			 do the scroll.
+
+	bsr	p_sc_up
+	movem.l (sp)+,d0/a1		; RESTORE ME!
+	bra	save_it
 
 no_scroll:
 

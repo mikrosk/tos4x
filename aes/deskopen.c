@@ -620,7 +620,7 @@ open_item( item, type, win )
 o_1:
 		  if ( ret == 1 )
 		  {
-		    background[item].ob_flags = HIDETREE;
+		    background[item].ob_flags |= HIDETREE;
 		    lp_collect();
 		    do_redraw( 0, &full, 0 );
 		  }
@@ -844,7 +844,7 @@ upfdesk( s, new )
 
 	for ( i = 1; i <= obj->ob_tail; i++ )
 	{
-	  if ( obj[i].ob_flags != HIDETREE )
+	  if ( !(obj[i].ob_flags & HIDETREE) )
 	  {
 	    type = backid[i].i_type;
 
@@ -876,7 +876,7 @@ u_1:	      if ( strcmp( s, backid[i].i_path ) )
 		}			/* erase icon		*/
 	        else			
 		{
-		  obj[i].ob_flags = HIDETREE;
+		  obj[i].ob_flags |= HIDETREE;
 		}
 
 		back_update = TRUE;	/* set the flag		*/

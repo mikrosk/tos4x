@@ -41,7 +41,7 @@ CERR=-j135i
 # -w: short ints
 # -b0 -bn: no base reg, a4 is reg. var
 # -v: no stack checking
-CMOD=-w -b0 -bn -v -cs
+CMOD=-w -b0 -bn -v
 # -d2: debug, include local symbols
 # -O: optimize
 # -mf: frames (link/unlk)

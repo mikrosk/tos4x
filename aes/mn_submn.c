@@ -30,6 +30,9 @@
  * 07/01/92  cjg   - Make sure starting scroll object is within limits
  * 07/30/92  cjg   - removed auto-initialization of global variables
  * 09/22/92  cjg   - Clip Menu draw to intersection of menu and full
+ * 01/13/93  cjg   - Set ObFlag() to 'SUBMENU' if a submenu is attached.
+ *		   - The Menu ID is still at the Extended Object Type byte.
+ *		   - Add check for the ObFlag & SUBMENU
  */
 
 
@@ -380,6 +383,8 @@ MENU		*Menu;
      {
         ObString( item )[ strlen( ObString( item )) - ARROW_OFFSET ] = RIGHT_ARROW;
         ObType( item ) |= ( Index << 8 );
+	MakeSubMenu( item );
+
         if( ( ProcPtr = FindProcess( id )) > NULL )
         {
 	  if( ( IndexPtr = GetIndexPtr( ProcPtr, ( WORD )Index )) > NULL )	
@@ -426,9 +431,9 @@ MENU		*Menu;
    BOOLEAN   flag;		/* SUCCESS or FAILUE        */
 
    flag = FALSE;
-   if( IsG_String( item ) )
+   if( IsG_String( item ) && IsSubMenu( item ) )
    {
-     if( ObString(item)[strlen(ObString(item))-ARROW_OFFSET]==RIGHT_ARROW)
+     if( ObString(item)[strlen(ObString(item))-ARROW_OFFSET]==RIGHT_ARROW )
      {
        Index = ( WORD )( ( ObType( item ) & 0xFF00 )  >> 8 );
        if( ( ProcPtr = FindProcess( id )) > NULL )
@@ -471,7 +476,7 @@ WORD		item;		/* see above...		     */
    WORD      Index;		/* Index ID! 		     */
    PNODE_PTR ProcPtr;		/* ptr to the process node   */
 
-   if( IsG_String( item ) )
+   if( IsG_String( item ) && IsSubMenu( item ) )
    {
      /* Clear the character where the arrow is located. */
      ObString( item )[ strlen( ObString( item ) ) - ARROW_OFFSET ] = ' ';
@@ -480,6 +485,8 @@ WORD		item;		/* see above...		     */
      Index = (WORD)( ( ObType( item ) & 0xFF00 ) >> 8 );
 
      ObType( item ) &= 0x00FF;         /* Clear out the extended object type */   
+
+     NoSubMenu( item );		       /* Clear out SUBMENU FLAG */
 
      if( ( ProcPtr = FindProcess( id )) > NULL )
          DeleteIndex( ProcPtr, Index, FALSE ); /* Clear out the index node. */
@@ -514,7 +521,7 @@ MENU_PTR	SubMenuPtr;	/* ptr to the submenu - if valid*/
    PNODE_PTR     ProcPtr;	/* ptr to process node */
 
 
-   if( IsG_String( obj ) && IsEnabled( obj ) )
+   if( IsG_String( obj ) && IsEnabled( obj ) && IsSubMenu( obj ) )
    {
      if( ObString( obj )[ strlen( ObString( obj )) - ARROW_OFFSET ] == RIGHT_ARROW )
      {
@@ -573,7 +580,7 @@ WORD		obj;			/* menu item we pop with      */
 
    SubPopPtr = ( MENU_PTR )NULL;
 
-   if( ( obj != NIL ) && IsG_String( obj ) )
+   if( ( obj != NIL ) && IsG_String( obj ) && IsSubMenu( obj ) )
    {
 
      ob_actxywh( tree, obj, &rect );

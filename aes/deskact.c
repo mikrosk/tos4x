@@ -152,15 +152,15 @@ file_op( dest, mode )
 	buffer[1] = 0;
 
 	obj = get_tree( CPBOX );
-	obj[CDDRIVE].ob_flags = NONE;
-	obj[DATEBOX].ob_flags = NONE;
+	obj[CDDRIVE].ob_flags &= ~HIDETREE;
+	obj[DATEBOX].ob_flags &= ~HIDETREE;
 
 	switch( mode )
 	{
 	  case OP_DELETE:
 	    which = get_fstring( DELSTR );
-	    obj[CDDRIVE].ob_flags = HIDETREE;
-	    obj[DATEBOX].ob_flags = HIDETREE;
+	    obj[CDDRIVE].ob_flags |= HIDETREE;
+	    obj[DATEBOX].ob_flags |= HIDETREE;
 	    if ( !cdele_save )
 	      d_display = FALSE;	
 
@@ -197,11 +197,14 @@ file_op( dest, mode )
 	(TEDINFO*)(obj[TITLE].ob_spec)->te_ptext = which;
 	f_str( obj, NUMDIR, ndir );
 	f_str( obj, NUMFILE, nfile );
-	obj[HIDECBOX].ob_flags = HIDETREE;
+	obj[HIDECBOX].ob_flags |= HIDETREE;
 	inf_sset( obj, CSDRIVE, Nostr );
 	buffer[0] = *dest;
 	inf_sset( obj, CDDRIVE, buffer );
-	obj[CHBOX1].ob_flags = ( d_display ) ? NONE : HIDETREE;
+	if (d_display)
+	  obj[CHBOX1].ob_flags &= ~HIDETREE;
+	else
+	  obj[CHBOX1].ob_flags |= HIDETREE;
 	fm_draw( CPBOX );	/* draw the box		*/
 
 	if ( d_display )
@@ -214,7 +217,7 @@ file_op( dest, mode )
 
         if ( item == OKCP )
 	{
-	  obj[HIDECBOX].ob_flags = NONE;
+	  obj[HIDECBOX].ob_flags &= ~HIDETREE;
 	  bfill( 32, 0, dr );
 	  x_first( &source, &type );
 	  ret = dofiles( source, dest, mode, &ndir, &nfile, &nsize, type, TRUE );
@@ -349,7 +352,7 @@ chk_rect( win, rect, id )
 	
 	for ( i = 1; i <= obj[0].ob_tail; i++ )
 	{
-	   if ( obj[i].ob_flags != HIDETREE )
+	   if ( !(obj[i].ob_flags & HIDETREE) )
 	   {
 	     rc_copy( &obj[i].ob_x, &pt );
 	     pt.x += orgx;
@@ -538,7 +541,7 @@ win_desk( swin, sitems, ditem, mx, my )
 	    if ( !backid[i].i_path )
 	    {
 	      do1_alert( NOICON );
-	      background[i].ob_flags = HIDETREE;
+	      background[i].ob_flags |= HIDETREE;
 	      break;
 	    }
 	

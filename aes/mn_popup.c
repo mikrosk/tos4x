@@ -21,6 +21,7 @@
  * 07/01/92  cjg   - Limit the Scroll value to the children of the parent.
  * 07/09/92  cjg   - Use gl_button instead of gr_mkstate
  * 09/22/92  cjg   - Clip to the intersection of the screen and menu
+ * 01/13/93  cjg   - Added MTOP_FLAG() and MB_FLAG() to AssignMenuData()
  */
 
 
@@ -281,10 +282,12 @@ WORD		start_obj;		/* the obj we want on top   */
 
     MTOP_OBJ( MenuPtr )       = MFIRST_CHILD( MenuPtr );
     MTOP_STATE( MenuPtr )     = ObState( MFIRST_CHILD( MenuPtr ) );
+    MTOP_FLAG( MenuPtr )      = ObFlags( MFIRST_CHILD( MenuPtr ) );
     MTOP_TXT( MenuPtr )[0]    = '\0';
 
     MB_OBJ( MenuPtr )    = MLAST_CHILD( MenuPtr );
     MB_STATE( MenuPtr )  = ObState( MLAST_CHILD( MenuPtr ) );
+    MB_FLAG( MenuPtr )   = ObFlags( MLAST_CHILD( MenuPtr ) );
     MB_TXT( MenuPtr )[0] = '\0';
 
     MBUFFER( MenuPtr )        = NULL;

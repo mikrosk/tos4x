@@ -341,10 +341,11 @@ cg_1:
 	    case FSVSLID:
 	      ob_offset( tree, FSVELEV, &xoff, &yoff );
 	      value = NM_NAMES;
-	      if ( my <= yoff )
+	      if ( my < yoff )
 		goto up;
-
-	      goto down;
+	      else if (my >= yoff + xtree[FSVELEV].ob_height)
+	        goto down;
+	    /* else fall through */
 
 	    case FSVELEV:
 	      if( !( xtree[ FSVELEV ].ob_state & SELECTED ))
@@ -906,7 +907,9 @@ ini_fsel()
 
 	ob_offset( tree, FCLSBOX, &x, &y );
 
+#if 0
 	obj[FSVSLID].ob_type |= 0x0100;
+#endif
  	obj[FILEBOX].ob_x = x - ADJ3DPIX - 1; 
 	obj[FTITLE].ob_x = x + obj[FCLSBOX].ob_width + ADJ3DPIX; /* adjust FTITLE */	
 	obj[FTITLE].ob_y = y - ADJ3DPIX;

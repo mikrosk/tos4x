@@ -839,13 +839,15 @@ just_draw(tree, obj, sx, sy)
 		gsx_cline(pt->g_x-2, pt->g_y+pt->g_h+1, pt->g_x+pt->g_w+2, pt->g_y+pt->g_h+1);
 		gsx_cline(pt->g_x-1, pt->g_y+pt->g_h, pt->g_x+pt->g_w+2, pt->g_y+pt->g_h);
 
-		gsx_attr(FALSE, MD_REPLACE, WHITE);
+		gsx_attr(FALSE, MD_REPLACE, LWHITE);
 		gsx_cline(pt->g_x-3, pt->g_y-3, pt->g_x+pt->g_w+2, pt->g_y-3);
-		gsx_cline(pt->g_x-3, pt->g_y-2, pt->g_x+pt->g_w+1, pt->g_y-2);
-		gsx_cline(pt->g_x-3, pt->g_y-1, pt->g_x+pt->g_w, pt->g_y-1);
 		gsx_cline(pt->g_x-3, pt->g_y-3, pt->g_x-3, pt->g_y+pt->g_h+2);
-		gsx_cline(pt->g_x-2, pt->g_y-3, pt->g_x-2, pt->g_y+pt->g_h+1);
-		gsx_cline(pt->g_x-1, pt->g_y-3, pt->g_x-1, pt->g_y+pt->g_h);
+
+		gsx_attr(FALSE, MD_REPLACE, WHITE);
+		gsx_cline(pt->g_x-2, pt->g_y-2, pt->g_x+pt->g_w+1, pt->g_y-2);
+		gsx_cline(pt->g_x-2, pt->g_y-1, pt->g_x+pt->g_w, pt->g_y-1);
+		gsx_cline(pt->g_x-2, pt->g_y-2, pt->g_x-2, pt->g_y+pt->g_h+1);
+		gsx_cline(pt->g_x-1, pt->g_y-2, pt->g_x-1, pt->g_y+pt->g_h);
 	      }
 	  }
 

@@ -1,4 +1,4 @@
 .globl date
 .globl dosdate
-date	equ	$10021992
-dosdate	equ	$1942
+date	equ	$01261993
+dosdate	equ	$1a3a

@@ -910,8 +910,14 @@ _SetMasks:
 ; Sparrow only stuff follows
 ; 920910 towns changed to or.w from move.w to preserve rest of shift
 ;              register
+	move.w	12(sp),d0
+	beq	clr_olay		; clear the overlay
 	or.w	#$0200,$FFFF8266	; Set the overlay bit
+	bra	setm_exit
+clr_olay:
+	and.w	#$fdff,$FFFF8266	; clear bit	
 
 ; Sparrow only stuff earlier
+setm_exit:
 	rts
 	.end

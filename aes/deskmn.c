@@ -1694,7 +1694,7 @@ WORD   *item;
     for( index = ROOT; index <= MAXMENU; index++ )
        rsrc_obfix( mtree, index );
 
-    mtree[ MAXMENU ].ob_flags = LASTOB;
+    mtree[ MAXMENU ].ob_flags |= LASTOB;
     tree = &mtree[ ROOT ];
     menu_icheck( tree, start, TRUE );
 

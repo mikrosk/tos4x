@@ -159,9 +159,13 @@ EXTERN WORD	gl_wchar;
 EXTERN WORD	gl_hchar;
 EXTERN WORD	gl_wbox;
 EXTERN WORD	gl_hbox;
+EXTERN WORD	gl_nplanes;
 EXTERN GRECT	gl_rscreen;
 EXTERN GRECT	gl_rfull;
 EXTERN GRECT	gl_rmenu;
+
+EXTERN WORD	adeskp[];			/* in GEMINIT.C		*/
+EXTERN WORD	awinp[];
 
 EXTERN LONG	tikaddr;
 EXTERN LONG	tiksav;
@@ -627,11 +631,24 @@ sh_main()
 	  if ( !sh_doexec )			/* goto to desktop	*/
 	  {
 	    ret = deskmain();
+#if 0
 	    i = trp14( 4 );
 	    if ( i != 2 && i != 6 )
               LLSET( ad_stdesk+12, 0x00001173L );
 	    else
               LLSET( ad_stdesk+12, 0x00001143L );
+#else
+/*    ++ ERS 1/14/93: use gl_nplanes to determine resolution, and set	*/
+/*	the desktop background and color from the values we read from	*/
+/*	desktop.inf							*/
+	    if (gl_nplanes == 1)
+	      i = 0;
+	    else if (gl_nplanes == 2)
+	      i = 1;
+	    else
+	      i = 2;    
+	    LLSET( ad_stdesk+12, 0x00001100L | adeskp[i] );
+#endif
 	    
 	    if ( !ret )
 	    {

@@ -20,6 +20,10 @@
 #include <gemlib.h>
 #include <osbind.h>
 
+/* whether window objects are 3D or not */
+#define NO3D	0
+#define IS3D	1
+
 /* in GEMFLAG.C */
 EXTERN WORD     unsync();
 EXTERN WORD     tak_flag();
@@ -220,86 +224,86 @@ REG GRECT   *rect;	/* x, y, width and height of full size window */
     wp->parent = wp->child = wp->sibling = NIL;
 
     /* first object is the background, and it has a shadow */
-    w_bld(wp, W_BOX, G_IBOX, NIL, GBOX_OBS);
+    w_bld(wp, W_BOX, G_IBOX, NIL, GBOX_OBS, NO3D);
     wp->obj[W_BOX].ob_state |= SHADOWED;;
 
     hparts = kind & HPARTS;	/* mask for vertical slider elements */
     vparts = kind & VPARTS;	/* mask for horizontal slider elements */
 
     if (kind & TPARTS) {	/* any title bar elements? */
-	w_bld(wp, W_TITLE, G_BOX, W_BOX, GBOX_OBS);
+	w_bld(wp, W_TITLE, G_BOX, W_BOX, GBOX_OBS, NO3D);
 
 	if (kind & CLOSER) {
-	    w_bld(wp, W_CLOSER, A3DBOXCHAR, W_TITLE, 0x05010000);
+	    w_bld(wp, W_CLOSER, G_BOXCHAR, W_TITLE, 0x05010000, IS3D);
 	}
 
 	if (kind & NAME) {
-	    w_bld(wp, W_NAME, A3DBOXTEXT, W_TITLE, &(wp->ttxt));
+	    w_bld(wp, W_NAME, G_BOXTEXT, W_TITLE, &(wp->ttxt), IS3D);
 	    w_ted(&(wp->ttxt), "Title Bar", 2, wtcolor[W_TITLE]);
 	} else if (kind & MOVER) {
-	    w_bld(wp, W_NAME, G_IBOX, W_BOX, 0L);
+	    w_bld(wp, W_NAME, G_IBOX, W_BOX, 0L, NO3D);
 	}
 
 	if (kind & FULLER) {
-	    w_bld(wp, W_FULLER, A3DBOXCHAR, W_TITLE, 0x07010000);
+	    w_bld(wp, W_FULLER, G_BOXCHAR, W_TITLE, 0x07010000, IS3D);
 	}
     }
 
     if (kind & INFO) {
-	w_bld(wp, W_INFO, G_BOXTEXT, W_BOX, &(wp->itxt));
+	w_bld(wp, W_INFO, G_BOXTEXT, W_BOX, &(wp->itxt), NO3D);
 	w_ted(&(wp->itxt), "Info Line", 0, wtcolor[W_INFO]);
     }
 
     if (kind & MNBAR) {
-	w_bld(wp, W_MNBAR, G_BOXTEXT, W_BOX, &(wp->mtxt));
+	w_bld(wp, W_MNBAR, G_BOXTEXT, W_BOX, &(wp->mtxt), NO3D);
 	w_ted(&(wp->mtxt), " Desk  File  View  Options", 0, wtcolor[W_MNBAR]);
     }
 
     if (kind & SIZER) {
-	w_bld(wp, W_SIZER, A3DBOXCHAR, W_BOX, 0x06010000);
+	w_bld(wp, W_SIZER, G_BOXCHAR, W_BOX, 0x06010000, IS3D);
 
 	if (!hparts && !vparts) {
-	    w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS);
+	    w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS, NO3D);
 	    /* Taken out to expand work area by 1 line	    */
-	    /* w_bld(wp, W_HBAR, A3DBOX, W_BOX, GBOX_OBS);    */
+	    /* w_bld(wp, W_HBAR, G_BOX, W_BOX, GBOX_OBS, IS3D);    */
 	}
     } else if (hparts && vparts) {
-	w_bld (wp, W_SIZER, A3DBOX, W_BOX, GBOX_OBS);
+	w_bld (wp, W_SIZER, G_BOX, W_BOX, GBOX_OBS, IS3D);
     }
 
     if (vparts) {
-	w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS);
+	w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS, NO3D);
 
 	if (kind & UPARROW) {
-	    w_bld(wp, W_UPARROW, A3DBOXCHAR, W_VBAR, 0x01010000);
+	    w_bld(wp, W_UPARROW, G_BOXCHAR, W_VBAR, 0x01010000, IS3D);
 	}
 
 	if (kind & DNARROW) {
-	    w_bld(wp, W_DNARROW, A3DBOXCHAR, W_VBAR, 0x02010000);
+	    w_bld(wp, W_DNARROW, G_BOXCHAR, W_VBAR, 0x02010000, IS3D);
 	}
 
 	if (kind & VSLIDE) {
-	    w_bld(wp, W_VSLIDE, G_BOX, W_VBAR, 0x00010000);	
-	    w_bld(wp, W_VELEV, A3DBOX, W_VSLIDE, GBOX_OBS);	
-/*	    w_bld(wp, W_VELEV, G_BOX, W_VSLIDE, GBOX_OBS);	*/
+	    w_bld(wp, W_VSLIDE, G_BOX, W_VBAR, 0x00010000, NO3D);	
+	    w_bld(wp, W_VELEV, G_BOX, W_VSLIDE, GBOX_OBS, IS3D);	
+/*	    w_bld(wp, W_VELEV, G_BOX, W_VSLIDE, GBOX_OBS, NO3D);	*/
 	}
     }
 
     if (hparts) {
-	w_bld(wp, W_HBAR, G_BOX, W_BOX, GBOX_OBS);
+	w_bld(wp, W_HBAR, G_BOX, W_BOX, GBOX_OBS, NO3D);
 
 	if (kind & LFARROW) {
-	    w_bld(wp, W_LFARROW, A3DBOXCHAR, W_HBAR, 0x04010000);
+	    w_bld(wp, W_LFARROW, G_BOXCHAR, W_HBAR, 0x04010000, IS3D);
 	}
 
 	if (kind & RTARROW) {
-	    w_bld(wp, W_RTARROW, A3DBOXCHAR, W_HBAR, 0x03010000);
+	    w_bld(wp, W_RTARROW, G_BOXCHAR, W_HBAR, 0x03010000, IS3D);
 	}
 
 	if (kind & HSLIDE) {
-	    w_bld(wp, W_HSLIDE, G_BOX, W_HBAR, 0x00010000);
-            w_bld(wp, W_HELEV, A3DBOX, W_HSLIDE, GBOX_OBS);     
-/*          w_bld(wp, W_HELEV, G_BOX, W_HSLIDE, GBOX_OBS);	*/
+	    w_bld(wp, W_HSLIDE, G_BOX, W_HBAR, 0x00010000, NO3D);
+            w_bld(wp, W_HELEV, G_BOX, W_HSLIDE, GBOX_OBS, IS3D); 
+/*          w_bld(wp, W_HELEV, G_BOX, W_HSLIDE, GBOX_OBS, NO3D);	*/
 	}
     }
 
@@ -1701,7 +1705,8 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	    }
 	    else
 	    {
-		sz = ( sz * wp->vslsz ) / 1000;
+	/* the won't fit in 16 bits, 'cause it's scaled by 1000: ++ERS 1/11/93 */
+		sz = ( (long)sz * wp->vslsz ) / 1000;
 		if ( sz > ( ADJ3DPIX << 1 ) ) 	
 		  sz = sz - (ADJ3DPIX << 1);
 
@@ -1742,7 +1747,8 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	    } 	
 	    else
 	    {
-		sz = sz * wp->hslsz / 1000;
+	/* the won't fit in 16 bits, 'cause it's scaled by 1000: ++ERS 1/11/93 */
+		sz = ((long) sz * wp->hslsz) / 1000;
 			 
 		if ( sz > ( ADJ3DPIX << 1 ) ) 	
 		  sz = sz - (ADJ3DPIX << 1);
@@ -2056,22 +2062,23 @@ w_drawchange(dirty, skip,stop)
  *
  */
 VOID
-w_bld(wp, ob, type, parent, spec)
+w_bld(wp, ob, type, parent, spec, is3d)
 WINDOW	*wp;
 REG int	ob;
 int	type, parent;
 long	spec;
+WORD	is3d;
 {
     REG OBJECT  *obaddr;
 
     /* initialize object */
     obaddr = &(wp->obj[ob]);
     obaddr->ob_next = obaddr->ob_head = obaddr->ob_tail = NIL;
-    obaddr->ob_flags = 0;
+    obaddr->ob_flags = is3d ? (IS3DOBJ|IS3DACT) : 0;
     obaddr->ob_type = type;
     obaddr->ob_state = NORMAL;
     obaddr->ob_spec = spec;
-    if (type != G_BOXTEXT && type != A3DBOXTEXT)
+    if (type != G_BOXTEXT)
 	obaddr->ob_spec |= ((LONG)wtcolor[ob] & 0x0000ffffL);
 
     /* add object to tree */

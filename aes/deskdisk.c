@@ -134,12 +134,12 @@ fc_start( source, op )
 
 	/* check for switch in cookie jar	*/
 
-	obj[FCHIGH].ob_flags = HIDETREE;
+	obj[FCHIGH].ob_flags |= HIDETREE;
 
 	if ( getcookie( 0x5F464443L, &value ) )	/* FDC cookie	*/
 	{
 	  if ( value & 0xFF000000L )		/* high density	*/
-	    obj[FCHIGH].ob_flags = SELECTABLE|RBUTTON;
+	    obj[FCHIGH].ob_flags &= ~HIDETREE;
 	  else
 	    goto fc_2; 
 	}
@@ -166,8 +166,8 @@ fc_2:	  if ( obj[FCHIGH].ob_state & SELECTED )
 
 	inf_sset( obj, FCLABEL, Nostr );
 
-	obj[FCBOXF].ob_flags = HIDETREE;
-	obj[FCBOXC].ob_flags = HIDETREE;
+	obj[FCBOXF].ob_flags |= HIDETREE;
+	obj[FCBOXC].ob_flags |= HIDETREE;
 
 	ret = ( *source == 'A' );
 	
@@ -201,16 +201,16 @@ fc_1:	  switch( ret )
 	  {
 	    case FCFORMAT:
 	      draw_fld( obj, FCBOXC );	/* erase copy function */
-	      obj[FCBOXC].ob_flags = HIDETREE;
-	      obj[FCBOXF].ob_flags = NORMAL;
+	      obj[FCBOXC].ob_flags |= HIDETREE;
+	      obj[FCBOXF].ob_flags &= ~HIDETREE;
 	      fc_draw( obj, FCBOXF );	/* draw the format	*/
 	      field = 0; 
 	      break;
 
 	    case FCCOPY:
 	      draw_fld( obj, FCBOXF );	/* erase the format 	*/
-	      obj[FCBOXF].ob_flags = HIDETREE;
-	      obj[FCBOXC].ob_flags = NORMAL;
+	      obj[FCBOXF].ob_flags |= HIDETREE;
+	      obj[FCBOXC].ob_flags &= ~HIDETREE;
 	      fc_draw( obj, FCBOXC );
 	      field = -1;
 	      break;
@@ -542,7 +542,8 @@ chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
 	      bufptr += bpc;
 	      fc_bar( obj, dev );
 	    }
-	    if( j = sectbufs % spc )
+	    j = sectbufs % spc;
+	    if( j )
 	    {
 	      if( fc_rwsec(op, bufptr, j, sectno, dev) )
 		goto bailout;

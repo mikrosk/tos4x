@@ -262,6 +262,9 @@ GLOBAL UWORD	gl_alrtcol;	/* alert background color */
 GLOBAL WORD	crt_error;	/* critical error handler semaphore	    */
 				/* set in jbind.s, checked by dispatcher    */
 
+GLOBAL WORD	adeskp[3];	/* desktop colors & backgrounds */
+GLOBAL WORD	awinp[3];	/* window colors & backgrounds */
+
 EXTERN BYTE *strcpy();		/* optimize.s	*/
 EXTERN BYTE *sh_name();		/* gemshlib.c	*/
 EXTERN WORD do_cdir();		/* jdos.s	*/
@@ -513,11 +516,12 @@ main()
 
 	if (gl_ws.ws_ncolors <= LWHITE) {    /* init button color */
     	    gl_actbutcol = gl_indbutcol = WHITE;
+    	    gl_alrtcol = WHITE;	/* init alert background color */
 	} else {
     	    gl_actbutcol = gl_indbutcol = LWHITE;
+    	    gl_alrtcol = LWHITE;	/* init alert background color */
 	}
 
-    	gl_alrtcol = WHITE;	/* init alert background color */
 
 	rom_ram( 0, ad_sysglo );
 
@@ -688,6 +692,8 @@ REG LONG newcacr;
 *	pre read the desktop.inf file and get the resolution set
 *	accordingly. If there are no disks or a desktop.inf does
 *	not exist or the resolutions match then return FALSE.
+*
+* ++ERS 1/14/93: also read the preferred desktop backgrounds
 */
 	WORD
 pred_dinf()
@@ -699,6 +705,7 @@ pred_dinf()
 	REG BYTE	*temp;
 	WORD		defdrv;
 	BYTE		*chrptr;
+	WORD		i;
 
 	gl_vdo = 0x0L;
 				/* _VDO */		/* 7/17/92 */
@@ -711,6 +718,13 @@ pred_dinf()
 	sh_get( pbuf, SIZE_AFILE );
 
         rom_ram( 3, pbuf, NULL );	/* res is default from ROM	*/
+
+	adeskp[0] = 0x41;	/* 4 = dither, 1 = black */
+	adeskp[1] = 0x73;	/* 7 = solid color, 3 = green */
+	adeskp[2] = 0x7D;	/* 7 = solid color, D = light cyan */
+	awinp[0] = 0x70;
+	awinp[1] = 0x70;
+	awinp[2] = 0x70;
 
 	if ( ctldown )
 	  goto p_1;
@@ -766,8 +780,16 @@ p_1:
 		temp = scan_2( temp, &g_flag );
 		temp = escan_str( temp, &g_autoboot[0] );
 	      }	
-	      else
-	      if ( *temp == 'E' )
+	      else if ( *temp == 'Q' )
+	      {
+	        temp += 2;
+		for (i = 0; i < 3; i++)
+		{
+		  temp = scan_2( temp, &adeskp[i] );
+		  temp = scan_2( temp, &awinp[i] );
+		}
+	      }
+	      else if ( *temp == 'E' )
 	      {
 		if ( LONGFRAME )
 		{
@@ -963,7 +985,7 @@ gr_slidebox(tree, parent, obj, isvert)
 	GRECT		t, c;
 	REG LONG	divnd, divis;
 	OBJECT		*objc;
-	WORD		ptype,ctype;
+	WORD		pflags,cflags;
 	WORD		ret,setxy,setwh;
 
 	pt = &t;
@@ -974,24 +996,24 @@ gr_slidebox(tree, parent, obj, isvert)
 	ob_relxywh(tree, obj, pt);
 
 	objc = tree;
- 	ptype = objc[parent].ob_type >> 8;
-	ctype = objc[obj].ob_type >> 8;	
+ 	pflags = objc[parent].ob_flags;
+	cflags = objc[obj].ob_flags;	
 
-	if ( ( ptype == X_3DIND ) || ( ptype == X_3DACT ) )
-	  ptype = 1;
+	if ( ( pflags & IS3DOBJ ) )
+	  pflags = 1;
 	else
-	  ptype = 0;
+	  pflags = 0;
 
-	if ( ( ctype == X_3DIND ) || ( ctype == X_3DACT ) )
-	  ctype = 1;
+	if ( ( cflags & IS3DOBJ ) )
+	  cflags = 1;
 	else
-	  ctype = 0;
+	  cflags = 0;
 	  
 	setxy = 0;
 
-	if ( ctype ) 	/* if the child is 3D, then check 	    */
+	if ( cflags ) 	/* if the child is 3D, then check 	    */
 	{	
-	  if ( !ptype ) /* if parent is not 3D, then the child is   */
+	  if ( !pflags ) /* if parent is not 3D, then the child is   */
 	  {		/* ADJ3DPIX off, we need to adjust it	    */
   	    pt->g_x -= ADJ3DPIX;
 	    pt->g_y -= ADJ3DPIX;

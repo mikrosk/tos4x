@@ -117,7 +117,7 @@ rm_icons()
 	  if ( ( obj[i].ob_state & SELECTED ) && ( !( obj[i].ob_flags & HIDETREE ) ) )
 	  {
 	    found = TRUE;
-	    obj[i].ob_flags = HIDETREE;
+	    obj[i].ob_flags |= HIDETREE;
 	    if ( ( backid[i].i_type == XFILE ) || ( backid[i].i_type == XDIR ) )
 	      collect = TRUE;
 	  }	
@@ -475,7 +475,7 @@ ins_icons( )
 	      ret = IPRINTER;
 	  }
 
-	  obj[DRID].ob_flags = select;
+	  obj[DRID].ob_flags = (obj[DRID].ob_flags & (IS3DOBJ|IS3DACT)) | select;
 	  obj[IDRIVE].ob_state = style;
 	  obj[ITRASH].ob_state = style;
 	  obj[IPRINTER].ob_state = style;
@@ -670,14 +670,14 @@ ins_wicon( )
 	  inf_sset( obj, WNAME, Nostr );
 	  obj[WFOLDER].ob_state = NORMAL;
 	  obj[WNONE].ob_state = SELECTED;
-	  obj[WFOLDER].ob_flags = SELECTABLE|RBUTTON;
-	  obj[WNONE].ob_flags = SELECTABLE|RBUTTON;
+	  obj[WFOLDER].ob_flags |= (SELECTABLE|RBUTTON);
+	  obj[WNONE].ob_flags |= (SELECTABLE|RBUTTON);
 
 	  pref = 0;
 
 	  if ( x_status )		/* something is selected	*/
 	  {
-	    obj[WNAME].ob_flags = NONE;
+	    obj[WNAME].ob_flags &= ~(SELECTABLE|EDITABLE);
 
 	    if ( itype == SUBDIR )
 	    {
@@ -691,8 +691,8 @@ ins_wicon( )
 	      strcpy( g_name( str ), buf2 );
 	    }
 		
-	    obj[WFOLDER].ob_flags = NONE;
-	    obj[WNONE].ob_flags = NONE;
+	    obj[WFOLDER].ob_flags &= ~(SELECTABLE|RBUTTON);
+	    obj[WNONE].ob_flags &= ~(SELECTABLE|RBUTTON);
 
 	    app = app_icon( buf2, ( itype == SUBDIR ) ? FOLDER : -1, &index );
 	    pref = app->a_pref;
@@ -701,7 +701,7 @@ ins_wicon( )
 	  else
 	  {
 	    index = 0;		/* icon index	*/
-	    obj[WNAME].ob_flags = EDITABLE;
+	    obj[WNAME].ob_flags |= EDITABLE;
 	    buf2[0] = 0;
 	  }
 
@@ -879,7 +879,7 @@ ins_drive()
 	      if ( !( ( map >> ( id - 'A' ) ) & 0x01 ) )
 	      {
 		free = TRUE;
-		obj[i].ob_flags = HIDETREE;
+		obj[i].ob_flags |= HIDETREE;
 	      }
 	    }
 	  }

@@ -3,21 +3,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/08 17:41:07 $
+* $Date: 88/04/12 18:22:34 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.6  88/04/12  18:22:34  apratt
+* Added baudrate variable in BSS (just forgot this...)
+*
 * Revision 1.5  88/04/08  17:41:07  apratt
 * Added baud-rate interrogation code: Rsconf(-2) will return old baud
 * rate index (0-15).
-*
+* 
 * Also changed key repeat code so it doesn't stop repeating when you
 * hit a new key: the new key restarts the cdelay1/cdelay2 cycle, and
 * doesn't stop until the repeating key comes up.
-*
+* 
 * Revision 1.4  88/04/05  17:42:30  apratt
 * Fixed ctl-alt-delete sensing.  Produces a warm boot.
 * 
@@ -34,7 +37,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.5 $
+* $Revision: 1.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -429,6 +432,11 @@ kinsize		equ	$100
 minsize		equ	$80
 
 
+*************************************************************************
+*		operating system memory space				*
+*       Baud rate shadow variable -- returned by Rsconf(-2)
+*
+baudrate        ds.w    1
 
 *
 *************************************************************************

@@ -4,13 +4,16 @@
 * $Author: unknown $
 * =======================================================================
 *
-* $Date: 1992/05/18 23:08:36 $
+* $Date: 1992/05/20 22:12:18 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.96  1992/05/20  22:12:18  unknown
+* Added NVMaccess for Sparrow and waketime for all.
+*
 * Revision 2.95  1992/05/18  23:08:36  unknown
 * Sparrow and TT are M68030.
 * If sparrow, we go to 16MHz really soon to speed up the boot.
@@ -344,7 +347,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.95 $
+* $Revision: 2.96 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -497,7 +500,7 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 .if (TT == 0)
 	.globl	_waketime		; alarm maintenance for STPAD
 .endif
-.if TT
+.if (TT | SPARROW)
 	.globl	NVMaccess		; read/write/init non-volatile RAM
 .endif
 	.globl	osconf			; equate imported from BIOS.S
@@ -4346,16 +4349,12 @@ trp14tab:
 	dc.l	_dmawrite		; 43: _dmawrite call
 	dc.l	_bconmap		; 44: _bconmap call
 	dc.l	unimpl			; 45: bconctl (when ready)
-.if TT
+.if (TT | SPARROW)
 	dc.l	NVMaccess		; 46: nvmaccess
 .else
 	dc.l	unimpl
 .endif
-.if (TT == 0)
-	dc.l	_waketime		; 47: non-TT alarm maintenance
-.else
-	dc.l	unimpl			; 47: unimpl on TT.
-.endif
+	dc.l	_waketime		; 47: Waketime
 
 * 0x30..0x3f: assigned to M.Schmal's MetaDOS
 

@@ -28,6 +28,7 @@
 #include <gemlib.h>
 #include <vdidefs.h>
 #include <funcdef.h>
+#include <osbind.h>
 
 /*****************************************************************/
 /*                   COLOR ICON DECLARATIONS                     */
@@ -43,6 +44,44 @@ WORD gl_colmask[128];		/* global mask used by color icons */
 EXTERN WORD 	gl_nplanes;	/* number of planes in current res */
 EXTERN FDB	gl_src, gl_dst;
 EXTERN WORD	ptsin[];
+
+/* This is the color table of RGB values that VDI expects in pixel-
+ * packed mode (This whole table can be moved to a separate file).
+ * The values were derived from 4 bit R, G, and B values that were
+ * converted to 5 bit values.  The original values are from VDI's 
+ * palette settings.
+ */
+WORD	rgb_tab[] = { 0xFFDF, 
+0xF800, 0x7C0, 0xFFC0, 0x1F, 0xF81F, 0x7DF, 0xB596, 0x8410, 0xA000, 0x500, 
+0xA500, 0x14, 0xA014, 0x514, 0x0, 0xFFDF, 0xE71C, 0xD69A, 0xC618, 0xB596, 
+0xA514, 0x9492, 0x8410, 0x738E, 0x630C, 0x528A, 0x4208, 0x3186, 0x2104, 0x1082, 
+0x0, 0xF800, 0xF802, 0xF804, 0xF806, 0xF808, 0xF80A, 0xF80C, 0xF80E, 0xF810, 
+0xF812, 0xF814, 0xF816, 0xF818, 0xF81A, 0xF81C, 0xF81F, 0xE01F, 0xD01F, 0xC01F, 
+0xB01F, 0xA01F, 0x901F, 0x801F, 0x701F, 0x601F, 0x501F, 0x401F, 0x301F, 0x201F, 
+0x101F, 0x1F, 0x9F, 0x11F, 0x19F, 0x21F, 0x29F, 0x31F, 0x39F, 0x41F, 
+0x49F, 0x51F, 0x59F, 0x61F, 0x69F, 0x71F, 0x7DF, 0x7DC, 0x7DA, 0x7D8, 
+0x7D6, 0x7D4, 0x7D2, 0x7D0, 0x7CE, 0x7CC, 0x7CA, 0x7C8, 0x7C6, 0x7C4, 
+0x7C2, 0x7C0, 0x17C0, 0x27C0, 0x37C0, 0x47C0, 0x57C0, 0x67C0, 0x77C0, 0x87C0, 
+0x97C0, 0xA7C0, 0xB7C0, 0xC7C0, 0xD7C0, 0xE7C0, 0xFFC0, 0xFF00, 0xFE80, 0xFE00, 
+0xFD80, 0xFD00, 0xFC80, 0xFC00, 0xFB80, 0xFB00, 0xFA80, 0xFA00, 0xF980, 0xF900, 
+0xF880, 0xB000, 0xB002, 0xB004, 0xB006, 0xB008, 0xB00A, 0xB00C, 0xB00E, 0xB010, 
+0xB012, 0xB014, 0xB016, 0xA016, 0x9016, 0x8016, 0x7016, 0x6016, 0x5016, 0x4016, 
+0x3016, 0x2016, 0x1016, 0x16, 0x96, 0x116, 0x196, 0x216, 0x296, 0x316, 
+0x396, 0x416, 0x496, 0x516, 0x596, 0x594, 0x592, 0x590, 0x58E, 0x58C, 
+0x58A, 0x588, 0x586, 0x584, 0x582, 0x580, 0x1580, 0x2580, 0x3580, 0x4580, 
+0x5580, 0x6580, 0x7580, 0x8580, 0x9580, 0xA580, 0xB580, 0xB500, 0xB480, 0xB400, 
+0xB380, 0xB300, 0xB280, 0xB200, 0xB180, 0xB100, 0xB080, 0x7000, 0x7002, 0x7004, 
+0x7006, 0x7008, 0x700A, 0x700C, 0x700E, 0x600E, 0x500E, 0x400E, 0x300E, 0x200E, 
+0x100E, 0xE, 0x8E, 0x10E, 0x18E, 0x20E, 0x28E, 0x30E, 0x38E, 0x38C, 
+0x38A, 0x388, 0x386, 0x384, 0x382, 0x380, 0x1380, 0x2380, 0x3380, 0x4380, 
+0x5380, 0x6380, 0x7380, 0x7300, 0x7280, 0x7200, 0x7180, 0x7100, 0x7080, 0x4000, 
+0x4002, 0x4004, 0x4006, 0x4008, 0x3008, 0x2008, 0x1008, 0x8, 0x88, 0x108, 
+0x188, 0x208, 0x206, 0x204, 0x202, 0x200, 0x1200, 0x2200, 0x3200, 0x4200, 
+0x4180, 0x4100, 0x4080, 0xFFDF, 0x0 
+};
+
+EXTERN WORD reverse();
+EXTERN expand_data();
 
 /******************** END COLOR *******************************/
 
@@ -165,6 +204,10 @@ UWORD	mode, which, inval1, inval2, *outval1, *outval2;
 		break;
 	    case ALRTCOL:
 		*outval1 = gl_alrtcol;
+		break;
+	    case AD3DVALUE:
+		*outval1 = ADJ3DPIX;	/* horizontal	*/
+		*outval2 = ADJ3DPIX;	/* vertical	*/
 		break;
 	    default:
 		ret = FALSE;	    /* error */
@@ -343,15 +386,36 @@ WORD	    icol;	/* interior color */
 
 /*
  * Routine to XOR color in any resolution as if there is only 16 colors.
+ * FROM THE VDI MANUAL: Section 6 (Raster Operations) Table 6-2
+ * Pixel VDI #  Default color
+ * ----- -----  -------------
+ * 0000	    0	white
+ * 0001	    2	red
+ * 0010	    3	green
+ * 0011	    6	yellow
+ * 0100	    4	blue
+ * 0101	    7	magenta
+ * 0110	    5	cyan
+ * 0111	    8	low white
+ * 1000	    9	grey
+ * 1001	    10	light red
+ * 1010	    11	light green
+ * 1011	    14	light yellow
+ * 1100	    12	light blue
+ * 1101	    15	light magenta
+ * 1110	    13  light cyan
+ * 1111	    1	black
  */
 WORD
 xor16(col)
 WORD col;
 {
 static WORD xor16tab[] = {
-		BLACK, WHITE, LRED, LGREEN, LBLUE, LCYAN, LYELLOW, LMAGENTA,
-		LBLACK, LWHITE, RED, GREEN, BLUE, CYAN, YELLOW, MAGENTA
-	    };
+/*  WHITE, BLACK, RED,   GREEN,    BLUE,    CYAN, YELLOW, MAGENTA */
+    BLACK, WHITE, LCYAN, LMAGENTA, LYELLOW, LRED, LBLUE,  LGREEN,
+/*  LWHITE, LBLACK, LRED, LGREEN,  LBLUE,  LCYAN, LYELLOW, LMAGENTA */
+    LBLACK, LWHITE, CYAN, MAGENTA, YELLOW, RED,   BLUE,    GREEN
+};
 static WORD xor4tab[] = { BLACK, WHITE, GREEN, RED };
 
     if (col >= 16 || col >= gl_ws[13]) /* ws_ncolors */
@@ -627,8 +691,9 @@ just_draw(tree, obj, sx, sy)
 		LBCOPY(&bi, spec, sizeof(BITBLK));
 		if (state & SELECTED)
 		{
-		    bb_fill(MD_XOR, FIS_SOLID, IP_SOLID, pt->g_x, pt->g_y,
-			    pt->g_w, pt->g_h);
+		/* If selected, XOR the background before drawing the image */
+		    bb_fill(MD_XOR, FIS_SOLID, IP_SOLID,
+			    pt->g_x, pt->g_y, pt->g_w, pt->g_h);
 		    bi.bi_color = xor16(bi.bi_color);
 		}
 		gsx_blt(bi.bi_pdata, bi.bi_x, bi.bi_y, bi.bi_wb,
@@ -714,8 +779,10 @@ just_draw(tree, obj, sx, sy)
 	  if ( (state & SHADOWED) && th )
 	  {
 	    vsf_color(bcol);
+	    /* draw the vertical line 	*/
 	    bb_fill(MD_REPLACE, FIS_SOLID, 0, pt->g_x, pt->g_y+pt->g_h+th,
 				pt->g_w + th, 2*th);
+	    /* draw the horizontal line */
 	    bb_fill(MD_REPLACE, FIS_SOLID, 0, pt->g_x+pt->g_w+th, pt->g_y, 
 			2*th, pt->g_h+(3*th));
 	  }
@@ -805,8 +872,8 @@ ob_find(tree, currobj, depth, mx, my)
 	REG WORD		depth;
 	WORD		mx, my;
 {
-	WORD		lastfound;
-	WORD		dosibs, done;
+	WORD		lastfound,dummy;
+	WORD		dosibs, done, state;
 	GRECT		t, o;
 	WORD		parent, childobj, flags;
 	REG GRECT	*pt;
@@ -831,9 +898,17 @@ ob_find(tree, currobj, depth, mx, my)
 						/* if inside this obj,	*/
 						/*   might be inside a	*/
 						/*   child, so check	*/
-	  ob_relxywh(tree, currobj, pt);
-	  pt->g_x += o.g_x;
-	  pt->g_y += o.g_y;
+
+	  state = LWGET(OB_STATE(currobj));
+	  if ( state & SHADOWED )
+	  {	
+	    ob_relxywh(tree, currobj, pt);
+	    pt->g_x += o.g_x;
+	    pt->g_y += o.g_y;
+	  }
+	  else
+	    ob_gclip( tree, currobj, &dummy, &dummy, &pt->g_x, &pt->g_y,
+		      &pt->g_w, &pt->g_h );
 
 	  flags = LWGET(OB_FLAGS(currobj));
 	  if ( (inside(mx, my, pt)) &&
@@ -1054,13 +1129,20 @@ ob_change(tree, obj, new_state, redraw)
 		ob_user(tree, obj, pt, spec, curr_state, new_state);
 		redraw = FALSE;
 	  }
-	  else if (obtype != G_ICON
-		&& ((new_state ^ curr_state) & SELECTED)
-		&& xor_ok(obtype, xobtype, spec) )
+	  else if (obtype != G_ICON && ((new_state ^ curr_state) & SELECTED) )
 	  {
-		bb_fill(MD_XOR, FIS_SOLID, IP_SOLID, pt->g_x+th, 
-			pt->g_y+th, pt->g_w-(2*th), pt->g_h-(2*th));
-		redraw = FALSE;
+	    /* For non-icon objects, see if we can toggle selection by XOR.
+	     * G_IMAGE objects must be DEselected by XOR draw, *and*
+	     * the image must be redrawn by just_draw().  If they're selected,
+	     * just_draw() does the XOR box before redrawing the image.
+	     */
+	    WORD xok = xor_ok(obtype, xobtype, spec);
+		if ( xok || (obtype == G_IMAGE && !(new_state & SELECTED)) )
+		{
+		    bb_fill(MD_XOR, FIS_SOLID, IP_SOLID, pt->g_x+th, 
+			    pt->g_y+th, pt->g_w-(2*th), pt->g_h-(2*th));
+		    redraw = !xok;
+		}
 	  }
 
 	  if (redraw)
@@ -1214,7 +1296,7 @@ ob_gclip(tree, obj, pxoff, pyoff, pxcl, pycl, pwcl, phcl)
 /* Adjust for shadow */
 	if (state & SHADOWED)
 	{
-	    border = border * ADJSHADPIX - offset;
+	    border = border * ADJSHADPIX - offset + border;
 	    if (border < 0)
 	    {
 		r.g_w -= border;
@@ -1281,6 +1363,32 @@ int planes;
     return( tempicon );
 }
 
+/*	Takes a list of icons and returns the first icon that 
+ *	has equal or smaller planes.  Returns a null pointer if no match.
+ */
+CICON *
+find_eq_or_less( iconlist, planes )
+CICON *iconlist;
+int planes;
+{
+    CICON *tempicon,*lasticon;
+
+    tempicon = iconlist;
+    lasticon = 0L;
+    while (tempicon) {
+	if (tempicon->num_planes == planes) break;
+	else {
+	    if ( tempicon->num_planes < planes ) {
+		if (!lasticon || (lasticon->num_planes < tempicon->num_planes))
+		    lasticon = tempicon;
+	    }
+	    tempicon = tempicon->next_res;
+	}
+    }
+    if ( tempicon ) return( tempicon );
+    else return( lasticon );
+}
+
 /*
  *	Routine to draw a color icon, which is a graphic image with a text
  *	string underneath it.  Note that this routine is very similar to
@@ -1292,7 +1400,7 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
 	REG WORD		state;
 	LONG		pmask;
 	LONG		pdata;
-	LONG		ptext;
+	BYTE		*ptext;
 	REG WORD		ch;
 	WORD		chx, chy;
 	REG GRECT		*pi;
@@ -1306,7 +1414,11 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
     int col_select;		/* is there a color select icon */
     int i,j;
 
-    color = match_planes( cicon->mainlist, gl_nplanes );
+/*    color = match_planes( cicon->mainlist, gl_nplanes );*/
+/* 8/31/92 DLF  Don't need this routine since mainlist is patched to
+ * contain the icon for this resolution.
+ */
+    color = cicon->mainlist;
 
     fgcol = (ch >> 12) & 0x000f;
     bgcol = (ch >> 8) & 0x000f;
@@ -1342,13 +1454,22 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
 						/* a white background	*/
     if ( !( (state & WHITEBAK) && (bgcol == WHITE) ) )
     {
-	gsx_blt(pmask, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
+	/* for pixel-packed mode, must blit in black (to zero out backgd) */
+	if ( ( gl_nplanes == 16 ) && ( color ) )
+	    gsx_blt(pmask, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
+		gl_width/8, pi->g_w, pi->g_h, MD_TRANS,
+		1, fgcol); 
+	else
+	    gsx_blt(pmask, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
 		gl_width/8, pi->g_w, pi->g_h, MD_TRANS,
 		bgcol, fgcol); 
-	if ( color && (state & SELECTED) )
-	    gr_rect(fgcol, IP_SOLID, pt);
-	else
-	    gr_rect(bgcol, IP_SOLID, pt);
+
+	if ( ptext[0] ) { /* only print bar if string is not null 9/3/92 */
+	    if ( color && (state & SELECTED) )
+		gr_rect(fgcol, IP_SOLID, pt);
+	    else
+		gr_rect(bgcol, IP_SOLID, pt);
+	}
     }
 
 						/* draw the data	*/
@@ -1359,6 +1480,7 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
  * testing purposes only.
  */
 /*      my_trans( pdata, pi->g_w/8, pdata,pi->g_w/8,pi->g_h );*/
+
 	gsx_cblt(pdata, 0, 0, pi->g_w/8, 0x0L, pi->g_x, pi->g_y, 
 		gl_width/8, pi->g_w, pi->g_h, S_OR_D,		/* 6/30/92 */
 		color->num_planes); 
@@ -1560,7 +1682,7 @@ get_color_rsc( cicondata )
 	WORD 	totalicons;
 
 	array_ptr = (CICONBLK **) cicondata;
-	totalicons = 1;
+	totalicons = 0;
 	while (*array_ptr++ != -1L) 
 	  totalicons++;
 
@@ -1601,6 +1723,12 @@ my_trans(saddr, swb, daddr, dwb, h, nplanes)
 /* TRANS_CICON()
  * Takes an array of color icons (and the number of icons), and changes
  * all of the color data from device-independent form to device-dependent.
+ * 8/31/92 DLF - Changed this function so that if there is no match for
+ * the current resolution, it will create one out of the next smallest icon.
+ * In either case, the memory will be malloced so that we can avoid the
+ * transform form in place.  Must deallocate at a later time.
+ * The data is put in a buffer of the same size or larger (if no match for
+ * current resolution).  
  */
 trans_cicon( tot_icons, carray )
 int tot_icons;
@@ -1608,22 +1736,237 @@ CICONBLK **carray;
 {
     int i;
     CICONBLK *ciconblk;
-    CICON *cic;
+    CICON *cic,*ctemp;
     int w, h;
+    WORD *databuffer,*selbuffer,*tempbuffer;
+    LONG tot_size;
 
     for (i = 0; i < tot_icons; i++ ) {
 	ciconblk = carray[i];
 	w = ciconblk->monoblk.ib_wicon;
 	h = ciconblk->monoblk.ib_hicon;
-	cic = ciconblk->mainlist;
-	while (cic) {
-	    my_trans( cic->col_data, w/8, cic->col_data, w/8, h, 
-		cic->num_planes );
-	    if (cic->sel_data)
-		my_trans( cic->sel_data, w/8, cic->sel_data, w/8, h,
-			cic->num_planes );
-	    cic = cic->next_res;
+	ctemp  = find_eq_or_less( ciconblk->mainlist, gl_nplanes );
+
+	ciconblk->mainlist = ctemp;
+	if (ctemp) {
+	    tot_size = w/8 * h * gl_nplanes;
+
+	    /* if not same size, allocate bigger buffers and expand */
+	    if (ctemp->num_planes != gl_nplanes) {
+		tempbuffer = (WORD *)Malloc( tot_size );
+		databuffer = (WORD *)Malloc( tot_size );
+		if ( !tempbuffer || !databuffer ) {
+		    ciconblk->mainlist = 0L;
+		    return;	/* just quit */
+		}
+		expand_data( ctemp->col_data,tempbuffer,ctemp->mask,
+			ctemp->num_planes, gl_nplanes, w, h);
+		tran_check( tempbuffer, databuffer, ctemp->mask, 
+		   w, h,gl_nplanes );
+		ctemp->col_data = databuffer;
+		if (ctemp->sel_data) {
+		    selbuffer = (WORD *)Malloc( tot_size );
+		    if ( selbuffer ) {
+			expand_data( ctemp->sel_data,tempbuffer,ctemp->sel_mask,
+			   ctemp->num_planes,gl_nplanes, w, h);
+			tran_check( tempbuffer, selbuffer, ctemp->mask, 
+			   w, h, gl_nplanes );
+		    }
+		    ctemp->sel_data = selbuffer;
+		}
+		Mfree(tempbuffer);
+	    } else {   /* just allocate same size, copy over because */
+		       /* we don't want to transform form in place */
+		databuffer = (WORD *)Malloc( tot_size );
+		if ( !databuffer ) {
+		    ciconblk->mainlist = 0L;
+		    return;
+		}
+		my_trans( ctemp->col_data, w/8, databuffer, w/8, h, 
+		    gl_nplanes );
+		ctemp->col_data = databuffer;
+		if (ctemp->sel_data) {
+		    selbuffer = (WORD *)Malloc( tot_size );
+		    if ( selbuffer ) {
+			my_trans( ctemp->sel_data, w/8, selbuffer, w/8, h,
+			   gl_nplanes );
+		    }
+		    ctemp->sel_data = selbuffer;
+		}
+	    }
+
+	    ctemp->num_planes = gl_nplanes;
+	    ctemp->next_res = 0L; /* won't need the rest of the list */
 	}
     }
 }
 
+/* Frees extra memory allocated when fixing up the icons.  There should
+ * be freeable memory for every icon, since fixup even mallocs memory
+ * for non-expanded data (so that we avoid the transform form in place)
+ */
+free_cicon( carray )
+CICONBLK **carray;
+{
+    int i;
+    CICONBLK *ciconblk, **ptr;
+    CICON *ctemp;
+    WORD tot_icons;
+
+    ptr = carray;
+    tot_icons = 0;
+    while (*ptr++ != -1L) 
+	tot_icons++;
+
+    for (i = 0; i < tot_icons; i++ ) {
+	ciconblk = carray[i];
+	ctemp = ciconblk->mainlist;
+	if (ctemp) {
+	    Mfree( ctemp->col_data );
+	    if ( ctemp->sel_data )
+		Mfree( ctemp->sel_data );
+	}
+    }
+}
+
+
+/* does the transform form but also checks to see if this is pixel-packed
+ * mode.  If pixel-packed, then after the transformation, the blacks and
+ * whites must be swapped.  Also inverts mask.
+ * dlf 9/1/92
+ * Special Note for Pixel-Packed mode:  
+ *	In pixel-packed mode, VDI no longer expects indexes as color data;
+ *	data must be in 5-bit red, 5-bit green (plus one bit), and 5-bit
+ *	blue.  So we must take the color indexes and convert them into
+ *	this format.  After we expand data in this routine, we do a
+ *	transform form on the data.  The result of the transform is that
+ *	each word represents a pixel, and the value corresponds to a color
+ *	index (0-255, but with reversed bits).  The rgb_tab has the correct
+ *	RGB settings per index.  Therefore, we substitute indexes (i.e.
+ *	reversed indexes) with RGB.
+ */
+tran_check( saddr, daddr, mask, w, h, nplanes )
+BYTE *saddr, *daddr, *mask;
+int w, h, nplanes;
+{
+    int no_words, no_longs, i;
+    WORD *wptr;
+    LONG *lptr;
+
+    my_trans( saddr, w/8, daddr, w/8, h, nplanes );
+
+    if ( nplanes == 16 ) {
+	no_words = w/16 * h * nplanes;
+	wptr = daddr;
+	for ( i = 0; i < no_words; i++ ) {
+	    switch ( wptr[i] ) {
+		case 0x0000:
+		     wptr[i] = 0xFFFF;
+		     break;
+		case 0xFFFF:
+		     wptr[i] = 0x0000;
+		     break;
+		default: 
+		     wptr[i] = get_rgb( wptr[i] );
+		     break;
+	    }
+	}
+    }
+}
+
+#ifdef NEVER
+/* reverses the bits of a word.  Used in get_rgb because the word of pixel-
+ * packed data end up being reversed.  Since, the rgb pixel values are
+ * table-driven and indexed, we must get a reversed index (e.g. the pixel-
+ * packed value 0x8000 is index 0x0001 ).
+ * NOTE: This routine has been optimized into assembly.
+ */
+unsigned int
+reverse( index )
+int index;
+{
+    unsigned int mask, result=0x0000;
+    long temp;
+    int i;
+
+    for (i = 0; i < 16; i++ ){
+	mask = 0x0001 << i;
+	temp = (long) mask & index;
+	if (temp)
+	    result |=  0x0001 << (16 - i-1);
+    }
+    return( result);
+}
+#endif
+
+WORD
+get_rgb( index )
+WORD index;
+{
+    WORD rindex;	/* reversed bits of index */
+
+    rindex = reverse( index );
+
+    return( rgb_tab[rindex] );
+}
+
+#ifdef NEVER
+/* Takes saddr, the source address for color icon data with splanes of info,
+ * and puts it into daddr, expanding it to dplanes.  It handles the expansion
+ * cases.
+ * DLF 8/31/92
+ * Special Note for Pixel-packed mode:
+ *	True-color behaves differently for blits.  The mask must be blitted
+ *	in black because black is 0.  You can then OR the color data into
+ *	black and preserve the colors.  Furthermore, you must make sure that
+ *	outside of the mask, there are 0's.  In this routine, we must make
+ *	the blacks be 1's (in the same way as 4 and 8 plane), but in
+ *	tran_check(), 0x0000's are reversed for 0xffff and vice versa.
+ * NOTE:  This has been optimized in  an assembly file.
+ */
+expand_data( saddr, daddr, mask, splanes, dplanes, w, h)
+BYTE *saddr, *daddr, *mask;
+int splanes, dplanes, w, h;
+{
+    int plane_size, orig_size, end_size;
+    register i, n;
+    register BYTE *stemp,*dtemp;
+
+    plane_size = w/8 * h;
+    orig_size = plane_size * splanes;
+    end_size = plane_size * dplanes;
+    for (i = 0; i < orig_size; i++ )	/* copy source */
+	daddr[i] = saddr[i];
+
+    for ( i = orig_size; i < end_size; i++ ) /* fill with 1's */
+	daddr[i] = 0xFF;
+    /* now "and" splanes into the next plane */
+    dtemp = &daddr[orig_size];
+    for (n = 0; n < splanes; n++) {
+	stemp = &saddr[n*plane_size];
+	for (i = 0; i < plane_size; i++ )
+	    dtemp[i] = stemp[i] & dtemp[i];
+    }
+    /* now copy plane into the rest of the planes */
+    stemp = &daddr[orig_size];
+    for ( n = 0; n < (dplanes - splanes - 1); n++ ) {
+	dtemp = &daddr[orig_size + ((n+1)*plane_size) ];
+	for (i = 0; i < plane_size; i++ )
+	    dtemp[i] = stemp[i];
+    }
+    /* Now "and" the mask into all planes */
+    for ( n = 0; n < dplanes; n++ ) {
+	dtemp = &daddr[n*plane_size];
+	/* We special-case pixel-packed because we need to make the outside
+	 * of the mask all 1's, since later on in tran_check(), all 1's
+	 * become 0's (which is black in pixel packed mode ).
+	 */
+	if ( dplanes == 16 ) 
+	    for ( i = 0; i < plane_size; i++ )
+		dtemp[i] = ~mask[i] | dtemp[i];
+	else for ( i = 0; i < plane_size; i++ )
+		dtemp[i] = mask[i] & dtemp[i];
+    }
+}
+
+#endif

@@ -43,6 +43,24 @@
  *		     -Redid the layout for this dialog box.
  * 08/03/92  - cjg - Hide TTLOW and TTMED on a TV
  *		   - fixed ST Compatibility set_mode variables
+ * 		   - Added a mem-check() to test if enough memory
+ *		     is available for switching resolutions.
+ * 08/05/92  - cjg - Change all Deselect() to XDeselect()
+ *		   - Change all Select() to XSelect()
+ *		   - Remove TTMED and TTLOW
+ * 08/06/92  - cjg - Changed XDeselect() and XSelect() to
+ *		     redraw from the root and to increase the
+ *		     redraw area by 2 pixels.
+ *		   - Changed Selecting Titles to draw_fld()
+ *		   - Enabled Arrow Buttons to INVERT when Selected.
+ *		   - Buttons remain selected until mouse button is released.
+ * 08/11/92  - cjg - When a function key is already used, and cancel is pressed
+ *		     deselect the OK button properly.
+ * 08/11/92  - cjg - Fixed bug with objc_find() inside ChkTouchButton()
+ * 08/17/92  - cjg - Fixed bug - System Configuration
+ *		   - Used wrong object number..
+ * 09/21/92  - cjg - Configuration Popup - Look for longest string first
+ * 09/24/92  - cjg - Fixed bug with MKUP and MKDOWN pausing for a scroll.
  */
 
 
@@ -54,43 +72,11 @@
 #include <defines.h>
 #include <window.h>
 #include <gemdefs.h>
-#include <wsdefine.h>
 #include <osbind.h>
 #include <mode.h>
-
-#if SPAIN
-#include <deskspa.h>
-#endif
-
-#if USA|UK
 #include <deskusa.h>
-#endif
-
-#if FRENCH|SWISSFRE
-#include <deskfre.h>
-#endif
-
-#if GERMANY|SWISSGER
-#include <deskgrm.h>
-#endif
-
-#if SWEDEN
-#include <deskswe.h>
-#endif
-
-#if ITALY
-#include <deskita.h>
-#endif
-
-#if 0
-#include <osbind.h>
-#endif
-
 #include <extern.h>
 
-/*
-#include <vdidefs.h>
-*/
 /* EXTERNS
  * ==================================================================
  */
@@ -108,7 +94,8 @@ EXTERN	WINDOW	*w_gfirst();
 EXTERN	WINDOW	*w_gnext();
 EXTERN	BYTE	*g_name();
 
-EXTERN	WS	gl_ws;
+EXTERN  WORD	gl_restype;
+EXTERN  WORD	gl_rschange;
 EXTERN	WORD	d_exit;
 EXTERN	LONG	gl_vdo;
 EXTERN	WORD	pref_save;
@@ -132,14 +119,18 @@ EXTERN	WORD	m_st;
 EXTERN  WORD	tb3[];
 
 EXTERN  BYTE	mentable[];
-/* EXTERN  WS	gl_ws;	*/
 
 EXTERN  UWORD    d_rezword;	/* set_mode() value ( system ) */
+EXTERN  WORD XDeselect();
 
+EXTERN  WORD	strlen();	/* cjg 09/21/92 */
 
 /* DEFINES
  * ==================================================================
  */
+#define Srealloc( a )   gemdos( 0x15, a )
+#define VgetSize( a )   xbios( 91, a )
+
 
 /* Structure for passing menu data */
 typedef struct _menu
@@ -188,29 +179,28 @@ WORD   button;
     GRECT rect;
 
     wind_update( BEG_MCTRL );
-
-    Select( tree, button );			
+    XSelect( tree, button );			
 
     graf_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
     while( mk.buttons )
     {
-      obj = objc_find( tree, button, 0, mk.x, mk.y );
+      obj = objc_find( tree, ROOT, MAX_DEPTH, mk.x, mk.y );
       if( obj != button )
       {
          if( tree[ button ].ob_state & SELECTED )
-	     Deselect( tree, button, TRUE );
+	     XDeselect( tree, button );
       }
       else
       {
          if( !( tree[ button ].ob_state & SELECTED ) )
-	     Select( tree, button );
+	     XSelect( tree, button );
       }
       graf_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
     }
     evnt_button( 1, 1, 0, &dummy, &dummy, &dummy, &dummy );
-    obj = objc_find( tree, button, 0, mk.x, mk.y );
+    obj = objc_find( tree, ROOT, MAX_DEPTH, mk.x, mk.y );
     if( obj != button )
-       Deselect( tree, button, TRUE );
+       XDeselect( tree, button );
 
     wind_update( END_MCTRL );
     return( obj == button );
@@ -244,7 +234,11 @@ mv_desk()
 	WORD		flag;
         GRECT		trect;
 	BYTE		dcolor;
+	MRETS		mk;
+	WORD		skip_flag;
+	LONG		old_f;		      /* cjg 09/24/92 */
 
+	skip_flag = TRUE;
 	obj = get_tree( MNSYSTEM );	      /* Get config tree  */
 	obj1 = menu_addr;		      /* Get Menu Bar Tree*/
 
@@ -312,8 +306,22 @@ mv_desk()
 	app = (APP*)0;
 	which = MFDOWN;
 
- 	f = 0;
+ 	old_f = f = 0;
 	fm_draw( MNSYSTEM, FALSE );		/* save the string	*/
+
+
+
+	for( f = 1; f <= 20; f++ )		/* cjg 09/24/92 */
+	{
+          if( app_key( ftab[f] )  )		/* ALL THIS.... */
+	  {
+	    old_f = f;
+	    break;
+	  }
+	}
+	f = 0;					/* cjg 09/24/92 */
+
+
 	goto ad_2;
 
 	while( TRUE )
@@ -365,23 +373,30 @@ ad_2:	  switch( which )
 		  mentable[i] = 0;
 
 	        put_keys();
-		Deselect( obj, MKCLEAR, TRUE );
+		XDeselect( obj, MKCLEAR );
 	        goto p_11;	
 	      }
 	      break;
 
 	    case MKUPS:		/* check for keys	*/
+
+cg_2:
 	      if ( menui )
 	      {
+	        XSelect( obj, which );	/* cjg 08/06/92 */
 	 	menui--;
 		goto p_11;
 	      }
-
+	      wait_up();
+	      XDeselect( obj, which );	/* cjg 08/06/92 */
 	      break;
 
 	    case MKDOWNS:
+
+cg_3:	      
 	      if ( ( menui + 1 ) < MAXMENU )
 	      {
+	        XSelect( obj, which );	/* cjg 08/06/92 */
 		menui++;
 p_11:
 	        ch_key( menui );
@@ -392,8 +407,22 @@ p_2:
 	        buf[0] = mentable[menui];
 	        inf_sset( obj, MKKEYS, buf );
 	        draw_fld( obj, MKKEYS );		
+		cl_delay();
+
+	        /* cjg 08/06/92 - Check if the buttons are still down */
+	        graf_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
+		if( mk.buttons )
+		{
+
+		   if( which == MKUPS )
+		      goto cg_2;
+		   
+		   if( which == MKDOWNS )
+		      goto cg_3;
+		}
 	      }
-	
+	      wait_up();
+	      XDeselect( obj, which );	/* cjg 08/06/92 */	
 	      break;
 
 	    case SDBUTTON:  /* Default Dir: */
@@ -415,63 +444,135 @@ p_2:
 	       goto ad_1;
 
 	    case MOK:
-	      s_defdir = ( dtree[FSAPP].ob_state & CHECKED ) ? TRUE : FALSE;
-	      s_fullpath = ( dtree[ FSFULL ].ob_state & CHECKED ) ? TRUE : FALSE;
-
+	      s_defdir = (( dstart == SDAPP ) ? ( TRUE ) : ( FALSE ) );
+	      s_fullpath = (( istart == SIFULL ) ? ( TRUE ) : ( FALSE ));
 	      goto ad_1;	 
 
 	    case MFUP:
-	        f--;
-	        if ( f )
+
+cg_4:
+		f--;
+
+	        if( f )
 	          goto ad_3;  	
 	        else
-		  f++;
-	      break;
+		{
+		  if( old_f )	/* cjg 09/24/92 */
+		    f = old_f;
+		  else
+		    f++;
+		}
+	        wait_up();
+		XDeselect( obj, which );	/* cjg 08/06/92 */
+	        break;
 	    
 	    case MFDOWN:
-	        f++;
-	        if ( f <= 20 )
+
+cg_5:
+		f++;
+
+	        if( f <= 20 )
 	        {
+
 ad_3:	          if ( !( xapp = app_key( ftab[f] ) ) )
+		  {
 		    goto ad_2;
+		  }
 	          else
 	          {
+
+		    if( !skip_flag )			/* Silly thing  */
+		    {
+		       old_f = f;			/* cjg 09/24/92 */
+		       XSelect( obj, which );		/* cjg 08/06/92 */
+		    }
 		    app = xapp;
 		    fi = 0;
 		    (TEDINFO*)(obj[MFFILE].ob_spec)->te_ptext = app->a_name;
 		    draw_fld( obj, MFFILE );
 		    f_str( obj, MFKEY, f );
 		    draw_fld( obj, MFKEY );
+
+		    if( !skip_flag )	/* Silly thing - cjg 08/06/92 */
+		    {
+		      cl_delay();
+	              /* cjg 08/06/92 - Check if the buttons are still down */
+	              graf_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
+		      if( mk.buttons )
+		      {
+			if( which == MFUP )
+			   goto cg_4;
+			if( which == MFDOWN )
+			   goto cg_5;
+		      }
+		    }
 	          }		
 	        }
 	        else
-		  f--;
+		{
+		  if( old_f  )			/* cjg - 09/24/92 */
+		    f = old_f;
+		  else
+		    f--;
+		}
+
+
+		if( !skip_flag )		/* Silly thing cjg -08/06/92*/
+		{
+		  wait_up();
+		  XDeselect( obj, which );	/* cjg 08/06/92 */
+		}
+		skip_flag = FALSE;
 	      break;
 
 	    case MFLEFT:		
 	    case MFRIGHT:
+
+cg_1:	  
+
 	      if( !app )
+	      {
+	        wait_up();
+		XDeselect( obj, which ); /* cjg 08/06/92 */
 		continue;
-		
-	      if ( which == MFLEFT )
+	      }
+	
+	      if( which == MFLEFT )
 	      {
 	        if ( fi > 0 )
+		{
 		  fi--;
+		}
 	        else
+		{
+	          wait_up();
+		  XDeselect( obj, which ); /* cjg 08/06/92 */
 		  continue;
+		}
 	      }
 	      else
 	      {
 	        fi++;
-	        if ( strlen( &app->a_name[fi] ) < len )
+	        if( strlen( &app->a_name[fi] ) < len )
 	        {
 		  fi--;
+	          wait_up();
+		  XDeselect( obj, which ); /* cjg 08/06/92 */
 		  continue;
 	        }
 	      }
 ad_4:
+	      XSelect( obj, which );	/* cjg 08/06/92 */
 	      (TEDINFO*)(obj[MFFILE].ob_spec)->te_ptext = &app->a_name[fi];
 	      draw_fld( obj, MFFILE );
+
+	      /* cjg 08/06/92 - Check if the buttons are still down */
+	      graf_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
+	      if( mk.buttons )
+	        goto cg_1;
+
+	      wait_up();
+	      XDeselect( obj, which );	 /* cjg 08/06/92 */
 	      goto ad_5;
 
 	  }/* switch */
@@ -506,6 +607,7 @@ mins_app()
 	LONG		l;
 
 
+	GRECT		rect;
 	OBJECT		*dtree;
 	GRECT		brect;
         GRECT		trect;
@@ -675,8 +777,15 @@ ins_1:	      	fill_string( str, NOTPRG );
 	  /* Set the Function Key */
 	  if( app->a_key )
 	  {
+	    if( app->a_key < 1 )	/* cjg 08/06/92 */
+	        app->a_key = 1;
+
+ 	    if( app->a_key > 20 )	/* cjg 08/06/92 */
+		app->a_key = 20;
+
 	    lbintoasc( (LONG)app->a_key, buffer );
 	    istart = MPIF1 + app->a_key - 1;
+	    
             ( BYTE *)obj[MPIBUTTN].ob_spec = get_fstring( FSF1 + app->a_key-1);
 	  }
 	  else
@@ -738,9 +847,9 @@ ins_2:
 				break;
 
 		case MPOK:  done = TRUE;  /*Install */
+	    		    l = (UWORD)(istart - MPINONE);	/* Get 1 - 20 */
 			    if( ( istart >= MPIF1 ) && ( istart <= MPIF20 ) )
 		  	    {
-	      			l = (UWORD)(istart - MPINONE);	/* Get 1 - 20 */
 			        sapp = applist;
 	      
 			        while( sapp )
@@ -778,7 +887,10 @@ ins_2:
 	             			menu_icheck( dtree, istart, TRUE );
 
 		     			draw_fld( obj, MPIBUTTN );
-		     			draw_fld( obj, MPOK );
+
+					/* cjg 08/11/92 */
+					obj[ MPOK ].ob_state |= SELECTED;
+					XDeselect( obj, MPOK );
 	             			where = 0;
 	             			goto ins_2;
 		  		      }
@@ -835,7 +947,7 @@ ins_4:				   sapp = sapp->a_next;
 			    if ( dtree[SDAPP].ob_state & CHECKED )
 			      app->a_pref = 1;
 
-			    if ( dtree[SDTOP].ob_state & CHECKED )
+			    if ( dtree[SIFULL].ob_state & CHECKED )
 			      app->a_pref += 2;
 
 			    if ( dtree[MPBAUTO].ob_state & CHECKED )
@@ -1032,6 +1144,7 @@ set_video()
 
 	WORD		monitor_type;
 	UWORD		mode_code;
+	UWORD		old_mode_code;
 
 	WORD		color_flag;
 	WORD		column_flag;
@@ -1042,6 +1155,7 @@ set_video()
 	WORD		vertical_flag;
 	WORD		double_flag;	/* 1 = double, 0 = interlaced mode*/
 	LONG		p_value;
+	BYTE		buffer[10];
 
 	obj   = get_tree( MNSETVID );
 	dtree = get_tree( MNMENU );
@@ -1062,6 +1176,10 @@ set_video()
 	obj[ SVLBUTTN ].ob_state &= ~DISABLED;
 	obj[ SVDBUTTN ].ob_state &= ~DISABLED;
 
+	obj[ SVCBUTTN ].ob_flags |= TOUCHEXIT;
+	obj[ SVLBUTTN ].ob_flags |= TOUCHEXIT;
+	obj[ SVDBUTTN ].ob_flags |= TOUCHEXIT;
+
 	/* 07/21/92 - cjg - display Sparrow Video Dialog Box first */
 	/* But, if monochrome, just disable everything...*/
 	if( !monitor_type )
@@ -1069,13 +1187,16 @@ set_video()
 	    obj[ SVCBUTTN ].ob_state |= DISABLED;
 	    obj[ SVLBUTTN ].ob_state |= DISABLED;
 	    obj[ SVDBUTTN ].ob_state |= DISABLED;
-        }        
-	mode_code   =  d_rezword;	/* Get wot the system thinks its in */
 
+	    obj[ SVCBUTTN ].ob_flags &= ~TOUCHEXIT;
+	    obj[ SVLBUTTN ].ob_flags &= ~TOUCHEXIT;
+	    obj[ SVDBUTTN ].ob_flags &= ~TOUCHEXIT;
+        }        
+	old_mode_code = mode_code   = setmode( -1 );
 	color_flag  = mode_code & NUMCOLS;	/* # of bits per pixel */
 	column_flag = mode_code & COL80;	/* 40 or 80 column     */
 
-	vga_flag    = mode_code & VGA;		/* 200 Lines/400 lines */
+	vga_flag    = mode_code & VGA;		/* VGA or TV/COLOR     */
 	pal_flag    = mode_code & PAL;		/* PAL or NTSC	       */
 	overscan_flag = mode_code & OVERSCAN;   /* Overscan or not     */
 	st_flag  = mode_code & STMODES;		/* ST mode or NOT      */
@@ -1083,9 +1204,9 @@ set_video()
 
 	
 	/* Determine whether to display Double Line or Interlace
-	 * 2 == VGA Monitor
+	 * Check if vga_flag == VGA
 	 */
-	double_flag = (( monitor_type == 2 ) ? ( TRUE ) : ( FALSE ));
+	double_flag = (( vga_flag == VGA ) ? ( TRUE ) : ( FALSE ));
 
 
 	/* Initialize Colors, Columns and Double Line/Interlace */
@@ -1158,17 +1279,34 @@ set_video()
 
 	   switch( button )
 	   {
-			     /* SParrow Video OK - NO ST COMPATIBILITY */
-	      case SVOK:     if( ( cstart != old_cstart ) ||
-				 ( lstart != old_lstart ) ||
-				 ( dstart != old_dstart ))
+			     /* SParrow Video OK - NO ST COMPATIBILITY
+			      * Change ONLY if one of the 3 variables has
+			      * changed AND we are NOT on a monochrome monitor.
+			      * Or, if we are in STMODE and want to get
+			      * out of it...
+			      */	
+	      case SVOK:
+			     if( ( ( cstart != old_cstart ) ||
+				   ( lstart != old_lstart ) ||
+				   ( dstart != old_dstart ) ||
+				   ( old_mode_code & STMODES ) )
+				   && monitor_type )
 			     {
-				 st_flag = FALSE;
-				 mode_code = (( cstart - VID2 ) |
-					     ( ( lstart == SVL80) ? (COL80):(COL40))|
-					     vga_flag | pal_flag |
-					     overscan_flag | st_flag |
-					     (( dstart == SVION )?(VERTFLAG ):(0)));
+			     	 st_flag = FALSE;
+			         mode_code = (( cstart - VID2 ) |
+					  ( ( lstart == SVL80) ? (COL80):(COL40))|
+					    vga_flag | pal_flag |
+					    overscan_flag | st_flag |
+					    (( dstart == SVION )?(VERTFLAG ):(0)));
+				 /* Check if there is enough memory
+				  * to switch to the new mode
+				  * If not, go back to form_do...
+				  */
+				 if( !get_that_size( mode_code ))
+				 {
+			            XDeselect( obj, SVOK );
+				    continue;
+				 }
 			     }
 			     else
 				button = SVCANCEL;
@@ -1180,9 +1318,11 @@ set_video()
 	      case SVMODES:  /* Compatibility Modes */
 			     do_finish( MNSETVID );	
 dialog1:
+			     vtree = get_tree( MNVIDEO );
 			     init_vtree();
 			     output = fmdodraw( MNVIDEO, 0 );
-	
+			     vtree[ output ].ob_state &= ~SELECTED;
+
 			     /* Must be in non-monochrome mode */
 			     if( output == SVTTOK )
 			     {
@@ -1194,56 +1334,68 @@ dialog1:
 				  mode_code = vga_flag | pal_flag | overscan_flag;
 
 				  vtree = get_tree( MNVIDEO );
-				  flag = inf_gindex( vtree, SVSTLOW, 5 );
+				  flag = inf_gindex( vtree, SVSTLOW, 3 );
 				  if( flag != -1 )
 				  {
 			  	       switch( flag )
 				       {
 					  case 0: /* STLOW */
 						  st_flag = STMODES;
-						  vertical_flag = (( monitor_type == 2 ) ? ( VERTFLAG ) : ( 0 ));
+						  vertical_flag = (( vga_flag  == VGA ) ? ( VERTFLAG ) : ( 0 ));
 				                  mode_code |= ( STMODES | BPS4 | COL40 | vertical_flag );
 						  break;
 
 					  case 1: /* STMED */
 						  st_flag = STMODES;
-						  vertical_flag = (( monitor_type == 2 ) ? ( VERTFLAG ) : ( 0 ));
+						  vertical_flag = (( vga_flag == VGA ) ? ( VERTFLAG ) : ( 0 ));
 						  mode_code |= ( STMODES | BPS2 | COL80 | vertical_flag );
 						  break;
 
 					  case 2: /* STHIGH */
 						  st_flag = STMODES;
-						  vertical_flag = (( monitor_type == 2 ) ? ( 0 ) : ( VERTFLAG ));
+						  vertical_flag = (( vga_flag == VGA ) ? ( 0 ) : ( VERTFLAG ));
 						  mode_code |= ( STMODES | BPS1 | COL80 | vertical_flag );
 						  break;
-
+#if 0
 					  case 3: /* TTLOW - NOTE: NON-ST Mode Flag*/
-						  vertical_flag = (( monitor_type == 2 ) ? ( 0 ) : ( VERTFLAG ));
+					 	  vertical_flag = (( vga_flag == VGA ) ? ( 0 ) : ( VERTFLAG ));
 						  mode_code |= ( BPS8 | COL40 | vertical_flag );
 						  break;
 
 					  case 4: /* TTMED - NOTE: NON-ST Mode Flag */
-						  vertical_flag = (( monitor_type == 2 ) ? ( 0 ) : ( VERTFLAG ));
+						  vertical_flag = (( vga_flag == VGA ) ? ( 0 ) : ( VERTFLAG ));
 						  mode_code |= ( BPS4 | COL80 | vertical_flag );
 						  break;
+#endif
+
 				      }/* end of switch*/
 
 				      /* If built mode_code does not AND
 				       * with current setting, change rez!
 				       */
-				
-		  				
-				      if( ( mode_code ^ d_rezword ))
-					button = SVTTOK;
-				
-				/*
+
 				    flag++;
-				    if ( flag != pref_save )
+				    if ( mode_code & 0x80 )
 				    {
-				      if ( app_reschange( flag ) ) 	
-					d_exit = L_CHGRES;
+				      gl_restype = flag;
+				      pref_save = flag;
+				      gl_rschange = TRUE;
+				      d_exit = L_CHGRES;
+				 /*   d_rezword = mode_code;	*/
 				    }	
-				*/
+		  				
+				      if( ( mode_code ^ old_mode_code ))
+				      {
+					if( get_that_size( mode_code ))
+					    button = SVTTOK;
+					else
+					{
+				           XDeselect( vtree, SVTTOK );
+					   goto dialog1;
+					}
+
+				      }
+
 				   }/* If flag != -1 */
 
 				} /* if( monitor_type ) */
@@ -1259,7 +1411,7 @@ dialog1:
 	      case SVCBUTTN: /* Number of Colors Popup */
 
 			     /* Don't allow 80col, VGA, True Color */
-			     if( ( monitor_type == 2 ) && ( lstart == SVL80 ) )
+			     if( ( vga_flag == VGA ) && ( lstart == SVL80 ) )
 				dtree[ VIDTRUE ].ob_state |= DISABLED;
 			     else
 				dtree[ VIDTRUE ].ob_state &= ~DISABLED;
@@ -1278,7 +1430,7 @@ dialog1:
 	      case SVLBUTTN: /* Number of Columns Popup */
 
 			     /* Don't allow 80col, VGA, TRUE Color */
-			     if( ( monitor_type == 2 ) && ( cstart == VIDTRUE ) )
+			     if( ( vga_flag == VGA ) && ( cstart == VIDTRUE ) )
 				dtree[ SVL80 ].ob_state |= DISABLED;
 			     else
 				dtree[ SVL80 ].ob_state &= ~DISABLED;
@@ -1305,7 +1457,10 @@ dialog1:
 
 	/* Change the Resolution! - Pass mode_code to DEREK! */
 	if( button != SVCANCEL )
-	{
+	{		/* valid the mode code */	
+	if ( ( gl_vdo & 0x30000L ) == 0x30000L )
+	   mode_code = trap14( 95, mode_code );
+
 	   d_rezword = mode_code;
 	   return( TRUE );
 
@@ -1316,44 +1471,55 @@ dialog1:
 
 
 
-/* Select()
+/* XSelect()
  * ==================================================================
  * Select an object and redraw
  */
 WORD
-Select( tree, obj )
+XSelect( tree, obj )
 OBJECT *tree;
 WORD   obj;
 {
+       GRECT trect;
+
+       /* If already selected, return...*/
+       if( tree[ obj ].ob_state & SELECTED )
+	 return;
+
        tree[ obj ].ob_state |= SELECTED;
-       draw_fld( tree, obj );
+       trect = *(GRECT *)&tree[(obj)].ob_x;
+       objc_offset( tree, obj, &trect.x, &trect.y );
+       trect.x -= 2;	/* cjg 08/06/92 */
+       trect.y -= 2;
+       trect.w += 4;
+       trect.h += 4;
+       objc_draw( tree, obj, MAX_DEPTH, trect.x, trect.y, trect.w, trect.h );
 }
 
 
-/* Deselect()
+/* XDeselect()
  * ====================================================================
  * Deselect an object and redraw - use the flag to redraw in case
  * the area to redraw needs to be bigger.( ie: SHADOWED )
  */
 WORD
-Deselect( tree, obj, flag )
+XDeselect( tree, obj )
 OBJECT *tree;
 WORD   obj;
-WORD   flag;
 {
        GRECT trect;
 
-       tree[ obj ].ob_state &= ~SELECTED;
-       trect = *(GRECT *)&tree[(obj)].ob_x;
-       objc_offset( tree, obj, &trect.x, &trect.y );
-       if( flag )
+       if( tree[ obj ].ob_state & SELECTED )
        {
-	   trect.x -= 1;
-	   trect.y -= 1;
-           trect.w += 2;
-           trect.h += 2;
+         tree[ obj ].ob_state &= ~SELECTED;
+         trect = *(GRECT *)&tree[(obj)].ob_x;
+         objc_offset( tree, obj, &trect.x, &trect.y );
+         trect.x -= 2;	/* cjg 08/06/92 */
+         trect.y -= 2;
+         trect.w += 4;
+         trect.h += 4;
+         objc_draw( tree, obj, MAX_DEPTH, trect.x, trect.y, trect.w, trect.h );
        }
-       objc_draw( tree, obj, MAX_DEPTH, trect.x, trect.y, trect.w, trect.h );
 }
 
 
@@ -1386,7 +1552,9 @@ WORD   Skip;
 	 return;
 
      /* Select the Title */
-     Select( tree, title );
+     tree[ title ].ob_state |= SELECTED;
+     draw_fld( tree, title );
+
 
      objc_offset( tree, button, &brect.x, &brect.y );
 
@@ -1411,8 +1579,8 @@ WORD   Skip;
         }
      }
      /* Deselect the title */
-     Deselect( tree, title, FALSE );
-     Deselect( tree, button, TRUE );
+     XDeselect( tree, title );
+     XDeselect( tree, button );
 }
 
 
@@ -1427,30 +1595,30 @@ init_vtree()
 	REG OBJECT	*vtree;
 	REG WORD	cyes, i, flag;
 	WORD		monitor_type;
-
+	
 	vtree = get_tree( MNVIDEO );
 
 	/* Clear the Compatability buttons */
-	for ( i = SVSTLOW; i <= SVTTMED; i++ )
+	for ( i = SVSTLOW; i <= SVSTHIGH; i++ )
 	  vtree[i].ob_state = NORMAL;
 
 	/* If we're on a monochrome monitor, disable all of the buttons*/
 	monitor_type = mon_type();
 	if( !monitor_type )
 	{
-	  for ( i = SVSTLOW; i <= SVTTMED; i++ )
+	  for ( i = SVSTLOW; i <= SVSTHIGH; i++ )
 	     vtree[i].ob_state = DISABLED;
 	}
-
-
+#if 0
 	vtree[ SVTTLOW ].ob_flags &= ~HIDETREE;
 	vtree[ SVTTMED ].ob_flags &= ~HIDETREE;
 	/* If we're on a TV or Color monitor, hide the TTLOW and TTMED buttons*/
-	if( ( monitor_type == 1 ) || ( monitor_type == 3 ))
+	if( ( d_rezword & VGA ) == TV )
 	{
 	   vtree[ SVTTLOW ].ob_flags |= HIDETREE;
 	   vtree[ SVTTMED ].ob_flags |= HIDETREE;
 	}
+#endif
 }
 
 
@@ -1476,9 +1644,26 @@ WORD   *item;
     GRECT  brect;
     WORD   start;
     WORD   old_item;
+    WORD   length;
+    WORD   temp;
 
     obj1 = menu_addr;
     start = *item + 1;
+
+    /* cjg 09/21/92 */
+    length = 0;
+    temp   = 0;
+    /* Get the length of the largest string */
+    for( index = 1; index <= MAXMENU; index++ )
+    {
+	temp = strlen( obj1[ tb3[ index - 1 ] ].ob_spec );
+	if( temp > length )
+	   length = temp;
+    }
+
+    /* Ensure a minimum width */
+    if( length < 30 )
+        length = 30;
 
     /* Initialize the ROOT */
     mtree[ ROOT ].ob_next   = -1;
@@ -1488,7 +1673,7 @@ WORD   *item;
     mtree[ ROOT ].ob_state  = SHADOWED;
     mtree[ ROOT ].ob_spec   = 0xFF1100L;
     mtree[ ROOT ].ob_x      = mtree[ ROOT ].ob_y = 0;
-    mtree[ ROOT ].ob_width  = 30;
+    mtree[ ROOT ].ob_width  = length;  /* cjg 09/21/92  - was 30 */
     mtree[ ROOT ].ob_height = MAXMENU;
 
     for( index = 1; index <= MAXMENU; index++ )
@@ -1501,7 +1686,7 @@ WORD   *item;
 	   mtree[ index ].ob_spec   = obj1[tb3[index-1]].ob_spec;
 	   mtree[ index ].ob_x      = 0;
            mtree[ index ].ob_y      = ( index - 1 );
-	   mtree[ index ].ob_width  = 30;
+	   mtree[ index ].ob_width  = length;   /* cjg 09/21/92 30; */
 	   mtree[ index ].ob_height = 1;
 	   objc_add( mtree, ROOT, index );
     }
@@ -1541,7 +1726,7 @@ WORD   *item;
 	    return( TRUE );
         }
      }
-     Deselect( dtree, button, TRUE );
+     XDeselect( dtree, button );
      return( FALSE );
 }
 
@@ -1595,3 +1780,45 @@ WORD item;
 }
 
 
+
+
+WORD
+get_that_size( newmode )
+WORD newmode;
+{
+	LONG avail, size, needed;
+	LONG char_bytes;
+	WORD IsVGA;
+	WORD IsVertFlag;
+	WORD Result;
+	WORD Bits;
+
+	avail = Srealloc( -1L );
+	size  = VgetSize( newmode );
+	IsVGA = (( newmode & VGA ) == VGA );
+	IsVertFlag = (( newmode & VERTFLAG ) == VERTFLAG );
+	Result = 2 - !( IsVGA ^ IsVertFlag );
+
+	char_bytes = 8 * ( 1 << newmode & NUMCOLS ) * Result;
+	needed = 25L * 40L * char_bytes;
+
+	if( ( avail - size ) < needed )
+	{
+	   do1_alert( FCNOMEM );
+	   return( FALSE );
+	}
+	return( TRUE );	
+}
+
+
+
+WORD
+wait_up()
+{
+  MRETS mk;
+
+  do
+  {
+      graf_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
+  }while( mk.buttons );
+}

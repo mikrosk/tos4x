@@ -211,10 +211,10 @@ fs_input( pipath, pisel, pbutton, lstring )
 	BYTE		*lstring;
 {
 REG	UWORD	i,j;
-	WORD	ad_flen,label,last,ret;
+	WORD	label,last,ret;
 REG	LONG	tree;
-	LONG	addr,mul,savedta,savepath,value;
-	UWORD	botptr,count;
+	LONG	addr,mul,savedta,savepath;
+	UWORD	botptr,count,value;
 	WORD	xoff,yoff,mx,my,bret;
 	BYTE	dirbuffer[122];
 	BYTE	*chrptr;	
@@ -224,14 +224,13 @@ REG	LONG	tree;
 	LONG	**lgptr;
 	GRECT	clip;
 	WORD	firstry;
-
 	OBJECT  *xtree;			/* cjg */
 	WORD    newend, oldend;
 
 /*
 *	Start up the file selector by initializing the fs_tree
 */
-	rs_gaddr(ad_sysglo, R_TREE, 0, &ad_fstree);
+	rs_gaddr(ad_sysglo, R_TREE, SELECTOR, &ad_fstree);
 	ob_center(ad_fstree, &gl_rfs);
 
 	firstry = TRUE;
@@ -285,12 +284,10 @@ bye2:	  fm_show( NOMEMORY, 0x0L, 1 );
 	fs_sset( tree, FDIRECTORY, "", &ad_fpath, &addr ); 
 	fs_sset( tree, FTITLE, "", &ad_title, &addr );
 	fs_sset( tree, FSELECTION, "", &ad_select, &addr );
-
 						/* get the current drive */
 	count = isdrive();
 	j = 1;
-						/* start from A drive	*/
-						/* set the button	*/
+				/* start from A drive set the button	*/
 	for ( i = DRIVEA; i <= DRIVEP; i++ )	
 	{
 	  LWSET( OB_STATE( i ), ( count & j ) ? NORMAL : DISABLED );
@@ -357,24 +354,26 @@ cg_1:
 	      take_ownership( TRUE );
 	      value = gr_slidebox( tree, FSVSLID, FSVELEV, TRUE );
 	      take_ownership( FALSE );
-	      mul = ( count - NM_NAMES ) * value;
-	      mul /= 1000;
-	      value = mul;
-	      value = fs_topptr - value;
-	      if ( (WORD)(value) >= 0 )
-		goto up;			/* go up	*/
-
-	      value = -value;			/* go down	*/
-
+	      if ( count > NM_NAMES )
+	      {	
+	        mul = ((LONG)( count - NM_NAMES )) * (LONG)(value);
+	        if ( fs_topptr != ( mul / 1000 ) )
+	        {
+		  fs_topptr = mul / 1000;
+	          r_sfiles( fs_topptr, value );
+	        }
+	      }
+	      
+	      goto out;
+	 	
 down:	    case FDNAROW:			/* scroll down	*/
-	      if ( fs_topptr == botptr )
+	      if ( fs_topptr >= botptr )
 	      {
-		FXWait();
+out:		FXWait();
 	        FXDeselect( xtree, ret );
                 gsx_sclip( &gl_rfs );
 		break;
 	      }
-
 
 	      if ( (fs_topptr + value) <= botptr )
 	        fs_topptr += value;
@@ -403,7 +402,7 @@ sfiles:
 
               gsx_sclip( &gl_rfs );
 
-	      r_sfiles( fs_topptr );
+	      r_sfiles( fs_topptr, value );
 
 	      dsptch();		
 	      if( gl_button )
@@ -669,7 +668,7 @@ REG	WORD	status,i;
 	}
 	LWSET( OB_Y(FSVELEV), 0 );		/* move it to the top	  */
 	LWSET( OB_HEIGHT(FSVELEV), (UWORD)h );	/* height of the elevator */
-	r_sfiles( 0 );				/* show form the top	  */
+	r_sfiles( 0, 0 );			/* show form the top	  */
 	status = TRUE;
 
 r_exit:
@@ -820,14 +819,12 @@ REG	WORD	gap,i,j,k;
 
 /*	show files and update the scroll bar	*/
 
-r_sfiles( index )
-	UWORD	index;
+r_sfiles( index, ratio )
+	UWORD	index,ratio;
 {	
 REG	WORD	label,i;
 REG	LONG	tree;
-	LONG	addr;
-	LONG	h,h1;
-	LONG	h3;
+	LONG	addr,h,h1,h3;
 
 	label = F1NAME;
 	tree = ad_fstree;
@@ -847,10 +844,15 @@ REG	LONG	tree;
 
 	h3 = index;
 
-	if ( fs_count > NM_NAMES )
-	  h = ( (h - h1) * h3 ) / (LONG)(( fs_count - NM_NAMES ));
+	if ( ratio == 1 || ratio == NM_NAMES )
+	{
+	  if ( fs_count > NM_NAMES )
+	    h = ( (h - h1) * h3 ) / (LONG)(( fs_count - NM_NAMES ));
+	  else
+	    h = 0;
+	}
 	else
-	  h = 0;
+	  h = ( (h - h1) * ratio ) / 1000;	  
 
 	LWSET( OB_Y(FSVELEV), h );
 
@@ -880,19 +882,15 @@ ini_fsel()
 	REG OBJECT	*obj;
 	OBJECT		*tree;
 
-	rs_gaddr(ad_sysglo, R_TREE, 0, &tree );
+	rs_gaddr(ad_sysglo, R_TREE, SELECTOR, &tree );
 	obj = tree;
 
 	y = x = 0;
 
 	for ( i = 0, j = DRIVEA; i < 8; i++, j++ )
 	{  
-/*	   obj[j].ob_height += 1;	*/
 	   obj[j].ob_x = x;
-/*	   obj[j].ob_height += 3;	*/
 	   obj[j++].ob_y = y;
-/*	   obj[j].ob_height += 2;	*/
-/*	   obj[j].ob_height += 3;	*/
 	   obj[j].ob_x = obj[j].ob_width + (ADJ3DPIX << 1) + x + 1;
 	   obj[j].ob_y = y;
 	   y += obj[j].ob_height + (ADJ3DPIX << 1) + 1;

@@ -1,13 +1,14 @@
-/*
- * Windows.c -	The Window Manager
- *
- * Oct 29 1990	ml.	Created this.
- * Feb 14 1991	ml.	Really started working on this.
- * Feb 28 1992	ml.	Started to add 3D look to window gadgets.
- *			(routines affected: w_adjust(), w_clipdraw)
- * Apr 21 1992	ml.	Fixed W_HSLSZ and W_VSLSZ bug
- *
- */
+/*	WINDOW.C 	The Window Manager	Minna Lai		*/
+/* Oct 29 1990	ml.	Created this.					*/
+/* Feb 14 1991	ml.	Really started working on this.			*/
+/* Feb 28 1992	ml.	Started to add 3D look to window gadgets.	*/
+/*			(routines affected: w_adjust(), w_clipdraw)	*/
+/* Apr 21 1992	ml.	Fixed W_HSLSZ and W_VSLSZ bug			*/
+/* 8/7/92	D.Mui	Fix wm_set to accomdate 3D buttons		*/
+/* 8/7/92 - 8/10/92	Fix w_adjust to accomdate 3D buttons		*/
+/* 8/13/92	D.Mui	Fix at wm_start for opening background window	*/
+/* 8/13/92	D.Mui	Check minimum window size before open		*/
+
 #include <portab.h>
 #include <machine.h>
 #include <struct88.h>
@@ -104,6 +105,7 @@ wm_start()
     REG RLIST   *rp;	/* pointer to RLIST structure */
     REG int	i;	/* counter */
     GRECT	windsiz;
+    WINDOW	*srchwp();
 
     /* Allocate memory for memory header and window structures */
     if ((wmhead = (MEMHDR *)
@@ -144,23 +146,23 @@ wm_start()
     newdesk = NULLPTR;		    /* no new DESKTOP */
     newroot = 0;
 
-    windsiz.g_x = -1;
-    windsiz.g_y = gl_hbox - 1;
+    /* These number is fixed	*/
+	
+    windsiz.g_x = -1;		/* These codes depend on the last */
+    windsiz.g_y = gl_hbox - 1;	/* section of the w_adjust */
     windsiz.g_w = gl_rfull.g_w + 2;
     windsiz.g_h = gl_rfull.g_h + 2;
 
     /* create DESKTOP window for now */
+
     deskwind = wm_create(0, &windsiz);
+    
+    /* Fake the full x y w and h for deskwind */
+    wp = srchwp( deskwind );
+    r_set( &wp->full, 0, gl_hbox, gl_rfull.g_w, gl_rfull.g_h );
+
+    /* Open the background window */	
     wm_open(deskwind, &windsiz);
-
-    windsiz.g_x = -2;
-    windsiz.g_y += 2;
-    windsiz.g_w = windsiz.g_h = 0;
-
-    /* create PHANTOM window */
-    phanwind = wm_create(0, &windsiz);
-    wm_open(phanwind, &windsiz);
-
     return TRUE;		    /* everything is fine */
 }
 
@@ -254,7 +256,7 @@ REG GRECT   *rect;	/* x, y, width and height of full size window */
 	w_bld(wp, W_SIZER, A3DBOXCHAR, W_BOX, 0x06010000);
 
 	if (!hparts && !vparts) {
-	    w_bld(wp, W_VBAR, A3DBOX, W_BOX, GBOX_OBS);
+	    w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS);
 	    /* Taken out to expand work area by 1 line	    */
 	    /* w_bld(wp, W_HBAR, A3DBOX, W_BOX, GBOX_OBS);    */
 	}
@@ -274,8 +276,9 @@ REG GRECT   *rect;	/* x, y, width and height of full size window */
 	}
 
 	if (kind & VSLIDE) {
-	    w_bld(wp, W_VSLIDE, G_BOX, W_VBAR, 0x00020000);
-	    w_bld(wp, W_VELEV, A3DBOX, W_VSLIDE, GBOX_OBS);
+	    w_bld(wp, W_VSLIDE, G_BOX, W_VBAR, 0x00010000);	
+	    w_bld(wp, W_VELEV, A3DBOX, W_VSLIDE, GBOX_OBS);	
+/*	    w_bld(wp, W_VELEV, G_BOX, W_VSLIDE, GBOX_OBS);	*/
 	}
     }
 
@@ -291,8 +294,9 @@ REG GRECT   *rect;	/* x, y, width and height of full size window */
 	}
 
 	if (kind & HSLIDE) {
-	    w_bld(wp, W_HSLIDE, G_BOX, W_HBAR, 0x00020000);
-	    w_bld(wp, W_HELEV, A3DBOX, W_HSLIDE, GBOX_OBS);
+	    w_bld(wp, W_HSLIDE, G_BOX, W_HBAR, 0x00010000);
+            w_bld(wp, W_HELEV, A3DBOX, W_HSLIDE, GBOX_OBS);     
+/*          w_bld(wp, W_HELEV, G_BOX, W_HSLIDE, GBOX_OBS);	*/
 	}
     }
 
@@ -314,7 +318,7 @@ REG GRECT   *rect;	    /* x, y, width and height of opened window */
 {
     REG WINDOW  *wp;	    /* pointer to window structure */
     WINDOW	*srchwp();
-    WORD	ret;	    /* return code */
+    WORD	ret,x,w,h;	    /* return code */
 
     /* if window structure can't be found or window already opened,
        return error */
@@ -322,7 +326,19 @@ REG GRECT   *rect;	    /* x, y, width and height of opened window */
 	return FALSE;
 
     wm_update(TRUE);
+
+    /* check the minimum size	*/
+	
+    wm_min( wp->kind, &w, &h );
+
+    if ( w > rect->g_w )
+      rect->g_w = w;
+
+    if ( h > rect->g_h )
+      rect->g_h = h;
+
     w_adjust(wp, rect);	    	    /* init window components */
+
     wp->status.opened = TRUE;	    /* remember that this is opened */
     ret = totop(handle, WMOPEN);    /* top it */
     wm_update(FALSE);
@@ -367,7 +383,7 @@ WORD	handle;			/* handle of window to be closed */
     dirty = wp->prev;
     dirty.g_w += SHADOW;
     dirty.g_h += SHADOW;
-    w_drawchange(&dirty, NIL);
+    w_drawchange(&dirty, NIL, NIL);
 
     /* maintain linked list of opened windows */
     if (handle == topw) {
@@ -685,7 +701,7 @@ REG WORD    iw[];	    /* values to change to */
 			rect1.g_y, rect.g_w, rect.g_h);
 		}
 
-		w_drawchange(&rect, handle);
+		w_drawchange(&rect, handle,handle);
 	    }
 	    break;
 
@@ -717,25 +733,44 @@ REG WORD    iw[];	    /* values to change to */
 		    break;
 	    }
 
-	    if (field == WF_HSLIDE || field == WF_HSLSIZE) {
+	    if (field == WF_HSLIDE || field == WF_HSLSIZE) 
+	    {
 		obj = W_HSLIDE;
 		blen = wp->obj[W_HSLIDE].ob_width;
 		if (wp->hslsz == -1 ||
 		    (sz = blen * wp->hslsz / 1000) < gl_wbox) {
 		    sz = gl_wbox;
 		}
-		wp->obj[W_HELEV].ob_x = (blen - sz) * wp->hslpos / 1000;
-		wp->obj[W_HELEV].ob_width = sz;
+		if ( sz >= ( ADJ3DPIX << 1 ) ) 
+		  wp->obj[W_HELEV].ob_width = sz - (ADJ3DPIX << 1);
+/*
+		blen -= ADJ3DPIX;
+		sz += ADJ3DPIX;		
+*/
+/*		sz += ADJ3DPIX;	*/
+		wp->obj[W_HELEV].ob_x = ((blen - sz) * wp->hslpos / 1000) + ADJ3DPIX;
+/*	  	if ( wp->hslpos >= 1000 )
+		  wp->obj[W_HELEV].ob_x -= ADJ3DPIX;
+*/		  
 
-	    } else {	/* field == WF_VSLIDE || field == WF_VSLSIZE */
+	    } 
+	    else 
+	    {	/* field == WF_VSLIDE || field == WF_VSLSIZE */
+
 		obj = W_VSLIDE;
 		blen = wp->obj[W_VSLIDE].ob_height;
 		if (wp->vslsz == -1 ||
 		    (sz = blen * wp->vslsz / 1000) < gl_hbox) {
 		    sz = gl_hbox;
 		}
-		wp->obj[W_VELEV].ob_y = (blen - sz) * wp->vslpos / 1000;
-		wp->obj[W_VELEV].ob_height = sz;
+		if ( sz >= ( ADJ3DPIX << 1 ) )
+		  wp->obj[W_VELEV].ob_height = sz - (ADJ3DPIX << 1);
+
+/*		sz += ADJ3DPIX;	*/
+		wp->obj[W_VELEV].ob_y = ((blen - sz) * wp->vslpos / 1000) + ADJ3DPIX;
+/*		if ( wp->vslpos >= 1000 )
+		  wp->obj[W_VELEV].ob_y -= ADJ3DPIX;
+*/
 	    }
 
 	    /* if window is already opened, redraw it */
@@ -904,6 +939,94 @@ int *oh;	/* output height of work/border area */
     *oy = iy + tb;
     *ow = iw - lb - rb;
     *oh = ih - tb - bb;
+}
+
+
+
+/*
+ * Wm_min() - calculates the min width and height of a window's border 
+ *	      area
+ *
+ */
+VOID
+wm_min( kind, ow, oh )
+	REG WORD 	kind;	/* coamponents present in the window */
+	WORD 		*ow;	/* output width of work/border area */
+	WORD 		*oh;	/* output height of work/border area */
+{
+    REG WORD	w1, w2, w3, h1, h2, h3;
+    REG	WORD	yinc, xinc;
+    WORD	hparts, vparts;
+
+    w1 = w2 = w3 = h1 = h2 = h3 = 1;
+
+    xinc = gl_wbox + (ADJ3DPIX << 1);
+    yinc = gl_hbox + (ADJ3DPIX << 1);
+	
+    if ( kind & (NAME | CLOSER | FULLER) )
+    {
+	h1 += yinc;
+	if ( kind & NAME )
+	  w1 += xinc;
+
+	if ( kind & CLOSER )
+	  w1 += xinc;
+
+	if ( kind & FULLER )
+	  w1 += xinc;
+    }
+
+    if ( kind & INFO )
+	h1 += yinc;
+
+    if ( kind & MNBAR )
+	h1 += yinc;
+
+    vparts = kind & (UPARROW | DNARROW | VSLIDE);
+    hparts = kind & (LFARROW | RTARROW | HSLIDE);
+
+    if ( vparts )
+	w2 += xinc;
+
+    if ( hparts )
+	h3 += yinc;
+
+    if ( kind & UPARROW )
+        h2 += yinc;
+
+    if ( kind & DNARROW )
+        h2 += yinc;
+
+    if ( kind & VSLIDE )
+        h2 += yinc;
+
+    if ( kind & LFARROW )
+	w3 += xinc;
+
+    if ( kind & RTARROW )
+	w3 += xinc;
+
+    if ( kind & HSLIDE )
+	w3 += xinc;
+
+    if ( kind & SIZER ) 
+    {	
+	if ( (!vparts && !hparts) )
+	{
+	  w2 += xinc;
+	  h2 += yinc;
+	}
+
+	if ( vparts )
+	  h2 += yinc;
+	
+	if ( !vparts && hparts )  	
+	  w3 += xinc;
+    }
+
+   *ow = max( ( w1 + w2 ), w3 );
+   h2 =  max( h2, h3 );
+   *oh = h2 + h1;
 }
 
 
@@ -1232,7 +1355,7 @@ WORD	handle;		/* handle of window to be bottmed */
     dirty = nbwp->curr;
     dirty.g_w += SHADOW;
     dirty.g_h += SHADOW;
-    w_drawchange(&dirty, handle);
+    w_drawchange(&dirty, handle,NIL);
 
     /* notify owner of newly topped window */
     ap_sendmsg(wind_msg, WM_TOPPED, unnbwp->owner->p_pid, unnbwp->handle, 
@@ -1404,6 +1527,220 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
     w3dbox = gl_wbox + (ADJ3DPIX << 1);
     h3dbox = gl_hbox + (ADJ3DPIX << 1);
 
+    inx = w3dbox;
+    iny = h3dbox;
+
+    if (wp->kind & TPARTS) {
+	w_obrect(wp, W_TITLE, 0, 0, rect->g_w, h3dbox);
+	uly = ury = iny;
+
+	if (wp->kind & CLOSER) {
+	    w_obrect(wp, W_CLOSER, ADJ3DPIX, ADJ3DPIX, gl_wbox, gl_hbox);
+	    ulx = inx;
+	}
+
+	if (wp->kind & FULLER) 
+	{
+	    w_obrect(wp, W_FULLER, (rect->g_w-w3dbox+ADJ3DPIX), ADJ3DPIX, gl_wbox, 
+		gl_hbox);
+	    urx = inx;
+	}
+
+	if (wp->kind & NAME || wp->kind & MOVER) 
+	{
+	    sz = rect->g_w-ulx-urx-(ADJ3DPIX << 1);
+	    w_obrect(wp, W_NAME, (ulx+ADJ3DPIX), ADJ3DPIX, sz, gl_hbox);
+	}
+    }
+
+    if (wp->kind & INFO) {
+	w_obrect(wp, W_INFO, 0, uly, rect->g_w, gl_hbox);
+	uly = ury += gl_hbox;
+    }
+
+    if (wp->kind & MNBAR) {
+	w_obrect(wp, W_MNBAR, 0, uly, rect->g_w, h3dbox);
+	uly = ury += iny;
+    }
+
+    urx = 0;	/* reinitialize upper right x offset */
+
+    if ((hparts = wp->kind & HPARTS))
+	lry = iny;
+    if ((vparts = wp->kind & VPARTS))
+	lrx = inx;
+
+    if (wp->kind & SIZER) 
+    {
+	w_obrect(wp, W_SIZER, (rect->g_w-w3dbox+ADJ3DPIX), (rect->g_h-h3dbox+ADJ3DPIX),
+		gl_wbox, gl_hbox);
+	lry = iny;
+	lrx = inx;
+
+	if (!hparts && !vparts) 
+	{
+	    w_obrect(wp, W_VBAR, (rect->g_w-w3dbox), ury, w3dbox, 
+		(rect->g_h-ury-lry));
+	    urx = inx;
+	}
+    } 
+    else
+    {	 
+	if (hparts && vparts)	/* if has horizontal or vertical parts ,we still need sizer */ 
+	{
+	  w_obrect(wp, W_SIZER, (rect->g_w-w3dbox+ADJ3DPIX), 
+		(rect->g_h-h3dbox+ADJ3DPIX), gl_wbox, gl_hbox);
+	  lry = iny;
+	  lrx = inx;
+	}
+    }
+
+    if (vparts) 
+    {
+	blen = rect->g_h - ury - lry;
+	urx = inx;
+	w_obrect(wp, W_VBAR, (rect->g_w-w3dbox), ury, w3dbox, blen);
+
+	if (wp->kind & UPARROW) 
+	{
+	    w_obrect(wp, W_UPARROW, ADJ3DPIX, ADJ3DPIX, gl_wbox, gl_hbox);
+	    ury += iny;
+	}
+
+	if (wp->kind & DNARROW) 
+	{
+	    w_obrect(wp, W_DNARROW, ADJ3DPIX, (blen-h3dbox+ADJ3DPIX), gl_wbox, 
+		gl_hbox);
+	    lry += iny;
+	}
+
+	if (wp->kind & VSLIDE) 
+	{
+	    sz = rect->g_h - ury - lry; 
+	    w_obrect(wp, W_VSLIDE, 0, (ury-uly), w3dbox, sz);
+
+	    /* Apr-21-92  ml. Use wp->hslsz to determine size of elevator */
+	    if (wp->vslsz == -1)
+	    {
+	       w_obrect(wp, W_VELEV, ADJ3DPIX, ADJ3DPIX, gl_wbox, 
+			gl_hbox - (ADJ3DPIX << 1) );
+	    }
+	    else
+	    {
+		sz = ( sz * wp->vslsz ) / 1000;
+		if ( sz > ( ADJ3DPIX << 1 ) ) 	
+		  sz = sz - (ADJ3DPIX << 1);
+
+		w_obrect(wp, W_VELEV, ADJ3DPIX, ADJ3DPIX, gl_wbox, 
+		    sz );
+	    }
+	}
+    }
+
+
+    if (hparts) 
+    {
+	blen = rect->g_w - lrx;
+	lly = iny;
+	w_obrect(wp, W_HBAR, 0, (rect->g_h-h3dbox), blen, gl_hbox);
+
+	if (wp->kind & LFARROW) {
+	    w_obrect(wp, W_LFARROW, ADJ3DPIX, ADJ3DPIX, gl_wbox, gl_hbox);
+	    llx = inx;
+	}
+
+	if (wp->kind & RTARROW) {
+	    w_obrect(wp, W_RTARROW, (blen-w3dbox+ADJ3DPIX), ADJ3DPIX, gl_wbox, 
+		gl_hbox);
+	    lrx += inx;
+	}
+
+	if (wp->kind & HSLIDE) 
+	{
+	    sz = rect->g_w - llx - lrx;
+	    w_obrect(wp, W_HSLIDE, llx, 0, sz, h3dbox);
+
+	    /* Apr-21-92  ml. Use wp->hslsz to determine size of elevator */
+	    if (wp->hslsz == -1)
+	    {	
+	      w_obrect( wp, W_HELEV, ADJ3DPIX, ADJ3DPIX, 
+			gl_wbox - (ADJ3DPIX << 1), gl_hbox );
+	    } 	
+	    else
+	    {
+		sz = sz * wp->hslsz / 1000;
+			 
+		if ( sz > ( ADJ3DPIX << 1 ) ) 	
+		  sz = sz - (ADJ3DPIX << 1);
+
+		w_obrect(wp, W_HELEV, ADJ3DPIX, ADJ3DPIX, sz, gl_hbox );
+	    }
+	}
+    }
+
+    /* initialize window work area */
+
+    if ( !uly )	/* if no element */
+      uly = 1;
+    if ( !lly )
+      lly = 1;
+    if ( !urx )
+      urx = 1;
+
+    w_rect((GRECT *)&(wp->obj[W_WORK].ob_x), (rect->g_x+1), 
+	    (rect->g_y+uly), (rect->g_w-urx-1), (rect->g_h-uly-lly));
+}
+
+
+#if 0
+/*
+ * W_adjust() - adjust x, y, w and h of each component in the 
+ *		given window with the window's x, y, w and h.
+ */
+VOID
+w_adjust(wp, rect)
+REG WINDOW  *wp;	/* pointer to window structure */
+REG GRECT   *rect;	/* pointer to window's coords and dimensions */
+{
+    int		ulx;	    /* x offset from upper left corner */
+    int		uly;	    /* y offset from upper left corner */
+    int		urx;	    /* x offset from upper right corner */
+    int		ury;	    /* y offset from upper right corner */
+    int		llx;	    /* x offset from lower left corner */
+    int		lly;	    /* y offset from lower left corner */
+    int		lrx;	    /* x offset from lower right corner */
+    int		lry;	    /* y offset from lower right corner */
+    int		inx, iny;   /* x and y increments */
+    int		blen;	    /* length of base bar */
+    int		sz;	    /* slider size */
+    int		w3dbox, h3dbox;
+
+    /***
+     *
+     * In the old Window Library, after the first wm_open(), 
+     * prev_xywh = curr_xywh = rect;
+     *
+     ***/
+
+    /* init previous and current window dimensions */
+    wp->prev = wp->curr;
+    wp->curr = *rect;
+
+    /* init dimensions of window background */
+    w_obrect(wp, W_BOX, rect->g_x, rect->g_y, rect->g_w, rect->g_h);
+
+    /* reinit work area if it is just a move */
+    if (rect->g_w == wp->prev.g_w && rect->g_h == wp->prev.g_h) {
+	/* initialize window work area */
+	wp->obj[W_WORK].ob_x -= (wp->prev.g_x - rect->g_x);
+	wp->obj[W_WORK].ob_y -= (wp->prev.g_y - rect->g_y);
+	return;
+    }
+
+    /* init offsets from the four corners and the x and y increments */
+    ulx = uly = urx = ury = llx = lly = lrx = lry = 0;
+    w3dbox = gl_wbox + (ADJ3DPIX << 1);
+    h3dbox = gl_hbox + (ADJ3DPIX << 1);
     inx = w3dbox - 1;
     iny = h3dbox - 1;
 
@@ -1415,9 +1752,17 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	    w_obrect(wp, W_CLOSER, ADJ3DPIX, ADJ3DPIX, gl_wbox, gl_hbox);
 	    ulx = inx;
 	}
-
-	if (wp->kind & FULLER) {
+/*
+	if (wp->kind & FULLER) 
+	{
 	    w_obrect(wp, W_FULLER, (rect->g_w-w3dbox+1), ADJ3DPIX, gl_wbox, 
+		gl_hbox);
+	    urx = inx;
+	}
+*/
+	if (wp->kind & FULLER) 
+	{
+	    w_obrect(wp, W_FULLER, (rect->g_w-w3dbox+ADJ3DPIX), ADJ3DPIX, gl_wbox, 
 		gl_hbox);
 	    urx = inx;
 	}
@@ -1425,6 +1770,7 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	if (wp->kind & NAME || wp->kind & MOVER) {
 	    w_obrect(wp, W_NAME, (ulx+ADJ3DPIX), ADJ3DPIX, 
 		(rect->g_w-ulx-urx-(ADJ3DPIX << 1)), gl_hbox);
+
 	}
     }
 
@@ -1445,19 +1791,32 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
     if ((vparts = wp->kind & VPARTS))
 	lrx = inx;
 
-    if (wp->kind & SIZER) {
-	w_obrect(wp, W_SIZER, (rect->g_w-w3dbox+1), (rect->g_h-h3dbox+1),
+    if (wp->kind & SIZER) 
+    {
+/*	w_obrect(wp, W_SIZER, (rect->g_w-w3dbox+1), (rect->g_h-h3dbox+1),
+		gl_wbox, gl_hbox);
+*/
+	w_obrect(wp, W_SIZER, (rect->g_w-w3dbox+2), (rect->g_h-h3dbox+2),
 		gl_wbox, gl_hbox);
 	lry = iny;
 	lrx = inx;
 
-	if (!hparts && !vparts) {
-	    w_obrect(wp, W_VBAR, (rect->g_w-w3dbox+1), ury, w3dbox, 
+	if (!hparts && !vparts) 
+	{
+/*	    w_obrect(wp, W_VBAR, (rect->g_w-w3dbox+1), ury, w3dbox, 
+		(rect->g_h-ury-lry));
+*/
+	    w_obrect(wp, W_VBAR, (rect->g_w-w3dbox+2), ury, w3dbox, 
 		(rect->g_h-ury-lry));
 	    urx = inx;
 	}
-    } else if (hparts && vparts) {
-	w_obrect(wp, W_SIZER, (rect->g_w-w3dbox+1), (rect->g_h-h3dbox+1),
+    } 
+    else if (hparts && vparts) 
+	{
+/*	w_obrect(wp, W_SIZER, (rect->g_w-w3dbox+1), (rect->g_h-h3dbox+1),
+		gl_wbox, gl_hbox);
+*/
+	w_obrect(wp, W_SIZER, (rect->g_w-w3dbox+2), (rect->g_h-h3dbox+2),
 		gl_wbox, gl_hbox);
 	lry = iny;
 	lrx = inx;
@@ -1480,8 +1839,13 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	}
 
 	if (wp->kind & VSLIDE) {
+/*
 	    sz = rect->g_h - ury - lry - (ADJ3DPIX << 1) - 1; 
-	    w_obrect(wp, W_VSLIDE, 0, (ury-uly+1), w3dbox, sz);
+	    w_obrect(wp, W_VSLIDE, 0, (ury-uly+1), w3dbox, sz);	
+*/
+
+	    sz = rect->g_h - ury - lry - (ADJ3DPIX << 1); 
+	    w_obrect(wp, W_VSLIDE, 0, (ury-uly), w3dbox, sz);
 
 	    /* Apr-21-92  ml. Use wp->hslsz to determine size of elevator */
 	    if (wp->vslsz == -1)
@@ -1524,9 +1888,9 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 
     /* initialize window work area */
     w_rect((GRECT *)&(wp->obj[W_WORK].ob_x), (rect->g_x+1), 
-	    (rect->g_y+uly+1), (rect->g_w-urx-2), (rect->g_h-uly-lly-2));
+	    (rect->g_y+uly), (rect->g_w-urx-1), (rect->g_h-uly-lly));
 }
-
+#endif
 
 
 /*
@@ -1544,7 +1908,7 @@ GRECT	*pc;	    /* pointer to clipping rectangle */
     REG RLIST	*rl;
     GRECT	rclip;
     RLIST	*genrlist(), *rlist;
-
+	
     gsx_moff();
     wm_update(TRUE);
     rlist = genrlist(wp->handle, WF_CURRXYWH);
@@ -1552,8 +1916,11 @@ GRECT	*pc;	    /* pointer to clipping rectangle */
 	/* if no clipping rectangle given, clip to screen and itself */
 	rclip = rl->rect;
 	if (!rc_intersect(&gl_rfull, &rclip))	/* clip to screen */
-	    rclip = gl_rfull;
-	if (!pc || rc_intersect(pc, &rclip)) {
+	   continue;
+	
+/*	    rclip = gl_rfull;	*/
+	if (!pc || rc_intersect(pc, &rclip)) 
+	{
 	    gsx_sclip(&rclip);
 	    ob_draw(wp->obj, obj, MAX_DEPTH);
 	}
@@ -1573,15 +1940,15 @@ GRECT	*pc;	    /* pointer to clipping rectangle */
  *		    redraw messages to those windows
  */
 VOID
-w_drawchange(dirty, skip)
-GRECT	*dirty;		/* rectangle of dirty area */
-UWORD	skip;		/* window to be skipped */
+w_drawchange(dirty, skip,stop)
+	GRECT	*dirty;		/* rectangle of dirty area */
+	UWORD	skip,stop;	/* window to be skipped */
 {
     UWORD   handle;	/* window handle */
     GRECT   exposed;	/* area to be drawn */
     WINDOW  *wp;	/* pointer to window structure */
 
-    for (handle = botw; handle != NIL; handle = wp->ontop) {
+    for (handle = botw; handle != stop; handle = wp->ontop) {
 	wp = srchwp(handle);
 
 	if (handle == skip)
@@ -1597,8 +1964,12 @@ UWORD	skip;		/* window to be skipped */
 		ap_sendmsg(wind_msg, WM_REDRAW, wp->owner->p_pid, handle, 
 		    exposed.g_x, exposed.g_y, exposed.g_w, exposed.g_h);
 	    else
+	    {	
 		ap_sendmsg(wind_msg, WM_REDRAW, ctl_pd->p_pid, handle, 
 		    exposed.g_x, exposed.g_y, exposed.g_w, exposed.g_h);
+	      
+/*      drawdesk( exposed.g_x, exposed.g_y, exposed.g_w, exposed.g_h);*/
+	    }
 	}
     }
 }
@@ -1712,94 +2083,6 @@ WORD	    w3, w4, w5, w6, w7;
     ap_msg[6] = w6;
     ap_msg[7] = w7;
     ap_rdwr(AQWRT, towhom, 16, ADDR(&ap_msg[0]));
-}
-
-
-/*
- *  Draw highlights around a rectangle depending on its state
- */
-VOID
-draw_hi(prect, state, clip, th, option)
-REG GRECT   *prect;	/* object rectangle */
-WORD	    state;	/* NORMAL or SELECTED */
-WORD	    clip;	/* 1: set clipping rect to object itself */
-WORD	    th;		/* thickness of rectangle */
-WORD	    option;	/* 3D object options */
-{
-    WORD	pts[12], col;
-    GRECT	r;
-
-    gsx_moff();
-    gsx_1code(15, 7);
-    gsx_1code(113, -1);			/* solid line style */
-
-    if (clip)
-	gsx_sclip(prect);
-
-    rc_copy(prect, &r);
-
-    if (th > 0) {			/* if border is inside,	    */
-	r.g_x += th;			/* object area is 1 pixel   */
-	r.g_y += th;			/* in all around	    */
-	r.g_w -= th<<1;
-	r.g_h -= th<<1;
-    }
-
-    pts[0] = pts[2] = r.g_x;
-    pts[3] = pts[5] = r.g_y;
-    pts[1] = pts[3] + r.g_h - 1;
-    pts[4] = pts[2] + r.g_w - 1;
-
-    if (state & SELECTED) {
-	if (option == OPT3 || option == OPT4) {
-	    gsx_attr(0, MD_REPLACE, BLACK);
-	} else {
-	    gsx_attr(0, MD_REPLACE, LBLACK);
-	}
-/*
-	gsx_attr(0, MD_REPLACE, LWHITE);
-/**/
-    } else { /* if not selected */
-	gsx_attr(0, MD_REPLACE, WHITE);
-    }
-
-    v_pline(3, pts);
-/*
-    if (option == OPT2 && state & SELECTED) {
-	pts[0] = pts[2] += 1;
-	pts[3] = pts[5] += 1;
-	pts[1] -= 1;
-	pts[4] -= 1;
-	v_pline(3, pts);
-    }
-/**/
-    /* pts 1, 4, 5 same as above */
-    pts[0] += 1;
-    pts[2] = pts[4];
-    pts[3] = pts[1];
-    pts[5] += 1;
-
-    if (state & SELECTED) {
-	switch (option) {
-	    case OPT5:
-		gsx_attr(0, MD_REPLACE, WHITE);
-		break;
-
-	    case OPT1:
-	    case OPT2:
-	    case OPT3:
-	    case OPT4:
-		gsx_attr(0, MD_REPLACE, LWHITE);
-		break;
-	}
-
-    } else { /* if not selected */
-	gsx_attr(0, MD_REPLACE, LBLACK);
-    }
-
-    v_pline(3, pts);
-
-    gsx_mon();
 }
 
 

@@ -124,7 +124,7 @@
 #include <obdefs.h>
 #include <gemlib.h>
 #include <taddr.h>
-#include <gemdefn.h>
+#include <gemusa.h>
 #include <funcdef.h>
 #include <osbind.h>
 #include <vdidefs.h>
@@ -152,6 +152,9 @@ EXTERN BYTE	*escan_str();
 EXTERN WORD	rom_ram();
 EXTERN WORD	sh_get();
 EXTERN WORD	sh_put();
+
+EXTERN	WORD	xrat;
+EXTERN	WORD	yrat;
 EXTERN WORD	gl_rschange;
 EXTERN WORD	gl_restype;
 EXTERN WORD	DOS_ERR;
@@ -958,7 +961,7 @@ gr_slidebox(tree, parent, obj, isvert)
 {
 	REG GRECT	*pt, *pc;	/* new pointer for Reg Opt	*/
 	GRECT		t, c;
-	REG UWORD	divnd, divis;
+	REG LONG	divnd, divis;
 	OBJECT		*objc;
 	WORD		ptype,ctype;
 	WORD		ret,setxy,setwh;
@@ -985,7 +988,7 @@ gr_slidebox(tree, parent, obj, isvert)
 	  ctype = 0;
 	  
 	setxy = 0;
-	setwh = 0;
+
 	if ( ctype ) 	/* if the child is 3D, then check 	    */
 	{	
 	  if ( !ptype ) /* if parent is not 3D, then the child is   */
@@ -996,23 +999,10 @@ gr_slidebox(tree, parent, obj, isvert)
 	  }	
 	  pt->g_w += (ADJ3DPIX << 1);
 	  pt->g_h += (ADJ3DPIX << 1);
-	  setwh = 1;
 	}
 
 	gr_dragbox( pt->g_w, pt->g_h, pt->g_x + pc->g_x, pt->g_y + pc->g_y, 
 		    pc, &pt->g_x, &pt->g_y ); 
-
-	if ( setxy )
-	{
-	  pt->g_x += ADJ3DPIX;
-	  pt->g_y += ADJ3DPIX;
-	}
-
-	if ( ptype )
-	{
-	  pt->g_x += ADJ3DPIX;
-	  pt->g_y += ADJ3DPIX;
-	}
 
 	if ( isvert )		/* vertical movement	*/
 	{
@@ -1025,9 +1015,15 @@ gr_slidebox(tree, parent, obj, isvert)
 	  divis = pc->g_w - pt->g_w;
 	}
 
+	if ( setxy )
+	{
+	  if ( divnd )
+  	    divnd += ADJ3DPIX;
+	}
+
 	if (divis)
 	{
-	  ret = mul_div( divnd, 1000, divis );
+	  ret = ( divnd * 1000 ) / divis;
 	  if ( ret > 1000 )
 	    ret = 1000;
 	  return( ret );
@@ -1035,3 +1031,86 @@ gr_slidebox(tree, parent, obj, isvert)
 	else
 	  return(0);
 }
+
+
+/*
+*	Routine to watch the mouse while the button is down and
+*	it stays inside/outside of the specified rectangle.
+*	Return TRUE as long as the mouse is down.  Block until the
+*	mouse moves into or out of the specified rectangle.
+*/
+
+	WORD
+gr_stilldn(out, x, y, w, h)
+	WORD		out, x, y, w, h;
+{
+/*	WORD		rets[6];*/
+	WORD		status;
+/*	WORD		state;	*/
+					/* compiler had better	*/
+					/*   put the values out,*/
+					/*   x, y, w, h in the	*/
+					/*   right order on the	*/
+					/*   stack to form a	*/
+					/*   MOBLK		*/
+	while( TRUE )
+	{
+	  forker();
+	  if ( !( button & 0x01 ) )
+	  {
+	    status = FALSE;		
+	    break;
+	  }
+	  else
+	  {
+	    if ( out != inside( xrat, yrat, &x ) )
+	    {
+	      status = TRUE;
+	      break;
+	    }
+ 	  }  	
+	}
+	return( status );
+} /* gr_stilldn */
+
+
+#if 0
+/*
+*	Routine to watch the mouse while the button is down and
+*	it stays inside/outside of the specified rectangle.
+*	Return TRUE as long as the mouse is down.  Block until the
+*	mouse moves into or out of the specified rectangle.
+*/
+
+	WORD
+gr_stilldn(out, x, y, w, h)
+	WORD		out, x, y, w, h;
+{
+	WORD		rets[6];
+	WORD		event;
+
+					/* compiler had better	*/
+					/*   put the values out,*/
+					/*   x, y, w, h in the	*/
+					/*   right order on the	*/
+					/*   stack to form a	*/
+					/*   MOBLK		*/
+	while(1)
+	{
+	  event = ev_multi( MU_BUTTON|MU_M1|MU_TIMER, &out, NULLPTR, 0x0L,
+			  0x00010100L, 0x0L, &rets[0] );/* 01ff00L */
+
+	  if ( event & MU_BUTTON )	/* button up */
+	    return( FALSE );
+
+	  if ( event & MU_M1 )
+	    return(TRUE);
+
+	  if ( event & MU_TIMER )
+	  {
+	    if ( !( rets[2] & 0x01 ) )
+	      return( FALSE );	
+	  }
+	}
+} /* gr_stilldn */
+#endif

@@ -1,10 +1,11 @@
-# MultiTOS 1.00 GEM.SYS in the six languages of its resources, run by C:\AUTO\RUNNER.PRG at boot
+# MultiTOS 1.01 GEM.SYS in the six languages of its resources, run by C:\AUTO\RUNNER.PRG at boot
 # (commands: build/src/runner.c). S: is the repository, D: the work copy, M: the RAM disk the makeprg rules
 # use. makeprg rules one command at a time (Lattice make cannot run makeprg); the two aln lines of makeprg
 # go to ALN as command files (gemsys/AB.LNK, GEM.LNK; the TOS command line is too short). Each language
-# links its glue as _USARSC; after the link the symbol table is stripped (STRIP68.TOS; the release has
-# none) and prgflags 7 7 is set as makeprg does. D:\MULTITOS\GEM_USA.SYS must be Atari's release
-# (1993-02-04) byte for byte (EXPECT.LST); the other five have no Atari copy.
+# links its glue as _USARSC; after the link the symbol table is stripped (STRIP68.TOS; the releases have
+# none) and prgflags 7 7 is set as makeprg does. D:\MULTITOS\GEM_USA.SYS, GEM_GRM.SYS and GEM_FRE.SYS
+# must be Atari's English, German and French releases byte for byte (EXPECT.LST); GEM_ITA.SYS, GEM_SPA.SYS
+# and GEM_SWE.SYS have no Atari copy.
 
 echo copy the sources to D:
 rmtree D:\
@@ -12,6 +13,9 @@ rmtree M:\
 cptree S:\MULTITOS D:\MULTITOS
 copy C:\GEMSYS\AB.LNK D:\MULTITOS\AB.LNK
 copy C:\GEMSYS\GEM.LNK D:\MULTITOS\GEM.LNK
+echo MAS rejects the "#" comment leader of the 1.1 $Log entry in gsx2.s and large.s 1.2 (3 lines each)
+subst D:\MULTITOS\GSX2.S \n# \n*
+subst D:\MULTITOS\LARGE.S \n# \n*
 
 echo AES binding library aesbin73: Alcyon C (cp68, c068 -f, c168) and MadMac 1.05 (mac -6) per member;
 echo the lost assembler of the original members made addq/moveq of these add/move forms (subst)
@@ -1160,9 +1164,9 @@ echo link with the MultiTOS ALN: ab.lnk once, then for each language its glue, g
 echo symbol table and prgflags (it waits for Return)
 x C:\MTOS\ALN.TOS -c ab.lnk
 
-echo English: glue.usa with NEWGLUE.PRG, one session ita, spa, usa (the bytes newglue never writes keep the
+echo English: glue.usa with NEWGLUE.PRG, one session swe, usa (the bytes newglue never writes keep the
 echo previous country's glue)
-type ita\rspa\rusa\rexit\r
+type swe\rusa\rexit\r
 x C:\GLUE\NEWGLUE.PRG
 x C:\MTOS\ALN.TOS -c gem.lnk
 x C:\SLAV\STRIP68.TOS gem.sys

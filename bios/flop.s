@@ -4,20 +4,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/05/22 13:53:33 $
+* $Date: 90/07/19 18:51:14 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.16  90/07/19  18:51:14  apratt
+* Removed some leftover debugging code.
+*
 * Revision 2.15  90/05/22  13:53:33  apratt
 * In go2track, an EQ return from flopcmds doesn't mean success, it
 * only means no timeout; you have to check the error bits in d7
 * to see if the seek-with-verify actually succeeded.  This is why
 * lengthening timeouts caused failure: before, the short timeout
 * expired first, so this code worked.  Now it works anyway.
-*
+* 
 * Revision 2.14  90/05/21  12:21:15  apratt
 * Lengthened timeouts; they were so short they timed out before the
 * 1772 could return record-not-found errors.
@@ -134,7 +137,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.15 $
+* $Revision: 2.16 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -467,8 +470,7 @@ _floprd:
 	bsr	rdfast
 	bsr	floplock		; lock floppies, setup parameters
 frd1:	bsr	select			; select drive,	setup registers
-frd4:	move.l	d7,$37c			; for debugging...
-	move.w	#$090,(a6)		; examine DMA status register
+	bsr	go2track		; seek appropriate track
 	bcs	flopfail		; EMPTY DRIVE - FAIL NOW
 	bne	frde			; retry on seek failure
 

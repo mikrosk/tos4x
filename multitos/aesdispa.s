@@ -219,41 +219,6 @@ r_exit:
 
 *****************************************************************
 *								*
-*	Load an AES external process				*
-*								*
-*	Called by sh_write to load applications when in single	*
-*	tasking mode (in multitasking mode this is handled	*
-*	by Pexec 106). We must use this function because	*
-*	Falcon GEMDOS mucks up the stack			*
-*								*
-*	long loadBP(char *fname, char *cmdtail, char *env)	*
-*****************************************************************
-
-	.globl	_loadBP
-_loadBP:
-	move.l	12(sp),d1		; get environment
-	move.l	8(sp),d0		; get command line
-	move.l	4(sp),a1		; get file name
-
-	move.l	sp,loadsav		; save stack pointer
-	move.l	tempstack,sp		; set up a temporary stack
-
-	move.l	d1,-(sp)		; environment string
-	move.l	d0,-(sp)		; command line
-	move.l	a1,-(sp)		; File Name
-	move.w	#3,-(sp)		; just load (single tasking)
-	move.w	#$4b,-(sp)
-	lea	-128(sp),a1		; leave space for gemdos on stack
-	move.l	a1, tempstack
-	trap	#1
-	move.l	tempstack,sp
-	add.l	#16+128,sp
-	move.l	sp,tempstack
-	move.l	loadsav,sp		; restore stack pointer
-	rts
-
-*****************************************************************
-*								*
 *	Exec an AES external process				*
 *								*
 *	Called by sh_write to run applications when in single	*
@@ -418,12 +383,11 @@ s_out:
 
 	.bss
 	.even
-loadsav:	.ds.l	1
 dispstack:	.ds.l	1
 savsr:		.ds.l	1		; for _cli and _si
 _runacc:	.ds.l	1		; acc exec code address
 psetsr:		.ds.w	1		; for psetup and process switching
-		.ds.b	4096		; temporary stack area
+		.ds.b	2048		; 2K stack
 topstack:	.ds.l	1		; top of stack
 	.data
 		.even

@@ -1,4 +1,4 @@
- /*	GEMCLI.C		2/21/91			D.Mui		*/
+/*	GEMCLI.C		2/21/91			D.Mui		*/
 /*	Crunch at ldaccs	3/18/88			D.Mui		*/
 /*	Take out sysacc define		2/11/88		D.Mui		*/
 /*	Fix at ldaccs .. load accessory from root  10/23/85 D.Mui	*/
@@ -43,6 +43,7 @@ EXTERN	WORD	mn_maxitem;
 EXTERN	BYTE	*ad_shcmd;
 EXTERN	THEGLO	D;
 EXTERN	BYTE	*ad_envrn;
+EXTERN	WORD	sh_accflag;
 
 GLOBAL	WORD	used_acc;
 GLOBAL	BYTE	STACCFULL[] = "C:\\*.ACC";
@@ -138,6 +139,8 @@ ps_rename( id, name, special )
 	REG PD		*p;
 	BYTE		*name;
 
+
+
 	strcpy( pfilespec, ad_shcmd );	/* very important */
 	name = sh_name( ad_shcmd );		
 
@@ -147,8 +150,13 @@ ps_rename( id, name, special )
 	  {			/* allocate PD memory for 	*/	
 	  			/* accessory Pexec 3		*/
 	    dos_close( handle );
-	    if ( show )
+	    if ( show ) {
+	      if (!gl_multi)
+		      sh_accflag = TRUE;		/* do not redraw whole screen when launching accs. */
 	      sh_draw( pfilespec );
+	      if (!gl_multi)
+		      sh_accflag = FALSE;	
+	    }
 
 	    if ( pgmld( ad_shcmd, &ldaddr, tail, envrn ) != -1 )	
 	    {
@@ -157,14 +165,17 @@ ps_rename( id, name, special )
 	      if (gl_multi) {
 	        p->p_textaddr = ( BYTE *)ldaddr[2];/* real text segment		*/
 	        ldaddr[2] = ( LONG )runacc;
+		waitforaes();
 	        if ( ( p->p_sysid = dos_pexec( 106, 0x0L, ( BYTE *)ldaddr, 0x0L ) ) >= 0 )
 	        {				/* converts X.??? number into name.id */
 		  Psetpgrp( p->p_sysid, p->p_sysid );
 		  ps_rename( p->p_sysid, name, 0 );
 		  strcpy( pfilespec, p->p_where );
 		  strcpy( tail, p->p_wtail );
+		  releaes();
 	          return( p );
 	        } 
+	        releaes();
 	      } else {
 	
   		  pstart(p, runacc, (BYTE *) ldaddr);
@@ -180,6 +191,7 @@ ps_rename( id, name, special )
 	  unlink_pd( &alr, p );
 	  free_pd( p );
 	}
+
 
 	return( (PD*)0 );
 }

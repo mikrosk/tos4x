@@ -15,6 +15,9 @@
 /*	Check control key for nodisk system at re_icon 8/13/91	D.Mui	*/
 /*	Change all the iconblk to ciconblk	7/11/92	D.Mui		*/
 /*      Load rsc file from disk			2/10/92 H.Krober        */
+/*	Start the separation of desktop and aes 3/18/93 C.Gee		*/
+/*	Implement flags for PRG vs SYS version  4/14/93 C.Gee		*/
+
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -36,7 +39,7 @@
 #include "pdesk.h"
 #include "pmisc.h"
 #include "pboth.h"
-
+#include "softload.h"
 /*
  *	Set the SOFTLOAD flag to implement softloaded desktop resources.
  *	The desktop will then try to read its resource file from
@@ -45,27 +48,28 @@
  * 	the resource file for the system. If this dialog box is exited
  *	using the 'Cancel' button, the resource will be copied from ROM.
  *
- *	NOTE: You have to define SOFTLOAD in gemrom.c, too, because there
+ *	NOTE: You have to define SOFTLOAD in deskrom.c, too, because there
  *	      are the actual functions.
+ *
+ *	See the Defines in SOFTLOAD.H
  */
-#define SOFTLOAD 1
+
 /*
- *	Version number of the DESKTOP.RSC file. Use "rscvers versnr DESKTOP.RSC"
+ *	Turn on resource file version number checking by setting the
+ *	DESKRSVER to 1. Use "rscvers versnr DESKTOP.RSC"
  *	to create a DESKTOP.RSC with a version number in the first byte of the
  *	resource header. This is to prevent user from using the wrong
  *	resource file.
- */
-#define DSKRSVER 1
-/* 
- * 	Set the ONERSC flag to indicate that the system just has the
- *	U.S. desktop resource in ROMs. If the system cannot load the
- *	DESKTOP.RSC from disk, it will pop up a warning, saying that
- *	the U.S. version from ROM will be used.
- *
- *	-> This message has to get internationalized!
+ *	See the Defines in SOFTLOAD.H
  */
 
-/* #define  ONERSC		1 */	
+/*
+ *	Set the DESKPRG flag to compile this file for a
+ *	replacement Desktop. Clear it for making GEM.SYS
+ *      DESKPRG must also be set/cleared in
+ *	      DESKSTAR.S, DESKVARI.C, DESKROM.C, DOSBIND.C
+ *	See the Defines in the makegem/makedesk files.
+ */
 
 typedef struct cblk
 {
@@ -118,9 +122,17 @@ MLOCAL	BYTE	TIMETABLE[] =	/* was: BYTE *TIMETABLE[], changed for LC */
 	1,1,'/',	/* SPAIN	*/
 	1,1,'/',	/* ITALY	*/
 	1,2,'-'		/* SWEDEN,NORWAY,FINLAND*/
-};	
+};
+	
+#if DESKPRG
+GLOBAL	WORD	gl_debug = 0;	/* Debug level for soft loaded desktop only */
+GLOBAL	WORD	gl_port  = 1;	/* port for debug messages */
 
-#ifdef SOFTLOAD
+VOID	Ndebug( WORD level, LONG number );
+VOID	Debug( WORD level, BYTE *str );
+#endif
+
+#if SOFTLOAD
 MLOCAL BYTE	*DESKRSC = "C:\\MULTITOS\\DESKTOP.RSC";
 MLOCAL BYTE	*FDESKRSC = "DESKTOP.RSC";
 
@@ -132,21 +144,14 @@ BYTE	*RSCVMSG =	"[1][Desktop resource in MULTITOS|\
 directory has incorrect version|number. Resource was not|loaded from disk.]\
 [ OK ]";
 
-BYTE	*RSCNMSG =	"[1][Desktop resource not found in|MULTITOS \
-directory. Use file|selector to specify it or|click on Cancel in file|\
-selector to use ROM version.][ OK ]";
-
-BYTE	*RSCSMSG = 	"Find DESKTOP.RSC file.";
-
-BYTE	*RSCFMSG =	"[1][Loading the specified resource|file failed. \
-Click on Cancel|in the file selector to use|U.S. ROM resource.][ OK ]";
-
-BYTE	*RSCRMSG =	"[1][No DESKTOP.RSC file loaded.|Using U.S. version \
-from ROM.][ OK ]";
-
 GLOBAL WORD	romdesk;
 #endif
 
+
+
+
+
+/*	Check if we're running MINT or not */
 	WORD
 desk_cMiNT( VOID )
 {
@@ -154,6 +159,10 @@ desk_cMiNT( VOID )
 
 	return( d_multi = getcookie( 0x4D694E54L, &value ) );
 }
+
+
+
+
 
 
 /*	Catch desktop terminate signal */
@@ -164,6 +173,7 @@ desk_term()
 	d_exit = L_EXIT;
 	return;			/* DOES THIS BELONG HERE ??? (hmk 2/16/93) */
 #if 0
+	/* IS THIS STUFF NEEDED? IF SO< WHERE?   */
 	Debug1( "Desktop catches terminate signal\r\n" );
 
 	ciconaddr = (CICONBLK*) 0;
@@ -255,11 +265,7 @@ ini_icon()
 
 	if ( !backid )
 	{
-#if 0
-	  form_alert( 1, "[1][ Desktop failed to allocate | icon memory ][ OK ]" );
-#else
 	  do1_alert( FCNOMEM );	/* ++ERS 12/16/92 */
-#endif
 	  return( FALSE );
 	}
 	
@@ -315,7 +321,7 @@ ini_rsc()
 	WORD		w,i;
 	CICONBLK	*icblk;
 
-#ifdef SOFTLOAD
+#if SOFTLOAD
 	if (romdesk) {				/* if loading rsc from */
 						/* disk failed and we  */
 						/* have to use the rom */
@@ -328,10 +334,8 @@ ini_rsc()
 	Debug1( "Rsrc_rcfix\r\n" );
 	rsrc_rcfix( (LONG)deskptr );
 #endif
-		
 	Debug1( "Get tree\r\n" );					
 	menu_addr = get_tree( ADMENU );	/* get the menu address		*/
-			
 	adj_menu( IDSKITEM - 1 );
 	adj_menu( ICONITEM - 1 );			
 
@@ -344,11 +348,8 @@ ini_rsc()
 	    iconaddr++;
 	  }
 	}
-
 	background = get_tree( BACKGROU ); /* was BACKROUND, changed for LC */
-					
 	maxicon = background[0].ob_tail;/* max background icon		*/
-
 /* 	Allocate memory for color icons 
  * 	These should go away if we have a RCS that can handle color icon 
  */
@@ -360,8 +361,6 @@ ini_rsc()
 	  {		
 	    for ( i = 0; i < maxicon; i++ )
 	    {
-/*	      ciconaddr[i].monoblk = *((ICONBLK*)background[i+1].ob_spec);	*/
-/*              ciconaddr[i].mainlist = (CICON*)0;	*/
 	      background[i+1].ob_spec = (LONG) &ciconaddr[i];
 	      background[i+1].ob_type = (UWORD) G_CICON;
 	    }
@@ -372,7 +371,6 @@ ini_rsc()
 	    return(FALSE);
 	  }
 	}
-
 	rc_copy( (WORD *)&full, (WORD *)&background[0].ob_x );
 
 	/* Precalculate the disk icon's pline values	*/
@@ -420,12 +418,11 @@ ini_rsc()
 	f_xywh[4] = w;
 	f_xywh[5] = obj[TSTYLE].ob_height;
 	f_xywh[7] = obj[TSTYLE].ob_height;
-
 	Debug1( "Ini_rsc done\r\n" );	
 	return( TRUE );
 }
 
-#ifdef SOFTLOAD
+#if SOFTLOAD
 /*
  *	chrscver()
  *	Check version number or rsc file
@@ -475,12 +472,6 @@ VOID deskrsc()			/* load the desk rsc from disk */
 	WORD	load = 0;
 	WORD	verflg;
 	UWORD	*rscaddr;
-#ifdef ONERSC
-	WORD	loop = 1;
-	WORD	button = 0;
-	BYTE	path[256];
-	BYTE	fname[16];
-#endif
 
 	*DESKRSC = ( isdrive() & 0x4 ) ? 'C' : 'A';
 
@@ -492,52 +483,22 @@ VOID deskrsc()			/* load the desk rsc from disk */
 	 *		  0, wrong version
 	 *		 -1, unable to open
 	 */
-
+#if DESKRSVER
 	if ((verflg = chkrscver(DESKRSC, DSKRSVER)) == 1) {
 		load = rsrc_load(DESKRSC);	
 	} else if (verflg == 0) {
 		form_alert(1, RSCVMSG);
 	}
-
-#ifdef	ONERSC
-	if (!load) {
-				/* std. desk rsc not found */
-		if (verflag == -1)	/* file not found */
-			form_alert(1, RSCNMSG);
-		do {
-			
-			strcpy( "C:\\*.RSC", path );
-	    		path[0] = ( isdrive() & 0x04 ) ? 'C' : 'A';
-	    		strcpy( FDESKRSC, fname );
-
-			fsel_exinput(path, fname, &button, RSCSMSG);
-			rep_path(fname, path);
- 
-			if (button) {
-				if ((verflg = chkrscver(path, DSKRSVER))==0){
-					form_alert(1, RSCVMSG);
-					loop = 1;
-				} else if ((load = rsrc_load(path)) == 0) {
-					form_alert(1, RSCFMSG);
-					loop = 1;
-				} else 
-					loop = 0;
-			} else
-				loop = 0;
-		} while (loop);
-
-	}
 #endif
-	if (!load) {
-#ifdef	ONERSC
-		if (st_lang != 0)	/* No U.S. machine */
-			form_alert(1, RSCRMSG);
-				/* this msg has to get internationalized */
-#endif
+	if (!load)
+	{
+		rsc_read();		/* cjg 03/30/93 */
 		deskptr = NULL;
 		rom_ram(1, (LONG)deskptr);		/* use ROM desktop rsc */
 		romdesk = TRUE;
-	} else {
+	}
+	else
+	{
 		rsrc_gaddr(0, 0, (LONG *)&rscaddr);
 		romdesk = FALSE;
 		deskptr = (OBJECT *) rscaddr;
@@ -545,27 +506,32 @@ VOID deskrsc()			/* load the desk rsc from disk */
 }
 #endif
 
+
+
 MLOCAL	BYTE	DESK_MAGIC[] = "4c4c444D";
 MLOCAL	BYTE	SH_MAGIC[] = "SH_MAGIC=";
 
 /*	Process 2 - Desktop 	*/
 
+#if DESKPRG
+	VOID
+main( VOID )
+
+#else
 	VOID
 deskmain()
+#endif
 {
 	REG WORD	i;
-	WORD		ret,x,doitonce,code;
+	WORD		ret,doitonce,code;
 	WORD		*ptr;	
 	BYTE		temp[30];
 	LONG		value;
 	WORD		temp1, temp2;
 
-#if 0	/* NOT USED: */
-	WORD		buffer[8];		
-	OBJECT		*obj;
-	LONG		*lptr;
+#if !DESKPRG
+	WORD		x;
 #endif
-
 
 	catchsignal( SIGTERM );	/* Redirect all the Signals	*/
 				/* Catch only the terminate signal */	
@@ -581,7 +547,11 @@ deskmain()
 				/* Let AES knows that we will handle AP_TERM 	*/
 	shel_write( 9, 0x1, 0,(LONG)Nostr,(LONG)Nostr );
 	
+#if DESKPRG
+	ret = graf_handle( &gl_wchar, &gl_hchar, &gl_wbox, &gl_hbox );
+#else
 	ret = graf_handle( &x, &x, &x, &x );
+#endif
 	v_handle = ret;
 
 	desk_vopnvwk( &v_handle, Getrez()+2, &ptr );
@@ -595,15 +565,27 @@ deskmain()
 	  goto m_6;
 	}
 
+#if DESKPRG
+	gl_ncols = ( ptr[0] + 1 )/ gl_wchar;	/* get # of columns */
+	gl_nrows = ( ptr[1] + 1 )/ gl_hchar;	/* get # of rows    */
+#endif
+
 	doitonce = TRUE;
 	icn_whandle = -1;
 	d_exit = L_NOEXIT;
 
 	ciconaddr = (CICONBLK*)0;	/* 7/10/92 */
+	ctldown = trap13( 0x0b, -1 ) & 0x0004 ? TRUE : FALSE;	/* 07/19/93 */
 
 	Debug1( "Desktop checks cookie\r\n" );
+	
+	desk_cMiNT();	/* check to see if we are multitasking */	
 
-	desk_cMiNT();	/* check to see if we are multitasking */
+#if DESKPRG
+	gl_vdo = 0x0L;
+				/* _VDO */		/* 7/19/93 */
+	getcookie( 0x5F56444FL, &gl_vdo );
+#endif
 
 	if ( getcookie( 0x5F414B50L, &value ) )	/* get _AKP cookie */
 	{
@@ -644,17 +626,20 @@ deskmain()
 	}
 top:
 	
-#ifdef SOFTLOAD
+#if SOFTLOAD
 	deskrsc();		/* read desktop resource */
 #else
 	Debug1( "Desktop does rom ram\r\n" );
 	Ndebug1( deskptr );
+	rsc_read();			/* cjg 03/19/93 */
 	rom_ram( 1, (LONG)deskptr );	/* read in desktop resource	*/
 #endif
+
+#if !DESKPRG			/* Do this only with the ROM version */
 	Debug1( "Desktop does deskerr\r\n" );
 
 	deskerr();
-
+#endif
 	ret = TRUE;		/* assume everything is OK	*/
 
 	appnode = (APP*)0;	/* No app buffer yet		*/
@@ -678,7 +663,11 @@ top:
 	Debug1( "Mem_init\r\n" );
 	if ( !mem_init() )	/* init the app path buffer	*/
 	{
-m_2:	  desknoerr();	  
+m_2:
+
+#if !DESKPRG			/* Do this only with the ROM Version */
+	  desknoerr();	  
+#endif
 	  goto m_1;		/* and desk app buffer		*/
 	}
 
@@ -690,20 +679,17 @@ m_2:	  desknoerr();
 	d_maxcolor = ptr[13];		/* vdi max number of color	*/
 
 	if ( doitonce )			/* do it once only	*/
-	{
-#if 0
-	  adjdcol( WHITE );		/* adjust dialogue box's color  */
-#endif
 	  adjobjects();			/* adjust object positions      */
-	}
 		
 	Debug1( "Read inf file\r\n" );
 	read_inf();			/* Let see what the user want	*/
 
 	Debug1( "Q_inf\r\n" );
 	q_inf();			/* make a copy of inf file	*/
-
+#if !DESKPRG
+/* CJG 03/19/93	temporarily disabled... */
 	desknoerr();
+#endif
 					/* Get the real res mode for FALCON	*/
 	if ( ( gl_vdo & HIGHWORD ) == FALCON ) 
 	  d_rezword = setmode(-1);
@@ -764,8 +750,12 @@ m_2:	  desknoerr();
 	  do_redraw( 0, &full, 0 );	/* draw the background	*/
 	}
 
+
+
+#if !DESKPRG
 	Debug1( "Menu_register\r\n" );
  	menu_register( desk_id, get_fstring(DESKNAME) );
+#endif
 
 	Debug1( "Open def\r\n" );
 	open_def();			/* open default windows	*/
@@ -977,49 +967,6 @@ ch_1:	  if ( ( temp = (WORD)trap14( 64, -1 ) ) & 0x2 )
 }
 
 
-#if 0
-/* adjust object colors if it is invalid */
-
-/* NOTE: This routine should no longer be necessary, but is
- * maintained "just to be sure"
- * ++ERS, 1/19/93
- */
-	VOID
-adjdcol(color)
-	UWORD color;
-{
-    REG OBJECT  *obj;
-
-    if ( d_maxcolor > LWHITE)
-	return;
-
-    obj = get_tree(ADFILEIN);
-    obj[FILEFT].ob_spec = (obj[FILEFT].ob_spec & 0xfffffff0) | color;
-    obj[FIRIGHT].ob_spec = (obj[FIRIGHT].ob_spec & 0xfffffff0) | color;
-
-    obj = get_tree(ADINSDIS);
-    obj[IUP].ob_spec = (obj[IUP].ob_spec & 0xfffffff0) | color;
-    obj[IDOWN].ob_spec = (obj[IDOWN].ob_spec & 0xfffffff0) | color;
-
-    obj = get_tree(ADFORMAT);
-    obj[SRCDRA].ob_spec = (obj[SRCDRA].ob_spec & 0xfffffff0) | color;
-    obj[SRCDRB].ob_spec = (obj[SRCDRB].ob_spec & 0xfffffff0) | color;
-    obj[ADRIVE].ob_spec = (obj[ADRIVE].ob_spec & 0xfffffff0) | color;
-    obj[BDRIVE].ob_spec = (obj[BDRIVE].ob_spec & 0xfffffff0) | color;
-
-    obj = get_tree(INWICON);
-    obj[WUP].ob_spec = (obj[WUP].ob_spec & 0xfffffff0) | color;
-    obj[WDOWN].ob_spec = (obj[WDOWN].ob_spec & 0xfffffff0) | color;
-
-    obj = get_tree(MNSYSTEM);
-    obj[ MFLEFT ].ob_spec = ( obj[ MFLEFT ].ob_spec & 0xfffffff0L ) | color;
-    obj[ MFRIGHT ].ob_spec = ( obj[ MFRIGHT ].ob_spec & 0xfffffff0L ) | color;
-    obj[ MFUP ].ob_spec = ( obj[ MFUP ].ob_spec & 0xfffffff0L ) | color;
-    obj[ MFDOWN ].ob_spec = ( obj[ MFDOWN ].ob_spec & 0xfffffff0L ) | color;
-    obj[ MKUPS ].ob_spec = ( obj[ MKUPS ].ob_spec & 0xfffffff0L ) | color;
-    obj[ MKDOWNS ].ob_spec = ( obj[ MKDOWNS ].ob_spec & 0xfffffff0L ) | color;
-}
-#endif
 	
 /* Adjust Object Positions */
 
@@ -1060,3 +1007,37 @@ adjobjects()
     obj[ FIRONLY ].ob_y -= 1;
     obj[ FIRWRITE ].ob_y -= 1;
 }
+
+
+#if DESKPRG
+
+	VOID
+Ndebug( level, number )
+	WORD	level;
+	LONG	number;
+{
+	BYTE	buffer[14];
+
+	lbintohex( number, buffer );
+	Debug( level, buffer );
+	Debug( level, "\r\n" );	
+}
+
+/*	Debug routine	*/
+
+	VOID
+Debug( level, str )
+	WORD	level;
+	BYTE	*str;
+{
+	if ( gl_debug >= level )
+	{
+#if 1
+	  while( *str )
+	    trap13( 3, gl_port, *str++ );
+#else
+	  trap(9, str);
+#endif
+	}
+}
+#endif

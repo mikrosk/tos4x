@@ -11,6 +11,7 @@
 *	Fix at mediach at remove extra slash at the beginning 4/5/91 D.Mui
 *	Add the new names (gemdos, bios, xbios) for trap functions
 *	so that we cam get rid of osbind.o 3/10/93	Eric Smith
+*	Removed gr_mouse declaration - its not used 3/19/93 C.Gee
 
 	.globl	_trap
 	.globl	_gemdos
@@ -19,7 +20,7 @@
 	.globl	_xbios
 	.globl 	_trap13
 	.globl	_bios
-	.globl 	_gr_mouse
+*	.globl 	_gr_mouse
 	.globl 	_getmouse
 	.globl 	_putmouse
 	.globl 	_LBCOPY

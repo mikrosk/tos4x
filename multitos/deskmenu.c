@@ -18,6 +18,8 @@
 /*	Convert to Lattice C 5.51		02/18/93 C.Gee		*/
 /*	Changed 2 uses of WINICON to SMILEY     02/28/93 C.Gee		*/
 /*	These two are TREES called by get_tree().			*/	
+/*	Changed v_hardcopy() to d_v_hardcopy()  03/31/93 C.Gee		*/
+
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -669,7 +671,7 @@ opt1:	      ins_icons();
 
 	  case PREFITEM:		/* desktop preference	*/
 	    mdesk_pref();		/* cjg 07/07/92 */
-	    /*desk_pref();*/
+/*	    desk_pref();	*/
 	    break;
 
 	  case READINF:
@@ -742,7 +744,7 @@ opt1:	      ins_icons();
 	      if ( do1_alert( PRINTTOP ) == 1 )
 	      {
 	        desk_mice( HOURGLASS );
-	        v_hardcopy();
+	        d_v_hardcopy();
 	        desk_mice( ARROW );
 	      }
 	    }
@@ -1082,6 +1084,11 @@ hd_window( msgbuff )
 
 	      break;
 
+	    case WM_BOTTOMED:
+	      clr_allwin();
+	      wind_set( handle, WF_BOTTOM, 0, 0, 0, 0);
+	      break;
+	      
 	    case WM_CLOSE:		/* close one path	*/
 	      close_path( win );
               break;
@@ -1330,14 +1337,12 @@ Debug1(" desktop woke up\r\n");
 	LONG
 av_mem( VOID )
 {
-
-
-if (!d_multi) {
+  if (!d_multi) {
 	REG BYTE	*start;
 	REG BYTE	*addr;
 	REG BYTE	**new;
 	LONG		total,size;
-
+	
 	total = 0L;
 	start = (BYTE*)0;
 
@@ -1376,10 +1381,10 @@ if (!d_multi) {
 	}
 
 	return( total );
-} else {
-/* do this the polite way under MultiTOS, i.e. ask U:\PROC how much
- * memory is free
- */
+  } else {
+  	/* do this the polite way under MultiTOS, i.e. ask U:\PROC how much
+	 * memory is free
+	 */
 	LONG meminfo[4];
 	BYTE oldpath[128];
 	WORD olddrv;
@@ -1395,7 +1400,7 @@ if (!d_multi) {
 	Dsetpath(oldpath);	/* restore old path for U: */
 	Dsetdrv(olddrv);	/* restore old drive */
 	return meminfo[0] * meminfo[2];
-}
+  }
 }
 
 #if 0

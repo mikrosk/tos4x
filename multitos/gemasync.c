@@ -189,7 +189,7 @@ mwait( mask )
           p->p_prvstate = p->p_state;
 	  p->p_state = PS_MWAIT;	/* wait for event	*/
 /*	  Debug0( "Mwait calls mwait\r\n" );	*/
-	  if ( !dsptch( p ) )
+	  if ( !dsptch() )
 	  {
 	    Debug1( "Mwait calls dsptch fails\r\n" );
 	    while(1)
@@ -223,9 +223,8 @@ iasync( afunc, aparm )
 /*	LONG		old;*/
 	WORD		ret,mask;
 	
-	if ( !( e = get_evb( currpd ) ) )	
-	{
-	  Debug1("iasync couldn't get evb\r\n");
+	if ( !( e = get_evb( currpd ) ) ) {
+	  Debug7("iasync: no evb\r\n");
 	  return( (EVSPEC)FALSE );
 	}
 	  
@@ -237,11 +236,11 @@ iasync( afunc, aparm )
 
 	for (e->e_mask=1; currpd->p_evbits & e->e_mask ; e->e_mask <<= 1);
 
-	if ( !e->e_mask )
-	{
-	  Debug1("iasync: e_mask == 0\r\n");
+	if ( !e->e_mask ) {
+	  Debug7("iasync: e_mask is 0\r\n");
 	  return( (EVSPEC) 0 );
 	}
+
 	mask = e->e_mask;
 	currpd->p_evbits |= e->e_mask;
 
@@ -266,7 +265,7 @@ i_3:
 		  currpd->p_evbits ^= mask;
 		  currpd->p_evlist = e->e_nextp;
 		  e->e_mask = 0;
-		  Debug1("aqueue failed\r\n");
+		  Debug7("iasync: aqueue returns 0\r\n");
 		  return( (EVSPEC)0 );
 		}
 
@@ -275,6 +274,7 @@ i_3:
 	  case ADELAY: 		
 		if ( !aparm )		/* # of ticks to wait	*/
 		{
+		  Debug7("iasync: aparm is 0\r\n");
 		  zombie(e);
 		  return( (EVSPEC)0 );
 		}
@@ -387,7 +387,7 @@ mui:			/* increment counting semaphore to show	*/
 		}
 		break;
 	}
-	
+	Debug7("iasync: aqueue returns e_mask:");Ndebug7((LONG)e->e_mask);
 	return( (EVSPEC) e->e_mask );
 }
 

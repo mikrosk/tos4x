@@ -1280,7 +1280,7 @@ close_window( handle, closeit )
 
 	  if ( closeit )		/* look for top window */
 	  {
-	    if ( win == winhead )	/* close the top window */
+ 	    if ( win == winhead )	/* close the top window */
 	    {
 	      win = winhead;
 	

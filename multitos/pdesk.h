@@ -402,6 +402,7 @@ VOID	vs_clip(WORD, WORD *);
 VOID	v_clsvwk(VOID);
 VOID	d_vro_cpyfm(WORD, WORD *, LONG *, LONG *);
 VOID	vq_chcells(WORD *, WORD *);
+VOID	d_v_hardcopy( VOID );
 
 /*	----------------------------------------------------------
  *	deskupda.c
@@ -414,7 +415,7 @@ VOID	q_write(VOID);
 /*	----------------------------------------------------------
  *	desktop.c
  */
-
+WORD	desk_cMiNT( VOID );
 VOID	desk_term(VOID);
 WORD	ch_xcache(VOID);
 WORD	re_icon(VOID);
@@ -453,8 +454,7 @@ VOID	launch_pref(VOID);
 WORD	set_dir(BYTE *);
 VOID	exec_file(BYTE *, WINDOW *, WORD, BYTE *);
 VOID	run_it(BYTE *, BYTE *, WORD, WORD, WORD);
-VOID	hide_windows(WORD);
-VOID	show_windows(WINDOW *);
+VOID 	hide_windows( WORD flag );
 
 /*	----------------------------------------------------------
  *	desksele.c
@@ -509,4 +509,3 @@ VOID	upfdesk(BYTE *, BYTE *);
 VOID	locate_item(WORD, BYTE *, WORD);
 
 
-         

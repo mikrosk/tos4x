@@ -2,13 +2,13 @@
  *************************************************************************
  *			Revision Control System
  * =======================================================================
- *  $Revision: 1.5 $	$Source: f:\multitos/RCS/romcart.c,v $
+ *  $Revision: 1.6 $	$Source: f:\multitos/RCS/romcart.c,v $
  * =======================================================================
- *  $Author: ersmith $	$Date: 1993/04/14 22:19:54 $	$Locker:  $
+ *  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
  * =======================================================================
  *  $Log: romcart.c,v $
- *  Revision 1.5  1993/04/14  22:19:54  ersmith
- *  Incorporated more single/multitasking changes.
+ *  Revision 1.6  1993/04/27  23:00:14  ersmith
+ *  Merged Cary's and Hans-Martin's changes
  *
  * Revision 1.4  1993/03/12  19:51:12  ersmith
  * Merged HMK's loadable resource stuff
@@ -173,6 +173,8 @@ cart_snext( VOID )
 	}
 }
 
+#if 0
+DISABLED FOR NOW...CJG 03/24/93
 	VOID
 ld_cartacc( VOID )
 {
@@ -210,7 +212,11 @@ ld_cartacc( VOID )
 	  }
 	}
 }
+#endif
 
+
+#if 0
+DISABLEd TEMPORARY...CJG 03/24/93	
 	WORD
 cart_exec(pcmd, ptail)
 	BYTE	*pcmd,*ptail;
@@ -233,6 +239,8 @@ cart_exec(pcmd, ptail)
 	dos_free( ( LONG )psp );
 	return(TRUE);
 }
+#endif
+
 
 
 	WORD

@@ -1,5 +1,7 @@
 /*	DESKVDI.C		12/10/91	Derek Mui	*/
 /*	Fixed at d_xline to set line style	6/9/92	D.Mui	*/
+/*	Separated Desktop from AES		3/31/93 C.Gee	*/
+/*	Added d_v_hardcopy()			3/31/93 C.Gee	*/
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -56,6 +58,7 @@ d_v_style( style )
 	control[3] = 1;
 	d_ncode();		
 }
+
 
 
 /*	Set user defined polyline style	*/
@@ -278,4 +281,18 @@ vq_chcells( row, col )
 	d_ncode();
 	*row = intout[0];
 	*col = intout[1];
+}
+
+
+
+
+/*	Hard Copy */
+	VOID
+d_v_hardcopy( VOID )
+{
+	control[0] = 5;
+	control[1] = 0;
+	control[3] = 0;
+	control[5] = 17;
+	d_ncode();
 }

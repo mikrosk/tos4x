@@ -182,19 +182,19 @@ err2:
 *****************************************
 
 _releaes:
-	tst.w	_gl_multi
-	beq	relout
-	clr.l	-(sp)
-	move.l	#'_MUI',-(sp)
-	move.w	#3,-(sp)
-	move.w	#$134,-(sp)
-	trap	#1
-	add.l	#12,sp
-relout:
-	rts
-
-;	clr.b	_inaes
+;	tst.w	_gl_multi
+;	beq	relout
+;	clr.l	-(sp)
+;	move.l	#'_MUI',-(sp)
+;	move.w	#3,-(sp)
+;	move.w	#$134,-(sp)
+;	trap	#1
+;	add.l	#12,sp
+;relout:
 ;	rts
+
+	clr.w	_inaes
+	rts
 
 
 *****************************************
@@ -204,22 +204,25 @@ relout:
 _waitforaes:
 	tst.w	_gl_multi
 	beq	waitout
-	move.l	#-1,-(sp)
-	move.l	#'_MUI',-(sp)
-	move.w	#2,-(sp)	; get semaphore 
-	move.w	#$134,-(sp)
+
+;	move.l	#-1,-(sp)
+;	move.l	#'_MUI',-(sp)
+;	move.w	#2,-(sp)	; get semaphore 
+;	move.w	#$134,-(sp)
+;	trap	#1
+;	add.l	#12,sp
+;waitout:
+;	rts
+
+w_spin:
+	tas	_inaes		; check the flag
+	beq	waitout
+	move.w	#$00ff,-(sp)	; Syield
 	trap	#1
-	add.l	#12,sp
+	addq.l	#2,sp
+	bra	w_spin
 waitout:
 	rts
-
-;	tas	_inaes		; check the flag
-;	beq	w_1
-;	move.w	#$00ff,-(sp)	; Syield
-;	trap	#1
-;	addq.l	#2,sp
-;	bra	_waitforaes
-; w_1:	rts
 
 
 

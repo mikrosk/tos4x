@@ -29,11 +29,16 @@
 #define LFARROW 0x0200
 #define RTARROW 0x0400
 #define HSLIDE	0x0800
+
+/* added 4/22/93 ERS */
+#define SMALLER	0x1000
+
+#if 0
 /* Added Jul 23 91 for new window manager - ml. */
-#define MNBAR	0x1000
+#define MNBAR	0x2000
+#endif
 
-
-#define	TPARTS	(NAME|CLOSER|FULLER|MOVER)
+#define	TPARTS	(NAME|CLOSER|FULLER|MOVER|SMALLER)
 #define	VPARTS	(UPARROW|DNARROW|VSLIDE)
 #define	HPARTS	(LFARROW|RTARROW|HSLIDE)
 
@@ -58,8 +63,11 @@
 #define	W_RTARROW   16		/* horizontal slider right arrow */
 #define	W_HSLIDE    17		/* horizontal slider background */
 #define	W_HELEV	    18		/* horizontal slider thumb/elevator */
-#define	W_MNBAR	    19		/* menu bar (added Jul 23 91 - ml.) */
+#define W_SMALLER   19		/* iconifier */
 
+#ifdef MNBAR
+#define	W_MNBAR	    20		/* menu bar (added Jul 23 91 - ml.) */
+#endif
 
 /* Callers of totop() */
 
@@ -112,7 +120,9 @@
 #define WF_BEVENT	24	/* button event		*/
 #define WF_BOTTOM	25	/* set window to bottom	*/
 
+#ifdef MNBAR
 #define	WF_MENUBAR	99
+#endif
 				/* arrow message	*/
 #define WA_UPPAGE 	0
 #define WA_DNPAGE 	1

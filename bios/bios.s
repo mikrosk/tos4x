@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/20 15:05:32 $
+* $Date: 88/05/05 13:42:55 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.8  88/05/05  13:42:55  apratt
+* Added ctl-alt-rshft-delete cold boot code.
+*
 * Revision 1.7  88/04/20  15:05:32  apratt
 * Changed the comments around Rsconf; no code changes.
-*
+* 
 * Revision 1.6  88/04/12  18:22:34  apratt
 * Added baudrate variable in BSS (just forgot this...)
 * 
@@ -40,7 +43,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.7 $
+* $Revision: 1.8 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3136,11 +3139,10 @@ ari13	cmp.w	bufhead(a0),d1 ;head=tail?
 	lsl.l	#$8,d0		;now do the shuffling to generate the new
 	lsr.w	#$8,d0		;improved conin format ($kkss00aa)
 	cmp.l	#$0c53001f,d0	;ctl-alt-delete value
-	bne.s	nowarmboot
-	bra	reseth		;jump to reset the system (warm boot)
-	swap	d2		;get high word
-nowarmboot:
 
+	cmp.l	#$0d53001f,d0	;ctl-alt-rshft-delete value
+	bclr.l	#KBCL+24,d2	;mask off caps-lock state
+	swap	d2		;get high word
 	cmp.w	#$0c53,d2	;ctl-alt plus delete's scan-code
 	beq	reseth
 	cmp.w	#$0d53,d2	;ctl-alt-rshft plus delete's scan-code
@@ -3222,6 +3224,49 @@ keymaus:
 	movea.l	(sp)+,a0	;restore kbufrec pointer
 	rts
 
+mauskey1:
+	dc.b	$47
+	dc.b	$c7
+* COLD cold boot code: copy a bit of code to $8, then jump to it.	*
+	dc.b	$d2
+* gets a bus error.  Then it branches to reseth.			*
+* COLD cold boot code: copy a bit of code to $C, then jump to it.
+* get here either, so don't worry about it.
+*
+* compile in the limit of 1MB and clear it from ROM.
+*
+	lea.l	cstart(PC),a0
+	move.w	#$f,d0			; move 64 bytes (should be enough)
+	move.l	#$8,a1
+rloop:	move.l	(a0)+,(a1)+
+	dbra	d0,rloop
+	jmp	$8
+.endif
+cstart:
+	lea.l	berr(PC),a0
+	move.l	a0,$8.w
+	lea.l	cend(PC),a0
+	moveq.l	#0,d0
+	move.l	d0,d1
+	move.l	d0,d2
+	move.l	d0,d3
+	move.l	d0,d4
+	move.l	d0,d5
+	move.l	d0,d6
+	move.l	d0,d7
+	dbra	d1,cploop
+* loop forever (until bus error)
+	move.l	#$808,d0		; clobber the cache
+cloop:	movem.l	d0-d7,(a0)
+	add.w	#(4*8),a0
+	bra	cloop
+	move.l	#$c,a1
+berr:	move.l	$4,a0
+	jmp	(a0)
+cend:	dc.w	0
+
+	move.l	a0,$8
+.else
 	move.l	$4,$8		; not TT: bus error jumps to reset vector
 .endif
 	lea.l	coldend(PC),a0	; start clearing here

@@ -1,12 +1,17 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.16 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.17 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/25 11:51:48 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/25 13:04:24 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.17  1991/06/25  13:04:24  apratt
+* This is slightly simplified from before... dots are always OK,
+* double slashes always stop the scan, and EROOT is returned only
+* if scan_type is SCAN_DIR (FN_NORM, FN_DOTSOK, etc are obsolete).
+*
 * Revision 1.16  1991/06/25  11:51:48  apratt
 * Dsetpath(".") in root didn't work before, and neither did \\ as an arg.
 * Now they do, but it's a crock, and I'm trying to improve it.
@@ -99,31 +104,25 @@ is empty (except last when dotsok), last component is "." or ".." (and not
 dotsok), any component is an invalid file name.  Also a component like
 "..abc" or other unparsable.
 
-Call with (flags | FN_DOTSOK) to enable finding . and .. in the last
-component; call with FN_TRAILOK to allow one or more trailing slashes (old
-GEMDOS Dsetpath allows this); call with FN_EARLY to return E_OK before
-searching in the last dir for the last component.  FN_DOTSOK is used in
-Dsetpath to enable Dsetpath(".."), and also in Fattrib (same reason). If
-you encounter dot or dot-dot in the root, the result is the root. If this
-is the last component of the path name, you get EBADRQ, unless FN_DOTSOK,
-in which case you get EROOT.  FN_TRAILOK is used in Dsetpath to enable
-Dsetpath("foo\") which some programs do.
+RETURNS: If the file doesn't exist, but you got all the way to the last
+directory, then EFILNF is returned and that directory's dev and cluster are
+valid.  (These are the only parts used as input to dirslot.)  If you didn't
+even get to the last directory (i.e. a component not found, or a component
+is a file not a directory) then EPTHNF is returned.  On a successful return
+from fn2dir() (return code zero), dir is fresh.
 
-If the file doesn't exist, but you got all the way to the last directory,
-then EFILNF is returned and that directory's dev and cluster are valid.
-(These are the only parts used as input to dirslot.)
+Call with SCAN_NORM for normal scans.  These will match dot and dot-dot.
+Call with SCAN_DIR to return EROOT when the path ultimately specifies the
+root directory; otherwise you'll get EFILNF.  Call with SCAN_EARLY to
+return before scanning for the last component.
 
-If you didn't even get to the last directory, EPTHNF is returned.
-
-On successful return from fn2dir() (return code zero), dir is fresh.
+A double backslash is taken as an empty component.  In the SCAN_DIR case,
+the scanning stops but succeeds.  Otherwise the drive is touched and you
+get EFILNF.  The drive is touched because of a bug in the Desktop, where
+Fopen of c:\\x has to touch the drive.
 
 QUIET CHANGE FROM ORIGINAL GEMDOS: Fopen("a:\*.*",0) used to open the first
 file on A: but this code returns EBADRQ.
-
-ROOT DIRECTORY SPECIAL CASES: ".\foo" when you're in the root is special
-cased because root doesn't truly have a "dot" directory.  "..\foo" in
-the root directory is special cased, too, so you can't get in trouble
-that way.  ".." in root is root.
 
 long
 dir2dir(dir)
@@ -207,11 +206,31 @@ x is space).
 #define isdots(s) (*(s) == '.' && \
 			(isend((s)+1) || ((*((s)+1) == '.') && isend((s)+2))))
 
+/*
+ * The types of searches are:
+ *
+ *	early return: scan for everything leading up to the last component.
+ *
+ *	directory: if you stop at the root, return EROOT.
+ *
+ * 	normal: scan for the file
+ *
+ * In each case, return with a fresh dir and *pname pointing to the
+ * beginning of the last component if you return E_OK or EFILNF (in which
+ * case the fresh dir describes the dir where the file would be if it
+ * existed).  Return EPTHNF if something in the middle isn't a directory,
+ * or isn't found.
+ *
+ * Stop looking if you encounter multiple slashes (empty components), but:
+ * in normal, hit the disk anyway, and in directory, if the result is the
+ * root, return EROOT.
+ */
+
 long
-fn2dir(pname, dir, flags)
+fn2dir(pname, dir, scan_type)
 char **pname;
 DIR *dir;
-int flags;
+int scan_type;
 {
     char *name = *pname, *oname, *end;
     DMD *dmd;
@@ -222,16 +241,13 @@ int flags;
     uint attr;
     long err;
     FCB fcb, *pfcb;
-    int dotsok, earlyflag, trailok, tslash;
-    int rootflag;
-
-    /* just because these are bitmapped doesn't mean they combine well */
-    dotsok = (flags & FN_DOTSOK);
-    trailok = (flags & FN_TRAILOK);
-    earlyflag = (flags & FN_EARLY);
+    int earlyflag, trailok;
 
     DBCMD(0x20,"print fn2dir -s (lpeek (lpeek (`a6 + 8))) "
 		"flags -x (wpeek (`a6 + 10)) dir: -x (lpeek (`a6 + c));_c");
+
+    trailok = (scan_type == SCAN_DIR);
+    earlyflag = (scan_type == SCAN_EARLY);
 
     if (!*name) return EBADRQ;
     if (*(name+1) == COLON) {
@@ -249,8 +265,7 @@ int flags;
 
     if (*name == SLASH) {
 	cl = 0;
-	/* collapse out multiple leading slashes */
-	while (*name == SLASH) name++;
+	++name;
     }
     else cl = run->p_curdir[dev];
 
@@ -270,76 +285,56 @@ int flags;
 	}
 
 	/*
-	 * Empty component? Return file not found (!) for compatibility.
-	 * I'd rather return EBADRQ because it will never succeed.
-	 * The dir has to be fresh when we return EFILNF.
+	 * Empty component?  Return file not found (!) for compatibility.
+	 * I'd rather return EBADRQ because it will never succeed.  We have
+	 * to touch the disk before returning EFILNF because old GEMDOS
+	 * did, and we have to return EROOT or E_OK if this is a SCAN_DIR.
 	 */
 
 	if (end == name) {
-	    dirfirst(dir,dmd);
-	    return EFILNF;
+	    if (trailok) {
+		if (cl == 0) return EROOT;
+		else return E_OK;
+	    }
+	    else {
+		dirfirst(dir,dmd);
+		return EFILNF;
+	    }
 	}
 
 	/*
-	 * Sigh.  Old GEMDOS just stopped looking when it saw a double
-	 * slash, but didn't fail, so a cd to auto\\ works, and a cd to
-	 * gemdos\\dossys will cd you to gemdos.  I don't care about the
-	 * second case, but the first case has to work.  So set tslash as a
-	 * flag; if there's nothing but slashes from here to the end of the
-	 * name, tslash is true.  We only bother scanning if trailok.
+	 * if (last component && earlyflag) bail out now.
 	 */
 
-	if (trailok && *end == SLASH) {
-	    char *p;
-
-	    for (p = (end+1); *p == SLASH; p++) ;
-	    tslash = !*p;
-	    DBCMD(0x20,tslash ? "print tslash!;_c" : "_c");
-	}
-	else tslash = 0;
-
-	/*
-	 * if (last component; trailing slash(es) OK if trailok)
-	 *     if earlyflag, bail out now.
-	 *     if isdots(),
-	 *	   if dotsok, do nothing (yet).
-	 *	   else return EBADRQ.
-	 *
-	 * Note: tslash can only be true if trailok: don't check trailok again.
-	 */
-
-	if (!*end || tslash) {
-	    if (earlyflag) {
-		*pname = name;
-		DBCMD(0x20,"print early return: *pname= "
-			    "-s (lpeek (lpeek (`a6 + 8))) "
-			    "dir -x (lpeek (`a6 + c)) is:;"
-				"dirx (lpeek (`a6 + c));_c");
+	if (!*end && earlyflag) {
+	    *pname = name;
+	    DBCMD(0x20,"print early return: *pname= "
+			"-s (lpeek (lpeek (`a6 + 8))) "
+			"dir -x (lpeek (`a6 + c)) is:;"
+			"dirx (lpeek (`a6 + c));_c");
 		return E_OK;
-	    }
-	    else if (isdots(name) && !dotsok) {
-		/* dots in last component; don't look unless dotsok */
-		DBCMD(0x20,"print dots in last component and not dotsok;_c");
-		return EBADRQ;
-	    }
 	}
 
 	/*
 	 * If we're in the root and the name is "." or ".." then we fake a
 	 * match.  dir is unchanged because it's already root. attr is set
 	 * to FA_SUBDIR so we don't think we've found a file in the middle
-	 * of a pathname where only directories can go.
+	 * of a pathname where only directories can go.  If this is the last
+	 * component then we return EROOT for SCAN_DIR, EFILNF otherwise.
 	 */
 
 	if (cl == 0 && isdots(name)) {
-	    DBCMD(0x20,"print dot or dot-dot in root dir: dotmatch;_c");
+	    DBCMD(0x20,"print dot or dot-dot in root dir;_c");
+	    if (!*end) {
+		if (scan_type == SCAN_DIR) return EROOT;
+		else return EFILNF;
+	    }
 	    attr = FA_SUBDIR;   /* fake attrib of matched "file" */
-	    rootflag = TRUE;
 	    goto dotmatch;
 	}
-	rootflag = FALSE;
 
-        if (haswild) return EBADRQ;	/* no wildcards at this point */
+	/* If you get here, no wildcards are allowed */
+        if (haswild) return EBADRQ;
 
 	/* build an FCB from the name */
 	if (err = name2fcb(name,end,&fcb)) return err;
@@ -388,22 +383,13 @@ dotmatch:
 	if (*name == SLASH) {
 	    /* fail if found a file but not at end of path */
 	    if (!(attr & FA_SUBDIR)) return EPTHNF;
-	    /* consume multiple slashes (Sigh...) */
-	    do {
-		name++;
-	    } while (*name == SLASH);
+	    ++name;
         }
     } while (*name);
 
-    /*
-     * End still points to end of last component; check for trailing SLASH.
-     * Dsetpath("\foo\bar\") is legal, so this is no error if trailok.
-     */
-    if (*end == SLASH && !trailok) return EBADRQ;
-
     DBCMD(0x20,"print fn2dir returns, dir:;dirf (lpeek (`a6 + c));_c");
     *pname = oname;
-    return (rootflag ? EROOT : E_OK);
+    return E_OK;
 }
 
 long

@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
+* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.11  1991/02/21  03:07:32  apratt
+* This version performs this testbed perfectly.
+*
 * Revision 2.10  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -169,7 +172,7 @@ DMD *dmd;
     dir2.dir_clust = dir->dir_fcb[1].f_clust;	/* f_clust of .. slot */
     swp68(dir2.dir_clust);
     dir2.dir_curcl = dir2.dir_clust;
-    dir2.dir_recno = cl2rec(dir2.dir_clust,dmd);
+    dir2.dir_recno = realcl2rec(dir2.dir_clust,dmd);
     dir2.dir_recoffs = 0;
 
     /* "freshen" this new dir */
@@ -236,6 +239,7 @@ char *s;
     FCB fcbhold;
     static char dotdotstr[12] = "..         ";
     int i;
+    BCB *bcb;
 
     /* allocate a cluster, initialize it, ixcreat the file, and link them */
 
@@ -264,9 +268,10 @@ char *s;
     newcl = TRUE;
     if (!(cl = nextcl(0,dmd,TRUE,NULL))) return ERROR;
     newcl = TRUE;
-    rec = cl2rec(cl,dmd);
+    rec = realcl2rec(cl,dmd);
 
-    fcb = getrec(rec,dmd,1,NULL);
+    /* use the special flag to getrec: don't pre-read the sector */
+    fcb = getrec(rec,dmd,2,NULL);
 
     /* make 'dot' entry */
     xmovs(11,dotdotstr,fcb->f_name);
@@ -275,6 +280,7 @@ char *s;
     for (i=10; i; fcb->f_fill[--i] = 0) ;
     fcb->f_time = realtime;
     fcb->f_date = realdate;
+    swp68(cl);
     fcb->f_clust = cl;
     fcb->f_fileln = 0;
 
@@ -286,16 +292,21 @@ char *s;
     fcb->f_time = fcbhold.f_time;
     fcb->f_date = fcbhold.f_date;
     fcb->f_clust = fcbhold.f_clust;
+    fcb->f_fileln = fcbhold.f_fileln;	/* really zero */
 
-    /* zero out the rest of the record */
+    /* zero out the rest of this record */
     fcb++;
     clear(fcb,((char *)fcb)+dmd->m_recsiz);
 
     /* zero out the rest of the cluster */
     for (i=dmd->m_clsiz-1; i; --i) {
-	fcb = getrec(rec+i,dmd,1,NULL);
+	fcb = getrec(rec+i,dmd,2,&bcb);		/* special flag */
 	clear(fcb,((char *)fcb)+dmd->m_recsiz);
     }
+
+    /* flush the new directory's records. The arg is the last record we */
+    /* cleared, but it'll flush them all because of flush's semantics.  */
+    flush(bcb);
 
     /* code stolen from ixcreate; at this point we know what dir */
     /* to look for a slot in.  If dirslot fails, the cluster we just */
@@ -326,11 +337,11 @@ char *s;
     swp68(fcb->f_date);
     fcb->f_fileln = 0;
 
-    /* set the starting-cluster field of the entry */
+    /* set the starting-cluster field of the entry (cl is already swapped) */
     fcb->f_clust = cl;
 
-    fatdirty(dir.dir_dev);
     dirdirty(&dir);
+    fatdirty(dir.dir_dev);
     return E_OK;
 }
 

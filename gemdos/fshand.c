@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.8  1991/02/21  03:07:32  apratt
+* This version performs this testbed perfectly.
+*
 * Revision 2.7  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -145,7 +148,7 @@ int src;
 PD *pd;
 {
 	long err;
-	PD *_run;
+	PD *_run = run;
 	OFD *ofd;
 
 	if ((dest < 0) || (dest >= pd->p_uftsize))
@@ -200,7 +203,7 @@ xclose(h)
 int h;
 {
 	OFD *ofd;
-	PD *_run;
+	PD *_run = run;
 
     /* A while ago, I "guaranteed" that any close would flush all */
     /* dirty sectors on all drives ... do that first. See xsync() */
@@ -315,8 +318,9 @@ int h;
 long len;
 void *ubufr;
 {
-	OFD	*ofd;
+	OFD *ofd;
 	long err;
+	DFD *dfd;
 
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;

@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\fscl.c,v $
+* $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.12  1991/02/21  03:07:32  apratt
+* This version performs this testbed perfectly.
+*
 * Revision 2.11  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -29,15 +32,13 @@
 #include "fs.h"
 
 /* 
- * macro to turn a buftyp into a buffer list number.
- * Input n is 0 for FAT, 1 for RD, 2 for data.
- * Originally, this formula was ((n) != 0), meaning the FAT was
- * on its own list and RD and data shared the other.  This
- * formula (FAT & RD on one, data on the other) makes more
- * sense to me.
+ * macro to turn a buftyp into a buffer list number. Input n is 0 for FAT,
+ * 1 for RD, 2 for data. Originally, this formula was ((n) != 0), meaning
+ * the FAT was on its own list and RD and data shared the other.  This
+ * formula (FAT & RD on one, data on the other) makes more sense to me.
  *
- * This macro is used in getrec to assign a block to a list,
- * and in flush to determine which list the buffer's on.
+ * This macro is used in getrec to assign a block to a list, and in flush
+ * to determine which list the buffer's on.
  */
 #define buflist(n) ((n) == 2)
 
@@ -56,14 +57,15 @@ uint n;
 
 /*
  * dirdirty(dir), fatdirty(dev): write the indicated part of the disk out.
- * In the case of dirdirty, the dir's bcb field is passed to flush.
- * For fatdirty, we actually have to look for a dirty FAT sector to write.
+ * In the case of dirdirty, the dir's bcb field is passed to flush. For
+ * fatdirty, we actually have to look for a dirty FAT sector to write.
  */
 
 voidfn
 dirdirty(dir)
 DIR *dir;
 {
+    DBCMD("print -n dirdirty ; dirx (lpeek (+ `a6 8)) ; _c");
     dir->dir_bcb->b_dirty = 1;
     flush(dir->dir_bcb);
 }
@@ -74,6 +76,7 @@ uint dev;
 {
     BCB *b;
 
+    DBCMD("print fatdirty (wpeek (+ `a6 8));_c");
     for (b = bufl[0]; b; b = b->b_link) {
 	if (b->b_bufdrv == dev && b->b_dirty) {
 	    flush(b);
@@ -85,10 +88,9 @@ uint dev;
 /*
  *  Flush a buffer
  *
- *  5/90: flush is only called from this source file (fscl.c),
- *  and it's only called when the buffer in question is actually
- *  dirty.  Therefore it doesn't check the validity or dirtiness
- *  of the buffer.
+ *  5/90: flush is only called from this source file (fscl.c), and it's
+ *  only called when the buffer in question is actually dirty.  Therefore
+ *  it doesn't check the validity or dirtiness of the buffer.
  *
  *  Flushing any buffer writes all buffers on that drive and that list.
  */
@@ -102,14 +104,15 @@ BCB *b;
   DMD *dmd;
   int i;
 
+  DBCMD("print -n flush ;bcb (lpeek (+ `a6 8));_c");
   dmd = b->b_dmd;
   n = b->b_buftyp;
   d = b->b_bufdrv;
 
   /*
    * flush all dirty buffers on this list and on this drive.
-   * (Unfortunately, they're flushed in LRU order, but this is
-   * actually likely to be pretty sequential.)
+   * (Unfortunately, they're flushed in LRU order, but this is actually
+   * likely to be pretty sequential.)
    */
 
   i = buflist(n);
@@ -133,9 +136,9 @@ BCB *b;
 /*
  * function to flush all dirty buffers on all drives.
  *
- * This is called by ixclose, because closing any file is now
- * guaranteed to flush all buffers on all drives. There may one 
- * day be a new call which does that explicitly, too.
+ * This is called by ixclose, because closing any file is now guaranteed to
+ * flush all buffers on all drives. There may one  day be a new call which
+ * does that explicitly, too.
  *
  * Implementation:
  *
@@ -154,6 +157,8 @@ flushall()
     REG int d;
     REG int l;
 
+    DBCMD("print flushall;_c");
+
     for (d=0; d<MAXDEVS; d++) {
 	for (l=1; l >= 0; l--) {
 	    for (b = bufl[l]; b; b = b->b_link) {
@@ -169,11 +174,11 @@ flushall()
 /*
  * usrio: actually do a block rwabs for a user file
  *
- * Invalidates any buffers in the region spanned by the operation.
- * For reads, writes the data first, but doesn't bother for writes.
+ * Invalidates any buffers in the region spanned by the operation. For
+ * reads, writes the data first, but doesn't bother for writes.
  *
- * Adds dmd->m_recdata to the record number: the caller (xrw) works
- * in zero-based data record numbers.
+ * Adds dmd->m_recdata to the record number: the caller (xrw) works in
+ * zero-based data record numbers.
  *
  * rwabs is a macro which longjmps on error.
  */
@@ -189,8 +194,13 @@ DMD *dmd;
 	uint d;
 	uint end;
 
-	end = strt+num;
+	DBCMD("print usrio rw: (wpeek (+ `a6 8)) count: (wpeek (+ `a6 a)) "
+	      "start: (wpeek (+ `a6 c)) ubuf: (lpeek (+ `a6 e)) "
+	      "dmd: (lpeek (+ `a6 12));_c");
+
 	d = dmd->m_drvnum;
+	strt += dmd->m_recdata;
+	end = strt+num;
 
 	/* flush all data blocks which overlap this write */
 	for (b = bufl[1]; b; b = b->b_link) {
@@ -202,21 +212,21 @@ DMD *dmd;
 	    }
 	}
 
-	rwabs(rwflg,ubuf,num,strt+dmd->m_recdata,d);
+	rwabs(rwflg,ubuf,num,strt,d);
 }
 
 
 /*
- * getrec: return pointer to buffer representing a record on disk.
- * Also fills in a BCB pointer if pbcb is nonnull.
+ * getrec: return pointer to buffer representing a record on disk. Also
+ * fills in a BCB pointer if pbcb is nonnull.
  *
- * The record number is absolute. All buffer management goes here.
- * Buffers are managed LRU, and written using flush() when the victim is
- * dirty.  If wrtflg is 0, the buffer's dirty flag is left alone or cleared.
- * If 1, it's marked dirty.  If 2, the buffer management stuff is done,
- * but the buffer isn't actually read from disk; this is for extending files,
- * where the contents of the old record don't matter.  (For increased 
- * security, zero the buffer before returning it.)
+ * The record number is absolute. All buffer management goes here. Buffers
+ * are managed LRU, and written using flush() when the victim is dirty.  If
+ * wrtflg is 0, the buffer's dirty flag is left alone or cleared. If 1,
+ * it's marked dirty.  If 2, the buffer management stuff is done, but the
+ * buffer isn't actually read from disk; this is for extending files, where
+ * the contents of the old record don't matter.  (For increased  security,
+ * zero the buffer before returning it.)
  */
 
 void
@@ -235,6 +245,9 @@ BCB **pbcb;
     BCB **phdr;
     int doread;
     int mcflag = 0;
+
+    DBCMD("print getrec recn: (wpeek (+ `a6 8)) dmd: (lpeek (+ `a6 a)) "
+	  "flg: (wpeek (+ `a6 e)) pbcb: (lpeek (+ `a6 10));_c");
 
     if (wrtflg == 2) doread = 0, wrtflg = 1;
     else doread = 1;
@@ -262,20 +275,26 @@ BCB **pbcb;
 	}
     }
     if (!b) {
-	/* we went to the end of the list. */
-	/* if mtbuf, set b to it and q to its prev's link */
-	/* else set b to last buffer in the list & q to prev's link */
+	/*
+	 * We went to the end of the list. if mtbuf, set b to it and q to
+	 * its prev's link else set b to last buffer in the list & q to
+	 * prev's link
+	 */
+
+	DBCMD("print cache miss;_c");
 
 	if (mtbuf) {
 	    /* miss, but there's an empty */
 	    b = mtbuf;
 	}
 
-	/* need to set q to link field of b's prev, or */
-	/* set b to last buf & q to its prev's link field */
-
-	/* The label doio is used to actually do the I/O when there's */
-	/* a cache hit, but the the mediach state is 1 (so we check) */
+	/* 
+	 * need to set q to link field of b's prev, or set b to last buf &
+	 * q to its prev's link field
+	 * 
+	 * The label doio is used to actually do the I/O when there's a
+	 * cache hit, but the the mediach state is 1 (so we check)
+	 */
 doio:
 	for (p = *(q = phdr); p->b_link; p = *(q = &p->b_link))
 	    if (b == p)
@@ -284,7 +303,10 @@ doio:
 	b = p;
 
 	/* if our victim is in use & dirty, flush him */
-	if (b->b_bufdrv != B_INVALID && b->b_dirty) flush(b);
+	if (b->b_bufdrv != B_INVALID && b->b_dirty) {
+	    DBCMD("print flush victim;_c");
+	    flush(b);
+	}
 
 	/* INVALIDATE this buffer because the rwabs might fail! */
 	b->b_bufdrv = B_INVALID;
@@ -303,6 +325,7 @@ doio:
     else {
 	/* cache hit */
 	/* use a buffer, but first validate media */
+	DBCMD("print cache hit;_c");
 	if (err = mediach(b->b_bufdrv)) {
 	    if (err == 1) {
 		mcflag = 1;
@@ -326,20 +349,21 @@ doio:
 	b->b_dirty = 1;
 
     if (pbcb) *pbcb = b;
+    DBCMD("print allbcbs after getrec:;allbcbs;_c");
     return(b->b_bufr);
 }
 
 /***********************************************************************
  * New FAT code by AKP 17-Sep-1987
  *
- * This code circumvents almost all of the seek/read/write stuff by
- * asking for the FAT buffer directly from the disk cache.
- * Flush() takes care of the two-copies-of-a-FAT stuff.
+ * This code circumvents almost all of the seek/read/write stuff by asking
+ * for the FAT buffer directly from the disk cache. Flush() takes care of
+ * the two-copies-of-a-FAT stuff.
  *
- * NOTE: This code assumes that there are at least two FAT buffers,
- * and that they're managed LRU: For non-16-bit FATs, it can call
- * getrec twice to get pointers to *two* FAT buffers, and assume they 
- * are both in memory at the same time.
+ * NOTE: This code assumes that there are at least two FAT buffers, and
+ * that they're managed LRU: For non-16-bit FATs, it can call getrec twice
+ * to get pointers to *two* FAT buffers, and assume they  are both in
+ * memory at the same time.
  *
  * To use this code, set newcl = TRUE before and after any loop of cluster
  * calls in your code.  This invalidates the cached info so you're sure to 
@@ -352,10 +376,11 @@ doio:
  * nextcl(cl,dmd,extflag,&extended) returns the next cluster in the chain,
  * extending the chain if necessary and extflag.  When extending, marks the
  * new cluster with -1.  *extended reflects whether or not the chain was
- * actually extended; pass in NULL if you don't care. Returns zero on EOF when
- * !extflag, and when extending fails because there are no free clusters, and
- * also if cl's entry is 0 or 0xfffx (where x is 0-e).  If cl itself is zero,
- * the first free cluster on the disk is returned (and marked with -1).
+ * actually extended; pass in NULL if you don't care. Returns zero on EOF
+ * when !extflag, and when extending fails because there are no free
+ * clusters, and also if cl's entry is 0 or 0xfffx (where x is 0-e).  If cl
+ * itself is zero, the first free cluster on the disk is returned (and
+ * marked with -1).
  * 
  **********************************************************************/
 
@@ -363,17 +388,32 @@ uint newcl;		/* flag: goes TRUE at start of a cluster loop */
 uint clsector;		/* holds saved sector number */
 DMD *cldev;		/* holds DMD of saved sector */
 char *clsave;		/* holds saved sector pointer */
-uint clwrite;		/* when TRUE, the sector has been marked dirty */
+BCB *clbcb;		/* hold the cluster's BCB for marking dirty */
 
 /*
  * getfat: this combination of macro and procedure returns the requested
  * FAT sector from the disk, with a combination of speed & small code size.
+ *
+ * The logic is this: if newcl is set, you definitely call getfat, which
+ * calls getrec.  If the dev isn't the same or the cluster isn't the same,
+ * you call getfat.  Otherwise, you OR wflag into the record's dirty flag
+ * and return the cached record pointer.
+ *
+ * The win is when you are chasing a FAT chain: you set newcl=TRUE, then
+ * call getcl (and clfix) a lot, and you only go through the buffer 
+ * management code once per FAT *sector* you touch, instead of once  per
+ * FAT *entry* you touch.  
+ *
+ * Is this really a win?  Maybe not. When do you use this a lot? On
+ * floppies, and when finding the next free cluster for an existing  file
+ * (find first free cluster is a separate operation), and when Fseeking to
+ * the end of a long file (but even then...).
  */
 
 #define Getfat(s,dmd,wflag) \
-    ((newcl || (cldev != (dmd)) || \
-     (clsector != (s)) || ((wflag && !clwrite))) ? \
-	getfat((s),(dmd),(wflag)) : clsave)
+    ((newcl || (cldev != (dmd)) || (clsector != (s))) \
+	? getfat((s),(dmd),(wflag)) \
+	: (clbcb->b_dirty |= wflag, clsave))
 
 char
 *getfat(s,dmd,wflag)
@@ -383,10 +423,9 @@ int wflag;
 {
 	/* get the buffer the sector is in */
 	newcl = TRUE;		/* do this in case getrec longjmp's */
-	clsave = getrec(s+dmd->m_recfat,dmd,wflag,NULL);
+	clsave = getrec(s+dmd->m_recfat,dmd,wflag,&clbcb);
 	clsector = s;
 	cldev = dmd;
-	clwrite = wflag;
 	newcl = FALSE;
 	return clsave;
 }
@@ -413,6 +452,8 @@ DMD *dmd;
     uint fatword;
     char *fptr;		/* points to first byte of fatword */
     char *q;		/* points to buf[offset] once that's known */
+
+    DBCMD("print clfix (wpeek (+ `a6 8)) becomes (wpeek (+ `a6 a));_c");
 
     if (dmd->m_16) {
 	/* compute byte offset into FAT */
@@ -545,6 +586,8 @@ int *extended;
 {
     uint xcl, lastcl, cl2, rover, i;
 
+    DBCMD("print nextcl;_c");
+
     if (extended) *extended = 0;
 
     if (!cl) {
@@ -556,21 +599,29 @@ int *extended;
     xcl = getcl(cl,dmd);
     if (!xcl) {
 	/* bad news: some clust or dir slot points to a free clust */
+	DBCMD("print INCONSISTENT DIR/FAT: zero entry;_c");
 	return 0;
     }
     else if (xcl == 0xffff) {
-	if (!extflag) return 0;
+	if (!extflag) {
+	    DBCMD("print end of chain and !extend;_c");
+	    return 0;
+	}
 
 extend:
+	DBCMD("print extend the chain;_c");
 	/* extend the chain, return the new cl */
 	if (!cl && dmd->m_16) {
 	    cl2 = fastcl(dmd,FALSE);
-	    if (!cl2) return 0;
+	    if (!cl2) {
+		DBCMD("print fastcl/no free space;_c");
+		return 0;
+	    }
 	}
 	else {
 	    /*
-		* this loop can run more than nec., but only if no space.
-		*/
+	     * this loop can run more than nec., but only if no space.
+	     */
 	    rover = cl;
 	    lastcl = dmd->m_numcl + 2;
 	    for (i=2; i<lastcl; i++) {
@@ -581,34 +632,42 @@ extend:
 		}
 		if (++rover > lastcl) rover = 0;
 	    }
+	    DBCMD("print slowcl/no free space;_c");
 	    return 0;
 	}
 gotone:
 	if (cl) clfix(cl,cl2,dmd);
 	clfix(cl2,-1,dmd);
 	if (extended) *extended = 1;
+	DBCMD("print extended: return cl2;_c");
 	return cl2;
     }
-    else if ((xcl & 0xfff0) == 0xfff0) return 0;
-    else return xcl;
+    else if ((xcl & 0xfff0) == 0xfff0) {
+	DBCMD("print FAT error: bad sector, etc.;_c");
+	return 0;
+    }
+    else {
+	DBCMD("print nextcl returns next cluster;_c");
+	return xcl;
+    }
 }
 
 
 /*
- * Fast cluster code, invoked when looking for the first unused cluster
- * in a 16-bit FAT.  Call with freeflag TRUE to return number of free
- * clusters in the whole FAT.  (One "if" per sector doesn't seem
- * like too high a price to pay.)
+ * Fast cluster code, invoked when looking for the first unused cluster in
+ * a 16-bit FAT.  Call with freeflag TRUE to return number of free clusters
+ * in the whole FAT.  (One "if" per sector doesn't seem like too high a
+ * price to pay.)
  *
- * 'i' is used as a FAT sector counter.  'end' is set to the index
- * of the last FAT sector actually used (independent from dmd->m_fsiz).
- * 'end' is computed in a sector-size-independent way.
- * In the inner loop, 'cl' is the count of words left to check in this
- * sector: it starts out short by two (and buf starts out incremented
- * by two words) in the first FAT sector.
+ * 'i' is used as a FAT sector counter.  'end' is set to the index of the
+ * last FAT sector actually used (independent from dmd->m_fsiz). 'end' is
+ * computed in a sector-size-independent way. In the inner loop, 'cl' is
+ * the count of words left to check in this sector: it starts out short by
+ * two (and buf starts out incremented by two words) in the first FAT
+ * sector.
  *
- * If a free cluster is found, its number is put in cl2, and i is
- * set to zero, so the later test "if (i < lastcl)" will fail.
+ * If a free cluster is found, its number is put in cl2, and i is set to
+ * zero, so the later test "if (i < lastcl)" will fail.
  *
  * Note that little-g getfat() is used, for low overhead.
  */
@@ -685,8 +744,8 @@ again:
  * o_currec is the record number on disk where bytenum is, zero-based
  *	from the start of the data part of the disk.
  *
- * If you call this for reading, don't try to read past EOF.  That is assumed
- * very subtly in a couple of places.
+ * If you call this for reading, don't try to read past EOF.  That is
+ * assumed fairly subtly in a couple of places.
  *
  * The overall logic is as follows:
  *
@@ -704,25 +763,29 @@ on a record boundary, the op can't have a head, only a middle and a tail.
     The logic of the middle part is thus:
 
     if (there's a middle) {
-	set up a run starting at the current record;
-	do {
+	set up a run starting at the current record, with run_len = 1;
+	while (--lenmid) {
 	    ++currec;
 	    if (fell off the end of the current cluster) {
 		curcl = next cluster of this file, extending if nec;
 		currec = cl2rec(curcl);
 		if (currec not contiguous with run) {
 		    write out the run;
-		    set up a new run;
+		    set up a new run with run_len = 0;
 		}
 	    }
-	    run ends at currec;
-	} while (--middle_length_in_records);
+	    ++run_len;
+	}
 	write out the run;
     }
 
-It seems like this code handles falling off a cluster a lot: in three
-different places.  If you can think of a better way, let me know.
-
+ * It seems like this code handles falling off a cluster a lot: in three
+ * different places.  If you can think of a better way, let me know.
+ * 
+ * There is a BUG in this code: if you do a transfer that ends on a record
+ * boundary, the curcl/currec fields are wrong.  It's worse if you end on a
+ * cluster boundary.
+ * 
  */
 
 long
@@ -736,7 +799,7 @@ void (*bufxfr) _P((uint, void *, void *));
     char *bufp;
     DMD *dmd;
     uint lenhead, lenmid, lentail;
-    uint run_start, run_end, run_len;
+    uint run_start, run_len;
     uint xcl;
     int extended;
     ulong rc;
@@ -748,7 +811,13 @@ void (*bufxfr) _P((uint, void *, void *));
     ulong bytnum;
     uint curcl, currec, recoffs;
 
-    dmd = &drvtbl[ofd->o_dfd->dfd_dev];
+    DBCMD("print xrw flg: (wpeek (+ `a6 8)) "
+	  "ofd: (lpeek (+ `a6 a)) "
+	  "len: (lpeek (+ `a6 e)) "
+	  "ubufr: (lpeek (+ `a6 12));_c");
+
+    dfd = ofd->o_dfd;
+    dmd = &drvtbl[dfd->dfd_dev];
     recsiz = dmd->m_recsiz;
     clsiz = dmd->m_clsiz;
     clsizb = dmd->m_clsizb;
@@ -761,40 +830,59 @@ void (*bufxfr) _P((uint, void *, void *));
 
     if (!curcl) {
 	/* our r/w pointer is not valid */
-	curcl = ofd->o_dfd->dfd_strtcl;
+	DBCMD("print start of file;_c");
+	curcl = dfd->dfd_strtcl;
 	swp68(curcl);
 	if (!curcl) {
 	    /* file is empty */
+	    DBCMD("print file is empty;_c");
 	    if (!wrtflg) return 0;
-	    newcl = TRUE;
 	    if (!(curcl = nextcl(0,dmd,wrtflg,NULL))) {
 		/* can't extend file from zero size */
 		return 0;
 	    }
-	    ofd->o_dfd->dfd_strtcl = curcl;
-	    swp68(ofd->o_dfd->dfd_strtcl);
-	    ofd->o_dfd->dfd_dirty = 1;
+	    dfd->dfd_strtcl = curcl;
+	    swp68(dfd->dfd_strtcl);
+	    dfd->dfd_dirty = 1;
 	    /* set extended now; if there's a middle this is set again */
 	    extended = TRUE;
 	}
 	currec = cl2rec(curcl,dmd);
     }
+    else {
+    	if (currec >= (cl2rec(curcl,dmd) + dmd->m_clsiz)) {
+	    /* a previous read/write ended at a cluster boundary. */
+	    if (!(curcl = nextcl(curcl,dmd,wrtflg,NULL))) {
+		/* no next cluster: end of file or full disk */
+		return 0;
+	    }
+	    currec = cl2rec(curcl,dmd);
+	}
+    }
+
+    DBCMD((ofd->o_curcl = curcl, ofd->o_currec = currec,
+	  "print OFD at top of xrw call:;do_ofd (lpeek (+ `a6 a));_c"));
 
     recoffs = bytnum & dmd->m_rbm;
 
     if (!recoffs) lenhead = 0;
     else lenhead = min(recsiz-recoffs,len);
 
-    /* do the head.  If there is one, then curcl is valid. */
+    /* do the head */
     if (lenhead) {
+	DBCMD("print do head;_c");
 	bufp = getrec(currec+dmd->m_recdata,dmd,wrtflg,NULL);
 	(*bufxfr)(lenhead,bufp+recoffs,ubufr);
 	ubufr += lenhead;
 	bytnum += lenhead;
 	len -= lenhead;
+
+	/* incr currec if head ended at end of record (even if done) */
+	if ((bytnum & dmd->m_rbm) == 0) ++currec;
+
 	/* if more to do, extend file to include next cluster */
-	if (len && (++currec & dmd->m_clrm) == 0) {
-	    /* more to do and fell off a cluster! */
+	if (len && ((currec & dmd->m_clrm) == 0)) {
+	    DBCMD("print more to do and fell off - a cluster: advance;_c");
 	    xcl = nextcl(curcl,dmd,wrtflg,NULL);
 	    if (xcl == 0) goto eof;
 	    curcl = xcl;
@@ -809,18 +897,19 @@ void (*bufxfr) _P((uint, void *, void *));
     lenmid = len >> dmd->m_rblog;
 
     if (lenmid) {
+	DBCMD("print do middle;_c");
 	run_start = currec;
-	run_end = currec;
 	run_len = 1;
-	do {
+	while (--lenmid) {
+	    DBCMD("print top of middle loop;_c");
 	    if ((++currec & dmd->m_clrm) == 0) {
 		/* fell off a cluster */
 		xcl = nextcl(curcl,dmd,wrtflg,NULL);
 		if (xcl == 0) goto eof;
 		curcl = xcl;
 		currec = cl2rec(curcl,dmd);
-		if (currec != (run_end+1)) {
-		    /* do the run */
+		if (currec != (run_start+run_len)) {
+		    DBCMD("print discontiguous record: do the run;_c");
 		    usrio(wrtflg,run_len,run_start,ubufr,dmd);
 		    runlen = ((ulong)run_len) << dmd->m_rblog;
 		    ubufr += runlen;
@@ -830,19 +919,21 @@ void (*bufxfr) _P((uint, void *, void *));
 		    run_len = 0;
 		}
 	    }
-	    run_len++;
-	    run_end = currec;
-	} while (--lenmid);
+	    ++run_len;
+	}
 
-	/* do the last run */
+	DBCMD("print out of middle loop: do the last run;_c");
 	usrio(wrtflg,run_len,run_start,ubufr,dmd);
 	runlen = ((ulong)run_len) << dmd->m_rblog;
 	ubufr += runlen;
 	bytnum += runlen;
 
-	/* if there's more work, advance to next rec / cl */
-	if (lentail && ((++currec & dmd->m_clrm) == 0)) {
-	    /* tail starts a new cluster */
+	/* incr currec even if no more to do, as a signal for next time */
+	currec++;
+
+	/* if there's more work and fell off a clust, advance to next cl */
+	if (lentail && ((currec & dmd->m_clrm) == 0)) {
+	    DBCMD("print there is a tail and it starts a new cluster;_c");
 	    xcl = nextcl(curcl,dmd,wrtflg,&extended);
 	    if (xcl == 0) goto eof;
 	    curcl = xcl;
@@ -853,6 +944,7 @@ void (*bufxfr) _P((uint, void *, void *));
     /* do tail bytes in last record */
 
     if (lentail) {
+	DBCMD("print do the tail;_c");
 	/* getrec for the record; if extended, don't read it in */
 	bufp = getrec(currec + dmd->m_recdata,
 			dmd,
@@ -860,6 +952,9 @@ void (*bufxfr) _P((uint, void *, void *));
 			NULL);
 	(*bufxfr)(lentail,bufp,ubufr);
 	bytnum += lentail;
+
+	/* incr currec if tail filled up record, as a flag for next time */
+	if ((bytnum & dmd->m_rbm) == 0) currec++;
     }
 
 eof:
@@ -868,24 +963,25 @@ eof:
     ofd->o_currec = currec;
     ofd->o_curcl = curcl;
     ofd->o_bytnum = bytnum;
-    dfd = ofd->o_dfd;
     if (bytnum > dfd->dfd_fileln) {
 	dfd->dfd_fileln = bytnum;
 	dfd->dfd_dirty = 1;
     }
+
+    DBCMD("print OFD after xrw call:;do_ofd (lpeek (+ `a6 a));_c");
     return rc;
 }
 
 
 /*
  * ckdrv: return 0 for success.  Checks to see if a drive exists, logs it
- * in if so and doesn't have a DMD.  drvsel is a bitmap of drives which have
- * DMD's.  If a drive experiences mediach, its drvsel bit is cleared.
+ * in if so and doesn't have a DMD.  drvsel is a bitmap of drives which
+ * have DMD's.  If a drive experiences mediach, its drvsel bit is cleared.
  * If the subsequent getbpb fails, it won't get set again.
  *
- * Call this before doing anything with any drive in an OS call.
- * fn2dir is a good choice, but some calls (Fsnext, Dgetpath) don't take
- * file names, yet need to use this call.
+ * Call this before doing anything with any drive in an OS call. fn2dir is
+ * a good choice, but some calls (Fsnext, Dgetpath) don't take file names,
+ * yet need to use this call.
  */
 
 long

@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\fs.h,v $
+* $Revision: 2.14 $	$Source: e:/tos/gd2\rcs\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.14  1991/02/21  03:07:32  apratt
+* This version performs this testbed perfectly.
+*
 * Revision 2.13  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -39,6 +42,7 @@
 /* prototypes and GCC qualifiers */
 
 #define DBMSG(s) trap14(11,5,0xf000,(s))
+#define DBCMD(s) trap14(11,5,0xf100,(s))
 
 #if __STDC__
 #define _P(x) x
@@ -47,6 +51,8 @@
 	sprintf(assertbuf,"Failed assert: \"" exp "\" file %s line %ld",\
 		file,(long)line), \
 	DBMSG(assertbuf))
+extern char assertbuf[];
+extern void sprintf();
 #define voidfn void
 #else
 #define _P(x) ()

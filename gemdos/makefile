@@ -1,11 +1,14 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\makefile.,v $
+# $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $     $Locker:  $
+# $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.13  1991/02/21  03:07:32  apratt
+# This version performs this testbed perfectly.
+#
 # Revision 2.12  1991/02/15  18:45:40  apratt
 # CI at the end of the week...
 #
@@ -22,7 +25,7 @@ TMPDIR	=	m:
 
 # un-comment this whole section to compile with GCC
 CC=c:\gnu\bin\gcc.ttp
-CFLAGS=-O -Wall -mshort -fstrength-reduce
+CFLAGS=-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem
 #.c.o:
 #	$(CC) $(CFLAGS) -S $*.c
 #	emacs @gas2mac.rc $*.s 

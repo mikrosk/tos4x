@@ -4,17 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/01 20:14:24 $
+* $Date: 1991/10/15 14:08:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.84  1991/10/01  20:14:24  apratt
-* Added code .if STPAD to run the AUTO folder on drive P after running
-* the one on bootdev.
+* Revision 2.85  1991/10/15  14:08:24  apratt
+* The test for power-plus-top-closed to subvert resvector on
+* STBOOK was wrong: other events can pull the power bit low,
+* and if the top was closed, say, when modem-wake happened,
+* resvector would be subverted when it wasn't meant to be.
+* Now we check for the value $FC explicitly: top-closed and
+* power and nothing else.
 *
+* Now we check for the value $FC explicitly: top-closed and
+* power and nothing else.
+*
+* Revision 2.84  1991/10/01  20:14:24  apratt
 * Added code .if STPAD to run the AUTO folder on drive P after running
 * the one on bootdev.
 *
@@ -218,7 +226,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.84 $
+* $Revision: 2.85 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\startup.s,v $
@@ -986,14 +994,16 @@ reset2:
 *
 *  Check to make sure we have a clean, well-bred
 *  bailout vector.  The high byte must be zero (not on M68030),
-* power and wait for RAM to decay.
+*  it must be even, and cannot be entirely zero.
+*
+*  NOTE THAT THE "RETURN ADDRESS" IN A6 IS FUNNY.  It points to resvchk,
 *  not reset3.  Tough luck: this has to be kept for compatibility's
 *  sake.  The workaround is to do this:
 *
 *	At init time, save the old contents of both resvector and resvalid,
 *	then set resvalid to resmagic and resvector to your vector address.
 *
-	and.b	#$0003,d0		; check just top-closed and power.
+*	When your handler is done, restore the saved contents of resvector
 *	and resvalid, and then return by "jmp (a6)."  This will re-execute
 *	the code below, starting at resvchk.
 *	If you were the last guy in the chain, resvaild won't be resmagic 

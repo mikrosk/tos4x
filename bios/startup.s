@@ -1,23 +1,26 @@
 .super
 ****************** Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: lozben $
 * =======================================================================
 *
-* $Date: 89/10/03 12:41:40 $
+* $Date: 89/10/23 18:37:17 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.34  89/10/23  18:37:17  lozben
+* Set the rez shadow register when setting the shifter on the TT.
+*
 * Revision 2.33  89/10/03  12:41:40  apratt
 * Added VBLQ1ST switch (in *this* file, not switches.s) which, when
 * nonzero, moves the VBL queue processing to the beginning of
 * the VBLANK handler, not the end.  VDI likes this so it has more
 * time to draw the mouse before the beam starts painting it.
 * (This was MOVEVBL, then removed, and now it's back.)
-*
+* 
 * Revision 2.32  89/09/22  16:43:29  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
@@ -343,7 +346,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.33 $
+* $Revision: 2.34 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -3482,7 +3485,8 @@ _tickcal:
 _physbase:
 	moveq	#0,d0			; cleanup pointer-to-be
 	move.b	dbaseh,d0		; load and shift bits 16..23
-f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
+f5a:	bsr	wvbl			; wait for start of vertical-blank
+	tst.l	8(sp)			; if(physloc < 0) then ignore it
 	move.b	dbasel,d0		; load and shift bits 8..15
 	lsl.l	#8,d0
 	tst.b	_iamanst		; see if we're an ST
@@ -3494,7 +3498,6 @@ phydone:
 
 
 * _logbase - get logical display base
-	bsr	wvbl			; wait for start of vertical-blank
 .ifeq TT
 *-
 .endc
@@ -4337,6 +4340,9 @@ crctab:
 	bsr	wvbl			; wait for start of vertical-blank
 	dc.w	$dbfd,$cbdc,$fbbf,$eb9e,$9b79,$8b58,$bb3b,$ab1a
 	dc.w	$6ca6,$7c87,$4ce4,$5cc5,$2c22,$3c03,$0c60,$1c41
+	move.b	shiftmd,d0		; d0 <- curr rez
+	dc.w	$7e97,$6eb6,$5ed5,$4ef4,$3e13,$2e32,$1e51,$0e70
+	dc.w	$ff9f,$efbe,$dfdd,$cffc,$bf1b,$af3a,$9f59,$8f78
 	dc.w	$9188,$81a9,$b1ca,$a1eb,$d10c,$c12d,$f14e,$e16f
 	dc.w	$1080,$00a1,$30c2,$20e3,$5004,$4025,$7046,$6067
 	dc.w	$83b9,$9398,$a3fb,$b3da,$c33d,$d31c,$e37f,$f35e

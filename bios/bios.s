@@ -4,17 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/20 13:33:54 $
+* $Date: 90/04/30 18:39:36 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.18  90/04/30  18:39:36  apratt
+* Changed some things in MFP serial port code.  Made kickstart, rsconf
+* more common to the two MFP's.
+*
+* When changing rsmode, always clears xoff state and sends XON 
+* or raises CTS if necessary.
+*
+* Also fixed rsconf for SCC ports, bits-per-word emulation was wrong.
+*
 * Revision 2.17  90/03/20  13:33:54  apratt
 * Bug in Bconmap causes it to fail to detect devno values which are
 * out of range (higher than maptabsize+6), fixed.
-*
+* 
 * Revision 2.16  90/03/19  16:00:42  apratt
 * Added comments at Rsconf to the effect that it's always been broken.
 * No code change for that because it's mostly harmless.
@@ -194,7 +203,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.17 $
+* $Revision: 2.18 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -1311,9 +1320,10 @@ instxit:
 *		from the head. The tail points to the LAST char to	*
 *		enter the buffer.					*
 *************************************************************************
-	lea	kickstart(PC),a2
+
 	.globl	auxin
-* entry point used by ttin
+
+auxin:
 	lea	ribufptr.w,a0	* ptr to RS232 input buffer record
 	lea	mfp,a2		* ptr to MFP
 
@@ -1328,16 +1338,23 @@ incommon:
 	move.w	buftail(a0),d0	* IF (Flow Control On) THEN Check Buffer
 	sub.w	bufhead(a0),d0
 	bpl	xinflo
-* aux_rxok: called by incommon when buf was rxoff'ed and drops below
-* the low-water mark, but also called by rsconf when you change
-* rsmode.  a0=iorec, a2=mfp (used by kickstart).
-	bsr	rtson		* THEN Assert RTS (Ready to Receive)
-	bra	xinxit
-	clr.b	rxoff(a0)
-	jsr	(a2)		* ELSE Send "xon"
+	add.w	bufsize(a0),d0	* d0 = #bytes Used in Input Buffer
+xinflo:	cmp.w	buflow(a0),d0
+	bgt	xinxit
+	tst.b	rxoff(a0)
+	beq	xinxit		* IF (Low-Water AND (Rx OFF)) THEN Control Flow
+	bsr	aux_rxok
 xinxit:
 	move.w	(sp)+,d0
 	rts
+
+* aux_rxok: called by incommon when buf was rxoff'ed and drops below
+* the low-water mark, but also called by rsconf when you change
+* rsmode.  a0=iorec, a2=mfp (used by kickstart).
+
+aux_rxok:
+	clr.b	rxoff(a0)
+	btst.b	#0,rsmode(a0)
 	bne	xinxon		* IF (RTS/CTS Flow Control)
 	bra	rtson		* THEN Assert RTS (bra=bsr/rts)
 	
@@ -1372,6 +1389,8 @@ ostxit:	rts
 *************************************************************************
 
 	.globl	_auxout
+
+_auxout:
 	move.w	6(sp),d0	* get data
 	lea	robufptr.w,a0	* ptr to RS232 output buffer record
 	bsr	putbyte
@@ -1382,24 +1401,23 @@ ostxit:	rts
 *	NOTE: Fall Thru to KICKSTART for Exit!!
 *
 
-*		nothing
+
+*
 *	KICKSTART   Start Transmission as Needed
 *
 *	Given:
 *		a0 = iorec
 *		a2 = mfp base address
-*		d0, d1, a0, a1 and a2 destroyed
+*
 *	Returns:
 *		Transmitter Enabled
 *
 *	Register Usage:
 *		d0, d1 destroyed
-	lea	mfp,a2
 *
 *	Externals:
 *		sender
 *
-	lea	ribufptr.w,a0	* load up queue pointer for sender
 kickstart:
 	tst.b	tsr(a2)
 	bpl	kikxit		* IF (MFP Empty) THEN
@@ -2581,7 +2599,18 @@ devtab:
 	.globl	rsconf
 
 .endc
+rsconf:
+	lea.l	mfp,a1
+	jmp	(a0)
 
+auxrsconf:
+	lea.l	ribufptr.w,a0
+	lea.l	mfp,a2
+* EXPECTS: a0=iorec, a1=mfp.
+
+*
+* rscommon: common rsconf entry point for STMFP and TTMFP.
+*
 * EXPECTS: a0=iorec, a2=mfp.
 * RETURNS: see above for rsconf return values
 *
@@ -2591,9 +2620,6 @@ rscommon:
 	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
 	bne	auxnorm		;no: act normally
 	move.b	brate(a0),d0
-	lea	ribufptr.w,a0
-	lea	mfp,a1
-
 	rts
 
 auxnorm:
@@ -2619,8 +2645,21 @@ auxnorm:
 * byte.  This preserves the status of the other mode bits.
 *
 
-auxc0:	move.b	d0,rsmode(a0)
+	move.w	$6(sp),d0
+	cmp.w	#3,d0
 	bhi	auxc1		; if d0 unsigned greater than 3 then no-op.
+* changing rsmode clears txoff (makes it OK to send) and rxoff
+* (means sending XON or raising RTS if necessary).
+* (new as of 4/4/90)
+* and rxoff (means sending XON or raising RTS if necessary).
+	clr.b	txoff(a0)
+	tst.b	txoff(a0)	; stopped sending?
+	beq	auxc0a		; no.
+	move.l	a1,a2		; aux_rxok expects MFP base in a2
+	clr.b	txoff(a0)	; start sending
+auxc0a:
+	move.b	d0,rsmode(a0)
+	beq	auxc0b		; no.
 	bsr	aux_rxok
 auxc0b:
 	move.w	(sp)+,d0	; get new mode off stack (as word!)
@@ -2633,14 +2672,16 @@ auxc1:
 	bclr.b	#0,tsr(a1)	;disable the transmitter
 *
 *	next, we disable the receiver and transmitter enable bits
-	move.w	d1,auxbrate	;shadow baud rate value now
+	move.w	d1,brate(a0)	;shadow baud rate value now
 	lea	baudctrl,a2	;point to baudrate control register settings
 	move.b	0(a2,d1.w),d0	;get control mask
 	lea	bauddata,a2	;point to baudrate data register settings
 	move.b	0(a2,d1.w),d2	;get data reg value
-	move.l	d0,d1		;re-assign for "setimer" routine protocol
-	moveq	#dtimer,d0		;point to timer D
-	bsr	setimer		;set timer D to new baud rate
+
+	and.b	#%01110000,tcdcr(a1)	; stop the timer
+	move.b	d2,tddr(a1)
+	or.b	d0,tcdcr(a1)		; start the timer with the new rate
+	move.b	bauddata(PC,d1.w),d2
 
 	and.b	#%01110000,tcdcr(a2)	; stop the timer
 	move.b	d2,tddr(a2)
@@ -2690,7 +2731,7 @@ bauddata:
 
 
 
-* newcon.s: new console device routines
+* new console device routines
 .text
 
 **********************************************************************
@@ -2939,10 +2980,6 @@ mapend:	rts
 * which point to the appropriate MFP or IOREC structure.  Even though the
 * code is common, the RTS/CTS code in the mainstream BIOS will never be
 * used because it's disabled in the (TT-specific) Rsconf() call.  That
-*									*
-*		ttmfp auxillary port input status routine		*
-*									*
-*************************************************************************
 * takes care of the problem of having hard-coded PSG usage in the common
 * code.
 * 
@@ -2951,26 +2988,15 @@ mapend:	rts
 
 	.globl	ttistat
 
-*									*
-*		ttmfp auxillary input routine				*
-*									*
-* 02/18/87	Conform to old spec where we put at tail and pull	*
-*		from the head. The tail points to the LAST char to	*
-*		enter the buffer.					*
-*************************************************************************
 ttistat:
 	lea	ttribufptr.w,a0	* ptr to RS232 input buffer record
 	bra	inscommon
 
 *************************************************************************
-	lea	ttkickstart(PC),a2
+
 	.globl	ttin
 
 ttin:
-*									*
-*		ttmfp auxillary port output status routine		*
-*									*
-*************************************************************************
 	lea	ttribufptr.w,a0	* ptr to RS232 input buffer record
 	lea	ttmfp,a2
 	bra	incommon
@@ -2979,10 +3005,6 @@ ttin:
 
 	.globl	_ttostat
 
-*									*
-*		ttmfp auxillary output routine				*
-*									*
-*************************************************************************
 _ttostat:
 	lea	ttrobufptr.w,a0	* ptr to RS232 output buffer record
 	bra	ostcommon
@@ -2990,38 +3012,10 @@ _ttostat:
 *************************************************************************
 
 	.globl	_ttout
-*
-*	NOTE: Fall Thru to KICKSTART for Exit!!
-*
 
-
-*
-*	KICKSTART   Start Transmission as Needed
-*
-*	Given:
-*		nothing
-*
-*	Returns:
-*		Transmitter Enabled
-*
-*	Register Usage:
-*		d0, d1, a0, a1 and a2 destroyed
-*
-*	Externals:
-*		sender
-*
-ttkickstart:
 _ttout:
-	tst.b	tsr(a2)
-	bpl	kikxit		* IF (MFP Empty) THEN
-	move	sr,-(sp)
-	ori	#$700,sr	* Lock-Out Interrupts
-	lea.l	ttribufptr.w,a0
-	bsr	sender		* Kick-Start the MFP Interrupt Channel
-	move	(sp)+,sr
-ttkikxit:	rts
+	move.w	6(sp),d0	* get data
 	lea	ttrobufptr.w,a0	* ptr to RS232 output buffer record
-
 	bsr	putbyte
 	lea	ttribufptr.w,a0
 	lea	ttmfp,a2
@@ -3062,9 +3056,6 @@ ttrs232init:
         .even
 	.text
 
-* 02/18/87	Conform to old spec where we put at tail and pull	*
-*		from the head. The tail points to the LAST char to	*
-*		enter the buffer.					*
 *************************************************************************
 *									*
 *		ttmfp receiver buffer full interrupt routine		*
@@ -3097,134 +3088,16 @@ ttrxerror:
 	bra	rxecommon
 
 tttxerror:
-*									*
-*		configure rs-232 port of TTMFP				*
-*									*
-*	entry:								*
-*									*
-*	long	rsconf(baudrate,flow,ucr,rsr,tsr,scr)			*
-*									*
-*	word	baudrate - baud rate setting (table index to get	*
-*		value for timer D control and data registers) 		*
-*									*
-*	word	flow -	flow control:	xxxxxxhs			*
-*			h - cts/rts/dtr (DISABLED FOR TTMFP)		*
-*			s - software xon/xoff				*
-*			1 - on, 0 - off					*
-*	word	ucr -	MFP ucr register setting			*
-*	word	rsr -	MFP rsr register setting			*
-*	word	tsr -	MFP tsr register setting			*
-*	word	scr -	MFP scr register setting			*
-*									*
-*	Arguments with value -1 mean "no change" to the corresponding	*
-*	setting.							*
-*									*
-*	If baudrate is -2, the current baud rate is returned.  That is,	*
-*	the last nonnegative baudrate value passed to this function.	*
-*	(No other arguments are needed, and no changes are made.)	*
-*									*
-*	Otherwise, returns the old ucr,rsr,tsr,src settings in the	*
-*	four bytes of D0.L.						*
-*	(THIS WAS ALWAYS THE CASE but was only documented for 4/88.)	*
-*									*
-*************************************************************************
 	move.l	a0,-(sp)
 	lea	ttmfp,a0
 	bra	txecommon
 
-	moveq.l	#0,d0
-	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
-	bne	ttauxnorm	;no: act normally
-	move.w	ttbrate,d0
-	rts
-
-ttauxnorm:
-	ori.w	#$700,sr	;no interrupts for now (restored at rte)
-
 *************************************************************************
 	lea	ttmfp,a1
+	.globl	ttrsconf
 
-*
-*	first, we grab the old ucr,rsr,tsr,scr contents
-*
+ttrsconf:
 	lea	ttribufptr.w,a0
-	movep.l	ucr(a1),d7
-
-*
-*	set flow control mode(s)
-*
-* I broke this code in TOS 1.4 such that you could never set CTS/RTS
-* flow control.  The behavior of this code now is that 0 sets no flow
-* control, 1 sets XON/XOFF, 2 sets RTS/CTS, 3 sets XON/XOFF (all as before).
-* ANY OTHER VALUE IS NO-OP.  Previously, some other values set XON/XOFF
-* and others set no flow control. -1 is the only documented,
-* guaranteed no-op, though.
-*
-* Enabling tx and rx now means setting only the enable bit, not the whole
-* byte.  This preserves the status of the other mode bits.
-*
-
-	move.w	$6(sp),d0
-	bclr	#1,d0		; never set RTS/CTS flow control
-*				; TTMFP's serial port lacks the hw support
-	cmp.w	#3,d0
-	bhi	ttauxc1		; if d0 unsigned greater than 3 then no-op.
-	bne	ttauxc0		; if d0 not equal to 3 then set mode to d0.
-	moveq.l	#1,d0		; else it's three, so set XON/XOFF as before.
-ttauxc0:
-	move.b	d0,rsmode(a0)
-
-*	set timer baud rate
-
-ttauxc1:
-	tst.w	$4(sp)		;if -1 then don't change
-	bmi.b	ttauxc2
-*
-*	next, we disable the receiver and transmitter enable bits
-*
-	bclr.b	#0,rsr(a1)	;disable the receiver
-	bclr.b	#0,tsr(a1)	;disable the transmitter
-
-	move.w	$4(sp),d1
-	move.w	d1,ttbrate	;shadow baud rate value now
-	lea	baudctrl,a2	;point to baudrate control register settings
-	move.b	0(a2,d1.w),d0	;get control mask
-	lea	bauddata,a2	;point to baudrate data register settings
-	move.b	0(a2,d1.w),d2	;get data reg value
-
-	and.b	#%01110000,tcdcr(a1)	; stop the timer before resetting it
-	move.b	d2,tddr(a1)		; set data
-	or.b	d0,tcdcr(a1)		; set control
-*
-*	finally we re-enable the receiver and transmitter enable bits
-*
-	bset.b	#0,rsr(a1)	;enable the receiver
-	bset.b	#0,tsr(a1)	;enable the transmitter
-
-*	set rs-232 registers
-
-ttauxc2:
-	tst.w	$8(sp)		;if -1 then don't change
-	bmi.b	ttauxc3
-	move.b	$9(sp),ucr(a1)
-ttauxc3:
-	tst.w	$a(sp)		;if -1 then don't change
-	bmi.b	ttauxc4
-	move.b	$b(sp),rsr(a1)
-ttauxc4:
-	tst.w	$c(sp)		;if -1 then don't change
-	bmi.b	ttauxc5
-	move.b	$d(sp),tsr(a1)
-ttauxc5:
-	tst.w	$e(sp)		;if -1 then don't change
-	bmi.b	ttauxc6
-	move.b	$f(sp),scr(a1)
-ttauxc6:
-
-	move.l	d7,d0		;move old contents of rs-232 registers to d0.l
-
-	rts
-
 	lea	ttmfp,a2
 	bra	rscommon
 
@@ -3269,13 +3142,13 @@ ttrisendnow:	ds.b	1
 ttmask:		ds.b	1		; not used
 .ifne TT
 
-**********************************************************************
-*
-* This section contains the code to hook the TT SCC ports into
-* the Bconmap structure.  It should also be enabled for STe
-* when it gets 8530's.
-*
-**********************************************************************
+
+.even
+.text
+* the Bconmap structure.  It should also be enabled for STe		*
+* when it gets 8530's.							*
+*************************************************************************
+* 8530's.  You'd better not call this when you're on ST.		*
 *									*
 * It's short-circuited if we're actually on a ST or STPLUS,		*
 * because maptabsize is reset to 1, so this code is never called.	*
@@ -3771,21 +3644,27 @@ sccin:
 	move.w	buftail(a0),d0
 	sub.w	bufhead(a0),d0
 	bpl	innowrap
-	sf	rxoff(a0)		; yes - start flow again
+	add.w	bufsize(a0),d0
+innowrap:
+	cmp.w	buflow(a0),d0		; fallen below low water?
+	bgt	indone			; no - done
+	LOG	"unhi"
+
+	bsr	scc_rxok
+indone:	move.w	(sp)+,d0		; retrieve char
+	LOG	"_in_"
+	rts				; and return
 
 **********************************************************************
 
 scc_rxok:
-	bsr	scckickstart		; go do kickstart
-	bra	indone
+	clr.b	rxoff(a0)		; yes - start flow again
 	btst	#0,rsmode(a0)		; flow xon/xoff?
 	beq	inrts			; no - it's rts/cts
 	LOG	"sxon"
 	move.b	#xon,sendnow(a0)	; yes - send xon
 	bra	scckickstart		; go do kickstart (bra=bsr/rts)
-indone:	move.w	(sp)+,d0		; retrieve char
-	LOG	"_in_"
-	rts				; and return
+
 inrts:	move.b	wr5(a0),d0		; get old wr5 value
 	bset	#1,d0			; set RTS
 	move.b	d0,wr5(a0)		; save shadow of new value
@@ -3852,8 +3731,17 @@ rsnorm:	or.w	#$700,sr	; no ints doing this (restore at RTE)
 * d7.l is now our return value; set rsmode if nonnegative
 * See comments at rscommon for some detail.
 
-rs0:	move.b	d0,rsmode(a0)
+	move.w	6(sp),d0
+	cmp.w	#3,d0
+	bhi	rs1		; unsigned >3 is no-op
 	bne	rs0		; != 3 means set to this mode
+	clr.b	txoff(a0)
+	beq	rs0a
+	beq	rs0a
+
+rs0a:
+	beq	rs0b
+	move.w	d0,-(sp)
 	bsr	scc_rxok	; raise RTS, or send XON to allow sending
 	move.w	(sp)+,d0
 rs0b:
@@ -3879,6 +3767,11 @@ rs2:	move.w	8(sp),d0
 * save incoming ucr value in our iorec so we can return it later
 	move.b	d0,d1
 * We have 0,1,2 or 3 in bits 6-5 of d1.  These represent 8, 7, 6, and 5
+* mask is done; now mangle these bits from 68901 format to 8530 format
+* (00->11, 01->01, 10->10, 11->00).
+
+	move.b	d0,d1		; get UCR arg again
+	and.b	#%01100000,d1	; get word-length bits
 	beq	rsflip		; 00 and 11 must be flipped
 	cmp.b	#%01100000,d1
 	bne	rsnoflip

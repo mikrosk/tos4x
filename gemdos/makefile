@@ -1,11 +1,15 @@
 #########################  GEMDOS MAKEFILE  #############################
 #
-# $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\makefile.,v $
+# $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\makefile.,v $
 # =======================================================================
-# $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $     $Locker:  $
+# $Author: apratt $ 	$Date: 1991/06/03 15:29:50 $     $Locker:  $
 # =======================================================================
 #
 # $Log: makefile,v $
+# Revision 2.19  1991/06/03  15:29:50  apratt
+# Changed to use fsstub, not fsstpar, the better to make available
+# to alpha testers who have only MIDI-port remote debugging, if any.
+#
 # Revision 2.18  1991/04/30  12:12:38  apratt
 # Converted DBCMDs to new infix DB style
 #
@@ -60,13 +64,9 @@ CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
 
 all: gtest.prg dos.sys
 
-# set these to .mac or .gas as appropriate
-
-docall.o: docall.mac
-traps.o: traps.mac
-rwa.o: rwa.mac
-
 ################
+
+
 
 CFILES =	fscl.c fsdir.c fsfs.c fshand.c scan.c \
 		time.c panic.c mem.c pool.c sup.c con.c \
@@ -78,7 +78,7 @@ OFILES =	fscl.o fsdir.o fsfs.o fshand.o scan.o \
 
 DS=dossys
 LDOBJS	=	$(DS)\self.o $(DS)\ld_dos.o $(DS)\clear.o $(DS)\clock.o \
-			$(DS)\announce.o $(DS)\fsstpar.o
+			$(DS)\announce.o $(DS)\fsstub.o
 
 dos.sys:	gemdos.o
 		mkvers $(DS)\announce.o
@@ -101,5 +101,14 @@ ftest.o: ftest.c
 		cc -c ftest.c
 fcmds.o: fcmds.c
 		cc -c fcmds.c
+
+
+############
+
+# set these to .mac or .gas as appropriate
+
+docall.o: docall.mac
+traps.o: traps.mac
+rwa.o: rwa.mac
 
 

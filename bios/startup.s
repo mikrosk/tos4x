@@ -3,27 +3,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/04/17 13:26:22 $
+* $Date: 89/04/17 14:43:48 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.8  89/04/17  14:43:48  apratt
+* Added mwdata and mwmask equates... Oops.
+*
 * Revision 2.7  89/04/17  13:26:22  apratt
 * Added the new system variable _sysflags, definition TBD ($5a0)
-*
+* 
 * Added fast-RAM refresh & sizing for TT.  Includes new system variables
 * _ramtop ($5a4), and _ramvalid ($5a8), which is validated with rammagic.
-*
+* 
 * Added programming the volume/tone generator for a sane volume & tone,
 * and to mix the GI sound with the DMA sound.
-*
+* 
 * Added DMAINV assembly-time switch: set to 1 if DMASND and the DMA chip
 * inverts MONOMON when it's IDLE.  Will go away one day.
-*
+* 
 * Slight changes elsewhere.
-*
+* 
 * Revision 2.6  89/03/30  04:35:49  kbad
 * Changed return code of _term from 1 to -1 ($ffff), "error."
 * 
@@ -217,7 +220,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.7 $
+* $Revision: 2.8 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -827,6 +830,8 @@ ttudr	equ	ttmfp+$2f		; USART data
 .ifne DMASND
 *--- DMA SOUND REGISTERS (only one interesting one)
 *--- 6850 registers:
+keyctl	equ	$fffffc00		; keyboard ACIA control
+keybd	equ	keyctl+2		; keyboard data
 .endc
 midictl	equ	$fffffc06		; MIDI ACIA control
 .ifne TT

@@ -4,13 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/30 16:45:06 $
+* $Date: 1991/09/30 18:04:38 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.24  1991/09/30  18:04:38  apratt
+* Previous version worked very badly.  One theory: Conner says that
+* you need a delay between Identify and Init Parameters.  When Minna
+* took out the Init Parameters call, she also took out the delay.
+* Well, hmm, maybe the delay is required between Identify and
+* ANYTHING ELSE.  So it's back.
+*
 * Revision 1.23  1991/09/30  16:45:06  apratt
 * New from Minna: checks both READY and BUSY waiting for the right values.
 * Seems some drives set READY before clearing BUSY.  Sigh.
@@ -115,7 +122,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.23 $
+* $Revision: 1.24 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\dmaread.s,v $
@@ -413,6 +420,11 @@ ide1:	cmp.l	_hz_200,d0
 	bmi	rwend			; if timed-out, return
 	bne	rw2			; if error, return with error code
 					; else can do read or write
+	move.l	#D_IDENTIFY,d0		; delay required by Conner drives
+	add.l	_hz_200,d0		;  between identify() and r/w
+ide4:	cmp.l	_hz_200,d0
+	bcc.b	ide4
+
 	lea	sbuf,a0			; a0 -> drive parameters
 	move.w	$e(sp),-(sp)		; physical unit #
 	move.l	$c(sp),-(sp)		; buffer

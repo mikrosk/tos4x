@@ -4,16 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/04/30 18:43:38 $
+* $Date: 90/08/01 13:10:44 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.8  90/08/01  13:10:44  apratt
+* Fixed a bug: check didn't leave regs right when checksum was wrong,
+* even though the read operation expected to be able to do the read
+* anyway.
+*
 * Revision 2.7  90/04/30  18:43:38  apratt
 * Added NVMaccess call: see comments for details.
-*
+* 
 * Revision 2.6  90/02/22  12:23:28  apratt
 * Removed ".w" from _time and _date.
 * 
@@ -52,7 +57,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.7 $
+* $Revision: 2.8 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -736,7 +741,7 @@ nvmil:	move.b	d1,(a1)		; clear all 50 RAM locations
 * Loads start & count off stack & checks range, returns EBADRQ (-5)
 * if bad. 
 *
-* Else leaves d1=start+$e, d2=count, a1=RTCA, a2=RTCD
+* Leaves d1=start+$e, d2=count, a1=RTCA, a2=RTCD, unless returning EBADRQ.
 *
 
 nvmcheck:
@@ -745,26 +750,32 @@ nvmcheck:
 	moveq	#-12,d0		; preload EGENRL return code
 	move.b	#49+$e,(a1)
 	cmp.b	(a2),d1		; match?
-	bne	nvmdone		; no - return EGENRL
+	bne	nvmckdone	; no - return EGENRL
 	not.b	d1
 	move.b	#48+$e,(a1)
 	cmp.b	(a2),d1		; inverse match?
-	bne	nvmdone		; no - return EGENRL
+	bne	nvmckdone	; no - return EGENRL
 
 ; checksum matches, now check args
 
 	moveq	#-5,d0		; preload EBADRQ return code
 	move.w	$a(sp),d1	; get start reg number
 	cmp.w	#48,d1
-	bhs	nvmdone		; start >= 48: EBADRQ
+	bhs	nvmckdone	; start >= 48: EBADRQ
 	move.w	$c(sp),d2	; get count
-	bmi	nvmdone		; count < 0: EBADRQ
+	bmi	nvmckdone	; count < 0: EBADRQ
 	add.w	d1,d2		; add start
 	cmp.w	#48,d2
-	bhi	nvmdone		; (start+count) > 48: EBADRQ
-	move.w	$c(sp),d2	; get count back
-	add.w	#$e,d1		; add $e to start for true reg num
+	bhi	nvmckdone	; (start+count) > 48: EBADRQ
 	moveq	#0,d0		; and return zero
+
+; nvmcheck returns through here always; d0 has a return code, and
+; the other registers are loaded here for returning.
+
+nvmckdone:
+	move.w	$c(sp),d2	; get count back
+	move.w	$a(sp),d1	; and start
+	add.w	#$e,d1		; add $e to start for true reg num
 	rts
 
 nvmgetchk:

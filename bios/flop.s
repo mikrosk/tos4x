@@ -1,18 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/21 17:21:05 $
+* $Date: 89/07/19 14:22:09 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.2  89/07/19  14:22:09  apratt
+* Changed all timeouts to use 200Hz, added TT flag, when set,
+* short delays use ttwait rather than instruction loops.
+*
 * Revision 2.1  89/02/21  17:21:05  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
-*
+* 
 * Revision 1.11  89/02/06  23:07:08  kbad
 * Changed _acctim (last floppy access time) to use video frame counter
 * instead of 200Hz clock.  Safer that way, since floppy WP is checked
@@ -64,7 +68,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.1 $
+* $Revision: 2.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -125,12 +129,13 @@
 *------------------------------------------------------------------------
 	text
 
+TT	equ	0		; set to 1 for TT, 0 for ST & STE @check@
 
 HI_DEN		equ	1		; always enable this code
-retries		equ	2		; default # of retries - 1
-midretry	equ	1		; "middle" retry (when to reseek)
-timeout		equ	$40000		; short	timeout (motor already on)
-ltimeout	equ	$60000		; long timeout (to startup motor)
+
+denselect	equ	$ffff860e	; density bits (WRITE ONLY)
+timeout		equ	200	; short	timeout (motor already on) (1 sec)
+ltimeout	equ	400	; long timeout (to startup motor) (2 sec)
 retries		equ	2	; default # of retries - 1
 
 timeout		equ	300	; short	timeout (motor already on) (1.5 sec)
@@ -306,13 +311,15 @@ fdcprobe:
 *	 $4(sp) ->buffer
 *	 $0(sp)	return address
 *
-	move.l	#timeout,d7		; set timeout count
 * Returns:	EQ, the read won (on all sectors),
+	move.l	_hz_200,d7
+*-
+_floprd:
 .if STPAD
 frd2:	btst.b	#5,gpip(a5)		; 1770 done yet?
 	beq	noflop1			; no floppies!
-	subq.l	#1,d7			; decrement timeout counter
-	bne	frd2			; (not timed-out yet)
+	cmp.l	_hz_200,d7
+
 	move.w	#e_nready,curr_err(a5)	; set "timeout" error
 	moveq	#e_read,d0		; set default error#
 	bsr	rdfast
@@ -416,12 +423,13 @@ fwr1a:	move.w	#e_error,curr_err(a5)	; set general error#
 .endif
 
 	or.w	cside.w,d0		; side 0
-	move.l	#timeout,d7		; d7 = timeout count
+	move.l	_hz_200,d7
+	moveq	#m_changed,d0		; set media change mode to unsure
 	bsr	setdmode		; (boy, is this /ugly/)
 fwr2:	btst.b	#5,gpip(a5)		; done yet?
 fwr1:	bsr	select			; select drive
-	subq.l	#1,d7			; decrement timeout count
-	bne	fwr2			; (still tickin')
+	cmp.l	_hz_200,d7
+	bcs	flopfail		; EMPTY DRIVE - FAIL NOW
 	bne	fwre1			; (retry on seek failure)
 fwr1a:	move.w	#e_error,curr_err.w	; set general error#
 
@@ -616,13 +624,14 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	ble	ot1			; proto	more sectors this pass
 	cmp.w	interlv.w,d3		; if(d3	<= interlv) then_continue;
 	cmp.w	#13,spt.w
-	move.l	#timeout,d7		; d7 = timeout value
+	move.l	_hz_200,d7
+	move.w	#1400,d1		; low-density value
 etok:
 	moveq	#$4e,d0			; end-of-track trailer
 otw1:	btst.b	#5,gpip(a5)		; is 1770 done?
 
-	subq.l	#1,d7			; if(--d7) continue;
-	bne	otw1
+	cmp.l	_hz_200,d7
+	move.b	cdma+3.w,dmalow		; load dma pointer
 	move.b	cdma+2.w,dmamid
 	move.b	cdma+1.w,dmahigh
 
@@ -721,13 +730,14 @@ tvr1:	move.b	cdma+3(a5),dmalow(a5)	; load dma pointer
 *		ccount = number of sectors to verify
 *		cdma -> 1K buffer (at least)
 *
-	move.l	#timeout,d7		; set timeout value
+	move.l	_hz_200,d7
+*		(buffer+$200..buffer+$3ff used as DMA buffer)
 *
 * Enviroment:	Head seeked to the correct track;
 tvr2:	btst.b	#5,gpip(a5)		; test for 1770	done
 *		Motor should be spinning (go2track and fmttrack do this).
-	subq.l	#1,d7			; decrement timeout count
-	bne	tvr2			; (still counting down)
+	cmp.l	_hz_200,d7
+* Uses:		Almost everything.
 *
 * Called-by:	_flopfmt, _flopver
 *
@@ -1024,16 +1034,18 @@ restore:
 	btst	#2,d7			; test TRK00 bit
 	eor	#$04,ccr		; flip Z bit (return NE if bit is zero)
 	bne	res_r			; punt if didn't win
-	move.l	#timeout,d7		; setup	timeout	count (assume short)
+	move.l	_hz_200,d7
+.if HI_DEN
 .if (QD == 0)
 rtmap:	dc.b	1,1,0,0			; see _floprate for mode on this
 .else
 rtmap:	dc.b	1,1,1,1			; QD table: gives 6ms at HD, 3ms at QD
-	move.l	#ltimeout,d7		; extra timeout for motor startup
+	move.l	_hz_200,d7
+.endif
 
 flopcmds:
-flopc1:	subq.l	#1,d7			; timeout?
-	beq	flopcto			; (yes,	reset and return failure)
+flopc1:	cmp.l	_hz_200,d7
+	and.w	#3,d0
 
 .if HI_DEN
 ; if hi-den, remap the seek rate
@@ -1055,8 +1067,14 @@ flopcm:	bsr	wdiskct6		; write	command	(in d6)
 flopc1:	cmp.l	_hz_200.w,d7
 	blo	flopcto			; (yes,	reset and return failure)
 	btst.b	#5,gpip			; 1770 completion?
+.ifeq TT
 	move.w	#15,d7			; wait for 1770	to stop	convulsing
 r1770:	dbra	d7,r1770		; (short delay loop)
+.endc
+.ifne TT
+	clr.w	d6
+	rts
+.endc
 	clr.b	d0			; clear the bit
 	bra	padden1
 padhi1:	move.b	#$80,d0			; set the bit
@@ -1140,10 +1158,16 @@ rdiskctl:				* read diskctl into d0
 	move.w	diskctl,d0		;	read it
 * Uses:		d1
 	move	sr,-(sp)		; save flags
-	move.w	d7,-(sp)		; save counter register
-	move.w	#$20,d7			; 0x20 seems about right...
-rwdly1:	dbra	d7,rwdly1		; busy-loop: give 1770 time to settle
-	move.w	(sp)+,d7		; restore register, flags, and return
+setporta:
+.ifne TT
+	move	sr,-(sp)		; save our IPL
+	or	#$0700,sr		; start	critical section
+.endc
+.ifeq TT
+	move.w	#$20,d0			; 0x20 seems about right...
+rwdly1:	dbra	d0,rwdly1		; busy-loop: give 1770 time to settle
+.endc
+	move.w	(sp)+,d0		; restore register, flags, and return
 	move	(sp)+,sr
 *
 * The 1770 can't keep up with full-tilt	CPU accesses, so

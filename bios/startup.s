@@ -1,18 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/02/08 17:45:15 $
+* $Date: 89/02/12 20:23:32 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.34  89/02/12  20:23:32  kbad
+* changed version, date, and dosdate equates from `=' to `equ'.  It seems
+* that as68 doesn't like `=' assignments inside conditional statements.  Urk.
+*
 * Revision 1.33  89/02/08  17:45:15  apratt
 * Backed off screen base to phystop-$25800 for TT (in two places).
-*
+* 
 * Revision 1.32  89/02/07  13:00:59  apratt
 * made priv handler conditional on LONGFRAME, not TT
 * 
@@ -169,7 +173,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.33 $
+* $Revision: 1.34 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -256,18 +260,21 @@ LONGFRAME	=	0	; @check@
 
 systype		=	rom	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
+
+**** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
+
 .ifeq TT
-version		=	$0104		; version number *MUST BE EVEN*
-date		=	$12131988	; date, $MMDDYYYY
+version		equ	$0104		; version number *MUST BE EVEN*
+date		equ	$02121989	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		=	%0001000110001101 ; Dec 13, 1988
+dosdate		equ	%0001001001001100 ; Feb 12, 1989
 .endc
 
 .ifne TT
-version		=	$0300		; version number *MUST BE EVEN*
-date		=	$02061989	; date, $MMDDYYYY
+version		equ	$0300		; version number *MUST BE EVEN*
+date		equ	$02061989	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		=	%0001001001000110 ; Feb 6, 1989
+dosdate		equ	%0001001001000110 ; Feb 6, 1989
 .endc
 
 ****

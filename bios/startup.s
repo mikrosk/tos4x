@@ -4,16 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/11/20 18:49:17 $
+* $Date: 90/12/07 14:50:23 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.61  90/11/20  18:49:17  apratt
-* changed version numbers
+* Revision 2.62  90/12/07  14:50:23  apratt
+* changed version number for 2.05/3.05
 *
+* Revision 2.62  90/12/07  14:50:23  apratt
+* changed version number for 2.05/3.05
+* 
 * Revision 2.61  90/11/20  18:49:17  apratt
 * changed version numbers
 * 
@@ -48,7 +51,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.61 $
+* $Revision: 2.62 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -112,21 +115,21 @@ DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
-version		equ	$0204		; version number
-date		equ	$11201990	; STPLUS date, $MMDDYYYY @check@
+version		equ	$0205		; version number
+date		equ	$12051990	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101110100 ; November 20, 1990
+dosdate		equ	%0001010110000101 ; Dec 5, 1990
 .else
 .ifne TT
-version		equ	$0304		; version number (need not be even)
-date		equ	$11201990	; TT date, $MMDDYYYY @check@
+version		equ	$0305		; version number (need not be even)
+date		equ	$12051990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101110100 ; November 20, 1990
+dosdate		equ	%0001010110000101 ; Dec 5, 1990
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
-version		equ	$0144
-date		equ	$11201990
+version		equ	$0145
+date		equ	$12051990
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101110100 ; November 20, 1990
+dosdate		equ	%0001010110000101 ; Dec 5, 1990
 .endc
 .endc
 

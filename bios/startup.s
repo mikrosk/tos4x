@@ -4,23 +4,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/03/27 12:37:43 $
+* $Date: 91/04/11 12:16:03 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.65  91/04/11  12:16:03  apratt
+* Added drawing of an Atari logo at power up.  Removed USEDB.
+* Changed date to 4/9/91; version is x.06.  Changed power-up delay
+* from 90 sec to 60 sec.
+*
+* Changed date to 4/9/91; version is x.06.  Changed power-up delay
+* from 90 sec to 60 sec.
+* 
 * Revision 2.64  91/03/27  12:37:43  apratt
 * Added STPAD: mostly, this is STPLUS (which should also be set), but sets
 * DMASND to zero, adds some magic vars at $840 which Slavik's touch pad
 * driver knows about, and short-circuits memory sizing. Also has its own
 * cookie: $00010000+STPAD (which should be 1). Also tries the IDE bus, then
 * the ACSI bus for booting.  Removes monitor-change code.
-*
-* Fixed a bug: the AND to get only the significant bits of the mode register
-* was wrong; it was always three bits when it should be just two if not TT.
-*
+* 
 * Fixed a bug: the AND to get only the significant bits of the mode register
 * was wrong; it was always three bits when it should be just two if not TT.
 * 
@@ -64,7 +69,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.64 $
+* $Revision: 2.65 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -106,11 +111,6 @@
 * The switches TT, STPLUS, systype, and country
 * are all moved to the file "switches.s" which is normally a copy
 * of one of the canned switch settings files.
-* When USEDB is set, the startup will initialize a remote-debugger stub
-* just before initializing GEMDOS.
-
-USEDB		equ	0
-
 
 .include "switches.s"
 
@@ -133,20 +133,20 @@ DMASND		equ	0
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
 version		equ	$0206		; version number
-date		equ	$03011991	; STPLUS date, $MMDDYYYY @check@
+date		equ	$04091991	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011001100001 ; Mar 1, 1991
+dosdate		equ	%0001011010001001 ; Apr 9, 1991
 .else
 .ifne TT
 version		equ	$0306		; version number (need not be even)
-date		equ	$03011991	; TT date, $MMDDYYYY @check@
+date		equ	$03091991	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011001100001 ; Mar 1, 1991
+dosdate		equ	%0001011010001001 ; Apr 9, 1991
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
 version		equ	$0146
-date		equ	$03011991
+date		equ	$04091991
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011001100001 ; Mar 1, 1991
+dosdate		equ	%0001011010001001 ; Apr 9, 1991
 .endc
 .endc
 
@@ -2051,25 +2051,6 @@ psdone:	add.l	d2,$16(sp)		; update PC for RTE
 
 priv1:	move.l	(sp)+,a0
 	move.l	(sp)+,a1
-.ifne USEDB
-* initialize the remote debugger
-.globl _sinit
-.data
-stopmsg: dc.b	"RAM TOS and stub loaded",0
-.even
-.text
-	clr.l	-(sp)
-	jsr	_sinit
-	addq	#4,sp
-	pea	stopmsg
-	move.w	#$f000,-(sp)		; MSG_MSG
-	move.w	#$5,-(sp)		; message
-	move.w	#$b,-(sp)		; code $b for stub
-	trap	#14
-	add.w	#$a,sp
-nostop:
-.endc
-
 	movem.l	(sp)+,d0-d2
 .if M68030
 	jmp	_term			; jmp to bomb handler
@@ -2097,6 +2078,171 @@ priv2:
 *	if the desktop ever exits to us (or COMMAND.PRG exits)
 *		then go back to RESETH and start over ....
 *
+*-
+
+* Draw an icon on the screen.  It is never cleared from the screen,
+* but the text cursor is placed below it so if something loads
+* and prints a message before the next screen clear it won't overlap
+* the icon.  The "icon" is a bloody huge thing on the screen.
+*
+
+* auto-boot games that can't hack having the cache on can run.  The
+* idea is that if you are holding down the ALT key, it's because you
+* want maximal ST compatibility of the boot phase.
+	tst.b	sshiftmd.w		; low rez?
+	bne	monoicon		; no, monochrome
+.endif
+
+	add.w	#160*4,a1		; bump down four lines
+*
+* Draw an icon on the screen.  It is never cleared from the screen (by us),
+* but the text cursor is placed below it so if something loads and prints a
+* message before the next screen clear it won't overlap the icon.
+* 
+* (Note: now that the ROM does a ROM CRC check and a memory test,
+* putting the cursor below the icon is a win for internal reasons, too.)
+*
+
+.if TT
+	add.w	#160-48,a1		; add stride
+mstride		equ	160	; TT HIGH stride, 160
+.else
+colstride	equ	160	; ST LOW stride, 40*4
+mstride		equ	80	; ST HIGH stride, 80
+	cmp.b	#2,sshiftmd.w		; mode 2? ST HIGH
+	beq	isthigh
+	add.w	#160*4,a1		; bump down 4 lines for TT HIGH
+	move.l	#160-12,d2		; TTHIGH stride from line to line
+	bra	doicon
+isthigh:
+	add.w	#80*4,a1		; bump down 4 lines for ST HIGH
+	move.l	#80-12,d2		; STHIGH stride from line to line
+doicon:
+
+	move.l	#icon_start,a0
+	move.l	_v_bas_ad.w,a1
+	move.b	sshiftmd.w,d0
+	add.l	d2,a1			; add stride
+	beq	monoicon
+	cmp.b	#6,d0
+	beq	monoicon
+
+* colricon:
+	add.w	#colstride*4,a1		; bump down four lines
+	move.w	#$55,d0			; $56 lines high
+ciconl:
+	moveq	#$5,d1			; $6 words wide
+ciconw:
+	move.w	(a0)+,d2
+	move.w	d2,(a1)+
+	move.w	d2,(a1)+
+	move.w	d2,(a1)+
+	move.w	d2,(a1)+
+	dbra	d1,ciconw
+	add.w	#colstride-48,a1	; add stride
+	dbra	d0,ciconl
+	bra	icondone
+
+monoicon:
+	add.w	#mstride*4,a1		; bump down 4 lines down
+	move.w	#$55,d0			; $56 lines high
+miconl:	moveq	#$b,d1			; $c bytes wide
+miconw:	move.b	(a0)+,(a1)+
+	dbra	d1,miconw
+	add.l	#mstride-12,a1		; add stride
+	dbra	d0,miconl
+*	bra	icondone		; bra to next instruction
+
+
+.data
+
+icon_start:
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$79FF3C00,$00000000
+	.dc.l	$00000000,$F9FF3E00,$00000000
+	.dc.l	$00000000,$F9FF3E00,$00000000
+	.dc.l	$00000000,$F9FF3E00,$00000000
+	.dc.l	$00000000,$F9FF3E00,$00000000
+	.dc.l	$00000000,$F9FF3E00,$00000000
+	.dc.l	$00000000,$F9FF3E00,$00000000
+	.dc.l	$00000001,$F9FF3F00,$00000000
+	.dc.l	$00000001,$F9FF3F00,$00000000
+	.dc.l	$00000001,$F9FF3F00,$00000000
+	.dc.l	$00000001,$F9FF3F00,$00000000
+	.dc.l	$00000003,$F9FF3F80,$00000000
+	.dc.l	$00000003,$F9FF3F80,$00000000
+	.dc.l	$00000003,$F9FF3F80,$00000000
+	.dc.l	$00000007,$F1FF1FC0,$00000000
+	.dc.l	$00000007,$F1FF1FC0,$00000000
+	.dc.l	$0000000F,$F1FF1FE0,$00000000
+	.dc.l	$0000000F,$F1FF1FE0,$00000000
+	.dc.l	$0000001F,$E1FF0FF0,$00000000
+	.dc.l	$0000003F,$E1FF0FF8,$00000000
+	.dc.l	$0000003F,$E1FF0FF8,$00000000
+	.dc.l	$0000007F,$C1FF07FC,$00000000
+	.dc.l	$000000FF,$C1FF07FE,$00000000
+	.dc.l	$000001FF,$81FF03FF,$00000000
+	.dc.l	$000003FF,$81FF03FF,$80000000
+	.dc.l	$000007FF,$01FF01FF,$C0000000
+	.dc.l	$00000FFE,$01FF00FF,$E0000000
+	.dc.l	$00001FFE,$01FF00FF,$F0000000
+	.dc.l	$00007FFC,$01FF007F,$FC000000
+	.dc.l	$0000FFF8,$01FF003F,$FE000000
+	.dc.l	$0003FFF0,$01FF001F,$FF800000
+	.dc.l	$001FFFE0,$01FF000F,$FFF00000
+	.dc.l	$00FFFFC0,$01FF0007,$FFFE0000
+	.dc.l	$00FFFF80,$01FF0003,$FFFE0000
+	.dc.l	$00FFFF00,$01FF0001,$FFFE0000
+	.dc.l	$00FFFC00,$01FF0000,$7FFE0000
+	.dc.l	$00FFF800,$01FF0000,$3FFE0000
+	.dc.l	$00FFE000,$01FF0000,$0FFE0000
+	.dc.l	$00FF8000,$01FF0000,$03FE0000
+	.dc.l	$00FC0000,$01FF0000,$007E0000
+	.dc.l	$00E00000,$01FF0000,$000E0000
+	.dc.l	$00000000,$00000000,$00000000
+	.dc.l	$00000000,$00000000,$00000000
+	.dc.l	$00000000,$00000000,$00000000
+	.dc.l	$00000000,$00000000,$00000000
+	.dc.l	$00000000,$00000000,$00000000
+	tst.w	sshiftmd.w
+	.dc.l	$0001E07F,$FE07801F,$F81E18C0
+	.dc.l	$0003E07F,$FE0F803F,$FC1E1740
+	.dc.l	$0003F07F,$FE0FC03F,$FE1E2520
+	.dc.l	$0003F07F,$FE0FC03F,$FE1E2620
+	.dc.l	$0007F803,$C01FE03C,$1F1E2520
+	.dc.l	$0007F803,$C01FE03C,$0F1E1540
+	.dc.l	$0007F803,$C01FE03C,$0F1E18C0
+	.dc.l	$000F7C03,$C03DF03C,$0F1E0700
+	.dc.l	$000F3C03,$C03CF03C,$0F1E0000
+	.dc.l	$000F3C03,$C03CF03C,$1E1E0000
+	.dc.l	$001E3E03,$C078F83C,$7E1E0000
+	.dc.l	$001E1E03,$C078783D,$FC1E0000
+	.dc.l	$001E1E03,$C078783D,$F81E0000
+	.dc.l	$003E1F03,$C0F87C3D,$E01E0000
+	.dc.l	$003FFF03,$C0FFFC3D,$E01E0000
+	.dc.l	$003FFF03,$C0FFFC3D,$E01E0000
+	.dc.l	$007FFF83,$C1FFFE3C,$F01E0000
+	.dc.l	$007FFF83,$C1FFFE3C,$F81E0000
+	.dc.l	$00780783,$C1E01E3C,$781E0000
+	.dc.l	$00F807C3,$C3E01F3C,$3C1E0000
+	.dc.l	$00F007C3,$C3C01F3C,$3E1E0000
+	.dc.l	$00F003C3,$C3C00F3C,$1E1E0000
+	.dc.l	$01F003E3,$C7C00FBC,$1F1E0000
+	move.w	d7,4(sp)
 
 .if crcstride == 4
 ; four chips, next letter is bit 1 of offset
@@ -2303,13 +2449,13 @@ dskb1:	rts				; return status
 *		ACSI bus.  If a sector is read, and it is executable (word
 *		checksum is $1234), then it is executed.  The search stops
 * 		set next_bar_time to bar_interval;	(d6)
-NINETY_SECONDS	equ	200*90
+NINETY_SECONDS	equ	200*60		; ok, not 90 sec; 60 sec.
 * 		place the cursor on the last char of this line;
 * 		fall through to continuation of bar shrinking;
-.ifeq STPAD				; don't wait on the pad
-	move.l	#NINETY_SECONDS,d7	; do this for 90 sec
-.else
+.ifne STPAD				; don't wait on the pad
 	moveq.l	#0,d7
+.else
+	move.l	#NINETY_SECONDS,d7	; do this for 90 sec (really 60 sec)
 .endc
 *             (else fall through to dmab_todone to erase the bar)
 dmab_to:

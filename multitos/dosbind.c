@@ -7,7 +7,7 @@
 /*	Restore into C language	from 3.01	8/31/90	D.Mui		*/
 /*	Convert to Lattice C 5.51		2/17/93	C.Gee		*/
 /*	Force the use of prototypes		2/25/93 C.Gee		*/
-
+/*	Added dos_create() and dos_delete()     7/8/93  C.Gee		*/
 /*
  *	Set the DESKPRG flag to compile this file for a
  *	replacement Desktop. Clear it for making GEM.SYS
@@ -113,6 +113,15 @@ dos_snext( VOID )
 }
 
 
+	WORD
+dos_create( pname, access)
+  	BYTE		*pname;
+  	WORD		access;
+{
+  	return( (WORD)trap( X_CREAT, pname, access ) );
+}
+
+
 
 	WORD
 dos_open(pname, access)
@@ -121,8 +130,6 @@ dos_open(pname, access)
 {
   	return( (WORD)trap( X_OPEN, pname, access ) );
 }
-
-
 
 	VOID
 dos_rename( old, new )
@@ -152,6 +159,14 @@ dos_write(handle, cnt, pbuffer)
 	BYTE		*pbuffer;
 {
  	return( (UWORD)trap(X_WRITE,handle,cnt,pbuffer));
+}
+
+
+	WORD			/* 7/8/93	*/
+dos_delete( pdrvpath )
+	BYTE *pdrvpath;
+{
+	return( ( WORD )trap( X_UNLINK, pdrvpath ) );
 }
 
 
@@ -203,7 +218,6 @@ dos_gdrv( VOID )
 	return( ( WORD )trap(X_GETDRV) );
 }
 
-
 /*	Set dta buffer	*/
 
 	WORD
@@ -211,6 +225,13 @@ dos_dta(ldta)
 	LONG		ldta;
 {
 	return( ( WORD )trap(X_SETDTA,ldta));
+}
+
+
+	LONG
+dos_gdta( VOID )
+{
+	return( trap(X_GETDTA) );
 }
 
 
@@ -228,6 +249,7 @@ dos_chdir(pdrvpath)
 {
 	return( trap( X_CHDIR, pdrvpath ) );
 }
+
 
 
 	WORD

@@ -65,6 +65,8 @@ WORD 	graf_mouse(WORD state, LONG form);
 WORD 	graf_dragbox(WORD w, WORD h, WORD sx, WORD sy, WORD xc, WORD yc,
 			WORD wc, WORD hc, WORD *pdx, WORD *pdy);
 VOID	graf_mkstate(WORD *pmx, WORD *pmy, WORD *pmstate, WORD *pkstate);
+WORD 	graf_rwind( WORD xorigin, WORD yorigin, WORD wmin, WORD hmin,
+			GRECT *goff, WORD *pwend, WORD *phend);
 WORD 	graf_rubbox( WORD xorigin, WORD yorigin, WORD wmin, WORD hmin,
 			WORD *pwend, WORD *phend);
 WORD 	graf_slidebox(OBJECT *tree, WORD parent, WORD obj, WORD isvert);
@@ -114,6 +116,8 @@ WORD	dos_sfirst( LONG pspec, WORD attr);
 
 WORD	dos_snext( VOID );
 
+WORD	dos_create( BYTE *pname, WORD access );
+
 WORD	dos_open( BYTE *pname, WORD access );
 
 VOID	dos_rename( BYTE *old, BYTE *new );
@@ -124,6 +128,8 @@ UWORD	dos_write( WORD handle, LONG cnt, BYTE *pbuffer );
 
 LONG	dos_lseek( WORD handle, WORD smode, LONG sofst );
 
+WORD	dos_delete( BYTE *pdrvpath );
+
 WORD	dos_gdir( WORD drive, LONG pdrvpath );
 
 LONG	dos_xalloc( LONG nbytes, WORD type );
@@ -131,6 +137,8 @@ LONG	dos_xalloc( LONG nbytes, WORD type );
 WORD	dos_gdrv( VOID );
 
 WORD	dos_dta( LONG ldta );
+
+LONG	dos_gdta( VOID );
 
 WORD	dos_close( WORD handle );
 
@@ -276,6 +284,9 @@ WORD	wildcmp( REG BYTE *pwild, REG BYTE *ptest );
 
 BYTE	*nstrcpy( BYTE *src, BYTE *dest, WORD n );
 
+WORD	mode2res( WORD mode );
+WORD	res2mode( WORD res );
+
 /* LARGE.S */
 VOID	expand_data(BYTE *saddr,BYTE *daddr,BYTE *mask,WORD splanes,WORD  dplanes, 
 	WORD w,WORD h);
@@ -341,6 +352,13 @@ VOID	Bigstack( VOID );
 /* AESDISPA.S */
 VOID	cli( VOID );
 VOID	sti( VOID );
+
+WORD	spl7( VOID );
+VOID	spl( WORD );
+
+#pragma inline d0=spl7()  {"40c0007c0700";}	/* move.w sr,d0; ori.w #$700,sr */
+#pragma inline spl(d0)    {"46c0";}		/* move.w d0,sr */
+
 WORD	rundisp( VOID );
 VOID	dispret( VOID );
 VOID	toaes( LONG, LONG, WORD );

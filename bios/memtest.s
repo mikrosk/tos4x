@@ -44,7 +44,6 @@
 
 test		equ	0
 
-
 * exports
 	.globl	mem_test_next
 	.globl	mem_abort
@@ -54,6 +53,11 @@ test		equ	0
 	.globl	_ramtop
 	.globl	_memtop
 	.globl	_membot
+
+*phystop	equ	$42e
+*_ramtop	equ	$5a4
+*_memtop	equ	$436
+*_membot	equ	$432
 
 .if test
 
@@ -90,7 +94,7 @@ _main:
 	addq	#8,sp
 	move.l	d0,d6			; d6 holds start of tt ram for state2
 
-	move.l	#$01400000,_ramtop	; assume a true TT RAM size of 4MB
+	move.l	#$02000000,_ramtop	; assume a true TT RAM size of 16MB
 nottram:
 
 l0:	bsr	mem_test_next
@@ -118,7 +122,6 @@ mstate0:
 	bsr	prmsg
 	clr.l	mt_start		; region base is zero
 	move.l	phystop,mt_top		; region top is phystop
-
 	move.l	_membot,d0		; get end of OS mem usage
 	add.l	#(128*1024)-1,d0	; round up to 128K boundary
 	move.l	#(128*1024)-1,d1
@@ -220,6 +223,9 @@ mstate3:
 	move.l	d0,mt_countdown
 	bgt	m3nodot
 
+; yes, time to put up a dot
+	move.l	mt_interval,d0
+	add.l	d0,mt_countdown
 	tst.w	mt_badflag
 	beq	m3good
 	putchar	#'X'
@@ -484,6 +490,7 @@ mt_interval:	ds.l	1
 mt_countdown:	ds.l	1
 
 mt_badflag:	ds.w	1
+
 .if test
 		ds.b	1024
 mt_stack:	ds.b	0
@@ -492,5 +499,6 @@ _v_bas_ad:	ds.l	1
 _membot:	ds.l	1
 _ramtop:	ds.l	1
 
+phystop:	ds.l	1
 
 .endif

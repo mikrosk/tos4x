@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/22 13:07:53 $
+* $Date: 88/04/28 16:08:09 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.9  88/04/28  16:08:09  apratt
+* Backed out table entry for Flopwp XBIOS call. See flop.s for more.
+*
 * Revision 1.8  88/04/22  13:07:53  apratt
 * Fixed dmahi to dmahigh in dmaread (slip of the finger...)
-*
+* 
 * Revision 1.7  88/04/08  17:45:24  apratt
 * Backed out reset bail-out vector fix -- leave it broken.  The workaround
 * is to return to the reset code via "jmp $24(a6)" rather than
@@ -45,7 +48,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.8 $
+* $Revision: 1.9 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -382,7 +385,7 @@ osconf		equ	%10111
 	.globl	pconfig			; printer configuration word
 	.globl	_prtblk			; _prtblk primitive
 	.globl	_osi			; initialize OS
-	.globl	_flopwp			; check wp state of floppies
+*	.globl	_flopwp			; check wp state of floppies
 	.globl	esc_init		; init glass tty
 	.globl	initmous		; mouse vector init
 	.globl	_mediach		; media change inquiry
@@ -2049,7 +2052,7 @@ trp13tab:
 	dc.l	_shift			; 11: get/set keyboard shift bits
 
 	dc.l	unimpl			; 40: used by AKP's DB alpha vers.
-	dc.l	_flopwp			; 41: new: check floppy WP state
+	dc.l	unimpl			; 41: was _flopwp (briefly)
 	dc.l	unimpl			; 42: unused
 	dc.l	unimpl			; 43: unused
 	dc.l	unimpl			; 44: unused

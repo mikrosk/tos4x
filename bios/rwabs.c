@@ -4,24 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/02/26 17:02:16 $
+* $Date: 88/04/05 17:47:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 1.3  88/04/05  17:47:24  apratt
+* Removed unsigned declarations (they don't work in old Alcyon)
+*
 * Revision 1.2  88/02/26  17:02:16  apratt
 * Changed boot params to match MSDOS better: floppies get 3 sectors/FAT
 * and a media-descriptor byte of F9.
 * Also changed to look for a boot sector on floppy regardless of bootdev.
-*
+* 
 * Revision 1.1  87/11/20  14:24:34  lozben
 * Initial revision
 * 
 * =======================================================================
 *
-* $Revision: 1.2 $
+* $Revision: 1.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -185,10 +188,10 @@ extern WORD motoron;		/* motor-on status (for both drives) */
 /*
  * Other floppy variables:
  */
-unsigned extern long hz_200;	/* system timer tick */
+extern long hz_200;		/* system timer tick */
 extern char diskbuf[];		/* disk buffer somewhere in BSS */
 extern int nflops;		/* number of active floppies {0,1,2} */
-unsigned extern long acctim[];	/* time of last floppy access */
+extern long acctim[];		/* time of last floppy access */
 long maxacctim;			/* delay for floppy to turn UNSAFE */
 
 char diskmode[2];		/* floppy mode {SAFE, UNSURE, CHANGED} */

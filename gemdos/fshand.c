@@ -1,12 +1,15 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\rcs\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.9  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 2.8  1991/02/21  03:07:32  apratt
 * This version performs this testbed perfectly.
 *
@@ -44,8 +47,12 @@ uftprobe()
     for (i = NUMSTD, fptr = &run->p_uft[NUMSTD];
     	 i < size;
     	 i++, fptr++) {
-	    if (*fptr == NULL) return i;
+	    if (*fptr == NULL) {
+		DBCMD(8,"print uftprobe succeeds;_c");
+		return i;
+	    }
     }
+    DBCMD(8,"print uftprobe fails;_c");
     return -1;
 }
 
@@ -68,9 +75,17 @@ OFD
 *syshnd(h)
 int h;
 {
-	if (h <= -NUMBIOS || h >= run->p_uftsize)
+	if (h <= -NUMBIOS || h >= run->p_uftsize) {
+	    DBCMD(8,"print syshnd (wpeek (+ `a6 8)) >> NULL;_c");
 	    return NULL;			/* too small/big */
-	if (h < 0) return (OFD *)(~(h+3));	/* old-style BIOS dev */
+	}
+	if (h < 0) {
+	    DBCMD(8,"print syshnd (wpeek (+ `a6 8)) >> BIOS dev;_c");
+	    return ofdtty(h+3);		/* old-style BIOS dev */
+        }
+	DBCMD(8,"print syshnd (wpeek (+ `a6 8)) >> "
+	    "(lpeek (+ (lpeek (+ (lpeek .run) 3c)) (* (wpeek (+ `a6 8)) 4)));"
+	    "_c");
 	return run->p_uft[h];
 }
 
@@ -105,6 +120,7 @@ int h;
 	OFD *ofd;
 	PD *_run = run;
 
+	DBCMD(1,"print xdup (wpeek (+ `a6 8));_c");
 	if ((h<0) ||
 	    (h >= _run->p_uftsize) ||
 	    ((ofd = _run->p_uft[h]) == NULL))
@@ -130,6 +146,7 @@ long
 xforce(std,h)
 int std,h;
 {
+	DBCMD(1,"print xforce (wpeek (+ `a6 8)) (wpeek (+ `a6 a));_c");
 	return(ixforce(std,h,run));
 }
 
@@ -202,11 +219,23 @@ long
 xclose(h)
 int h;
 {
-	OFD *ofd;
-	PD *_run = run;
+    OFD *ofd, *pofd, **qofd;
+    PD *_run = run;
+    DFD *dfd, *pdfd, **qdfd;
 
-    /* A while ago, I "guaranteed" that any close would flush all */
-    /* dirty sectors on all drives ... do that first. See xsync() */
+    DBCMD(1,"print xclose (wpeek (+ `a6 8));_c");
+
+    /*
+     * A while ago, I "guaranteed" that any close would flush all dirty
+     * sectors on all drives ... do that first. See xsync(). This will
+     * longjmp on errors before the file is closed.  If it succeeds, the
+     * rest of the close can't encounter an error.
+     *
+     * If you want close to "succeed" no matter what, then set h and ofd
+     * before calling xsync and catch the longjmp.  The danger is that any
+     * error, including e.g. write-protect on ANOTHER drive, will still
+     * close the file and lots of things will be inconsistent.
+     */
 
     xsync();
 
@@ -215,7 +244,7 @@ int h;
 
     if ((ofd = _run->p_uft[h]) == NULL) return EIHNDL;	/* not open */
 
-    /* mark as closed, but see below: h<NUMSTD gets reopened */
+    /* mark as closed NOW, but see below: h<NUMSTD gets reopened */
     _run->p_uft[h] = NULL;
 
     if (ofdisatty(ofd)) {
@@ -223,10 +252,38 @@ int h;
 	/* but see below: we reopen h onto BIOS dev if it's a std hdl */
     }
     else {
-	/* close a file; really close it in spite of errors */
+	/*
+	 * Decrement use counts, free blocks.  This would be a lot cleaner
+	 * if the ofd_head and dfd_head lists were maintained differently,
+	 * like doubly-linked or in rings or pseudo-rings where the "next"
+	 * field is first and points to the list header rather than being
+	 * null.  The casts would get hairy, though.
+	 */
 	if ((--ofd->o_use) == 0) {
-	    if (--(ofd->o_dfd->dfd_use) == 0) {
+	    DBCMD(8,"print ofd->o_use dropped to 0;_c");
+	    dfd = ofd->o_dfd;
+	    if (--(dfd->dfd_use) == 0) {
+		DBCMD(8,"print dfd->d_use dropped to 0;_c");
+		/* unlink this DFD from dfd_head */
+		for (pdfd = *(qdfd = &dfd_head);
+		     pdfd != dfd;
+		     pdfd = *(qdfd = &pdfd->dfd_next)) {
+			if (!pdfd) {
+			    DBCMD(-1,"print xclose panic: dfd not on list");
+			    Panic();
+			}
+		}
+		*qdfd = pdfd->dfd_next;
 		freebig(ofd->o_dfd);
+	    }
+	    /* unlink this block from ofd_head */
+	    for (pofd = *(qofd = &ofd_head);
+		 pofd != ofd;
+		 pofd = *(qofd = &pofd->o_next)) {
+		    if (!pofd) {
+			DBCMD(-1,"print xclose panic: ofd not on list");
+			Panic();
+		    }
 	    }
 	    freebig(ofd);
 	}
@@ -235,42 +292,44 @@ int h;
     /* now re-open the handle on its default BIOS device if < NUMSTD */
     if (h < NUMSTD) {
 	/* h was a std handle; we need to reopen it on a char dev. */
+	DBCMD(8,"print re-open handle on BIOS dev;_c");
 	_run->p_uft[h] = ofdtty(biosdev[h]);
     }
 
+    DBCMD(8,"print end of xclose:;uft (lpeek .run);_c");
     return E_OK;
 }   
 
 long
 xsync()
 {
-	DFD *dfd;
-	DIR dir;
-	long err;
-	FCB *fcb;
+    DFD *dfd;
+    DIR dir;
+    long err;
+    FCB *fcb;
 
-	/* update all dirty DFD's -- mark BCB's dirty so flushall writes them */
-	for (dfd = dfd_head; dfd; dfd = dfd->dfd_next) {
-	    if (dfd->dfd_dirty) {
-		dir.dir_dev = dfd->dfd_dev;
-		dir.dir_clust = dfd->dfd_dircl;
-		dir.dir_recno = dfd->dfd_dirrec;
-		dir.dir_recoffs = dfd->dfd_diroffs;
-		if (err = dir2dir(&dir)) return err;
-		fcb = dir.dir_fcb;
-		fcb->f_attrib = dfd->dfd_attrib;
-		fcb->f_time = dfd->dfd_time;
-		fcb->f_date = dfd->dfd_date;
-		fcb->f_clust = dfd->dfd_strtcl;
-		fcb->f_fileln = dfd->dfd_fileln;
-		swp68l(fcb->f_fileln);
-		dir.dir_bcb->b_dirty = 1;
-		dfd->dfd_dirty = 0;
-	    }
+    /* update all dirty DFD's -- mark BCB's dirty so flushall writes them */
+    for (dfd = dfd_head; dfd; dfd = dfd->dfd_next) {
+	if (dfd->dfd_dirty) {
+	    dir.dir_dev = dfd->dfd_dev;
+	    dir.dir_clust = dfd->dfd_dircl;
+	    dir.dir_recno = dfd->dfd_dirrec;
+	    dir.dir_recoffs = dfd->dfd_diroffs;
+	    if (err = dir2dir(&dir)) return err;
+	    fcb = dir.dir_fcb;
+	    fcb->f_attrib = dfd->dfd_attrib;
+	    fcb->f_time = dfd->dfd_time;
+	    fcb->f_date = dfd->dfd_date;
+	    fcb->f_clust = dfd->dfd_strtcl;
+	    fcb->f_fileln = dfd->dfd_fileln;
+	    swp68l(fcb->f_fileln);
+	    dir.dir_bcb->b_dirty = 1;
+	    dfd->dfd_dirty = 0;
 	}
+    }
 
-	flushall();
-	return E_OK;
+    flushall();
+    return E_OK;
 }
 
 /*
@@ -289,6 +348,9 @@ void *ubufr;
 {
 	OFD *ofd;
 	long maxlen;
+
+	DBCMD(1,"print xread (wpeek (+ `a6 8)) (lpeek (+ `a6 a)) "
+		"(lpeek (+ `a6 e));_c");
 
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
@@ -321,6 +383,9 @@ void *ubufr;
 	OFD *ofd;
 	long err;
 	DFD *dfd;
+
+	DBCMD(1,"print xwrite (wpeek (+ `a6 8)) (lpeek (+ `a6 a)) "
+		"(lpeek (+ `a6 e));_c");
 
 	if ((ofd = syshnd(h)) == NULL) return EIHNDL;
 	if (!len) return 0;
@@ -371,11 +436,243 @@ int attr;
 	long err;
 	DIR dir;
 
+	DBCMD(1,"print xcreat -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c));_c");
+
 	/* deny creates of subdirs; also of labels with any other bit set */
 	if ((attr & FA_SUBDIR) || ((attr & FA_LABEL) && (attr != FA_LABEL)))
 		return EBADRQ;
 	if (err = ixcreat(name, attr, &dir)) return err;
 	return ixopen(&dir,((attr & FA_RO) ? 0 : 2));
+}
+
+/*
+ *  Open file.  Finds the DIR entry for the file & calls ixopen.
+ */
+
+long
+xopen(name, mod)
+char *name;
+int mod;
+{
+    DIR dir;
+    long err;
+
+    DBCMD(1,"print xopen -s (lpeek (+ `a6 8)) -x (wpeek (+ `a6 c));_c");
+    /* find the file */
+    err = fn2dir(&name,&dir,FN_NORM);
+    if (err) return err;
+
+    return ixopen(&dir,mod);
+}
+
+/*
+ * ixopen: given a DIR entry, open the file.
+ *
+ * ERROR CONSIDERATIONS:
+ * 
+ * Since this function doesn't do any writes, it can't mangle the disk. We
+ * allocate an OFD early because we know we'll need one, and free it if we
+ * then need a DFD and can't get one, but that's all that can go wrong.
+ */
+
+long
+ixopen(dir,mod)
+DIR *dir;
+uint mod;
+{
+    FCB *fcb;
+    int h;
+    DFD *dfd;
+    OFD *ofd;
+
+    DBCMD(8,"print ixopen dir: (lpeek (+ `a6 8)) mode (wpeek (+ `a6 c));"
+	    "dirx (lpeek (+ `a6 8));fcb (lpeek (+ (lpeek (+ `a6 8)) e));_c");
+
+    /* fail if opening for mode other than zero and file is RO */
+    if (mod && (dir->dir_fcb->f_attrib & FA_RO)) return EACCDN;
+
+    /* fail if there are no handles left */
+    if ((h = uftprobe()) < 0) return ENHNDL;
+
+    /* get an OFD first, because we know we'll need one */
+    /* and failure should get us out of here NOW. */
+
+    if ((ofd = MGET(OFD)) == NULL) return ENHNDL;
+
+    if ((dfd = getdfd(dir)) == NULL) {
+	/* no DFD for this file already; get a new one, fill it in */
+	if ((dfd = MGET(DFD)) == NULL) {
+	    MFREE(ofd);
+	    return ENHNDL;
+	}
+
+	fcb = dir->dir_fcb;
+
+	dfd->dfd_time = fcb->f_time;
+	dfd->dfd_date = fcb->f_date;
+	dfd->dfd_strtcl = fcb->f_clust;
+	dfd->dfd_fileln = fcb->f_fileln;
+	swp68l(dfd->dfd_fileln);
+	dfd->dfd_attrib = fcb->f_attrib;
+	dfd->dfd_dev = dir->dir_dev;
+	dfd->dfd_dircl = dir->dir_clust;
+	dfd->dfd_dirrec = dir->dir_recno;
+	dfd->dfd_diroffs = dir->dir_recoffs;
+	dfd->dfd_use = 0;
+	dfd->dfd_dirty = 0;
+
+	/* link it in */
+	dfd->dfd_next = dfd_head;
+	dfd_head = dfd;
+    }
+
+    /* fill in the OFD */
+    ofd->o_next = ofd_head;
+    ofd_head = ofd;
+    ofd->o_mode = mod;
+    ofd->o_curcl = 0;	/* flag meaning r/w clust info uninitialized */
+    ofd->o_currec = 0;
+    ofd->o_bytnum = 0;
+
+    ofd->o_use = 1;
+    ofd->o_dfd = dfd;
+    dfd->dfd_use++;
+
+    /* make handle h refer to this ofd and return h */
+
+    run->p_uft[h] = ofd;
+
+    DBCMD(8,"print end of ixopen:;uft (lpeek .run);_c");
+    return h;
+}
+
+/*
+ * xlseek: update the read-write pointer of a file. Calls ixlseek on the
+ * OFD and new pointer location.
+ *
+ * For tty's, returns zero.  Some programs use this to determine isatty.
+ */
+
+long
+xlseek(n,h,flg)
+long n;
+int h;
+int flg;
+{
+    OFD *ofd;
+    DFD *dfd;
+    uint new;
+    uint old;
+    uint clcount;
+    uint rec;
+    DMD *dmd;
+    uint curcl;
+
+    DBCMD(1,"print xlseek (lpeek (+ `a6 8)) (wpeek (+ `a6 c)) "
+	    "(wpeek (+ `a6 e));_c");
+
+    if ((ofd = syshnd(h)) == NULL) return EIHNDL;
+    if (ofdisatty(ofd)) return 0;
+
+    dfd = ofd->o_dfd;
+
+    if (flg == 2)
+	n += dfd->dfd_fileln;
+    else if (flg == 1)
+	n += ofd->o_bytnum;
+    else if (flg)
+	return(EINVFN);
+
+    if (n > dfd->dfd_fileln || n < 0)
+	return(ERANGE);
+
+    dmd = &drvtbl[dfd->dfd_dev];
+
+    /* set OFD r/w pointer fields to the right values */
+    if (!n) ofd->o_curcl = 0;
+    else {
+	new = n >> dmd->m_clblog;
+	old = ofd->o_bytnum >> dmd->m_clblog;
+	if (new < old) {
+	    curcl = dfd->dfd_strtcl;
+	    clcount = new;
+	}
+	else {
+	    /* (new >= old) */
+	    curcl = ofd->o_curcl;
+	    clcount = (old-new);
+	}
+	while (clcount--) {
+	    if (!(curcl = getcl(curcl,dmd))) return ERROR;
+	}
+
+	/* set rec to the record offset in this clust */
+	rec = (n & (dmd->m_clsizb-1)) >> dmd->m_rblog;
+
+	ofd->o_curcl = curcl;
+	ofd->o_currec = cl2rec(curcl,dmd) + rec;
+    }
+
+    ofd->o_bytnum = n;
+
+    DBCMD(8,"print end of xlseek:;uft (lpeek .run);_c");
+    return(n);
+}
+
+/*
+ * Fdatime, Get/Set File Date and Time
+ *
+ * Megamax C relies on this function leaving the input buffer alone on a
+ * read when the handle isatty, and on changing it (with the file's info)
+ * when the handle !isatty.  We can preserve that and still return EIHNDL
+ * with the handle refers to a tty.
+ *
+ * We change the DFD for the open file, not what's on disk. Fsfirst/next
+ * has to look for a DFD or it will be out of date.
+ *
+ * NO DISK ACTIVITY, NO ERROR CONSIDERATIONS.
+ */
+
+long
+xdatime(buf, h, wrt)
+int *buf;			/* -> user buffer */
+int h;				/* file handle */
+int wrt;			/* 0:get, 1:set */
+{
+    OFD *ofd;
+    DFD *dfd;
+    int t[2];			/* buffer to hold user input for swapping */
+
+    DBCMD(1,"print xdatime -x08 (lpeek (lpeek (+ `a6 8))) (wpeek (+ `a6 c)) "
+	    "(wpeek (+ `a6 e));_c");
+
+    ofd = syshnd(h);
+    if (ofd == NULL || ofdisatty(ofd)) return EIHNDL;
+  
+    dfd = ofd->o_dfd;
+    if (!buf) return EBADRQ;	/* a little self-protection! */
+
+    if (!wrt) {
+	buf[0] = dfd->dfd_time;
+	buf[1] = dfd->dfd_date;
+	swp68(buf[0]);
+	swp68(buf[1]);
+	return E_OK;
+    }
+
+    /* else it's a write */
+
+    t[0] = buf[0];
+    t[1] = buf[1];
+    swp68(t[0]);
+    swp68(t[1]);
+
+    dfd->dfd_time = t[0];
+    dfd->dfd_date = t[1];
+    dfd->dfd_dirty = 1;
+
+    DBCMD(8,"print end of xdatime;uft (lpeek .run);_c");
+    return E_OK;
 }
 
 /****************************************************************************/
@@ -388,6 +685,7 @@ int attr;
 long
 xgetdta()
 {
+	DBCMD(1,"print xgetdta;_c");
 	return((long)run->p_xdta);
 }
 
@@ -399,6 +697,7 @@ long
 xsetdta(addr)
 DTA *addr;
 {
+	DBCMD(1,"print xsetdta (lpeek (+ `a6 8));_c");
 	run->p_xdta = addr;
 	return 0;		/* Return success! AKP 1/91 */
 }
@@ -412,6 +711,7 @@ long
 xsetdrv(drv)
 uint drv;
 {
+	DBCMD(1,"print xsetdrv (wpeek (+ `a6 8));_c");
 	if (drv > MAXDEVS) return EDRIVE;
 	run->p_curdrv = drv;
 	return( trap13(0x0A) );	/* return Drvmap() */
@@ -425,6 +725,7 @@ uint drv;
 long
 xgetdrv()
 {
+	DBCMD(1,"print xgetdrv;_c");
 	return(run->p_curdrv);
 }
 

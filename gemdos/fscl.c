@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.12 $	$Source: e:/tos/gd2\rcs\fscl.c,v $
+* $Revision: 2.13 $	$Source: e:/tos/gd2\rcs\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.13  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 2.12  1991/02/21  03:07:32  apratt
 * This version performs this testbed perfectly.
 *
@@ -65,7 +68,7 @@ voidfn
 dirdirty(dir)
 DIR *dir;
 {
-    DBCMD("print -n dirdirty ; dirx (lpeek (+ `a6 8)) ; _c");
+    DBCMD(2,"print -n dirdirty ; dirx (lpeek (+ `a6 8)) ; _c");
     dir->dir_bcb->b_dirty = 1;
     flush(dir->dir_bcb);
 }
@@ -76,7 +79,7 @@ uint dev;
 {
     BCB *b;
 
-    DBCMD("print fatdirty (wpeek (+ `a6 8));_c");
+    DBCMD(2,"print fatdirty (wpeek (+ `a6 8));_c");
     for (b = bufl[0]; b; b = b->b_link) {
 	if (b->b_bufdrv == dev && b->b_dirty) {
 	    flush(b);
@@ -104,7 +107,7 @@ BCB *b;
   DMD *dmd;
   int i;
 
-  DBCMD("print -n flush ;bcb (lpeek (+ `a6 8));_c");
+  DBCMD(2,"print -n flush ;bcb (lpeek (+ `a6 8));_c");
   dmd = b->b_dmd;
   n = b->b_buftyp;
   d = b->b_bufdrv;
@@ -157,7 +160,7 @@ flushall()
     REG int d;
     REG int l;
 
-    DBCMD("print flushall;_c");
+    DBCMD(2,"print flushall;_c");
 
     for (d=0; d<MAXDEVS; d++) {
 	for (l=1; l >= 0; l--) {
@@ -194,7 +197,7 @@ DMD *dmd;
 	uint d;
 	uint end;
 
-	DBCMD("print usrio rw: (wpeek (+ `a6 8)) count: (wpeek (+ `a6 a)) "
+	DBCMD(4,"print usrio rw: (wpeek (+ `a6 8)) count: (wpeek (+ `a6 a)) "
 	      "start: (wpeek (+ `a6 c)) ubuf: (lpeek (+ `a6 e)) "
 	      "dmd: (lpeek (+ `a6 12));_c");
 
@@ -246,7 +249,7 @@ BCB **pbcb;
     int doread;
     int mcflag = 0;
 
-    DBCMD("print getrec recn: (wpeek (+ `a6 8)) dmd: (lpeek (+ `a6 a)) "
+    DBCMD(2,"print getrec recn: (wpeek (+ `a6 8)) dmd: (lpeek (+ `a6 a)) "
 	  "flg: (wpeek (+ `a6 e)) pbcb: (lpeek (+ `a6 10));_c");
 
     if (wrtflg == 2) doread = 0, wrtflg = 1;
@@ -281,7 +284,7 @@ BCB **pbcb;
 	 * prev's link
 	 */
 
-	DBCMD("print cache miss;_c");
+	DBCMD(2,"print cache miss;_c");
 
 	if (mtbuf) {
 	    /* miss, but there's an empty */
@@ -304,7 +307,7 @@ doio:
 
 	/* if our victim is in use & dirty, flush him */
 	if (b->b_bufdrv != B_INVALID && b->b_dirty) {
-	    DBCMD("print flush victim;_c");
+	    DBCMD(2,"print flush victim;_c");
 	    flush(b);
 	}
 
@@ -325,7 +328,7 @@ doio:
     else {
 	/* cache hit */
 	/* use a buffer, but first validate media */
-	DBCMD("print cache hit;_c");
+	DBCMD(2,"print cache hit;_c");
 	if (err = mediach(b->b_bufdrv)) {
 	    if (err == 1) {
 		mcflag = 1;
@@ -349,7 +352,7 @@ doio:
 	b->b_dirty = 1;
 
     if (pbcb) *pbcb = b;
-    DBCMD("print allbcbs after getrec:;allbcbs;_c");
+    DBCMD(2,"print allbcbs after getrec:;allbcbs;_c");
     return(b->b_bufr);
 }
 
@@ -453,7 +456,7 @@ DMD *dmd;
     char *fptr;		/* points to first byte of fatword */
     char *q;		/* points to buf[offset] once that's known */
 
-    DBCMD("print clfix (wpeek (+ `a6 8)) becomes (wpeek (+ `a6 a));_c");
+    DBCMD(4,"print clfix (wpeek (+ `a6 8)) becomes (wpeek (+ `a6 a));_c");
 
     if (dmd->m_16) {
 	/* compute byte offset into FAT */
@@ -586,7 +589,7 @@ int *extended;
 {
     uint xcl, lastcl, cl2, rover, i;
 
-    DBCMD("print nextcl;_c");
+    DBCMD(4,"print nextcl;_c");
 
     if (extended) *extended = 0;
 
@@ -599,22 +602,22 @@ int *extended;
     xcl = getcl(cl,dmd);
     if (!xcl) {
 	/* bad news: some clust or dir slot points to a free clust */
-	DBCMD("print INCONSISTENT DIR/FAT: zero entry;_c");
+	DBCMD(4,"print INCONSISTENT DIR/FAT: zero entry;_c");
 	return 0;
     }
     else if (xcl == 0xffff) {
 	if (!extflag) {
-	    DBCMD("print end of chain and !extend;_c");
+	    DBCMD(4,"print end of chain and !extend;_c");
 	    return 0;
 	}
 
 extend:
-	DBCMD("print extend the chain;_c");
+	DBCMD(4,"print extend the chain;_c");
 	/* extend the chain, return the new cl */
 	if (!cl && dmd->m_16) {
 	    cl2 = fastcl(dmd,FALSE);
 	    if (!cl2) {
-		DBCMD("print fastcl/no free space;_c");
+		DBCMD(4,"print fastcl/no free space;_c");
 		return 0;
 	    }
 	}
@@ -632,22 +635,22 @@ extend:
 		}
 		if (++rover > lastcl) rover = 0;
 	    }
-	    DBCMD("print slowcl/no free space;_c");
+	    DBCMD(4,"print slowcl/no free space;_c");
 	    return 0;
 	}
 gotone:
 	if (cl) clfix(cl,cl2,dmd);
 	clfix(cl2,-1,dmd);
 	if (extended) *extended = 1;
-	DBCMD("print extended: return cl2;_c");
+	DBCMD(4,"print extended: return cl2;_c");
 	return cl2;
     }
     else if ((xcl & 0xfff0) == 0xfff0) {
-	DBCMD("print FAT error: bad sector, etc.;_c");
+	DBCMD(4,"print FAT error: bad sector, etc.;_c");
 	return 0;
     }
     else {
-	DBCMD("print nextcl returns next cluster;_c");
+	DBCMD(4,"print nextcl returns next cluster;_c");
 	return xcl;
     }
 }
@@ -811,7 +814,7 @@ void (*bufxfr) _P((uint, void *, void *));
     ulong bytnum;
     uint curcl, currec, recoffs;
 
-    DBCMD("print xrw flg: (wpeek (+ `a6 8)) "
+    DBCMD(4,"print xrw flg: (wpeek (+ `a6 8)) "
 	  "ofd: (lpeek (+ `a6 a)) "
 	  "len: (lpeek (+ `a6 e)) "
 	  "ubufr: (lpeek (+ `a6 12));_c");
@@ -830,12 +833,12 @@ void (*bufxfr) _P((uint, void *, void *));
 
     if (!curcl) {
 	/* our r/w pointer is not valid */
-	DBCMD("print start of file;_c");
+	DBCMD(4,"print start of file;_c");
 	curcl = dfd->dfd_strtcl;
 	swp68(curcl);
 	if (!curcl) {
 	    /* file is empty */
-	    DBCMD("print file is empty;_c");
+	    DBCMD(4,"print file is empty;_c");
 	    if (!wrtflg) return 0;
 	    if (!(curcl = nextcl(0,dmd,wrtflg,NULL))) {
 		/* can't extend file from zero size */
@@ -860,7 +863,7 @@ void (*bufxfr) _P((uint, void *, void *));
 	}
     }
 
-    DBCMD((ofd->o_curcl = curcl, ofd->o_currec = currec,
+    DBCMD(4,(ofd->o_curcl = curcl, ofd->o_currec = currec,
 	  "print OFD at top of xrw call:;do_ofd (lpeek (+ `a6 a));_c"));
 
     recoffs = bytnum & dmd->m_rbm;
@@ -870,7 +873,7 @@ void (*bufxfr) _P((uint, void *, void *));
 
     /* do the head */
     if (lenhead) {
-	DBCMD("print do head;_c");
+	DBCMD(4,"print do head;_c");
 	bufp = getrec(currec+dmd->m_recdata,dmd,wrtflg,NULL);
 	(*bufxfr)(lenhead,bufp+recoffs,ubufr);
 	ubufr += lenhead;
@@ -882,7 +885,7 @@ void (*bufxfr) _P((uint, void *, void *));
 
 	/* if more to do, extend file to include next cluster */
 	if (len && ((currec & dmd->m_clrm) == 0)) {
-	    DBCMD("print more to do and fell off - a cluster: advance;_c");
+	    DBCMD(4,"print more to do and fell off - a cluster: advance;_c");
 	    xcl = nextcl(curcl,dmd,wrtflg,NULL);
 	    if (xcl == 0) goto eof;
 	    curcl = xcl;
@@ -897,11 +900,11 @@ void (*bufxfr) _P((uint, void *, void *));
     lenmid = len >> dmd->m_rblog;
 
     if (lenmid) {
-	DBCMD("print do middle;_c");
+	DBCMD(4,"print do middle;_c");
 	run_start = currec;
 	run_len = 1;
 	while (--lenmid) {
-	    DBCMD("print top of middle loop;_c");
+	    DBCMD(4,"print top of middle loop;_c");
 	    if ((++currec & dmd->m_clrm) == 0) {
 		/* fell off a cluster */
 		xcl = nextcl(curcl,dmd,wrtflg,NULL);
@@ -909,7 +912,7 @@ void (*bufxfr) _P((uint, void *, void *));
 		curcl = xcl;
 		currec = cl2rec(curcl,dmd);
 		if (currec != (run_start+run_len)) {
-		    DBCMD("print discontiguous record: do the run;_c");
+		    DBCMD(4,"print discontiguous record: do the run;_c");
 		    usrio(wrtflg,run_len,run_start,ubufr,dmd);
 		    runlen = ((ulong)run_len) << dmd->m_rblog;
 		    ubufr += runlen;
@@ -922,7 +925,7 @@ void (*bufxfr) _P((uint, void *, void *));
 	    ++run_len;
 	}
 
-	DBCMD("print out of middle loop: do the last run;_c");
+	DBCMD(4,"print out of middle loop: do the last run;_c");
 	usrio(wrtflg,run_len,run_start,ubufr,dmd);
 	runlen = ((ulong)run_len) << dmd->m_rblog;
 	ubufr += runlen;
@@ -933,7 +936,7 @@ void (*bufxfr) _P((uint, void *, void *));
 
 	/* if there's more work and fell off a clust, advance to next cl */
 	if (lentail && ((currec & dmd->m_clrm) == 0)) {
-	    DBCMD("print there is a tail and it starts a new cluster;_c");
+	    DBCMD(4,"print there is a tail and it starts a new cluster;_c");
 	    xcl = nextcl(curcl,dmd,wrtflg,&extended);
 	    if (xcl == 0) goto eof;
 	    curcl = xcl;
@@ -944,7 +947,7 @@ void (*bufxfr) _P((uint, void *, void *));
     /* do tail bytes in last record */
 
     if (lentail) {
-	DBCMD("print do the tail;_c");
+	DBCMD(4,"print do the tail;_c");
 	/* getrec for the record; if extended, don't read it in */
 	bufp = getrec(currec + dmd->m_recdata,
 			dmd,
@@ -968,7 +971,7 @@ eof:
 	dfd->dfd_dirty = 1;
     }
 
-    DBCMD("print OFD after xrw call:;do_ofd (lpeek (+ `a6 a));_c");
+    DBCMD(4,"print OFD after xrw call:;do_ofd (lpeek (+ `a6 a));_c");
     return rc;
 }
 

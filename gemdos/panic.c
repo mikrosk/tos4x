@@ -1,12 +1,15 @@
 /*
 ***************************    PANIC.C     ******************************
 *
-* $Revision: 2.7 $	$Source: e:/tos/gd2\rcs\panic.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\panic.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/22 15:29:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: panic.c,v $
+* Revision 2.8  1991/02/22  15:29:28  apratt
+* generic checkin
+*
 * Revision 2.7  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -34,6 +37,7 @@ panic()
 {
   char *p;
   char *s = "\033H*** OUT OF INTERNAL MEMORY:\033K\r\n*** USE FOLDR100.PRG TO GET MORE.\033K\r\n\033K\n\033K\n*** SYSTEM HALTED ***\033K";
+  DBMSG(-1,"panic!");
   for (p=s; *p; bconout(2,*p++)) /* do nothing */ ;
   for (;;) /* halt the system */ ;
 }

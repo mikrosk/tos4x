@@ -113,6 +113,7 @@ procedure dta a
 procedure fcb a
   print -n name -s11 `a;xa (+ `a b)
   print -n attrib (peek `a);xa (+ `a 1)
+  xa (+ `a a)
   print -n time (wpeek `a);xa (+ `a 2)
   print -n date (wpeek `a);xa (+ `a 2)
   print -n clust (wpeek `a);xa (+ `a 2)
@@ -228,7 +229,7 @@ procedure pmd
 
 alias allpmds "pmd"
 
-# uft: given a pd (like (lpeek `run)) lists the uft.
+# uft: given a pd (like (lpeek .run)) lists the uft.
 
 procedure uft a
   local uft size count ofd
@@ -237,8 +238,7 @@ procedure uft a
   set uft (lpeek (+ `a 3c))
 #:loop
   set ofd (lpeek `uft)
-  print handle -d2 `count -x8 `ofd
-  if (&& `ofd (! (& `ofd 1))) do_ofd `ofd
+  if `ofd "print handle -d2 `count -x8 `ofd;if (! (& `ofd 1)) do_ofd `ofd"
   set uft (+ `uft 4)
   set count (+ `count 1)
   if (< `count `size) goto loop
@@ -287,3 +287,9 @@ b#9 (- .trap14 2); alias br9 "if `bios_ret print BIOS returns `d0;_13leave"
 
 alias _c defer g
 
+alias dblev "sl.__dblev"
+
+print say "dblev X" to set db level to X.
+print Levels: 1=top level, 2=rwabs/getrec, 4=xrw and clusters, 8=handles
+
+dblev 1

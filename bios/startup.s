@@ -1,15 +1,21 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 88/11/16 15:10:19 $
+* $Date: 88/11/28 11:16:44 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.19  88/11/28  11:16:44  kbad
+* Put the magic back in.  Dungeon Master was depending on the AES magic
+* to reclaim the AES BSS after the boot sequence takes it away.  This
+* is deemed a Good Feature - 12K is no small potatoes on a 520 ST.
+*
+*
 * Revision 1.18  88/11/16  15:10:19  apratt
 * Added STPLUS assembly-time flag.  Set to 1 for ST PLUS, 0 for ST.
 * This flag influences the following:
@@ -17,7 +23,7 @@
 * Setcolor: after reading color register, masks with $0777 for ST, $0fff
 * for STPLUS.
 * No other changes required for ST PLUS.  Even screen dump is fine.
-*
+* 
 * Revision 1.17  88/11/02  15:21:19  apratt
 * Backed out clearing of _bootdev; caused more pain than it's worth.
 * Specifically, people with bootable ramdisks (!) became unhappy.
@@ -95,7 +101,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.18 $
+* $Revision: 1.19 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -156,12 +162,13 @@ denmark		=      13 ***DON'T  CHANGE***
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
 STPLUS		=	0		; set to 1 for ST PLUS video & palette
+
 systype		=	ram		; 'rom' or 'ram'
 country		=	usa      	; 'usa', etc....
 version		=	$0104		; version number *MUST BE EVEN*
-date		=	$10011988	; date, $MMDDYYYY
+date		=	$11091988	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		=	%0001000101000001 ; Oct 1, 1988
+dosdate		=	%0001000101101001 ; Nov 9, 1988
 
 
 ****
@@ -171,7 +178,8 @@ dosdate		=	%0001000101000001 ; Oct 1, 1988
 * object modules in the link stage.  Other places affected by this
 * are marked with the key word "newbuild."
 *
-* endos is the address where the BIOS/GEMDOS/VDI memory usage ends.
+* endos is the address where the BIOS/GEMDOS/VDI memory usage ends,
+* and is now located in the file build\endbgv.s
 *
 **--- for RAM:
 * ifeq systype-ram
@@ -835,15 +843,9 @@ ostext:		bra.s	reseth		;($0)  branch to reset handler
 * In ROM, these are found at $FC0000.
 * In any event, they are found at *(_st_begos).
 *
-****
-* newbuild changes os_end and os_magic, commented lines are obsolete.
-* See comments below on endaesbss; the_magic isn't used any more.
-*
-* os_end:	dc.l	endos		;($c)  -> end of OS memory usage
-os_end:		dc.l	endaesbss	;($c)  -> end of OS memory usage
+* Some code depends on the size of this, since it is copied into
 * RAM to make the hard disk driver happy.
-* os_magic:	dc.l	the_magic	;($14) -> GEM magic (or NULL)
-os_magic:	dc.l	0		;($14) -> GEM magic (or NULL)
+*
 *-
 ostext:		bra	reseth		;($0)  branch to reset handler
 		dc.w	version		;($2)  OS version number
@@ -1219,28 +1221,11 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *  need to align their screens on 256-byte boundaries, so the low byte
 *  of the address is zero.  
 *
-* newbuild -- this stuff is obsoleted by what follows it.
-*
-*	move.l	os_magic(pc),a0		; get pointer to magic
-*	cmp.l	#$87654321,(a0)		; is the magic there?
-*	beq	usem			; yes -- use numbers there
-*	lea	os_end-4(pc),a0		; no, use default numbers
-*usem:	move.l	4(a0),end_os		; init end-of-OS pointer
-*	move.l	8(a0),exec_os		; init default-shell pointer
-****
-*
-* endaesbss is a symbol whose value is the highest RAM usage by the
-* OS.  In a ROM system, this is the end of the AES BSS.  In a RAM
-* system, this is the end of the AES text/data/resource (whatever
-* is last).
-*
-	.globl	endaesbss
-	.globl	gemstart
-	move.l	#endaesbss,end_os
-	move.l	#gemstart,exec_os
-*
-* end of newbuild changes
-****
+*  Backing off by 256 bytes means the defualt low byte is zero, and the
+*  screen doesn't abut the end of memory, so this solves both problems.
+	lea	os_end-4(pc),a0		; no, use default numbers
+usem:	move.l	4(a0),end_os		; init end-of-OS pointer
+	move.l	8(a0),exec_os		; init default-shell pointer
 	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero
 .else
 	move.l	#_dskinit,hdv_init(a5)	; initialization
@@ -2342,9 +2327,9 @@ _get_mpb:
 	bls	nottram
 	move.b	dbasel,d0		; load and shift bits 8..15
 	lea.l	ttmd.w,a2
-	.ifne	STPLUS
-	move.b	$ffff820c,d0		; load bits 0..7 on STPLUS only
-	.endc
+ 	.ifne	STPLUS
+ 	move.b	$ffff820c,d0		; load bits 0..7 on STPLUS only
+ 	.endc
 
 	sub.l	#$01000000,d0
 	move.l	d0,8(a2)		; ttmd.m_length = (length)
@@ -2388,9 +2373,9 @@ f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
 	move.b	dbasel,d0		; load and shift bits 8..15
 	move.b	9(sp),dbaseh		; set bits 16..23 of hardware pointer
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
-	.ifne	STPLUS
-	move.b	$b(sp),$ffff820c	; STPLUS set low 8 bits, too
-	.endc
+ .ifne STPLUS
+ 	move.b	$b(sp),$ffff820c	; STPLUS set low 8 bits, too
+ .endc
 phydone:
 	rts				; return pointer in d0
 
@@ -2425,12 +2410,12 @@ _setscreen:
 *--- set logical location:
 	lea	color0,a0		; a0 -> base of palette memory
 	bmi	f5a
-	.ifeq	STPLUS
+ .ifeq STPLUS
 *--- set physical location:
-	.endc
-	.ifne	STPLUS
-	and.w	#$0fff,d0		; STPLUS has different dirty bits
-	.endc
+ .endc
+ .ifne STPLUS
+	and.w	#$0fff,d0		; STPLUS has different dirty bits 
+ .endc
 	tst.w	6(sp)			; if new color is <0, don't set it
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
  	move.b	$b(sp),dbasell		; STPLUS set low 8 bits, too

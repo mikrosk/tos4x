@@ -3,19 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/05/05 13:41:04 $
+* $Date: 88/05/06 16:06:38 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.12  88/05/06  16:06:38  apratt
+* In dmaread: removed "retry on no error/no data" and replaced it
+* with "retry on any error" (except timeout).
+*
 * Revision 1.11  88/05/05  13:41:04  apratt
 * Added clr.w _bootdev to startup sequence, to fix bootable hard disk
 * bug (when using ALT to avoid HD boot, A:\auto doesn't get executed).
 * This was because GEMDOS set the current drive based on _bootdev,
 * which wasn't getting cleared by anybody.
-*
+* 
 * Revision 1.10  88/05/03  15:09:56  apratt
 * Added comments as relates to the version number and problems with
 * First Byte's Kid series of software -- you get address error unless
@@ -60,7 +64,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.11 $
+* $Revision: 1.12 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1571,14 +1575,13 @@ dmb_2:	add.b	#$20,d7		; next devno
 *    Uses:	everything else
 *
 *
-* Changed 3/88 by Allan Pratt: retry the operation if the read succeeds
-* (status code == 0 (no error)) but the DMA counter didn't change.
-* Removable-media drives signal media change this way.  The second try
-* should work fine.
-*
+* Changed 5/88 by Allan Pratt: always retry the operation on a read error.
+* This is because some removable media signal media change this way.
+* This code does NOT retry on a timeout from the DMA or drive controller.
+* (Should it? TBD.)
 *-
 dmaread:
-	clr.w	d5		; set for one iteration (dbra at end)
+	clr.w	d5		; set for two iterations (dbra at end)
 
 dmaagain:
 	lea	fifo,a6		; a6 -> DMA control register
@@ -1621,27 +1624,11 @@ dmr_lp:	move.l	(a0)+,d0	; get next command byte
 	move.w	#$08a,(a6)	; select status reg
 	move.w	(a5),d0		; get return code from DMA device
 	and.w	#$00ff,d0	; strip crufty bits
-	bne	dmr_q		; not zero, so it's bad.
+	beq.s	dmr_r		; zero, so it's good.
 
-* check DMA counter - if it's unchanged, try the whole thing again.
-* (this is for the removable media hard drive, which has this property)
-* Added 3/88 AKP.
+	dbra	d5,dmaagain	; bad read - retry (once)
 
-	move.b	dmamid,d1	; test mid first because it's most likely
-	cmp.b	_dskbufp+2,d1	; to have changed.
-	bne.s	dmr_r		; success if changed.
-	move.b	dmalow,d1
-	cmp.b	_dskbufp+3,d1
-	bne.s	dmr_r		; success if changed.
-	move.b	dmahigh,d1
-	cmp.b	_dskbufp+1,d1
-	bne.s	dmr_r		; success if changed, else fall through.
-
-* DMA counter didn't change -- retry the operation (once)
-
-	dbra	d5,dmaagain
-
-* Fall through if we've already retried once: give up (return -1).
+* Fall through if we've already tried twice: give up (return -1).
 
 *--- reset DMA, return NE
 dmr_q:

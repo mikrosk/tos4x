@@ -182,7 +182,9 @@ M68030		equ	(SPARROW | TT)
 * available for Drive A: (only).
 *
 
-USE_DISK_CHANGE	equ SPARROW
+*USE_DISK_CHANGE	equ SPARROW
+USE_DISK_CHANGE	equ 0
+
 
 *
 * There used to be a switch called SLOWACSI which was used when you reset

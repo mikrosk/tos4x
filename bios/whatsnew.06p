@@ -1,0 +1,211 @@
+NEW FEATURES OF 3.06p (9/23/91) COMPARED TO 3.01; also 2.06p/2.01:
+
+ONE ROM TO RULE THEM ALL:
+
+	One build runs on all STe and Mega STe machines.  It also runs
+on ST's if they've been modified to accept 256KB of ROM at $00E00000.
+
+ST MONOCHROME MONITORS:
+
+	On non-TT machines, there is code which guards against changing the
+video resolution when it "isn't safe."  The answer to the question "when is
+it safe?" is not forthcoming.  During boot time, the code answers that
+question with "it's safe when you get a tick on Timer B, which is to say a
+falling edge of DE."  During rez changes via Setscreen and the vblank
+anti-burnout check, the answer is "it's safe when you get a tick on
+_frclock, which is counted in software by the VBLANK handler."
+
+	It is possible that this is wrong.
+
+FLOPPY DISK:
+
+	High density now officially supported in Mega STe and TT.  The _FDC
+cookie is installed by the BIOS if you declare that you have high-density
+capability.
+
+	Part of the high-density support includes inhibiting the spin-up
+delay for drive A: by default if you declare you have high-density
+capability.  The external drive still incurs the spin-up delay. 
+Floprate(drive,-2) sets the no-spinup-delay flag for a drive; -3 clears the
+flag, and -4 returns the state of the flag for a drive without changing it.
+	
+	Empty drives are now detected better: operations time out faster,
+and the access light will go out.
+
+	Floppies with only one FAT are now supported.  When a floppy with
+only one FAT is detected, BIOS sets bit 1 of the flags word in the BPB.
+GEMDOS notices this and doesn't try to write the FAT twice.  Hard-disk
+drivers can also set this bit to indicate to GEMDOS that there is only one
+FAT on that drive.
+
+	The BIOS now uses the system variable _dskbufp as a pointer to the
+buffer where disk I/O is done for serial-number and FAT checking. Previous
+versions of the OS used a compiled-in constant.  _dskbufp must point to a
+buffer at least 3K in size.  The BIOS used to use _diskbuf as a compiled-in
+constant buffer address.
+
+MEDIA CHANGE:
+
+	The four-byte serial number of a floppy disk introduced by MSDOS
+4.x is now checked in addition to TOS's 3-byte serial number to determine
+media change.  In addition, the first six sectors of a floppy disk (usually
+the boot sector and the first FAT) are checked: changes in the checksum
+with respect to the last values read or written by GEMDOS or Rwabs() result
+in the "media changed" error.
+
+	GEMDOS now protects better against undetected media change.  If
+there are no open files on a disk, which is the usual case, no stale data
+(cached data which is not valid) will ever be used, even if the disk is
+changed in a way that the BIOS media-change code does not detect.  If there
+are open files there is still a risk of using stale data, but because of
+the new, better media-change detection in the BIOS, it is much harder to
+modify data on a disk and still have it appear unchanged.
+
+
+
+	This improved media-change detection and handling will make
+accesses to floppies slightly slower, and will make the disk cache
+essentially useless when using a write-protected disk, but this is
+considered a minor inconvenience compared to the disasters that ensue with
+the old, relaxed media-change detection and handling.
+
+SERIAL PORTS:
+
+	The serial ports should all work as advertised.
+
+REAL-TIME CLOCK IN TT:
+
+	The base year for the real-time clock chip is now 1968; when it was
+changed from 1980 to 1970 for TT, leap years were computed wrong.
+
+BOOT SEQUENCE:
+
+	The consistency of the code in the ROMs is now checked on reset.
+
+	The 68882 FPU in a TT is now reset at boot time.
+
+	An icon is displayed at boot time, so you know that your machine is
+working.  TT's with color monitors now boot into TT MEDIUM resolution.  If
+you hold down the ALT key after seeing the icon, then you'll go back to ST
+LOW resolution.  This is in case you have a program that auto-boots and
+requires ST LOW resolution.  The time you have for holding the ALT key is
+the time that the ROMs are being CRC-checked.  You have to hold down the
+ALT key when you see the icon, and not let go until the screen clears.
+
+	After checking for a bootable floppy, the system undergoes a memory
+test.  After the memory test completes, a bar will appear across the
+screen. The bar will shrink from the right until it's totally gone, at
+which point the hard disk will boot.  The purpose of this delay is to
+ensure the hard disk is not accessed until it is ready.  If you know your
+hard disk is ready (i.e. has spun up and is ready to take commands) you can
+hit ESCAPE (really any key except shift, control, alternate, or caps lock)
+to abort the delay, or even abort the memory test.
+
+	Programs that use Timer A should work better.  The 3.01 boot
+sequence left Timer A in a state that caused some programs to bomb.
+
+KEYBOARD:
+
+	By holding down the ALT key and typing a decimal number on the
+numeric keypad, you can "type" any character.  The number you key in is
+used as the ASCII code of a character which appears in the keyboard input
+buffer.  This character will have a scan code of zero, which is unusual and
+could cause some programs to bomb.
+
+	Some countries had faulty keyboard maps for shifted arrow keys
+and the like.  They are all correct now.
+
+LITTLE NITS:
+
+	The upper limit of ACSI-accessible RAM as far as the floppy disk
+code is concerned is now 10MB, not 4MB.
+
+	The media-descriptor byte used by Protobt for 1.44MB 3.5" disks
+is $F0, which is what MSDOS uses.
+
+
+
+	Even if you have a diagnostic cartridge installed, the exception
+vectors that point to the bomb handler are installed.  Previously, these
+were left alone on the assumption that your diagnostic cartridge would take
+care of those exceptions.
+
+	The ACSI DMA chip is reset early in the boot sequence.  This is so
+it will in turn reset the floppy disk controller.
+
+	Formatting logical disk B in physical drive A (on a one-floppy
+machine) caused incorrect media-change handling.  This is now fixed.
+
+	The documentation says that writing to sector 0 of a floppy
+causes its media-change state to go to "maybe changed" but this has
+always been wrong: it goes to "definitely changed."
+
+	Programs that change resolution and use Timer B should work better.
+Timer B is still used by the OS during resolution change, but it is now
+restored to a safer state after the resolution change than it was before.
+
+	The Gettime() call now updates GEMDOS' idea of date and time to the
+value in the RTC.  This does NOT happen if you have no RTC (i.e. if the
+date & time come from the IKBD).  Before, if you wanted to do this
+explicitly, you'd have to call Settime(Gettime()), but this would round
+down to the previous 2-second interval.
+
+	The Jdisabint() call has been wrong for a long time: forever, it's
+used bclr to clear the "pending" bit, and this is always wrong. The new
+code doesn't clear it because it's implicitly cleared by clearing the
+enable bit.  In 9/89, I did a different fix which was wrong:  BCLR of the
+isr is the wrong insn, so I used AND, but I used it wrong and now it's
+right.
+
+	The _MCH cookie now has more defined values:
+
+		$00000000	ST, Mega ST
+		$00010000	STe
+		$00010001	STBOOK or STylus (not sure which)
+		$00010002	STBOOK (not currently differentiated)
+		$00010003	STylus (not currently differentiated)
+		$00010010	Mega STe
+		$00020000	TT
+
+	It may be that the _FPU cookie isn't documented yet; at any rate
+it isn't in some versions of the cookie jar document.  Here it is:
+
+
+
+	The _FPU cookie's high word describes the nature of hardware
+floating-point installed in the machine.  The low bit of this word is set
+if the SFP004 floating-point peripheral (or equivalent) is detected. The
+next-higher three bits encode the presence of a Motorola 6888x
+Floating-Point Coprocessor: %000 for none, %001 for MC68881 or MC68882
+(don't know which), %010 for MC68881 definitely, and %011 for MC68882
+definitely. %100 in these bits indicates the presence of the on-chip
+floating-point  processor in the MC68040.  The following table summarizes
+the meanings of some possible values of the high word of the _FPU cookie:
+
+	_FPU COOKIE HIGH WORD
+
+	0000	no hardware FPU
+	0001	SFP004
+ 	0002	MC68881 or MC68882, unsure which
+	0003	MC68881 or MC68882, unsure which, plus SFP004
+ 	0004	MC68881
+	0005	MC68881 + SFP004
+	0006	MC68882
+	0007	MC68882 + SFP004
+	0008	MC68040
+	0009	MC68040 + SFP004 (unlikely)
+
+The reason for this scheme is that you may (for example) have a Mega STe
+(with a built-in SFP004 peripheral) which has been upgraded with a MC68030
+and MC68882 combination; the high word of the cookie value in that case would
+be 0003 or 0007.  The BIOS does not probe for the difference between
+MC68881 and MC68882, but software may probe and set the value of the _FPU
+cookie accordingly if it chooses.
+
+The low word of the FPU cookie's value describes what software floating
+point is installed.  Since there isn't any yet, this is somewhat nebulous. 
+A zero means that there is no software floating point code installed (as
+far as the cookie knows).  A value with the high bit set means that the
+software is MC68040 FPU-aware, so it will use coprocessor instructions for
+those operations which the '040 can do.  The other bits are reserved and
+will be assigned by Atari as needed.

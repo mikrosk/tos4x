@@ -1,0 +1,97 @@
+:g
+you must stop the stub and "wait" before you do this
+:wait
+Waiting... Press ^C to stop waiting.
+Breakpoint.
+:alias
+alias bfind "f bss[blen]"
+alias dfind "f data[dlen]"
+alias tfind "f text[tlen]"
+alias seefix "dl rwstart+1c+lpeek(rwstart+2)+lpeek(rwstart+6)+lpeek(rwstart+e)"
+alias mmlist "l rwstart+20[lpeek(rwstart+4)]"
+alias q "quit"
+alias mwc "x $ 0 ; f +lpeek(clientbp+2c)[800] \"ARGV=\" ; if $ s $ \"Z\""
+alias rts "fl pc[800] 4e5e4e75;g,$"
+alias rwfind "f rwstart[rwsize]"
+alias cold "xsr 2300;sl420 0;xpc lpeek(4);continue"
+alias warm "xsr 2300;xpc lpeek(4);continue"
+alias reset "`sr = 2300;sl 420 0;g lpeek(4)"
+alias xskip "b #f lpeek(sp) ; g ; nb #f"
+alias skip "g,lpeek(sp)"
+alias log "transcript"
+alias proc "procedure"
+:b
+:where
+13FBA: 
+_mediach:L33 + 8
+:l
+000141B0      rts
+_floprw, ~~floprw:
+000141B2      link.w	a6,#$FFF4
+000141B6      movem.l	d2-d7/a5,-(a7)
+000141BA      move.w	$10(a6),d0
+000141BE      muls.w	#$24,d0
+000141C2      movea.l	d0,a5
+000141C4      adda.l	#$8EBA,a5	_dsbtab
+000141CA      btst.b	#$0,$D(a6)
+000141D0      bne.b	$141D6	L10008
+000141D2      clr.w	d0
+000141D4      bra.b	$141DA	L10009
+L10008:
+000141D6      move.w	#$1,d0
+:br2
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+rwabs returns 0 
+mediach returns 0 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+Waiting... Press ^C to stop waiting. ("insert disk b")
+rwabs returns 0 
+mediach returns 1 
+mediach returns 1 
+chkmedia returns 2 
+rwabs returns -14 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+rwabs returns 0 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+rwabs returns 0 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+rwabs returns 0 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+rwabs returns 0 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+rwabs returns 0 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+rwabs returns 0 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+rwabs returns 0 
+mediach returns 0 
+mediach returns 0 
+chkmedia returns 0 
+Waiting... Press ^C to stop waiting. ("insert disk a")
+rwabs returns 0 
+mediach returns 1 
+mediach returns 1 
+Waiting... Press ^C to stop waiting.
+chkmedia returns 2 
+rwabs returns -14 
+Waiting... Press ^C to stop waiting.
+"wait" aborted
+:log off

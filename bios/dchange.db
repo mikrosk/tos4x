@@ -1,0 +1,8 @@
+getsym d:\tos\build\tos.sym
+b #0 .floprw - 4 ; #rwabs rts
+b #1 .rwabs - 4 ; #chkmedia rts
+b #2 .chkmedia - 4 ; #mediach rts
+alias br0 "print rwabs returns -d `d0 ; defer g"
+alias br1 "print chkmedia returns -d `d0 ; defer g"
+alias br2 "print mediach returns -d `d0 ; defer g"
+

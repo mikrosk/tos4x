@@ -157,7 +157,7 @@
 * $Revision: 2.52 $
 * =======================================================================
 *
-* $Source: d:/tos/bios\RCS\bios.s,v $
+* $Source: d:/tos/bios\rcs\bios.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -5808,12 +5808,18 @@ kt3:	move.l	#skeytran,d0
 
 .globl NVMaccess
 
+; 920916	towns	changed the starting address of the NVMaccess 
+;					call made below. With Falcon TOS, the starting 
+;					address changed from 2 to 7. Since we never used
+;					the NVRAM _akp settings before Falcon TOS, the 
+;					change of location doesn't matter.
+
 bioskeys:
 	subq.l	#2,sp		; get space on stack
 	move.l	sp,a0
 	pea	1(a0)		; push buffer address
 	move.w	#1,-(sp)	; count of one
-	move.w	#2,-(sp)	; start address of two
+	move.w	#7,-(sp)	; start address of seven (used to be two)
 	move.w	#0,-(sp)	; read operation
 	bsr	NVMaccess
 	add.w	#10,sp

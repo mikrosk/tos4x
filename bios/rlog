@@ -1,0 +1,2915 @@
+
+RCS file: rcs\bios.s,v
+Working file: bios.s
+head: 2.52
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.52
+	OKSPARROW: 2.49
+	STPAD43: 2.47
+	SPRW_DAL: 2.46
+	FINAL206: 2.39
+	TOS306: 2.38
+	VERS06h: 2.35
+	VERSX06c: 2.32
+	VERSX06b: 2.32
+	XDOT06: 2.30
+	TT304: 2.26
+	TTFINAL: 2.24
+	BLUE: 2.21
+	GREEN: 2.20
+	ORANGE: 2.19
+	MAR011990: 2.15
+	FIRST_MAS: 2.7
+	LAST_AS68: 2.6
+	TOS16: 2.5
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 74;	selected revisions: 74
+description:
+----------------------------
+revision 2.52
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +6881 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.51
+date: 1992/07/27 20:12:04;  author: kbad;  state: Exp;  lines: +18 -3
+Nearly last Sparrow test BIOS
+----------------------------
+revision 2.50
+date: 1992/07/01 21:47:00;  author: kbad;  state: Exp;  lines: +428 -138
+last akp revision
+----------------------------
+revision 2.49
+date: 1992/05/20 22:10:16;  author: unknown;  state: Exp;  lines: +33 -5
+Added some comments to the keyboard BIOS
+----------------------------
+revision 2.48
+date: 1992/05/18 23:07:12;  author: unknown;  state: Exp;  lines: +36 -10
+Set M68030 if (SPARROW | TT) -- all Sparrow is 68030
+
+The cold boot code for STPAD and SPARROW now clear 1MB as documented.
+----------------------------
+revision 2.47
+date: 1992/02/28 08:31:20;  author: apratt;  state: Exp;  lines: +6519 -0
+Changed coldboot so it works for Sparrow.
+----------------------------
+revision 2.46
+date: 1992/02/28 08:25:20;  author: apratt;  state: Exp;  lines: +6495 -0
+Changed TT to M68030 in some places, where it's really CPU dependency we're
+talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
+in any other way. (Well, it has the same clock chip.)
+----------------------------
+revision 2.45
+date: 1992/02/28 02:00:06;  author: apratt;  state: Exp;  lines: +6 -2
+Added .globl coldboot to export it.
+----------------------------
+revision 2.44
+date: 1992/02/28 01:22:04;  author: apratt;  state: Exp;  lines: +10 -5
+Change to coldboot, to clear up to 4MB in STPAD.
+----------------------------
+revision 2.43
+date: 1992/02/12 01:32:40;  author: apratt;  state: Exp;  lines: +27 -5
+Fixed an RTS/CTS bug in SCC code. See scc_sender.
+----------------------------
+revision 2.42
+date: 1991/11/14 23:51:46;  author: apratt;  state: Exp;  lines: +16 -3
+Added a comment about hidden interaction between ikbdws and ikbdput.
+----------------------------
+revision 2.41
+date: 1991/11/14 23:42:20;  author: apratt;  state: Exp;  lines: +33 -17
+Fixed two bugs reported from Germany.  First, the wrong argument was
+pulled off the stack in the SCC Rsconf code, so you couldn't cause a
+break as documented.  Second, the "wait 5ms using a trick" code in
+ikbdwc had two problems, one of logic and one of implementation.
+Now both work.
+----------------------------
+revision 2.40
+date: 1991/10/22 19:25:30;  author: apratt;  state: Exp;  lines: +11 -2
+Added a moveq to pre-clear d0 in the Midi Bconin code.  Until now,
+Bconin on MIDI always returned $FFFFFFxx.  Sadly this didn't make it
+into 3.06 or 2.06.  Sigh.
+----------------------------
+revision 2.39
+date: 1991/10/15 14:08:24;  author: apratt;  state: Exp;  lines: +9 -2
+Changed Bioskeys so it does something else, too: it nukes
+key repeat.  In the first place, there was no way to do this
+(and it's necessary for STBOOK), and in the second place, this
+is not an unreasonable place to do it, since key repeat is based
+on scan code and you're ostensibly changing the tables with this
+call.
+----------------------------
+revision 2.38
+date: 1991/09/16 23:44:52;  author: apratt;  state: Exp;  lines: +10 -7
+Fixed jdisabint twice: first, you can't clear ipra using bclr: it's an
+asynchronous register.  Second, my "fix" back in 89 for clearing isr was
+wrong -- I used asl, not rol, so we were clearing the isr for the interrupt
+in question and all the lower bits in the same isr.  Sigh.
+----------------------------
+revision 2.37
+date: 1991/09/12 19:41:34;  author: apratt;  state: Exp;  lines: +25 -34
+Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+So we use (TT == 0) instead.  Sigh.
+----------------------------
+revision 2.36
+date: 1991/09/06 14:50:56;  author: apratt;  state: Exp;  lines: +118 -116
+Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
+----------------------------
+revision 2.35
+date: 1991/08/05 15:26:53;  author: apratt;  state: Exp;  lines: +20 -2
+Modified coldboot code for STPAD
+----------------------------
+revision 2.34
+date: 1991/06/20 14:06:47;  author: apratt;  state: Exp;  lines: +8 -48
+Removed new keyboard code (was conditional on OLDIKBD)
+because I found a way to hook in a TSR to fix overrun without
+changing the keyboard code.
+----------------------------
+revision 2.33
+date: 1991/06/13 16:29:56;  author: apratt;  state: Exp;  lines: +59 -8
+Added alt-keypad functionality: hold down ALT, type a decimal number on the
+keypad, and let go of alt to get that ASCII code into the keyboard buffer. 
+The result has zero as the scan code and the kbshift value at the moment
+you let go of ALT (so you can't get ALT itself in there).
+----------------------------
+revision 2.32
+date: 1991/05/21 16:54:10;  author: apratt;  state: Exp;  lines: +61 -9
+Changed error handling in midi/ikbd so I could hook in a TSR to fix the
+overrun problems.  The overrun fixing might one day be part of the OS.  The
+change is that the error handler in ikbdvecs gets control BEFORE the byte
+has been read from the chip, so it must read the data to clear the error. 
+Also, if there is an error, the data byte is not presumed valid and is not
+used.  Set OLDIKBD to 1 to get the old behavior back.
+
+----------------------------
+revision 2.31
+date: 1991/04/26 17:44:39;  author: apratt;  state: Exp;  lines: +5 -6
+Removed the STPAD conditional around MIDI code.  Bconmap probably isn't as
+unconditional as it's cracked up to be: it's not been tested when neither
+STPLUS nor TT is true.
+
+----------------------------
+revision 2.30
+date: 1991/04/11 12:13:54;  author: apratt;  state: Exp;  lines: +6 -3
+Removed PAL condition from spain -- now it's always PAL.
+----------------------------
+revision 2.29
+date: 1991/04/02 12:34:47;  author: apratt;  state: Exp;  lines: +22 -12
+Folded in some more things from SERPTCH. This is the version for 3.06.
+----------------------------
+revision 2.28
+date: 1991/03/27 12:33:58;  author: apratt;  state: Exp;  lines: +14 -6
+Turned on Bconmap for TT+STPLUS rather than just TT. It should really be on
+for ANYTHING.  Also, a bug fix in RSCONF for MFP's: was writing rsmode in
+iorec as word, not byte.  Could be other problems which I haven't handled
+yet, but which are fixed by SERPTCH.
+
+Took out midi part of ikbd/midi interrupt if STPAD, since pad has no MIDI.
+----------------------------
+revision 2.27
+date: 1991/01/31 13:50:17;  author: apratt;  state: Exp;  lines: +67 -14
+Fixed some bugs in serial port handling for SCC.
+----------------------------
+revision 2.26
+date: 1990/10/15 12:08:02;  author: apratt;  state: Exp;  lines: +26 -18
+Fixed keyboard tables so they're right: the arrow keys for some countries
+did NOT give ASCII codes of digits when shifted, as the VDI spec says
+they should.  Also, shifted numeric keypad keys gave punctuation
+in some countries, which was wrong.
+
+Also removed PC-relative addressing because MAS has a bug: PC-relative
+addressing to a label that's BEFORE the PC, with arithmetic, generates
+incorrect code.  Example: "move.b label+1(PC),d0" when 'label' is before
+the current PC generates "move.b label+3(PC),d0"
+----------------------------
+revision 2.25
+date: 1990/08/21 17:18:59;  author: apratt;  state: Exp;  lines: +136 -278
+Mega STe support added.
+
+Bconmap is no longer conditional.
+
+Osconf is now an EQU exported from here to startup.s, so that file
+isn't country-dependent any more.
+----------------------------
+revision 2.24
+date: 1990/08/03 15:18:09;  author: apratt;  state: Exp;  lines: +6 -3
+Fixed an oops in Norway's keyboard table: REAL TTOS FINAL RELEASE!
+----------------------------
+revision 2.23
+date: 1990/08/03 13:21:50;  author: apratt;  state: Exp;  lines: +14 -2
+TTOS FINAL RELEASE
+----------------------------
+revision 2.22
+date: 1990/07/19 14:46:56;  author: apratt;  state: Exp;  lines: +33 -4
+Fixed a bug in rsconf: -2 for TT MFP's port always returned rate
+for ST MFP.  Now it is right.  Also sped up memory clearing in
+coldboot.
+
+Added a thing that Insignia needs for their SoftPC product: a vector
+BEFORE Kbdvbase() which is jmp'ed through when the BIOS has established
+that a scan code from the keyboard is a make or break code from a key,
+not part of a mouse or joystick packet.  By default points to "itsakey."
+
+Made cold-boot RAM clearing faster using a tower of four.
+----------------------------
+revision 2.21
+date: 1990/06/18 16:36:05;  author: apratt;  state: Exp;  lines: +18 -4
+Fixed keyclicks so caps-lock keyclick goes through kcl_hook, not the
+built-in keyclick.
+
+----------------------------
+revision 2.20
+date: 1990/05/09 16:46:58;  author: apratt;  state: Exp;  lines: +15 -8
+Fixed scc tx int code so it works (oops).
+
+Documented a feature of dosound that's always been true: it returns
+the current sound-routine pointer, or zero if none.
+If the new pointer you pass in is negative, it doesn't change it.
+----------------------------
+revision 2.19
+date: 1990/05/02 16:29:03;  author: apratt;  state: Exp;  lines: +75 -40
+Fixed rsconf so when changing rsmode (flow-control mode): if txoff,
+causes a bsr to sender (to wake up the transmission if anything's
+buffered), and if rxoff, causes XON or raising RTS.  This didn't work
+before.
+
+Changed sender and scc_sender to allow sending the byte at sendnow even
+if txoff is set, so you can tell the host to XOFF even if he has told
+you to XOFF.
+----------------------------
+revision 2.18
+date: 1990/04/30 18:39:36;  author: apratt;  state: Exp;  lines: +98 -210
+Changed some things in MFP serial port code.  Made kickstart, rsconf
+more common to the two MFP's.
+
+When changing rsmode, always clears xoff state and sends XON 
+or raises CTS if necessary.
+
+Also fixed rsconf for SCC ports, bits-per-word emulation was wrong.
+----------------------------
+revision 2.17
+date: 1990/03/20 13:33:54;  author: apratt;  state: Exp;  lines: +15 -3
+Bug in Bconmap causes it to fail to detect devno values which are
+out of range (higher than maptabsize+6), fixed.
+----------------------------
+revision 2.16
+date: 1990/03/19 16:00:42;  author: apratt;  state: Exp;  lines: +25 -6
+Added comments at Rsconf to the effect that it's always been broken.
+No code change for that because it's mostly harmless.
+
+Fixed Bconmap range-check to be (devno >= maxdev) not (devno > maxdev).
+Pre-cleared d0 in ttmfp Rsconf when returning baud rate (bug fix).
+
+Added move.l d7,d0 at the end of Rsconf for SCC (bug fix).
+
+Increased Iorec initialization table for SCC to include initial 
+baud rate of 1 (9600).
+----------------------------
+revision 2.15
+date: 1990/03/06 15:22:27;  author: apratt;  state: Exp;  lines: +8 -3
+Fixed a fatfinger: if you get a bus error while initting SCC,
+the code is supposed to return safely.  Now it does.
+----------------------------
+revision 2.14
+date: 1990/03/02 10:47:58;  author: apratt;  state: Exp;  lines: +14 -2
+Added initialization of ST MFP Timer B to something other than 1.
+See startup.s, at the label noblank, for why this is necessary
+and not sufficient (!).
+----------------------------
+revision 2.13
+date: 1990/03/01 15:33:46;  author: apratt;  state: Exp;  lines: +39 -23
+Made dowait global; changed delay in ikput to use STMFP Timer C rather
+than instructions.  Made bus error during SCC init just return.
+Changed some ttwait calls to dowait.
+----------------------------
+revision 2.12
+date: 1990/02/26 17:31:51;  author: apratt;  state: Exp;  lines: +32 -13
+Changed instruction-loop delays to use dowait (see startup) during boot
+and another trick in the other place which needs it: ikbdwc. The trick
+expects that Timer C is running as we programmed it, but does not rely
+on the interrupt being enabled or our handler still handling it.
+----------------------------
+revision 2.11
+date: 1990/02/16 16:43:07;  author: apratt;  state: Exp;  lines: +829 -35
+Added SCC serial-port code to the bconmap section.  All works.
+
+Added initializing registers 9 and 10 to zero in the keyclick-sound
+data list, in the hopes that this would fix it: some sounds cause
+subsequent keyclicks to come out wrong.  Don't know if this fixes
+it or not, because my TT has no speaker!
+----------------------------
+revision 2.10
+date: 1990/02/02 13:37:53;  author: apratt;  state: Exp;  lines: +769 -55
+Added conmap code, and TTMFP serial port code.  The conmap code
+should really be dependent on a separate conditional, not TT
+as it is now, because it will go in new STe's.  SCC serial-port
+driver doesn't exist here yet.
+
+Also changed coldboot to clobber fast RAM, too, again up to
+a bus error.
+----------------------------
+revision 2.9
+date: 1989/12/08 15:46:16;  author: apratt;  state: Exp;  lines: +16 -8
+Changed rsconf so it enables & disables tx and rx just by
+changing the one bit, not by setting and clearing the whole
+tsr/rsr.  This preserves the $5 mode set previously,
+so reset & baud-rate changes don't cause spurious chars to be sent.
+----------------------------
+revision 2.8
+date: 1989/10/03 10:03:02;  author: apratt;  state: Exp;  lines: +29 -5
+Changed initialization of MFP's TSR to make the output state
+"High" not "Hi-Z" (open collector) when the transmitter is idle.
+This finally gets rid of the spurious $ff character transmitted
+when you reset an ST.  Also added code to initialize TTMFP's serial
+port and set it to 9600 baud.  (No other non-ST serial support yet.)
+----------------------------
+revision 2.7
+date: 1989/09/22 16:39:12;  author: apratt;  state: Exp;  lines: +509 -489
+THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+No functional changes from previous revision, which is the last to
+require Alcyon's AS68 assembler.
+----------------------------
+revision 2.6
+date: 1989/09/12 12:57:08;  author: apratt;  state: Exp;  lines: +32 -11
+Fixed bad initialization of serial port; added dummy read of TSR
+at end of txerror as 68901 book suggests; changed use of bclr
+when clearing ISR into move with all bits 1 except the one to clear:
+this is also required by the 68901 book.
+----------------------------
+revision 2.5
+date: 1989/07/27 18:01:56;  author: apratt;  state: Exp;  lines: +27 -6
+Added kcl_hook and bell_hook usage here (usu. they're def_click
+and def_bell).
+----------------------------
+revision 2.4
+date: 1989/07/20 15:45:17;  author: apratt;  state: Exp;  lines: +18 -2
+Added code to initialize TTMFP (to totally disabled) and make
+its interrupt vectors start at $140, right after STMFP.
+----------------------------
+revision 2.3
+date: 1989/07/19 14:15:55;  author: apratt;  state: Exp;  lines: +33 -17
+Added TT flag, added call to ttwait in ikbdws, moved ringbel
+so VDI's bsr to there is closer.  (VDI should really jsr.)
+----------------------------
+revision 2.2
+date: 1989/07/11 11:27:27;  author: apratt;  state: Exp;  lines: +18 -13
+I broke Rsconf in rev 2.1 (or possibly before).  Now it's fixed.
+Previously you couldn't ever set RTS/CTS flow control, now you can.
+Both RTS/CTS and XON/XOFF is documented, but not useful, and Mega ROMs
+(and possibly earlier) didn't allow it.  See the comments near auxc0.
+----------------------------
+revision 2.1
+date: 1989/02/27 18:13:55;  author: kbad;  state: Rel;  lines: +6 -3
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.22
+date: 1989/02/27 18:09:50;  author: kbad;  state: Exp;  lines: +53 -47
+Added ITALY keyboard code for new Italian keyboard
+----------------------------
+revision 1.21
+date: 1989/02/13 12:03:37;  author: apratt;  state: Exp;  lines: +9 -5
+Check for reboot used to include ASCII part of the key code, so if you
+redefined the keyboard it wouldn't reboot.  Now just the
+scan code and kbshift bits are checked.  This will be trouble
+if any keyboard doesn't have delete on the same scan code ($53).
+----------------------------
+revision 1.20
+date: 1989/02/06 12:20:25;  author: apratt;  state: Exp;  lines: +13 -4
+Added a timeout to Gettime ... if time doesn't arrive in 1 sec, return 0.
+----------------------------
+revision 1.19
+date: 1988/12/21 12:15:42;  author: apratt;  state: Exp;  lines: +14 -4
+Added comments around the ctl-alt-delete reset code, and saved 1 word
+nearby.  Big deal.
+----------------------------
+revision 1.18
+date: 1988/12/13 16:12:13;  author: apratt;  state: Exp;  lines: +29 -21
+Added (a5) to lots of otherwise-long accesses, both to low RAM and
+high I/O space.
+----------------------------
+revision 1.17
+date: 1988/11/18 11:04:15;  author: apratt;  state: Exp;  lines: +30 -7
+Documented with comments the fact that kstate is now officially
+fixed just after ikbdsys (which is to say, after the end of
+the vector list returned by Kbdvbase).  This has always been
+true; now it's official.  See the comment with "11/18/88" in it
+for details.
+----------------------------
+revision 1.16
+date: 1988/11/08 15:58:27;  author: kbad;  state: Exp;  lines: +107 -94
+Modified keyboard driver so that ISO keyboards can produce correct
+control keystrokes (previously, control was handled before alt, thus
+rendering the alt-control keystrokes useless).
+----------------------------
+revision 1.15
+date: 1988/11/02 15:22:35;  author: apratt;  state: Exp;  lines: +11 -3
+Raised IPL to 7 for the duration of the centronics strobe, so
+another interrupt can't cause the strobe to be active too long.
+----------------------------
+revision 1.14
+date: 1988/09/06 11:32:32;  author: kbad;  state: Exp;  lines: +79 -5
+Added DENMARK key table and driver, and fixed SWEDEN '|' on capslock.
+----------------------------
+revision 1.13
+date: 1988/08/08 17:56:44;  author: apratt;  state: Exp;  lines: +17 -8
+Removed 32K limit on serial input/output buffers.  Limit
+is now 64K (actually 64K-1 for AUX, MIDI and 64K-4 for KB).
+----------------------------
+revision 1.12
+date: 1988/07/25 18:21:00;  author: apratt;  state: Exp;  lines: +8 -3
+Got rid of the damn '.w' after 8 in coldboot code.  Gremlins.
+----------------------------
+revision 1.11
+date: 1988/07/21 12:17:34;  author: apratt;  state: Exp;  lines: +7 -3
+Fixed fatfinger in reboot code: adding wrong offset to KBCL
+(was adding 16 bits, but 24 bits is right) meant you could
+never reboot.
+----------------------------
+revision 1.10
+date: 1988/06/28 16:35:29;  author: apratt;  state: Exp;  lines: +12 -2
+Inexplicably, no revision actually had the rsconf(-2) code in it.
+Now it's there.
+----------------------------
+revision 1.9
+date: 1988/05/12 11:33:07;  author: apratt;  state: Exp;  lines: +11 -6
+Fixed reboot sequences to ignore caps-lock state.
+----------------------------
+revision 1.8
+date: 1988/05/05 13:42:55;  author: apratt;  state: Exp;  lines: +52 -7
+Added ctl-alt-rshft-delete cold boot code.
+----------------------------
+revision 1.7
+date: 1988/04/20 15:05:32;  author: apratt;  state: Exp;  lines: +22 -10
+Changed the comments around Rsconf; no code changes.
+----------------------------
+revision 1.6
+date: 1988/04/12 18:22:34;  author: apratt;  state: Exp;  lines: +15 -2
+Added baudrate variable in BSS (just forgot this...)
+----------------------------
+revision 1.5
+date: 1988/04/08 17:41:07;  author: apratt;  state: Exp;  lines: +34 -25
+Added baud-rate interrogation code: Rsconf(-2) will return old baud
+rate index (0-15).
+
+Also changed key repeat code so it doesn't stop repeating when you
+hit a new key: the new key restarts the cdelay1/cdelay2 cycle, and
+doesn't stop until the repeating key comes up.
+----------------------------
+revision 1.4
+date: 1988/04/05 17:42:30;  author: apratt;  state: Exp;  lines: +7 -4
+Fixed ctl-alt-delete sensing.  Produces a warm boot.
+----------------------------
+revision 1.3
+date: 1988/02/25 17:25:33;  author: apratt;  state: Exp;  lines: +19 -3
+Added keyboard reset on CONTROL-ALT-DELETE
+----------------------------
+revision 1.2
+date: 1987/11/25 18:19:12;  author: lozben;  state: Exp;  lines: +86 -9
+Added flags for new countries: Turkey, Finland, and Norway. Also added
+new keyboard scan codes for Turkey and Norway
+----------------------------
+revision 1.1
+date: 1987/11/20 14:22:53;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\clear.s,v
+Working file: clear.s
+head: 2.3
+branch:
+locks:
+access list:
+symbolic names:
+	OKSPARROW: 2.3
+	STPAD43: 2.3
+	SPRW_DAL: 2.3
+	FINAL206: 2.3
+	TOS306: 2.3
+	VERS06h: 2.3
+	VERSX06c: 2.3
+	VERSX06b: 2.3
+	XDOT06: 2.3
+	TT304: 2.3
+	TTFINAL: 2.3
+	BLUE: 2.2
+	GREEN: 2.2
+	ORANGE: 2.2
+	MAR011990: 2.2
+	TOS16: 2.1
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 4;	selected revisions: 4
+description:
+----------------------------
+revision 2.3
+date: 1990/08/03 13:20:29;  author: apratt;  state: Exp;  lines: +7 -4
+TTOS FINAL RELEASE
+----------------------------
+revision 2.2
+date: 1989/11/21 13:42:46;  author: apratt;  state: Exp;  lines: +12 -9
+Removed '.s' from bra instructions so mas can handle it.
+----------------------------
+revision 2.1
+date: 1989/02/21 17:20:45;  author: kbad;  state: Rel;  lines: +9 -6
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.1
+date: 1987/11/20 14:23:37;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\clock.s,v
+Working file: clock.s
+head: 2.23
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.23
+	OKSPARROW: 2.21
+	STPAD43: 2.20
+	SPRW_DAL: 2.20
+	FINAL206: 2.19
+	TOS306: 2.14
+	VERS06h: 2.11
+	VERSX06c: 2.9
+	VERSX06b: 2.9
+	XDOT06: 2.9
+	TT304: 2.9
+	TTFINAL: 2.9
+	BLUE: 2.7
+	GREEN: 2.7
+	ORANGE: 2.7
+	MAR011990: 2.6
+	FIRST_MAS: 2.4
+	LAST_AS68: 2.3
+	TOS16: 2.1
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 27;	selected revisions: 27
+description:
+----------------------------
+revision 2.23
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +1274 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.22
+date: 1992/07/27 20:12:04;  author: kbad;  state: Exp;  lines: +7 -6
+Nearly last Sparrow test BIOS
+----------------------------
+revision 2.21
+date: 1992/05/18 23:07:48;  author: unknown;  state: Exp;  lines: +51 -8
+SPARROW now uses motorola clock chip; added stub waketime
+----------------------------
+revision 2.20
+date: 1992/02/28 01:21:56;  author: apratt;  state: Exp;  lines: +16 -3
+Oops. When STPAD boots we *do* want to disable off the alarm.
+----------------------------
+revision 2.19
+date: 1991/10/04 17:58:30;  author: apratt;  state: Exp;  lines: +108 -20
+This version folds in those things which are new since I put most of clock.s
+into power.prg for quick-turnaround testing.  The key difference is that
+calling Waketime(1) less than 14 seconds into the minute the alarm is set
+for causes a return of -1.  See other comments for discussion of this.
+----------------------------
+revision 2.18
+date: 1991/10/03 17:53:24;  author: apratt;  state: Exp;  lines: +31 -10
+More revs; this is the last rev before putting Waketime in power.prg
+for testing.  It'll get folded back into here soon... :-)
+----------------------------
+revision 2.17
+date: 1991/10/01 20:12:52;  author: apratt;  state: Exp;  lines: +31 -17
+When you try to set the alarm (Waketime(1)), we now return
+zero for success (i.e. no time to set, or time is in the past,
+or successfully set), and -1 for the special case where you
+are trying to set the alarm for the same minute you're already in.
+----------------------------
+revision 2.16
+date: 1991/09/30 16:45:58;  author: apratt;  state: Exp;  lines: +57 -29
+Another rev for STBOOK alarm stuff; see comments above waketime.
+----------------------------
+revision 2.15
+date: 1991/09/29 23:59:46;  author: apratt;  state: Exp;  lines: +224 -6
+Added the Waketime() XBIOS call, number 47 ($2f).  See the code
+for documentation of it.  It's meant for STPAD but works for all
+ST's and STe's but not TT (because TT has a different RTC).
+Note that this code now computes and sets day-of-week, but
+never reads it.  DOW participates in the alarm match, so it has
+to be computed when you set the time, and when you set the alarm.
+----------------------------
+revision 2.14
+date: 1991/09/17 21:48:52;  author: apratt;  state: Exp;  lines: +8 -4
+For TT TOS, we have stored "year since 1970" in the RTC.
+This is wrong: if you do that then leap years are off by two years.
+We did this originally for the UNIX group's sake, so they could
+represent 1970.  To preserve that (no skin off my nose) the RTC
+for TT now holds "year since 1968."
+----------------------------
+revision 2.13
+date: 1991/09/12 19:41:34;  author: apratt;  state: Exp;  lines: +8 -5
+Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+So we use (TT == 0) instead.  Sigh.
+----------------------------
+revision 2.12
+date: 1991/09/06 14:50:56;  author: apratt;  state: Exp;  lines: +17 -5
+Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
+----------------------------
+revision 2.11
+date: 1991/08/15 15:31:13;  author: apratt;  state: Exp;  lines: +36 -23
+Added code to write GEMDOS' idea of _date and _time every time _getclock is
+called (for either clock chip).  This lets you update those variables
+without doing Settime(Gettime()), which would cause the RTC to lose between
+zero and two seconds each time.
+
+Fixed the STPAD case where the reset register and test register weren't
+being initialized properly.
+----------------------------
+revision 2.10
+date: 1991/08/05 15:13:11;  author: apratt;  state: Exp;  lines: +29 -11
+Added support for STPAD: took out the test (the Ricoh chip is ALWAYS
+there), disabled the 1Hz and 16Hz wave outputs, and changed other code to
+avoid clobbering alarm registers.
+----------------------------
+revision 2.9
+date: 1990/08/03 13:21:39;  author: apratt;  state: Exp;  lines: +7 -2
+TTOS FINAL RELEASE
+----------------------------
+revision 2.8
+date: 1990/08/01 13:10:44;  author: apratt;  state: Exp;  lines: +18 -9
+Fixed a bug: check didn't leave regs right when checksum was wrong,
+even though the read operation expected to be able to do the read
+anyway.
+----------------------------
+revision 2.7
+date: 1990/04/30 18:43:38;  author: apratt;  state: Exp;  lines: +144 -5
+Added NVMaccess call: see comments for details.
+----------------------------
+revision 2.6
+date: 1990/02/22 12:23:28;  author: apratt;  state: Exp;  lines: +10 -6
+Removed ".w" from _time and _date.
+----------------------------
+revision 2.5
+date: 1989/12/08 15:40:49;  author: apratt;  state: Exp;  lines: +45 -54
+Changed TT clock code to use bitfield instructions.
+Also fixes a bug: the minutes were set to half the correct value.
+----------------------------
+revision 2.4
+date: 1989/09/22 16:42:45;  author: apratt;  state: Exp;  lines: +68 -63
+THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+No functional changes from previous revision, which is the last to
+require Alcyon's AS68 assembler.
+----------------------------
+revision 2.3
+date: 1989/08/29 15:13:19;  author: apratt;  state: Exp;  lines: +8 -3
+Fixed TT clock code (I hope).
+----------------------------
+revision 2.2
+date: 1989/08/18 14:28:59;  author: apratt;  state: Exp;  lines: +265 -33
+Added TT clock code. Not extensively tested. Includes switch for TT,
+set to zero for not TT.
+----------------------------
+revision 2.1
+date: 1989/02/27 12:36:29;  author: apratt;  state: Rel;  lines: +5 -2
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.4
+date: 1989/02/27 12:35:02;  author: apratt;  state: Exp;  lines: +6 -3
+Blasted fatfinger again, in the no-bus-error case in clktest. Fixed.
+----------------------------
+revision 1.3
+date: 1989/02/17 11:55:46;  author: apratt;  state: Exp;  lines: +13 -8
+Fixed my fat fingers in clktest.  Also shortened by a few bytes.
+----------------------------
+revision 1.2
+date: 1989/02/06 13:45:40;  author: apratt;  state: Exp;  lines: +20 -6
+Added handling for bus error when accessing RTC (because TT has none).
+The handling is harmless for non-TT, so it's not conditional.
+----------------------------
+revision 1.1
+date: 1987/11/20 14:23:42;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\dmaread.s,v
+Working file: dmaread.s
+head: 1.32
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 1.32
+	OKSPARROW: 1.30
+	STPAD43: 1.29
+	SPRW_DAL: 1.29
+	FINAL206: 1.26
+	TOS306: 1.22
+	VERS06h: 1.18
+	VERSX06c: 1.12
+	VERSX06b: 1.12
+	XDOT06: 1.12
+	TT304: 1.10
+	TTFINAL: 1.8
+	BLUE: 1.7
+	GREEN: 1.7
+	ORANGE: 1.7
+	MAR011990: 1.6
+	FIRST_MAS: 1.4
+	LAST_AS68: 1.3
+comment leader: "* "
+keyword substitution: kv
+total revisions: 32;	selected revisions: 32
+description:
+This file contains the dmaread XBIOS call and the resetscsi procedure.
+----------------------------
+revision 1.32
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +1936 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 1.31
+date: 1992/07/27 20:12:04;  author: kbad;  state: Exp;  lines: +7 -6
+Nearly last Sparrow test BIOS
+----------------------------
+revision 1.30
+date: 1992/05/18 23:07:56;  author: unknown;  state: Exp;  lines: +7 -4
+Sparrow and TT are M68030 - no longer read from a file
+----------------------------
+revision 1.29
+date: 1992/02/28 08:25:22;  author: apratt;  state: Exp;  lines: +1929 -0
+Changed cache handling to be .if M68030 rather than .if SCSI.  This lets
+us make ROMs for Sparrow.
+----------------------------
+revision 1.28
+date: 1992/02/12 01:32:14;  author: apratt;  state: Exp;  lines: +413 -3
+Much Sparrow stuff. Also fixed a bug in slow ACSI devices.
+----------------------------
+revision 1.27
+date: 1991/11/06 22:42:16;  author: apratt;  state: Exp;  lines: +7 -4
+Fixed a BIG OOPS: at qd0 the label 'sdelay' was wrong so that
+the add of _hz_200 to d0 was INSIDE the loop.  Oops.  Fixed.
+----------------------------
+revision 1.26
+date: 1991/10/15 15:04:18;  author: apratt;  state: Exp;  lines: +1508 -0
+Fixed a bug in the caller of strcmp.
+----------------------------
+revision 1.25
+date: 1991/10/11 17:27:30;  author: apratt;  state: Exp;  lines: +103 -8
+Special case for Conner's IDE drives.  Turned out to be a big drag
+getting them to change their firmware.  Sigh.
+----------------------------
+revision 1.24
+date: 1991/09/30 18:04:38;  author: apratt;  state: Exp;  lines: +11 -2
+Previous version worked very badly.  One theory: Conner says that
+you need a delay between Identify and Init Parameters.  When Minna
+took out the Init Parameters call, she also took out the delay.
+Well, hmm, maybe the delay is required between Identify and
+ANYTHING ELSE.  So it's back.
+----------------------------
+revision 1.23
+date: 1991/09/30 16:45:06;  author: apratt;  state: Exp;  lines: +250 -225
+New from Minna: checks both READY and BUSY waiting for the right values.
+Seems some drives set READY before clearing BUSY.  Sigh.
+----------------------------
+revision 1.22
+date: 1991/09/13 17:45:58;  author: apratt;  state: Exp;  lines: +7 -3
+Oops - the delay was supposed to be 500us, not 500ms.  Made it
+two ticks, which is btw 5 and 10 ms.
+----------------------------
+revision 1.21
+date: 1991/09/13 00:46:52;  author: apratt;  state: Exp;  lines: +39 -25
+Minna added yet another delay: Conner wants 0.5sec between
+power up and the Identify command.
+----------------------------
+revision 1.20
+date: 1991/09/12 19:56:18;  author: apratt;  state: Exp;  lines: +11 -5
+Changed to assemble IDE_AT for ALL MACHINES, now that there's no
+distinction at assembly time between ST and STPLUS.
+----------------------------
+revision 1.19
+date: 1991/09/06 14:50:56;  author: apratt;  state: Exp;  lines: +29 -25
+Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
+----------------------------
+revision 1.18
+date: 1991/08/21 11:18:56;  author: apratt;  state: Exp;  lines: +14 -8
+Fixed two oopses: iderdy is now consistently _iderdy,
+and undev is outside IDEAT conditionals.
+----------------------------
+revision 1.17
+date: 1991/08/20 13:22:25;  author: minna;  state: Exp;  lines: +51 -12
+Added iderdy() to test if IDE drive is ready before 
+it's being talked to.  If the drive does not become
+ready in 5 sec., it's considered as an unknown device.
+----------------------------
+revision 1.16
+date: 1991/08/15 16:18:07;  author: apratt;  state: Exp;  lines: +22 -6
+Added code for IDE to wait until ATASR shows READY before
+doing anything else.  Also changed so IDE_AT is assembled for
+all STPLUS versions; the bus error detection will take care
+of failing out quick on those machines that don't really have
+an IDE bus.
+----------------------------
+revision 1.15
+date: 1991/08/02 16:21:23;  author: minna;  state: Exp;  lines: +20 -6
+Added delay between identify() and initparm(),
+and reversed changes made earlier today.
+----------------------------
+revision 1.14
+date: 1991/08/02 15:07:10;  author: minna;  state: Exp;  lines: +21 -6
+Added handling of final interrupt after data transfer
+----------------------------
+revision 1.13
+date: 1991/07/29 12:37:45;  author: minna;  state: Exp;  lines: +40 -15
+_atread() and _atwrite modified to not use the
+ATSC (sector count register) to count down on
+multiple sectors read or write.  Some vendors
+decrement the register too early.
+
+To test if the IDE interface exists, instead of
+reading from bAT (the data register), read from
+ATASR (the alternate status register.)
+----------------------------
+revision 1.12
+date: 1991/03/27 12:36:36;  author: apratt;  state: Exp;  lines: +63 -15
+Base address of IDE has moved to $F00000.  This code assumes that the base
+address is on a longword boundary.  Added guards against missing IDE bus,
+and against missing ACSI (bus error when accessing DMA chip).  This is
+for prototype PADs only, and may go away soon.
+
+Changed switches to SCSI and IDE_AT, which are set based on TT and STPAD at
+the top of the file.
+----------------------------
+revision 1.11
+date: 1991/02/26 17:58:37;  author: minna;  state: Exp;  lines: +62 -78
+Base address of IDE bus has been moved to $F00000.
+----------------------------
+revision 1.10
+date: 1990/10/29 15:52:12;  author: minna;  state: Exp;  lines: +37 -29
+Base address of IDE bus has been moved to $C00040 (long word boundary).
+----------------------------
+revision 1.9
+date: 1990/10/19 16:05:22;  author: minna;  state: Exp;  lines: +407 -44
+Added code to handle drives on the IDE-AT bus.
+----------------------------
+revision 1.8
+date: 1990/08/03 13:22:48;  author: apratt;  state: Exp;  lines: +6 -2
+TTOS FINAL RELEASE
+----------------------------
+revision 1.7
+date: 1990/03/06 16:09:16;  author: apratt;  state: Exp;  lines: +8 -4
+Moved .globl _resetscsi into the TT conditional; otherwise
+MAS thinks it's external, even though it's never used!
+----------------------------
+revision 1.6
+date: 1990/03/02 17:46:34;  author: apratt;  state: Exp;  lines: +35 -79
+This rev is the source for the 3/1/90 ROM.
+----------------------------
+revision 1.5
+date: 1990/03/01 17:27:00;  author: apratt;  state: Exp;  lines: +283 -149
+Checkin of Minna's changes, including adding better spin-up delays
+and the dmawrite call.
+----------------------------
+revision 1.4
+date: 1989/09/22 16:42:55;  author: apratt;  state: Exp;  lines: +90 -77
+THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+No functional changes from previous revision, which is the last to
+require Alcyon's AS68 assembler.
+----------------------------
+revision 1.3
+date: 1989/09/07 16:30:02;  author: apratt;  state: Exp;  lines: +14 -3
+Added delay after (potentially) resetting ACSI DMA chip; see SLOWACSI
+code in flop.s.
+----------------------------
+revision 1.2
+date: 1989/08/25 16:49:18;  author: apratt;  state: Exp;  lines: +15 -13
+Moved lastacstm from text seg to bss.
+----------------------------
+revision 1.1
+date: 1989/08/25 16:45:32;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\flop.s,v
+Working file: flop.s
+head: 2.41
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.41
+	OKSPARROW: 2.39
+	STPAD43: 2.38
+	SPRW_DAL: 2.38
+	FINAL206: 2.35
+	TOS306: 2.32
+	VERS06h: 2.30
+	VERSX06c: 2.27
+	VERSX06b: 2.26
+	XDOT06: 2.23
+	TT304: 2.21
+	TTFINAL: 2.17
+	BLUE: 2.15
+	GREEN: 2.15
+	ORANGE: 2.13
+	MAR011990: 2.12
+	FIRST_MAS: 2.6
+	LAST_AS68: 2.5
+	TOS16: 2.2
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 52;	selected revisions: 52
+description:
+----------------------------
+revision 2.41
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +2091 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.40
+date: 1992/07/27 20:12:04;  author: kbad;  state: Exp;  lines: +15 -7
+Nearly last Sparrow test BIOS
+----------------------------
+revision 2.39
+date: 1992/05/18 23:08:08;  author: unknown;  state: Exp;  lines: +55 -9
+Added USE_DISK_CHANGE to use that bit.  It's sparrow-only; TT has the bit
+in a different place, and besides, TT can have external floppies that don't
+supply this bit.  The consequence of USE_DISK_CHANGE is that the floppy
+vblank handler gets smaller and never selects a drive (thus no blink).
+
+Also, for Sparrow, the bit which was Drive One Select is no longer touched
+in this code; it's a no-connect for now, but somebody'll find a use for it.
+----------------------------
+revision 2.38
+date: 1992/02/28 08:25:02;  author: apratt;  state: Exp;  lines: +2034 -0
+Changed TT to M68030 in some places, where it's really CPU dependency we're
+talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
+in any other way.
+
+Changed TT to (TT | SPARROW) for unconditional access to the denselect
+register.
+
+Added MAXACSI of 14MB for SPARROW.
+----------------------------
+revision 2.37
+date: 1992/02/12 01:32:28;  author: apratt;  state: Exp;  lines: +20 -4
+Added loops .if SPARROW to check the SDMA status bit.
+----------------------------
+revision 2.36
+date: 1991/11/06 21:27:32;  author: apratt;  state: Exp;  lines: +30 -3
+New code to check _iamanst and avoid hitting denselect if you are.
+This only works if writing denselect on (non-Mega) STe doesn't buserr.
+----------------------------
+revision 2.35
+date: 1991/10/21 19:03:30;  author: apratt;  state: Exp;  lines: +8 -3
+Fixed a comment: flopwr to sector 0 sets MC mode to "changed" not
+"unsure."  It always has, but this was commented and documented
+incorrectly for a long time.
+----------------------------
+revision 2.34
+date: 1991/10/15 14:12:08;  author: apratt;  state: Exp;  lines: +1972 -0
+Changed to probe for FDC every time you call, not just at boot time.
+This is STPAD only, of course.  This way you can boot without a
+floppy attached and still attach one later.
+----------------------------
+revision 2.33
+date: 1991/10/03 17:53:24;  author: apratt;  state: Exp;  lines: +50 -4
+Added code for high-density selection on STPAD, which is different from
+other high-density select code.
+----------------------------
+revision 2.32
+date: 1991/09/12 19:41:34;  author: apratt;  state: Exp;  lines: +15 -8
+Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+So we use (TT == 0) instead.  Sigh.
+----------------------------
+revision 2.31
+date: 1991/09/06 14:49:02;  author: apratt;  state: Exp;  lines: +82 -270
+Removed a lot of comments and log messages.  Removed SLOWACSI
+conditional -- now we're always SLOWACSI.  Made the "nospindelay"
+field of the dsb truly conditional on HI_DEN.
+
+Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
+----------------------------
+revision 2.30
+date: 1991/08/15 15:31:18;  author: apratt;  state: Exp;  lines: +21 -14
+In STPAD, do a better "ram test" on the registers in the 1772 before
+deciding that it's there.  If you just write a value to one register, then
+read it back, it's possible you'll read what you wrote because of signal
+persistence, not because the 1772 is there.  So instead we write -1 to trkreg,
+0 to secreg, then read them back in order.
+----------------------------
+revision 2.29
+date: 1991/08/05 15:13:36;  author: apratt;  state: Exp;  lines: +53 -22
+Removed nospindelay global; now spin delay is the first byte of the field
+of the DSB. It has to be first because startup.s sets it for drive 0 when
+the high-density switch is thrown.  It gets ORed into the appropriate
+commands, so its value is the bit to set.  Floprate(drv,-2) sets, -3
+clears, and -4 probes the current setting of that bit.
+----------------------------
+revision 2.28
+date: 1991/06/13 16:27:09;  author: apratt;  state: Exp;  lines: +6 -4
+removed tmpdma -- left over from something, took up 4 bytes in BSS and four
+in ROM for a clr.b instruction.
+
+----------------------------
+revision 2.27
+date: 1991/05/22 14:56:07;  author: apratt;  state: Exp;  lines: +15 -4
+Expanded comments about QD switch and TURNED IT OFF because
+it's just for debugging.
+----------------------------
+revision 2.26
+date: 1991/05/21 16:56:53;  author: apratt;  state: Exp;  lines: +91 -11
+Changed so the motor spin-up delay is disabled if the BIOS sets the
+nospindelay flag.  Startup.s sets this flag if the switch is thrown. Also
+increased the "absurd" sector count because 36 is not absurd for quad
+density.  QD is slightly implemented here, based on the assembly-time
+switch QD.
+
+----------------------------
+revision 2.25
+date: 1991/04/26 17:44:01;  author: apratt;  state: Exp;  lines: +40 -9
+Added a drop-dead deselect timeout in Vblank after 5 seconds, motor-on or
+not.  This way empty drives do get turned off.
+
+----------------------------
+revision 2.24
+date: 1991/04/24 17:23:15;  author: apratt;  state: Exp;  lines: +35 -16
+Added a new type of return from flopcmds, used only by go2track
+and hence by its callers:  if you return with carry set, it means
+the command timed out, and this usually means there's no disk in
+the drive.  In that case we go directly to flopfail, do not pass
+go, do not retry at the other density.  This works WONDERS for
+the "feel" of a system with no disk in the drive at boot time or
+any other time.
+----------------------------
+revision 2.23
+date: 1991/04/11 12:12:05;  author: apratt;  state: Exp;  lines: +12 -9
+Changed MAXACSI for TT to 10MB, not 4MB.  Should it be 10 for STe?
+----------------------------
+revision 2.22
+date: 1991/03/27 12:36:54;  author: apratt;  state: Exp;  lines: +79 -26
+Added a check for the dma chip and the 1772 if STPAD.  The missing-ACSI-chip
+test is only necessary for prototype PADs, and may go away soon.
+
+Made fast-ram handling (actually non-ACSI-ram) happen for any machine.  
+----------------------------
+revision 2.21
+date: 1990/11/20 18:20:27;  author: apratt;  state: Exp;  lines: +14 -4
+Removed the one place that reads the denselect register: it's
+WRITE ONLY in Mega STE.  It's shadowed anyway in the DSB, so
+this is no hardship.
+----------------------------
+revision 2.20
+date: 1990/11/19 19:35:27;  author: apratt;  state: Exp;  lines: +15 -4
+Fixed a bug which has been here since day 1: on single-drive systems,
+Flopfmt and Flopwr to the boot sector set the state of disk A to "has
+changed" even if you formatted/wrote to disk B.
+
+Documentation alert: the docs say writing to sector zero causes the flag
+to go to "maybe changed" but it actually goes to "has changed."
+----------------------------
+revision 2.19
+date: 1990/11/19 15:45:12;  author: apratt;  state: Exp;  lines: +6 -6
+Changed HI_DEN to be TT+STPLUS - it's available in Mega STe.
+Removed READFIFO, which was unused (was there for an old MCU).
+----------------------------
+revision 2.18
+date: 1990/08/21 17:26:50;  author: apratt;  state: Exp;  lines: +6 -3
+Mega STe version: made SLOWACSI true for STPLUS, too.
+----------------------------
+revision 2.17
+date: 1990/08/03 13:22:58;  author: apratt;  state: Exp;  lines: +5 -2
+TTOS FINAL RELEASE
+----------------------------
+revision 2.16
+date: 1990/07/19 18:51:14;  author: apratt;  state: Exp;  lines: +10 -4
+Removed some leftover debugging code.
+----------------------------
+revision 2.15
+date: 1990/05/22 13:53:33;  author: apratt;  state: Exp;  lines: +27 -10
+In go2track, an EQ return from flopcmds doesn't mean success, it
+only means no timeout; you have to check the error bits in d7
+to see if the seek-with-verify actually succeeded.  This is why
+lengthening timeouts caused failure: before, the short timeout
+expired first, so this code worked.  Now it works anyway.
+----------------------------
+revision 2.14
+date: 1990/05/21 12:21:15;  author: apratt;  state: Exp;  lines: +26 -4
+Lengthened timeouts; they were so short they timed out before the
+1772 could return record-not-found errors.
+----------------------------
+revision 2.13
+date: 1990/04/30 18:43:55;  author: apratt;  state: Exp;  lines: +97 -45
+Added code to check the cookie jar for _FRB the first time alternative
+RAM is used, rather than counting on the BIOS having found the alt. RAM
+at boot time.  This lets people call "Maddalt()" and add an _FRB cookie
+to install new memory (e.g. on the VME bus).
+
+Also removed the first toggle of the direction bit, so it changes
+either once or twice, not twice or three times.  Makes the ACSI DMA
+chip happier, and might even allow removal of SLOWACSI code.
+----------------------------
+revision 2.12
+date: 1990/03/01 17:11:39;  author: apratt;  state: Exp;  lines: +12 -7
+Oops - end of track is 1400 bytes regular, 2800 high density. Fixed.
+----------------------------
+revision 2.11
+date: 1990/03/01 15:47:26;  author: apratt;  state: Exp;  lines: +42 -23
+Changed track leadin on high-density floppies from 60 bytes to 120.
+Changed track trailer, too: 700 bytes in reg. den., 1400 in high.
+Reset1770 code had a bug, and rwdelay: fixed.
+----------------------------
+revision 2.10
+date: 1990/02/26 17:10:24;  author: apratt;  state: Exp;  lines: +38 -13
+Removed all instruction-dependent timing loops.  The delay at reset1770
+and rwdelay are done with a trick which assumes that Timer C is still
+programmed the way BIOS programmed it.  It does NOT assume that
+the interrupt is actually enabled or that the system interrupt handler
+is handling it.  (This is in preparation for Mega STe with 16MHz CPU
+but no extra MFP with its extra timers.)
+----------------------------
+revision 2.9
+date: 1990/02/22 17:50:49;  author: apratt;  state: Exp;  lines: +11 -6
+Worked around a MAS PC-relative bug, and added "and.w #3,d0" to
+mask off the unwanted bits in denselect before using it.
+----------------------------
+revision 2.8
+date: 1989/11/30 11:14:27;  author: apratt;  state: Exp;  lines: +6 -4
+Removed a little hi-density debugging code I inadvertently left in.
+----------------------------
+revision 2.7
+date: 1989/11/27 14:48:57;  author: apratt;  state: Exp;  lines: +121 -26
+Added support for 1.44MB floppies ifne HI_DEN.  HI_DEN is
+set to the same value as the TT flag, for now.
+----------------------------
+revision 2.6
+date: 1989/09/22 16:43:05;  author: apratt;  state: Exp;  lines: +140 -136
+THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+No functional changes from previous revision, which is the last to
+require Alcyon's AS68 assembler.
+----------------------------
+revision 2.5
+date: 1989/09/07 16:28:11;  author: apratt;  state: Exp;  lines: +113 -10
+Added SLOWACSI code.  Seems to work, but I'm not happy with it.
+----------------------------
+revision 2.4
+date: 1989/08/30 15:56:23;  author: apratt;  state: Exp;  lines: +106 -2
+Added code to handle floppy I/O with fast RAM.  Calls to ??fast
+either do a pre-copy and change the buffer address on the stack,
+or they set up a post-copy using fastbuf and fastcnt.  unfast handles
+the post-copy, called at the common floppy return point unlok1.
+----------------------------
+revision 2.3
+date: 1989/08/18 14:31:51;  author: apratt;  state: Exp;  lines: +16 -4
+Added some calls to clrcache -- putting it at RWABS isn't good enough.
+----------------------------
+revision 2.2
+date: 1989/07/19 14:22:09;  author: apratt;  state: Exp;  lines: +50 -27
+Changed all timeouts to use 200Hz, added TT flag, when set,
+short delays use ttwait rather than instruction loops.
+----------------------------
+revision 2.1
+date: 1989/02/21 17:21:05;  author: kbad;  state: Rel;  lines: +8 -3
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.11
+date: 1989/02/06 23:07:08;  author: kbad;  state: Exp;  lines: +18 -6
+Changed _acctim (last floppy access time) to use video frame counter
+instead of 200Hz clock.  Safer that way, since floppy WP is checked
+at vblank time -- this way mediach() will work even if 200Hz is disabled.
+----------------------------
+revision 1.10
+date: 1988/12/22 12:56:27;  author: apratt;  state: Exp;  lines: +33 -29
+Added (a5)'s to save some words & some time (as if it mattered in 
+floppy code...)
+----------------------------
+revision 1.9
+date: 1988/10/12 17:23:15;  author: apratt;  state: Exp;  lines: +44 -4
+Added the Floprate call: oldrate = Floprate(devno,newrate) where
+newrate == -1 if you don't want to change it.
+----------------------------
+revision 1.8
+date: 1988/06/28 16:27:21;  author: apratt;  state: Exp;  lines: +25 -19
+Removed extra index information because it made 10-sector
+formatting not work.  Better to be compatible with our own
+programs than to try to be compatible with crummy PC drives.
+----------------------------
+revision 1.7
+date: 1988/04/28 16:06:39;  author: apratt;  state: Exp;  lines: +35 -30
+Backed out Flopwp XBIOS call... Turned out to be a flop.
+(I didn't want the Desktop to use this one Flop call, because it's possible
+that somebody installed an Rwabs-level driver for drives A and B.)
+----------------------------
+revision 1.6
+date: 1988/04/27 13:36:26;  author: apratt;  state: Exp;  lines: +15 -2
+Added code to set last-access time of both drives to "long ago"
+when you change logical disks in a physical drive, so the next call
+to mediach() won't think it's still in the "grace period."
+----------------------------
+revision 1.5
+date: 1988/04/05 17:45:52;  author: apratt;  state: Exp;  lines: +10 -4
+Tested Flopwp call; it returns TRUE when there is no disk in the drive.
+This can be overcome by doing a READ to make sure there *is* a disk
+in the drive.  The read should come from GEMDOS (e.g. Fsfirst("A:\\*.*",-1))
+rather than BIOS to be sure that media change is processed.
+----------------------------
+revision 1.4
+date: 1988/04/04 15:39:24;  author: apratt;  state: Exp;  lines: +7 -3
+Didn't do anything: don't know why it was locked.
+----------------------------
+revision 1.3
+date: 1988/03/28 11:45:48;  author: apratt;  state: Exp;  lines: +45 -3
+Added check-floppy-state Xbios call.  Can cause "insert other floppy"
+message, so use this only when you would cause a swap anyway.
+----------------------------
+revision 1.2
+date: 1988/03/25 11:49:50;  author: apratt;  state: Exp;  lines: +29 -6
+This version has more index information per Intel controller spec
+in the format-track code.  THIS IS UNTESTED AND MIGHT NOT WORK.
+----------------------------
+revision 1.1
+date: 1987/11/20 14:23:48;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\makefile.,v
+Working file: makefile.
+head: 2.18
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.18
+	OKSPARROW: 2.16
+	STPAD43: 2.15
+	SPRW_DAL: 2.14
+	FINAL206: 2.13
+	TOS306: 2.13
+	VERS06h: 2.12
+	VERSX06c: 2.11
+	VERSX06b: 2.11
+	XDOT06: 2.10
+	TT304: 2.7
+	TTFINAL: 2.6
+	BLUE: 2.4
+	GREEN: 2.4
+	ORANGE: 2.4
+	MAR011990: 2.4
+	FIRST_MAS: 2.4
+	LAST_AS68: 2.3
+	TOS16: 2.2
+	TOS14: 2.2
+comment leader: "# "
+keyword substitution: kv
+total revisions: 22;	selected revisions: 22
+description:
+makefile for allbios.o
+----------------------------
+revision 2.18
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +214 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.17
+date: 1992/07/27 20:12:04;  author: kbad;  state: Exp;  lines: +200 -238
+Nearly last Sparrow test BIOS
+----------------------------
+revision 2.16
+date: 1992/05/18 23:08:24;  author: unknown;  state: Exp;  lines: +63 -15
+Made rwabs.c machine-dependent, because of disk change.
+Took "optimize" out because it doesn't work under MiNT.
+Took out m68030.s - it was a temporary hack while Sparrows had both CPUs.
+----------------------------
+revision 2.15
+date: 1992/02/29 21:24:14;  author: apratt;  state: Exp;  lines: +10 -7
+Added dependency on m68030.s
+----------------------------
+revision 2.14
+date: 1991/12/05 00:43:20;  author: apratt;  state: Exp;  lines: +10 -5
+Added machine type 'w' for Sparrow.
+----------------------------
+revision 2.13
+date: 1991/09/25 19:35:36;  author: apratt;  state: Exp;  lines: +12 -13
+Removed clear.o -- absorbed into startup.s or something.
+----------------------------
+revision 2.12
+date: 1991/08/05 15:29:10;  author: apratt;  state: Exp;  lines: +20 -7
+Added calls to biosvers to create version.s which exports date and dosdate
+to startup.  Added the memtest target.
+----------------------------
+revision 2.11
+date: 1991/05/21 16:54:35;  author: apratt;  state: Exp;  lines: +7 -4
+Fixed so 'rm' doesn't rely on wildcards or globbing, and
+no pushd/popd, and no temp directories.
+----------------------------
+revision 2.10
+date: 1991/04/11 12:13:43;  author: apratt;  state: Exp;  lines: +8 -8
+Removed pushd and popd -- they're not reliable.
+----------------------------
+revision 2.9
+date: 1991/03/27 14:00:26;  author: apratt;  state: Exp;  lines: +18 -9
+Changed so switches files are in a subdirectory.
+----------------------------
+revision 2.8
+date: 1991/03/27 12:37:31;  author: apratt;  state: Exp;  lines: +26 -42
+Changed to add the "pad" machine.  Took out TSXMACHINE; dmaread and clock
+are the only files for which multiple machines are really the same binary,
+and that's just not enough to worry about.
+----------------------------
+revision 2.7
+date: 1990/11/26 13:16:28;  author: apratt;  state: Exp;  lines: +56 -29
+Flop now has .sx, .e, and .t extensions, though .e and .t
+are really the same thing.  (Both TT and MSTE have high-density
+floppy capability.)
+----------------------------
+revision 2.6
+date: 1990/08/03 13:23:19;  author: apratt;  state: Exp;  lines: +6 -2
+TTOS FINAL RELEASE
+----------------------------
+revision 2.5
+date: 1990/08/03 11:28:25;  author: apratt;  state: Exp;  lines: +70 -147
+This version has variables set for machine and country, to tell it
+what switches and object files to use.
+----------------------------
+revision 2.4
+date: 1989/09/22 16:54:54;  author: apratt;  state: Exp;  lines: +185 -17
+THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+No functional changes from previous revision, which is the last to
+require Alcyon's AS68 assembler.
+----------------------------
+revision 2.3
+date: 1989/08/25 16:45:58;  author: apratt;  state: Exp;  lines: +9 -3
+Added dmaread.o and dmaread.s (needs mac, not as68).
+----------------------------
+revision 2.2
+date: 1989/06/19 15:46:12;  author: kbad;  state: Exp;  lines: +8 -7
+Fixed pushd/popd lines.
+----------------------------
+revision 2.1
+date: 1989/02/22 20:45:37;  author: kbad;  state: Rel;  lines: +26 -8
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.4
+date: 1989/01/23 12:18:41;  author: kbad;  state: Exp;  lines: +6 -10
+Changed `alnnew' reference to 
+`aln' (new aln is now production model)
+----------------------------
+revision 1.3
+date: 1988/10/12 14:44:51;  author: kbad;  state: Exp;  lines: +2 -1
+fix up file copying
+----------------------------
+revision 1.2
+date: 1988/10/03 15:07:07;  author: kbad;  state: Exp;  lines: +9 -9
+Added new build parameters (now uses ``alnnew'')
+----------------------------
+revision 1.1
+date: 1988/09/19 14:00:58;  author: kbad;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\memtest.s,v
+Working file: memtest.s
+head: 1.6
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 1.6
+	OKSPARROW: 1.5
+	STPAD43: 1.5
+	SPRW_DAL: 1.5
+	FINAL206: 1.5
+	TOS306: 1.4
+	VERS06h: 1.2
+comment leader: "# "
+keyword substitution: kv
+total revisions: 6;	selected revisions: 6
+description:
+----------------------------
+revision 1.6
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +507 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 1.5
+date: 1991/10/01 11:50:18;  author: apratt;  state: Exp;  lines: +9 -5
+Fixed an oops: if you have to space over (<= 1MB to test), the spacing
+was done in inverse video, so the test bar was the wrong size and filled
+from the middle.  Works now.
+----------------------------
+revision 1.4
+date: 1991/09/24 02:25:46;  author: apratt;  state: Exp;  lines: +11 -3
+Fixed a long-standing bug: TT RAM >4MB overran the bar, but it's right now.
+----------------------------
+revision 1.3
+date: 1991/09/06 14:43:52;  author: apratt;  state: Exp;  lines: +12 -1
+Added code to space over before displaying the bar if your
+machine has one MB or less; this means that backspacing to
+display the number of KB at the end won't overwrite anything.
+----------------------------
+revision 1.2
+date: 1991/08/15 15:31:27;  author: apratt;  state: Exp;  lines: +39 -15
+Changed to use only 40 columns, and to work on screens with EXACTLY
+40 columns and no wraparound.
+----------------------------
+revision 1.1
+date: 1991/08/05 15:11:51;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\mkswitch.e,v
+Working file: mkswitch.e
+head: 1.4
+branch:
+locks:
+access list:
+symbolic names:
+	OKSPARROW: 1.4
+	STPAD43: 1.4
+	SPRW_DAL: 1.4
+	FINAL206: 1.1
+	TOS306: 1.1
+	VERS06h: 1.1
+	VERSX06c: 1.1
+	VERSX06b: 1.1
+	XDOT06: 1.1
+comment leader: "# "
+keyword substitution: kv
+total revisions: 4;	selected revisions: 4
+description:
+This file is a micro emacs script to create switches files.
+----------------------------
+revision 1.4
+date: 1992/02/12 01:32:24;  author: apratt;  state: Exp;  lines: +3 -3
+Added SPARROW, removed STPLUS.
+----------------------------
+revision 1.3
+date: 1991/12/05 00:49:30;  author: apratt;  state: Exp;  lines: +9 -9
+Commented out useless countries like denmark and turkey.
+----------------------------
+revision 1.2
+date: 1991/12/05 00:43:20;  author: apratt;  state: Exp;  lines: +9 -9
+Added machine type 'w' for Sparrow.
+----------------------------
+revision 1.1
+date: 1991/03/27 13:58:04;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\portab.h,v
+Working file: portab.h
+head: 2.4
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.4
+	OKSPARROW: 2.3
+	STPAD43: 2.2
+	SPRW_DAL: 2.2
+	FINAL206: 2.2
+	TOS306: 2.2
+	VERS06h: 2.2
+	VERSX06c: 2.2
+	VERSX06b: 2.2
+	XDOT06: 2.2
+	TT304: 2.2
+	TTFINAL: 2.2
+	BLUE: 2.1
+	GREEN: 2.1
+	ORANGE: 2.1
+	MAR011990: 2.1
+	TOS16: 2.1
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 5;	selected revisions: 5
+description:
+----------------------------
+revision 2.4
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +84 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.3
+date: 1991/01/02 19:07:08;  author: unknown;  state: Exp;  lines: +6 -3
+Checkin to shut up rcsdiff: no changes.
+----------------------------
+revision 2.2
+date: 1990/08/03 13:23:22;  author: apratt;  state: Exp;  lines: +7 -4
+TTOS FINAL RELEASE
+----------------------------
+revision 2.1
+date: 1989/02/21 17:22:11;  author: kbad;  state: Rel;  lines: +9 -6
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.1
+date: 1987/11/20 14:24:08;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\prtblk.c,v
+Working file: prtblk.c
+head: 2.5
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.5
+	OKSPARROW: 2.3
+	STPAD43: 2.2
+	SPRW_DAL: 2.2
+	FINAL206: 2.2
+	TOS306: 2.2
+	VERS06h: 2.2
+	VERSX06c: 2.2
+	VERSX06b: 2.2
+	XDOT06: 2.2
+	TT304: 2.2
+	TTFINAL: 2.2
+	BLUE: 2.1
+	GREEN: 2.1
+	ORANGE: 2.1
+	MAR011990: 2.1
+	TOS16: 2.1
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 6;	selected revisions: 6
+description:
+----------------------------
+revision 2.5
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +472 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.4
+date: 1992/07/27 20:12:04;  author: kbad;  state: Exp;  lines: +11 -8
+Nearly last Sparrow test BIOS
+----------------------------
+revision 2.3
+date: 1991/01/02 19:07:12;  author: unknown;  state: Exp;  lines: +6 -3
+Checkin to shut up rcsdiff: no changes.
+----------------------------
+revision 2.2
+date: 1990/08/03 13:23:25;  author: apratt;  state: Exp;  lines: +7 -4
+TTOS FINAL RELEASE
+----------------------------
+revision 2.1
+date: 1989/02/21 17:22:18;  author: kbad;  state: Rel;  lines: +9 -6
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.1
+date: 1987/11/20 14:24:13;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\prtblk.h,v
+Working file: prtblk.h
+head: 2.4
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.4
+	OKSPARROW: 2.3
+	STPAD43: 2.2
+	SPRW_DAL: 2.2
+	FINAL206: 2.2
+	TOS306: 2.2
+	VERS06h: 2.2
+	VERSX06c: 2.2
+	VERSX06b: 2.2
+	XDOT06: 2.2
+	TT304: 2.2
+	TTFINAL: 2.2
+	BLUE: 2.1
+	GREEN: 2.1
+	ORANGE: 2.1
+	MAR011990: 2.1
+	TOS16: 2.1
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 5;	selected revisions: 5
+description:
+----------------------------
+revision 2.4
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +69 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.3
+date: 1991/01/02 19:07:12;  author: unknown;  state: Exp;  lines: +6 -3
+Checkin to shut up rcsdiff: no changes.
+----------------------------
+revision 2.2
+date: 1990/08/03 13:23:31;  author: apratt;  state: Exp;  lines: +7 -4
+TTOS FINAL RELEASE
+----------------------------
+revision 2.1
+date: 1989/02/21 17:22:35;  author: kbad;  state: Rel;  lines: +9 -6
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.1
+date: 1987/11/20 14:24:18;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\prtblkc.h,v
+Working file: prtblkc.h
+head: 2.4
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.4
+	OKSPARROW: 2.3
+	STPAD43: 2.2
+	SPRW_DAL: 2.2
+	FINAL206: 2.2
+	TOS306: 2.2
+	VERS06h: 2.2
+	VERSX06c: 2.2
+	VERSX06b: 2.2
+	XDOT06: 2.2
+	TT304: 2.2
+	TTFINAL: 2.2
+	BLUE: 2.1
+	GREEN: 2.1
+	ORANGE: 2.1
+	MAR011990: 2.1
+	TOS16: 2.1
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 5;	selected revisions: 5
+description:
+----------------------------
+revision 2.4
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +196 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.3
+date: 1991/01/02 19:07:16;  author: unknown;  state: Exp;  lines: +6 -3
+Checkin to shut up rcsdiff: no changes.
+----------------------------
+revision 2.2
+date: 1990/08/03 13:23:33;  author: apratt;  state: Exp;  lines: +7 -4
+TTOS FINAL RELEASE
+----------------------------
+revision 2.1
+date: 1989/02/21 17:22:39;  author: kbad;  state: Rel;  lines: +9 -6
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.1
+date: 1987/11/20 14:24:23;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\rwabs.c,v
+Working file: rwabs.c
+head: 2.11
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.11
+	OKSPARROW: 2.9
+	STPAD43: 2.8
+	SPRW_DAL: 2.8
+	FINAL206: 2.8
+	TOS306: 2.8
+	VERS06h: 2.7
+	VERSX06c: 2.4
+	VERSX06b: 2.4
+	XDOT06: 2.3
+	TT304: 2.3
+	TTFINAL: 2.3
+	BLUE: 2.2
+	GREEN: 2.2
+	ORANGE: 2.2
+	MAR011990: 2.2
+	TOS16: 2.1
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 17;	selected revisions: 17
+description:
+----------------------------
+revision 2.11
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +1054 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.10
+date: 1992/07/27 20:12:04;  author: kbad;  state: Exp;  lines: +13 -6
+Nearly last Sparrow test BIOS
+----------------------------
+revision 2.9
+date: 1992/05/18 23:08:30;  author: unknown;  state: Exp;  lines: +92 -11
+Added USE_DISK_CHANGE for Sparrow.  Flop.s and this file need to be
+built with that switch in the same state.  In this file the consequence
+is that wpstatus and wplatch are gone, and the disk-change line is used
+for media-change detection.  Other impact is stepping the drive to
+make that signal go away.
+----------------------------
+revision 2.8
+date: 1991/08/26 16:37:14;  author: apratt;  state: Exp;  lines: +40 -32
+Changed to checksum only 6 sectors; diskbuf is under 4K in size in
+STe VDI.  Also changed to use dskbufp the pointer, not diskbuf
+the buffer, so changing the pointer really changes where this stuff
+goes.
+----------------------------
+revision 2.7
+date: 1991/08/05 15:15:33;  author: apratt;  state: Exp;  lines: +136 -12
+Added code to compute checksums on the first N sectors of a disk
+and compare with the old values, improving media-change detection
+by comparing FATs.  In addition, the serial number written by
+MSDOS versions 5.0 (4.0?) and newer is checked.  (This is all moot
+if your GEMDOS discards cached information when there are no open
+files and the media-change state is "maybe.")
+----------------------------
+revision 2.6
+date: 1991/06/20 14:09:52;  author: apratt;  state: Exp;  lines: +14 -2
+Added another bit in the flags word of the BPB: set flags & 2 when
+the floppy claims to have fewer than two FATs.  New GEMDOSes
+should check this and not write two FATs when this is set.
+----------------------------
+revision 2.5
+date: 1991/06/13 16:29:42;  author: apratt;  state: Exp;  lines: +23 -3
+Added a check of the four-byte serial number that MSDOS 5.0 puts at offset
+$27 in the boot sector.  For non-MSDOS 5.0 disks, this is just another four
+bytes' worth of chance to be different, but for MSDOS 5.0 disks it's the
+ONLY chance, since they all appear to have the same serial number.
+
+See also GEMDOS of this date for new media change handling.
+----------------------------
+revision 2.4
+date: 1991/05/21 16:57:45;  author: apratt;  state: Exp;  lines: +19 -13
+Removed things which were ifdef DAS_BOOT, and left in unconditionally those
+things which were ifndef DAT_BOOT.  Added Protobt type 5 for quad density,
+against future need.  Changed some magic numbers into #defined constants.
+
+----------------------------
+revision 2.3
+date: 1990/08/03 13:23:37;  author: apratt;  state: Exp;  lines: +6 -3
+TTOS FINAL RELEASE
+----------------------------
+revision 2.2
+date: 1989/11/27 14:50:03;  author: apratt;  state: Exp;  lines: +14 -4
+Added a fourth Protobt() disk type: 1.44MB (18 sec/2side/80trk).
+----------------------------
+revision 2.1
+date: 1989/02/21 17:22:52;  author: kbad;  state: Rel;  lines: +8 -3
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.6
+date: 1989/02/06 23:10:32;  author: kbad;  state: Exp;  lines: +23 -6
+mediach() used to use the 200Hz timer for the grace period, now uses
+the video frame counter (frclock).  This way, mediach() will work even
+if the 200Hz timer is disabled.
+----------------------------
+revision 1.5
+date: 1988/04/22 15:30:11;  author: apratt;  state: Exp;  lines: +14 -4
+Went back to 5-sector FATs thanks to a bug in the dual-drive code
+(that is, the logical A/B code for single-drive systems).  I don't
+know what the bug is yet, but it causes big trouble with differing
+FAT sizes.  This explains why PC disks don't always work on ST's.
+						-- Allan
+----------------------------
+revision 1.4
+date: 1988/04/20 17:02:21;  author: apratt;  state: Exp;  lines: +6 -2
+Added initializing bflags in getbpb to zero -- 12-bit FATs.
+(Previously, this field went uninitialized... Just lucky, I guess.)
+----------------------------
+revision 1.3
+date: 1988/04/05 17:47:24;  author: apratt;  state: Exp;  lines: +10 -5
+Removed unsigned declarations (they don't work in old Alcyon)
+----------------------------
+revision 1.2
+date: 1988/02/26 17:02:16;  author: apratt;  state: Exp;  lines: +36 -15
+Changed boot params to match MSDOS better: floppies get 3 sectors/FAT
+and a media-descriptor byte of F9.
+Also changed to look for a boot sector on floppy regardless of bootdev.
+----------------------------
+revision 1.1
+date: 1987/11/20 14:24:34;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\sparrequ.s,v
+Working file: sparrequ.s
+head: 1.2
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 1.2
+comment leader: "# "
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+Falcon hardware & XBIOS equates
+----------------------------
+revision 1.2
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +124 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 1.1
+date: 1992/08/10 23:39:00;  author: kbad;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\startup.s,v
+Working file: startup.s
+head: 2.99
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.99
+	OKSPARROW: 2.96
+	STPAD43: 2.94
+	SPRW_DAL: 2.91
+	FINAL206: 2.85
+	POU25: 2.84
+	TOS306: 2.82
+	VERS06h: 2.77
+	VERSX06c: 2.70
+	VERSX06b: 2.69
+	XDOT06: 2.65
+	TT304: 2.61
+	TTFINAL: 2.57
+	BLUE: 2.50
+	GREEN: 2.49
+	ORANGE: 2.46
+	MAR011990: 2.44
+	FIRST_MAS: 2.32
+	LAST_AS68: 2.31
+	TOS16: 2.16
+	TOS14: 2.6
+comment leader: "* "
+keyword substitution: kv
+total revisions: 135;	selected revisions: 135
+description:
+----------------------------
+revision 2.99
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +6997 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.98
+date: 1992/07/27 20:12:04;  author: kbad;  state: Exp;  lines: +410 -203
+Nearly last Sparrow test BIOS
+----------------------------
+revision 2.97
+date: 1992/07/01 21:48:18;  author: kbad;  state: Exp;  lines: +72 -2
+last akp revision
+----------------------------
+revision 2.96
+date: 1992/05/20 22:12:18;  author: unknown;  state: Exp;  lines: +15 -10
+Added NVMaccess for Sparrow and waketime for all.
+----------------------------
+revision 2.95
+date: 1992/05/18 23:08:36;  author: unknown;  state: Exp;  lines: +221 -218
+Sparrow and TT are M68030.
+If sparrow, we go to 16MHz really soon to speed up the boot.
+Sparrow doesn't have microwire any more.
+Changes to the FPU detection code.
+Moved privilege violation handler code so it's not in the startup stream.
+Only branch to dmaboot if systype == rom -- what did we do before?
+Changed user preference code because TT and SPARROW both have NVM.
+----------------------------
+revision 2.94
+date: 1992/03/11 01:26:14;  author: apratt;  state: Exp;  lines: +16 -3
+CHanged version number back to x.06; was commented as changed to x.08,
+but was really x.07.  Back to .06 for STPAD ROMs of this date.
+----------------------------
+revision 2.93
+date: 1992/03/11 01:24:22;  author: apratt;  state: Exp;  lines: +51 -12
+Clear the high byte of d0.w before writing into SPAR_VMC.  This wasn't in
+the first one, the one before the cartridge-port check.  In the first
+write, also, write ff8260 to set ST shift mode.
+
+Added comments for meanings of PSG output bits in the place where they're
+set.
+
+Commented out the new code for FPU probe .if STPAD, because I'm building
+STPAD ROMs and the code isn't tested.
+
+Fixed a bug in the code that points "coldboot" vectors to "term."
+----------------------------
+revision 2.92
+date: 1992/02/29 21:24:18;  author: apratt;  state: Exp;  lines: +193 -142
+Moved and improved FPU probe and Frestore.  Haven't really tested it.
+
+Fixed the bug that caused coldboot vectors not to revector to _term.
+Moved the coldboot vectoring code to happen as soon as RAM is good.
+
+Took out the Sparrow code that tests and sets the PWRFAIL bit,
+because it doesn't work (yet).
+
+Changed boot_dev_tab to attempt only IDE unit 0 and SCSI unit 0 if Sparrow.
+----------------------------
+revision 2.91
+date: 1992/02/28 08:24:44;  author: apratt;  state: Exp;  lines: +0 -0
+Changed TT to M68030 in some places, where it's really CPU dependency we're
+talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
+in any other way. (Well, it has the same clock chip.)
+
+The Sparrow people in Dallas want the SPAR_CONF register to be read
+and the appropriate bits written to VMC even before the diag cart is
+checked, so I moved the code.
+
+I added test-and-set of the Sparrow power-fail bit for cold-boot detection.
+
+I added a hit on color0 to throw Sparrow video more completely into ST mode.
+Hmm, maybe reading isn't enough?
+
+Clear _iamanst if you're on Sparrow.
+
+I made Rwabs go through the tt_rw code (now called m030_rw). It was
+supposed to all along but it didn't.
+
+There is still a bug: if you are a TT and you don't have an FPU you will
+die. The FPU reset code and the FPU probe code need to agree better, and
+need to work when (A) there is no FPU, and (B) the FPU is signalling an
+exception, or will as a result of the probe instruction, and exceptions
+are enabled.
+----------------------------
+revision 2.90
+date: 1992/02/28 02:00:06;  author: apratt;  state: Exp;  lines: +19 -3
+Added .globl coldboot to import it.
+----------------------------
+revision 2.89
+date: 1992/02/28 01:22:40;  author: apratt;  state: Exp;  lines: +75 -46
+The rev 2.88 log should have looked like this:
+
+Changed version number to 2.08/3.08. (Maintain even version numbers for
+compatibility with nasty old stuff.)
+
+Added tons of Sparrow stuff: initalize memory, video, etc. New MCH, VDO.
+
+Changed the dma boot code to cycle through a table of device numbers to
+attempt, rather than the stupid stuff that was there before.
+
+Here's the log message for revision 2.89:
+
+Vector nasty exceptions during boot to coldboot. Also backed out
+sparrow-special in MicroWire handling, because that HW bug is fixed.
+----------------------------
+revision 2.88
+date: 1992/02/12 01:31:40;  author: apratt;  state: Exp;  lines: +261 -73
+ci -u startup.s <slog
+ci -u '-mMuch Sparrow stuff. Also fixed a bug in slow ACSI devices.' dmaread.s
+ci -u '-mAdded SPARROW, removed STPLUS.' mkswitch.e
+ci -u '-mAdded loops .if SPARROW to check the SDMA status bit.' flop.s
+ci -u '-mFixed an RTS/CTS bug in SCC code. See scc_sender.' bios.s
+----------------------------
+revision 2.87
+date: 1991/11/14 20:33:10;  author: apratt;  state: Exp;  lines: +27 -3
+Fixed an oops: the ROM CRC check should be done if you have NOT
+been up for 80 seconds yet; instead it was done only if you HAVE
+been up that long.  This version (11/14/91) is the "real" 2.06
+(knock wood!).
+----------------------------
+revision 2.86
+date: 1991/11/07 00:09:34;  author: apratt;  state: Exp;  lines: +94 -47
+Evidently not all Mega ST's are created equal.  The one I used here for
+testing STe TOS on an ST worked with Theory 1 for noblank and theory 3 for
+noblank1; others don't. So now noblank uses theory 3 and everybody should
+be happy.
+
+In addition, some Megas do give bus errors at dstride, which I was using to
+probe for ST-vs-STe before RAM was good.  Problem yet to be solved. Idea:
+use dbasell (which at least two kinds of Megas I have *do* dtack) as the
+probe and some other register in the shifter as the control that prevents
+getting a false-positive due to bus capacitance.  That is coded (but
+ill-tested) in this version.
+
+Also, in flop.s, the code writes to the 1772-clock-select register, and
+again, I didn't get a bus error there, but other Megas do, so that will
+have to change.
+
+Finally, I changed the CRC-check code so it only runs if this is a cold
+boot.  The cold-boot detection for this is the same as the hard-disk
+timeout: if _hz_200 reads eighty seconds or more, then you don't get the
+CRC check.  This bailout only works when not TT, because on TT it's quick
+enough, and because without it there's no opportunity to use the ALT key to
+go to ST LOW rez.
+----------------------------
+revision 2.85
+date: 1991/10/15 14:08:24;  author: apratt;  state: Exp;  lines: +10 -4
+The test for power-plus-top-closed to subvert resvector on
+STBOOK was wrong: other events can pull the power bit low,
+and if the top was closed, say, when modem-wake happened,
+resvector would be subverted when it wasn't meant to be.
+Now we check for the value $FC explicitly: top-closed and
+power and nothing else.
+----------------------------
+revision 2.84
+date: 1991/10/01 20:14:24;  author: apratt;  state: Exp;  lines: +35 -7
+Added code .if STPAD to run the AUTO folder on drive P after running
+the one on bootdev.
+----------------------------
+revision 2.83
+date: 1991/09/29 23:59:46;  author: apratt;  state: Exp;  lines: +32 -9
+Added hooks for _waketime XBIOS call in clock.s.  Also commented
+out the code that does a RAM test when you use RAM TOS.
+----------------------------
+revision 2.82
+date: 1991/09/24 02:24:54;  author: apratt;  state: Exp;  lines: +124 -54
+STPAD: memory sizing for either 1MB or 4MB.  Also, STylus button bits are
+one when they're UP, not when they're DOWN.
+
+ST: "when is it safe" changed to old-old wait-for-vblank trick after boot;
+during boot, it's "any tick on Timer B."  This is only done if (TT == 0)
+because it's always safe on TT (?).
+
+RAM: we now bra dmaboot even if systype == ram; this lets us do a memory
+test there.
+
+ALL: WVBL now only clears the '4' bit of IPL so it won't drop below 3 if it
+isn't already.  LONG discussion on "when is it safe" at noblank.
+
+This is 2/3.06p, and hopefully the final release for 2/3.06.
+----------------------------
+revision 2.81
+date: 1991/09/12 19:41:34;  author: apratt;  state: Exp;  lines: +383 -341
+Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+So we use (TT == 0) instead.  Sigh.
+----------------------------
+revision 2.80
+date: 1991/09/06 12:14:10;  author: apratt;  state: Exp;  lines: +372 -268
+Changed .ifne to just .if, .ifeq to .if !, and .endc to .endif.
+Changed noblank1 so it uses some old code: it waits for 240 ticks
+from timer B (clocked by DE) and then waits for 2ms (using an
+instruction loop) with no ticks.  This works on STe and the old
+method (wait for any tick on timer B, which tells you you're not
+in VBLANK) doesn't.
+
+This is 2.06k / 3.06k, send to Texas for analysis of the monochrome
+video problem which the new noblank solves.
+----------------------------
+revision 2.79
+date: 1991/08/26 17:48:29;  author: apratt;  state: Exp;  lines: +39 -13
+Changed most uses of _diskbuf into _dskbufp, and exported _dskbufp
+so rwabs.c could use it.
+
+There is some version-control problem here; recent versions seem to have
+the 80-second timeout code in STPAD as well, when the real thing splits off
+STPAD so you get memory test but no timeout, as in this version.  To get
+2.06h and i, apply patches by hand and be careful changing the stuff in the
+timeout code.
+
+This is 2.06j of 8/26/91.
+----------------------------
+revision 2.78
+date: 1991/08/22 11:30:18;  author: apratt;  state: Exp;  lines: +13 -3
+fixed an oops for ste mch setting; this is 2.06i
+----------------------------
+revision 2.77
+date: 1991/08/21 11:20:03;  author: apratt;  state: Exp;  lines: +43 -9
+STPAD fixes: if both POWER-ON and TOP-CLOSED are down at boot time,
+then DON'T go through resvector.  This defeats the
+shutdown/startup code, which is necessary when things go wrong.
+Also fixed a bug that caused shutdown/startup to initialize
+wrong after a cold boot.
+
+THIS VERSION IS 3.06h RELEASED TO TEST THIS DATE.
+----------------------------
+revision 2.76
+date: 1991/08/20 12:27:51;  author: apratt;  state: Exp;  lines: +9 -3
+STylus buttons are found at $D00004, not $D00006.  Documentation error.
+----------------------------
+revision 2.75
+date: 1991/08/20 11:47:17;  author: apratt;  state: Exp;  lines: +40 -27
+Changes for STPAD: clear the conversion-done interrupt during startup,
+vector NMI to RTE because when it happens, Pterm is always the wrong thing
+to do, and check for a stylus-button-click to abort the 80-second timeout
+(because STylus has no keyboard to use for aborting this timeout).
+----------------------------
+revision 2.74
+date: 1991/08/15 15:31:41;  author: apratt;  state: Exp;  lines: +329 -59
+Moved STPAD power-control initialization; it was in the wrong place.
+Documented the _MCH cookie better and set it for STe/AT (see _MCH).  Added
+"cart1" processing for STPAD; see cartscan.  Changed memory test and HD
+delay completely; search for "spaghetti" for details.  Explained dmaboot
+device-number sequence (see dmarfail).
+
+----------------------------
+revision 2.73
+date: 1991/08/05 15:28:11;  author: apratt;  state: Exp;  lines: +30 -2
+Added a bad hack for STPAD: fifteen ms after enabling interrupts,
+we clobber kbshift.  This way if you reset with ctl-alt-delete,
+the dmaboot code won't see the alt key still down.  Don't know how
+well this works yet.
+----------------------------
+revision 2.72
+date: 1991/08/05 14:22:34;  author: apratt;  state: Exp;  lines: +113 -47
+Changed version system: now version.s exports date and dosdate,
+and it's maintained by biosvers.prg.  startup.s imports these,
+and the high byte of the version number comes from the system type,
+and the low byte from a constant in startup.s.  Also, moved STPAD screen
+init higher, changed spindelay (see flop.s), enabled cache on TT more,
+and added a memory test.
+----------------------------
+revision 2.71
+date: 1991/06/13 16:27:51;  author: apratt;  state: Exp;  lines: +35 -14
+changed date to 6/16/91; this is 3.06d.  Also backed out the check that
+said, "If you have a diagnostic cartridge, don't install the bomb vectors."
+Also enabled the cache during CRC checks on TT so they're faster.  Also
+changed the comment for XBIOS call 11 to the effect that it's used by AKP's
+debugger, and XBIOS call 40 as the one KBAD and John Towns will use for a
+cookie call.
+----------------------------
+revision 2.70
+date: 1991/05/22 14:53:27;  author: apratt;  state: Exp;  lines: +21 -8
+Changed date to today.  This is 3.06c.  3.06b had a bug
+in flop.s: some QD debug code was left in, so seeks happened
+at 6ms/step and write precompensation was turned off (both
+only in high density mode).
+----------------------------
+revision 2.69
+date: 1991/05/21 16:57:58;  author: apratt;  state: Exp;  lines: +122 -43
+Reset the ACSI chip and leave it in the read state VERY EARLY in the boot,
+between the CPU reset and the reset instruction at the top of the code. 
+Changed the _FDC cookie to match the new def'n.  Set nospindelay (from
+flop.s) if the switch is thrown.
+
+Made TT's boot up in TT MED so they don't look like game machines.  Fixed
+icon-drawing code appropriately.  Hold down ALT to go back to ST LOW so
+autoboot games get what they expect.
+
+Fixed CRC message so it identifies the chip just like on the board.
+----------------------------
+revision 2.68
+date: 1991/05/02 17:40:55;  author: apratt;  state: Exp;  lines: +23 -2
+Added code to save tbcr in addition to the enable bit from iera
+in noblank1.  Can't hurt, and probably will help: if somebody
+has the interrupt enabled and the counter stopped, and we
+end up leaving the counter running (and restore the enable bit),
+you'll start getting timer B ints!
+----------------------------
+revision 2.67
+date: 1991/04/26 17:50:25;  author: apratt;  state: Exp;  lines: +64 -13
+Version number is back to x.06, so we can go out with that number.
+See discussion of even version numbers in the comments.
+
+Added _FDC cookie; this is tentative, and will become firm on or near May
+2, 1991.  For now the cookie is installed and the high word is one if
+configuration switch bit 6 is thrown.
+
+New in-house version number tracking scheme: as soon as there's a release,
+the number is incremented and 'a' gets added; the letter changes when
+necessary.  For rev's release, the letter is dropped.
+----------------------------
+revision 2.66
+date: 1991/04/24 17:16:37;  author: apratt;  state: Exp;  lines: +194 -16
+Changed dates and version number for x.07.  Added frestore of null
+state in reset code (comment was there but code wasn't).  Added
+comments to the effect that the PSG outputs being initialized to
+zero are getting zeros on purpose.  Added a write to STPAD power
+control registers.  Changed the delay back to 90 sec -- there was
+no reason to change to 60, and if it ain't broke...  Added a
+ROM CRC check to detect (among other things) incorrect switch
+settings before you burn half a day debugging it.
+----------------------------
+revision 2.65
+date: 1991/04/11 12:16:03;  author: apratt;  state: Exp;  lines: +187 -36
+Added drawing of an Atari logo at power up.  Removed USEDB.
+Changed date to 4/9/91; version is x.06.  Changed power-up delay
+from 90 sec to 60 sec.
+----------------------------
+revision 2.64
+date: 1991/03/27 12:37:43;  author: apratt;  state: Exp;  lines: +113 -55
+Added STPAD: mostly, this is STPLUS (which should also be set), but sets
+DMASND to zero, adds some magic vars at $840 which Slavik's touch pad
+driver knows about, and short-circuits memory sizing. Also has its own
+cookie: $00010000+STPAD (which should be 1). Also tries the IDE bus, then
+the ACSI bus for booting.  Removes monitor-change code.
+
+Fixed a bug: the AND to get only the significant bits of the mode register
+was wrong; it was always three bits when it should be just two if not TT.
+----------------------------
+revision 2.63
+date: 1991/01/31 13:57:42;  author: apratt;  state: Exp;  lines: +25 -14
+Changed noblank1 to save & restore iera bit 0. Now vers x.06
+----------------------------
+revision 2.62
+date: 1990/12/07 14:50:23;  author: apratt;  state: Exp;  lines: +14 -11
+changed version number for 2.05/3.05
+----------------------------
+revision 2.61
+date: 1990/11/20 18:49:17;  author: apratt;  state: Exp;  lines: +16 -10
+changed version numbers
+----------------------------
+revision 2.60
+date: 1990/11/12 16:23:51;  author: apratt;  state: Exp;  lines: +31 -13
+Changed date & version number, changed code to test result of
+_iclock correctly, and added code to clobber Timer A after
+the boot-up sequence is done with it (for compatibility with
+programs that do enabling steps in an unsafe order).
+----------------------------
+revision 2.59
+date: 1990/10/15 12:04:40;  author: apratt;  state: Exp;  lines: +32 -13
+Changed all version numbers, and changed all dates to Oct 12, 1990.
+
+Also removed PC-relative addressing because MAS has a bug: PC-relative
+addressing to a label that's BEFORE the PC, with arithmetic, generates
+incorrect code.  Example: "move.b label+1(PC),d0" when 'label' is before
+the current PC generates "move.b label+3(PC),d0"
+----------------------------
+revision 2.58
+date: 1990/08/21 17:15:28;  author: apratt;  state: Exp;  lines: +131 -838
+This version works in both STe and Mega STe, distinguishing between
+them at runtime by checking for bus error when accessing ttscu1.
+
+Bconmap is no longer conditional.
+
+Probe for the SFP004 only if not TT.  Fix the FPU cookie, which was
+broken before, but only on non-TT (whew!).
+
+This version is NOT country-dependent.  The only country dependency was
+osconf, and that's now an EQU exported from BIOS (which is already
+country dependent).
+
+Other log messages removed.
+----------------------------
+revision 2.57
+date: 1990/08/03 13:23:45;  author: apratt;  state: Exp;  lines: +6 -2
+TTOS FINAL RELEASE
+----------------------------
+revision 2.56
+date: 1990/08/01 13:12:28;  author: apratt;  state: Exp;  lines: +35 -26
+Changed boot color to white, and commented out color-cycling code.
+Changed date to 8/1/90.  This is the final TT release revision.
+----------------------------
+revision 2.55
+date: 1990/07/27 15:08:15;  author: apratt;  state: Exp;  lines: +61 -186
+Removed obsolete (and long-commented-out) dmaboot code.
+
+Added "boot preference" code: first ttscu1 bits 7-3, then the first
+word of NVM are used as boot preference.  If NVM is invalid it's zero.
+----------------------------
+revision 2.54
+date: 1990/07/25 14:24:45;  author: apratt;  state: Exp;  lines: +95 -21
+Re-added clear of bootdev at reset time when you're a RAM TOS so the
+floppy's AUTO folder gets executed, not the hard disk's.
+
+Improved privilege violation handler (again and for the last time!)
+to handle D registers as dest of move.
+----------------------------
+revision 2.53
+date: 1990/07/19 18:52:11;  author: apratt;  state: Exp;  lines: +37 -15
+Changed date to 7/19 and color to slightly yellow, pulsing from
+full yellow to full white.  Added pulsing for non-TT, too.
+----------------------------
+revision 2.52
+date: 1990/07/19 15:17:54;  author: apratt;  state: Exp;  lines: +19 -2
+Moved TT screen base to phystop-screen_size-$100, so the low byte is
+zero and programs which double buffer and write directly to the shifter
+work.
+
+Moved the PMMU page tables into RAM at $700-$800, so they're protected
+from user-mode access and less likely to be clobbered by programs that
+assume they can take over the whole system.  However, they are not
+protected from supervisor OR DMA access.
+
+Added better code to handle privilege violation when it's a move from
+SR. See the label "priv" for details.
+----------------------------
+revision 2.51
+date: 1990/07/19 14:55:04;  author: apratt;  state: Exp;  lines: +185 -87
+Added ONLY_LONGFRAME code, which you set on TT to just assume
+longframe.  
+
+Removed VBLQ1ST; now VBLQ is always first.  
+
+Added pulsing boot colors. 
+
+Removed frestore of null state: it is not necessary and it was before
+we checked for the existence of the 881.  Catch coprocessor violation
+in the FPU probe; this "shouldn't happen." 
+
+Made ttwait/ttdelay use timer C of TTMFP because leaving Timer A free
+is nicer: Timer A doesn't shade a control register with another timer. 
+
+Moved TT screen base to phystop
+----------------------------
+revision 2.50
+date: 1990/06/18 16:36:11;  author: apratt;  state: Exp;  lines: +44 -34
+Changed date to 6/16/90, boot color to dark blue  (n.b. was a sky blue
+before; "blue" isn't descriptive enough).
+
+Fixed a BIG BUG: ttwait/ttdelay used STMFP timer A, not TTMFP timer A
+as intended.
+
+Clobbering code now clobbers PMMU, cache, VBR, and FPU with frestore of
+null state.
+
+Hit a key to stop the boot delay, then do a warm boot within 90 sec:
+now you don't wait again.
+
+----------------------------
+revision 2.49
+date: 1990/05/21 12:16:46;  author: apratt;  state: Exp;  lines: +10 -4
+Moved some conditionals around, changed boot color to green.
+This rev (cross your fingers) could be sent to developers, etc.
+----------------------------
+revision 2.48
+date: 1990/05/16 11:54:21;  author: apratt;  state: Exp;  lines: +13 -5
+Added some ifne TT conditionals, so it compiles for not-TT.
+Also changed boot color to dark blue, because light blue was taken.
+----------------------------
+revision 2.47
+date: 1990/05/09 16:45:37;  author: apratt;  state: Exp;  lines: +86 -5
+Added _FPU cookie; see the comments there for details.
+Boot color: sky blue.
+----------------------------
+revision 2.46
+date: 1990/04/30 18:44:45;  author: apratt;  state: Exp;  lines: +97 -43
+Changed Getmpb call to conform to new GEMDOS style: one MD for both
+ST RAM and alternative RAM, with the low bit of the block start address
+nonzero for alt. RAM.
+
+Noblank and noblank1 clobber Timer B always, so it doesn't survive a rez
+change ever -- see comments there.
+
+Added nvmaccess call to XBIOS list ($2e).  It's implemented in clock.s.
+----------------------------
+revision 2.45
+date: 1990/03/19 16:00:50;  author: apratt;  state: Exp;  lines: +15 -6
+Changed TT to TT+STPLUS w.r.t. SCU: catch & ignore bus errors in the
+init code for SCU so it runs on either STe or Mega STe.
+
+Fixed the out-of-range check for Bcon* functions: was (devno > maxdev)
+but is now (devno >= maxdev).
+----------------------------
+revision 2.44
+date: 1990/03/02 17:45:44;  author: apratt;  state: Exp;  lines: +46 -9
+This rev is the source for the 3/1/90 ROM.
+----------------------------
+revision 2.43
+date: 1990/03/02 10:39:08;  author: apratt;  state: Exp;  lines: +13 -2
+Added a comment to the effect that anybody who programs Timer B
+to a value of 1 (that is, interrupt every time) will defeat
+noblank/noblank1 processing.  I don't want to actually WRITE
+to Timer B's data register in noblank, since it would kill
+somebody's real programming, but there is this danger.
+
+initmfp in bios.s now writes 0 (meaning 256) to Timer B's data
+register, so if NOBODY uses it, it will have a legal value (not 1).
+----------------------------
+revision 2.42
+date: 1990/03/01 17:10:51;  author: apratt;  state: Exp;  lines: +124 -81
+Added equates for TTMFP: ttgpip, ttiera, etc.
+Fixed ttwait, stwait for new equates.
+Added use of noblank, rather than vwait: see comments at noblank.
+Noblank1 is similar, but returns via rts.
+Fixed a some things causing STe not to work.
+Removed restriction (in findpackages) that phystop be on a 1K boundary.
+----------------------------
+revision 2.41
+date: 1990/02/26 17:27:28;  author: apratt;  state: Exp;  lines: +104 -117
+Fixed up conditionals, using else rather than endc/if. Added stwait,
+using STMFP timer A for delays, suitable for delays during boot
+(applications can use timer A later on). Used calls to dowait in boot,
+(stwait or ttwait as appropriate), to replace ttwait in TT, and
+instruction loops in not-TT. Removed VBLQ1ST once and for all - now
+vblq is always 1st. Hope this doesn't hurt if we ever build ST ROMS
+again! Changed _term to use dc.w's to get what I'm after: a jsr (not
+bsr) to the next instruction.
+----------------------------
+revision 2.40
+date: 1990/02/22 17:51:41;  author: apratt;  state: Exp;  lines: +24 -34
+Changed bootup BG color from yellow to magenta.  Added moveq #0,d0
+to clear screen so it doesn't turn green.  Removed twin color
+tables: $f is full-magnitude on STe and TT, and eq to $7 on ST.
+----------------------------
+revision 2.39
+date: 1990/02/16 16:50:17;  author: apratt;  state: Exp;  lines: +111 -100
+Fixed an oops in the startup code which made RAM TOSes not work. Also,
+initialize ssp to its ultimate destination (_supstk+supsiz) rather than
+$8000 at reset4.  Also, after reset4, changed to clear from the start
+of the BSS which needs clearing (that is, endosbss) to the true end of
+the BSS: endaesbss in ROM systems, ostext in RAM.
+
+Default boot-up rez code changed: if no mono detect, ST LOW; else
+ST HIGH or TT HIGH as appropriate.
+
+MMU code works, and is now enabled.
+----------------------------
+revision 2.38
+date: 1990/02/02 14:17:54;  author: apratt;  state: Exp;  lines: +550 -211
+Reordered entire startup sequence to improve clarity and
+function.  Cold boot for TT is defined as "ttscu1 bit 0 is clear."
+This happens on power-up only, not on reset-button or keyboard
+reset.  (Keyboard cold boot clears the bit, though.)  The
+distinction is not well tested.
+
+Also added code necessary for Bconmap functions to work.
+----------------------------
+revision 2.37
+date: 1989/12/28 15:35:09;  author: apratt;  state: Exp;  lines: +30 -13
+Moved the line which sets the refresh rate for fast RAM.  Now
+it's outside the ROM/RAM conditional, and most of all outside
+the coldboot/warmboot conditional.  Turns out fast RAM
+decays faster, so it might not be valid even when slow RAM is.
+This won't hurt anything, since nothing in fast RAM is presumed
+valid across a warm boot.  Not by the OS, anyway.
+
+Also added 'moveq.l #0,d0' to some of Slavik's calls so they
+don't return garbage in the high parts of d0.
+----------------------------
+revision 2.36
+date: 1989/12/08 15:45:14;  author: apratt;  state: Exp;  lines: +13 -13
+Fixed Lozben's fatfinger in _setscreen concerning wvbl.
+Also changed TT background color to blue: it's nonwhite, so you
+know this is not the final ROM (per LT), but it's not black,
+so you can tell your TT is doing something.
+----------------------------
+revision 2.35
+date: 1989/12/06 14:03:49;  author: apratt;  state: Exp;  lines: +10 -4
+In the reset-bailout vector test, there are some sanity checks.
+One of them checks to be sure that the high byte of the vector is 00.
+This is OK on ST and STE, but not TT, so I made it conditional.
+----------------------------
+revision 2.34
+date: 1989/10/23 18:37:17;  author: lozben;  state: Exp;  lines: +15 -5
+Set the rez shadow register when setting the shifter on the TT.
+----------------------------
+revision 2.33
+date: 1989/10/03 12:41:40;  author: apratt;  state: Exp;  lines: +32 -11
+Added VBLQ1ST switch (in *this* file, not switches.s) which, when
+nonzero, moves the VBL queue processing to the beginning of
+the VBLANK handler, not the end.  VDI likes this so it has more
+time to draw the mouse before the beam starts painting it.
+(This was MOVEVBL, then removed, and now it's back.)
+----------------------------
+revision 2.32
+date: 1989/09/22 16:43:29;  author: apratt;  state: Exp;  lines: +283 -312
+THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+No functional changes from previous revision, which is the last to
+require Alcyon's AS68 assembler.
+----------------------------
+revision 2.31
+date: 1989/09/21 13:40:41;  author: apratt;  state: Exp;  lines: +10 -9
+The vbl part of Setscreen() copied the new palette to TT regs
+rather than ST regs -- now it copies to the ST regs always.
+This was a vestige of bit-shifting in software, now unnecessary.
+----------------------------
+revision 2.30
+date: 1989/09/18 13:35:33;  author: apratt;  state: Exp;  lines: +43 -78
+Removed LONGFRAME conditional assembly: now LONGFRAME is all there is.
+Removed code which emulated STE color registers; it turns out
+that the TT shifter's ST-compatible registers *are* like STE regs.
+Added code to retry _dmaread if it returns a "retryable" error
+(other than timeout).
+----------------------------
+revision 2.29
+date: 1989/09/07 16:29:00;  author: apratt;  state: Exp;  lines: +10 -7
+Changed date & dosdate and added 'check' to date lines.
+----------------------------
+revision 2.28
+date: 1989/09/05 17:49:47;  author: apratt;  state: Exp;  lines: +11 -5
+Fixed dumb bug in setpalette code for TT.  Works now.
+----------------------------
+revision 2.27
+date: 1989/08/30 16:02:43;  author: apratt;  state: Exp;  lines: +35 -17
+Added def_frb variable, set to the value that the _FRB cookie gets.
+Zero if no fast RAM.  Added moving end_os up by 64K as well as _membot.
+Added code to match the boot spec: scan of bootable devices stops
+when hdv_rw changes.  Cut bomb-handler delay from 1 sec to 0.5 sec.
+----------------------------
+revision 2.26
+date: 1989/08/30 15:18:42;  author: lozben;  state: Exp;  lines: +9 -6
+Fixed a bug in _EsetShift().
+----------------------------
+revision 2.25
+date: 1989/08/29 17:36:45;  author: apratt;  state: Exp;  lines: +9 -3
+Added code (two lines) to set GEMDOS date/time when XBIOS Settime()
+call is made.
+----------------------------
+revision 2.24
+date: 1989/08/28 21:01:16;  author: kbad;  state: Exp;  lines: +17 -7
+Changed mushroom code to get rid of the LUT for initial screen offset,
+since there are only two of them (and TT res offsets are > word length)
+----------------------------
+revision 2.23
+date: 1989/08/28 19:03:23;  author: kbad;  state: Exp;  lines: +27 -13
+Fixed(?) bomb handler for all resolutions.  Also fixed a couple of
+fatfingers at dmaboot. (_diskbufp != _dskbufp !!!)
+----------------------------
+revision 2.22
+date: 1989/08/25 18:46:04;  author: lozben;  state: Exp;  lines: +9 -5
+Fixed a bug in EsetShift().
+----------------------------
+revision 2.21
+date: 1989/08/25 15:38:36;  author: apratt;  state: Exp;  lines: +240 -163
+Added new dma boot code which calls _dmaread, and added _dmaread
+as XBIOS call $2a.
+----------------------------
+revision 2.20
+date: 1989/08/25 12:23:16;  author: lozben;  state: Exp;  lines: +9 -3
+EsetShift() now always returns old shift mode register value.
+----------------------------
+revision 2.19
+date: 1989/08/24 16:54:58;  author: lozben;  state: Exp;  lines: +34 -57
+Added EgetShift() and EsetShft() xbios function calls. Deleted
+EsetRez() and EsetPhysBase() xbios function calls.
+----------------------------
+revision 2.18
+date: 1989/08/18 13:44:47;  author: apratt;  state: Exp;  lines: +94 -95
+All changes are TT only:  added _FRB cookie pointing to a 64K buffer
+in slow RAM for ACSI transfers to/from fast RAM.  Only present if there
+is any fast RAM.
+
+Changed bomb handler to get the exception number from the stack frame.
+
+Changed Setcolor and Setpalette so, to the caller, the RGB values
+are like STe (hi-order bit is least significant).
+----------------------------
+revision 2.17
+date: 1989/07/31 12:08:51;  author: apratt;  state: Exp;  lines: +8 -4
+Added .globl clrcache directive.
+----------------------------
+revision 2.16
+date: 1989/07/29 21:40:50;  author: kbad;  state: Exp;  lines: +3 -3
+branches:  2.16.1;
+Put the reset back at reseth.  It was a gratuitous incomprattibility.
+----------------------------
+revision 2.15
+date: 1989/07/28 21:54:43;  author: apratt;  state: Exp;  lines: +22 -11
+Changed the hard-disk delay timing so it starts from when the power
+was turned on, not when we started looking. This makes warm boots
+really fast, not 10sec.
+
+The reset instruction at the start of the ROM has been gone for a 
+rev or two - I wish I knew this was not a bad idea.
+----------------------------
+revision 2.14
+date: 1989/07/27 18:06:22;  author: apratt;  state: Exp;  lines: +73 -8
+Added kcl_hook and bell_hook variables and initializations.
+Added _SWI cookie and set bit 1 of _SND based on bit 7 of _SWI.
+----------------------------
+revision 2.13
+date: 1989/07/26 19:42:08;  author: apratt;  state: Exp;  lines: +121 -53
+Final BIOS for STPLUS: Added cookie jar, full-volume DMA sound,
+added hard-disk boot delay, backed out MOVEVBL.
+
+Note: _longframe code is still dumb: it checks on every trap & RTE.
+----------------------------
+revision 2.12
+date: 1989/07/20 15:36:50;  author: apratt;  state: Exp;  lines: +94 -53
+Changed ttdelay code to use TTMFP timer A.  Also added code to catch
+the return from Rwabs calls and clobber the cache if the operation
+was a read.  (This is a lose for ramdisks and drivers which do it
+on their own, but it's a win because you can use ST drivers.)
+----------------------------
+revision 2.11
+date: 1989/07/19 13:58:39;  author: apratt;  state: Exp;  lines: +146 -12
+Added ttwait/ttdelay calls to remove some instruction-loop
+delays.  These entry points are also used by bios.s and flop.s.
+----------------------------
+revision 2.10
+date: 1989/06/15 15:43:11;  author: apratt;  state: Exp;  lines: +52 -34
+Changed STPLUSVIDEO to STPLUS, because it covers everything STPLUS
+unique (DMASND covers other things).  Changed version number to 1.6,
+and date to 6/16/89.  Added STPLUS memory sizing.  The BIOS revs
+with this date or earlier are correct for STPLUS (now called STE).
+I think.
+----------------------------
+revision 2.9
+date: 1989/05/10 14:00:24;  author: apratt;  state: Exp;  lines: +60 -44
+Added MOVEVBL switch to make vblqueue happen early in vblank.
+Moved memory clearing around so the screen clears early on as before.
+(Previous rev had a substantial delay between power-on and clear screen.)
+----------------------------
+revision 2.8
+date: 1989/04/17 14:43:48;  author: apratt;  state: Exp;  lines: +20 -4
+Added mwdata and mwmask equates... Oops.
+----------------------------
+revision 2.7
+date: 1989/04/17 13:26:22;  author: apratt;  state: Exp;  lines: +167 -45
+Added the new system variable _sysflags, definition TBD ($5a0)
+
+Added fast-RAM refresh & sizing for TT.  Includes new system variables
+_ramtop ($5a4), and _ramvalid ($5a8), which is validated with rammagic.
+
+Added programming the volume/tone generator for a sane volume & tone,
+and to mix the GI sound with the DMA sound.
+
+Added DMAINV assembly-time switch: set to 1 if DMASND and the DMA chip
+inverts MONOMON when it's IDLE.  Will go away one day.
+
+Slight changes elsewhere.
+----------------------------
+revision 2.6
+date: 1989/03/30 04:35:49;  author: kbad;  state: Exp;  lines: +12 -6
+Changed return code of _term from 1 to -1 ($ffff), "error."
+----------------------------
+revision 2.5
+date: 1989/03/23 17:32:00;  author: apratt;  state: Exp;  lines: +75 -15
+Added real memory controller programming and memory sizing for TT.
+The memory sizing is actually not TT-dependent.
+Also fixed some things in the DMA SOUND vblank handler... Now
+it really works.
+----------------------------
+revision 2.4
+date: 1989/03/22 13:48:22;  author: apratt;  state: Exp;  lines: +19 -5
+Changed monochrome detect code in vblank -- it would wait until GPIP
+read the same way twice, which might *never* happen.  Now it waits
+until bit 7 of GPIP reads the same way twice, which is more common.
+----------------------------
+revision 2.3
+date: 1989/03/09 08:32:06;  author: apratt;  state: Exp;  lines: +12 -12
+Fixed priv handler -- correct one got lost in folding-in process. (TT only)
+----------------------------
+revision 2.2
+date: 1989/03/08 15:59:37;  author: apratt;  state: Exp;  lines: +395 -41
+Contains Slavik's Xbios calls & other changes for TT.  Insignificant
+changes if not TT.  Some things are conditional on STPLUSVIDEO+TT,
+which is meant to be an OR of those two assembly-time conditions.
+----------------------------
+revision 2.1
+date: 1989/02/21 17:23:11;  author: kbad;  state: Rel;  lines: +11 -6
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.35
+date: 1989/02/17 12:09:32;  author: apratt;  state: Exp;  lines: +19 -5
+Fixed byte-count for clearing screen at clrm_2, and
+fixed priv handler: must clear & disable caches after clobbering
+the instruction, then restore cacr to its previous value.
+----------------------------
+revision 1.34
+date: 1989/02/12 20:23:32;  author: kbad;  state: Exp;  lines: +15 -9
+changed version, date, and dosdate equates from `=' to `equ'.  It seems
+that as68 doesn't like `=' assignments inside conditional statements.  Urk.
+----------------------------
+revision 1.33
+date: 1989/02/08 17:45:15;  author: apratt;  state: Exp;  lines: +17 -3
+Backed off screen base to phystop-$25800 for TT (in two places).
+----------------------------
+revision 1.32
+date: 1989/02/07 13:00:59;  author: apratt;  state: Exp;  lines: +15 -6
+made priv handler conditional on LONGFRAME, not TT
+----------------------------
+revision 1.31
+date: 1989/02/06 21:55:55;  author: apratt;  state: Exp;  lines: +15 -10
+Little (but frustrating!) bug fixes so TT would work.
+----------------------------
+revision 1.30
+date: 1989/02/06 15:17:41;  author: apratt;  state: Exp;  lines: +77 -3
+Oops - left out _termtab.
+----------------------------
+revision 1.29
+date: 1989/02/06 13:22:23;  author: apratt;  state: Exp;  lines: +133 -5
+Added TT code.  No change if you set TT = 0.  EXCEPT:
+bombs now cause Pterm(-1) to be called, rather than Pterm0().
+TT code is prototypical, esp. in memory sizing.
+----------------------------
+revision 1.28
+date: 1989/02/06 12:39:45;  author: apratt;  state: Exp;  lines: +41 -28
+Split STPLUS conditional assembly into STPLUSVIDEO and DMASND, because
+DMASND is true for TT as well, but STPLUSVIDEO isn't.  This
+is in preparation for adding TT conditional assembly.
+----------------------------
+revision 1.27
+date: 1989/01/23 11:43:21;  author: kbad;  state: Exp;  lines: +14 -3
+Restored `nop' after jsr in _term, it's required because of dumb AS68.
+----------------------------
+revision 1.26
+date: 1989/01/13 15:41:07;  author: apratt;  state: Exp;  lines: +35 -25
+NO CODE CHANGE: just comment changes around trp13tab and trp14tab
+documenting assigned BIOS and XBIOS function numbers.
+----------------------------
+revision 1.25
+date: 1988/12/30 11:42:22;  author: apratt;  state: Exp;  lines: +11 -4
+Change for STPLUS only: dbasell was defined as the address of the
+register as a WORD, but was being used as a byte.  Now it's the
+address as a byte.  Also, D.RENN assures me that the register's low-
+order bit will always read as zero, so I don't need to mask it out.
+----------------------------
+revision 1.24
+date: 1988/12/21 11:01:45;  author: apratt;  state: Exp;  lines: +34 -19
+Fixed two places where (a5) was used when a5 wasn't clear.
+Oops.  Also updated some comments before 'reset2' with cleverer
+reset-handler instructions (just comment change here).
+----------------------------
+revision 1.23
+date: 1988/12/13 16:35:41;  author: apratt;  state: Exp;  lines: +81 -69
+Added lots of (a5)'s for otherwise-long addresses, both low RAM
+and high I/O space.
+----------------------------
+revision 1.22
+date: 1988/12/13 14:43:44;  author: apratt;  state: Exp;  lines: +101 -34
+Added some code for STPLUS: more proper use of the low-byte-of-video-base
+register (and an equate for it: dbasell), and DMASND code which works
+for the latest board (with MONOMON and DMASND XORed together) including
+resetting DMASND during the boot, and handling the XOR case during
+boot and in VBLANK.  Also the new default color palette for STPLUS: 7's
+become F's.
+----------------------------
+revision 1.21
+date: 1988/12/06 17:02:06;  author: apratt;  state: Exp;  lines: +69 -19
+Added a system variable at $59e: _longframe.  It's zero if you're
+on a 68000, nonzero otherwise.  This is used on entry and exit
+for BIOS/XBIOS (at "traph") so we can deal with the extra word
+on the stack for 680[1-3]0 exception frames.  MASSIVELY UNTESTED,
+and almost no change if you leave LONGFRAME equ 0.
+----------------------------
+revision 1.20
+date: 1988/12/06 16:24:23;  author: apratt;  state: Exp;  lines: +48 -6
+Added code for STPLUS to fix the check for MONOMON in the Vblank
+handler: it gets inverted when the DMA sound is active, so this code
+has to un-invert it.  It's not quite bulletproof, but it should be
+pretty damn rare that a spurious reset sneaks through.  Well-nigh
+impossible, I hope.
+
+Only a tiny code change if not STPLUS.
+----------------------------
+revision 1.19
+date: 1988/11/28 11:16:44;  author: kbad;  state: Exp;  lines: +34 -46
+Put the magic back in.  Dungeon Master was depending on the AES magic
+to reclaim the AES BSS after the boot sequence takes it away.  This
+is deemed a Good Feature - 12K is no small potatoes on a 520 ST.
+----------------------------
+revision 1.18
+date: 1988/11/16 15:10:19;  author: apratt;  state: Exp;  lines: +25 -3
+Added STPLUS assembly-time flag.  Set to 1 for ST PLUS, 0 for ST.
+This flag influences the following:
+Physbase/Setscreen: read & write new low-byte-of-display-base register.
+Setcolor: after reading color register, masks with $0777 for ST, $0fff
+for STPLUS.
+No other changes required for ST PLUS.  Even screen dump is fine.
+----------------------------
+revision 1.17
+date: 1988/11/02 15:21:19;  author: apratt;  state: Exp;  lines: +24 -4
+Backed out clearing of _bootdev; caused more pain than it's worth.
+Specifically, people with bootable ramdisks (!) became unhappy.
+
+Also added code to set GEMDOS time from IKBD if real-time clock chip
+doesn't exist or has a bad time, and if IKBD has a good time.
+JWT says IKBD clock is defined as starting up at 0/0/00, which is
+an unambiguously illegal date.
+----------------------------
+revision 1.16
+date: 1988/10/12 17:25:57;  author: apratt;  state: Exp;  lines: +12 -5
+Added table entry for floprate call: see flop.s for more.
+----------------------------
+revision 1.15
+date: 1988/10/03 15:01:09;  author: kbad;  state: Exp;  lines: +60 -23
+Incorporated changes for new build method (several things were made
+obsolete -- look for the keyword "newbuild" to find these changes).
+----------------------------
+revision 1.14
+date: 1988/09/21 15:08:19;  author: apratt;  state: Exp;  lines: +8 -5
+Whoops.. dmaread claimed to try twice, but really tried once.
+Now it tries twice.
+----------------------------
+revision 1.13
+date: 1988/09/06 11:39:52;  author: kbad;  state: Exp;  lines: +17 -8
+Added osconf word for denmark.
+----------------------------
+revision 1.12
+date: 1988/05/06 16:06:38;  author: apratt;  state: Exp;  lines: +17 -28
+In dmaread: removed "retry on no error/no data" and replaced it
+with "retry on any error" (except timeout).
+----------------------------
+revision 1.11
+date: 1988/05/05 13:41:04;  author: apratt;  state: Exp;  lines: +11 -5
+Added clr.w _bootdev to startup sequence, to fix bootable hard disk
+bug (when using ALT to avoid HD boot, A:\auto doesn't get executed).
+This was because GEMDOS set the current drive based on _bootdev,
+which wasn't getting cleared by anybody.
+----------------------------
+revision 1.10
+date: 1988/05/03 15:09:56;  author: apratt;  state: Exp;  lines: +16 -4
+Added comments as relates to the version number and problems with
+First Byte's Kid series of software -- you get address error unless
+the version number is even.  See comments above 'systype' for more
+information.
+----------------------------
+revision 1.9
+date: 1988/04/28 16:08:09;  author: apratt;  state: Exp;  lines: +7 -4
+Backed out table entry for Flopwp XBIOS call. See flop.s for more.
+----------------------------
+revision 1.8
+date: 1988/04/22 13:07:53;  author: apratt;  state: Exp;  lines: +8 -3
+Fixed dmahi to dmahigh in dmaread (slip of the finger...)
+----------------------------
+revision 1.7
+date: 1988/04/08 17:45:24;  author: apratt;  state: Exp;  lines: +14 -9
+Backed out reset bail-out vector fix -- leave it broken.  The workaround
+is to return to the reset code via "jmp $24(a6)" rather than
+with "jmp (a6)" as advertised.  THE RESET CODE CAN'T CHANGE thanks to this.
+----------------------------
+revision 1.6
+date: 1988/04/05 17:47:50;  author: apratt;  state: Exp;  lines: +19 -6
+Changed Flopwp call to Xbios $29 because of internal versions of AKP's
+debugger, which uses $28.  Must keep Xbios $11 unused.
+(Newer versions of the debugger use Xbios calls $11 and $F000)
+----------------------------
+revision 1.5
+date: 1988/03/31 15:58:23;  author: apratt;  state: Exp;  lines: +16 -9
+Fixed reset bailout vector so it leaves the right number in a6.
+If (a6) == $9bcd you have buggy ROMs -- return via jmp'ing to $24(a6).
+Else you have new ROMs -- return via jmp'ing to (a6)
+
+Also fixed some bsr's to jsr's so gemdos can be far away from here.
+----------------------------
+revision 1.4
+date: 1988/03/28 11:46:47;  author: apratt;  state: Exp;  lines: +10 -4
+Added Flopwp call (Xbios call $28).  Actual code is in flop.s
+----------------------------
+revision 1.3
+date: 1988/03/18 16:16:59;  author: apratt;  state: Exp;  lines: +35 -4
+Added code to dmaread: retry the read if the first one succeeds (status
+code 0 (no error)) but the DMA counter hasn't changed.
+The removable-media drives we have use this to signal media change.
+----------------------------
+revision 1.2
+date: 1987/11/25 18:17:00;  author: lozben;  state: Exp;  lines: +25 -10
+Added new flags for finland, norway, and turkey.
+----------------------------
+revision 1.1
+date: 1987/11/20 14:24:44;  author: lozben;  state: Exp;
+Initial revision
+----------------------------
+revision 2.16.1.1
+date: 1990/01/03 15:44:29;  author: apratt;  state: Exp;  lines: +11 -8
+This is STE TOS BIOS with nothing changed except the date
+and version number.  It is to be built with the 1/90 version
+of GEMDOS, with the OS POOL bug fixed.
+=============================================================================
+
+RCS file: rcs\vtg.c,v
+Working file: vtg.c
+head: 1.2
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 1.2
+comment leader: " * "
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+Falcon video XBIOS calls
+----------------------------
+revision 1.2
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +1476 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 1.1
+date: 1992/08/10 23:35:00;  author: kbad;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\xinout.s,v
+Working file: xinout.s
+head: 2.4
+branch:
+locks:
+access list:
+symbolic names:
+	TOS0400: 2.4
+	OKSPARROW: 2.3
+	STPAD43: 2.2
+	SPRW_DAL: 2.2
+	FINAL206: 2.2
+	TOS306: 2.2
+	VERS06h: 2.2
+	VERSX06c: 2.2
+	VERSX06b: 2.2
+	XDOT06: 2.2
+	TT304: 2.2
+	TTFINAL: 2.2
+	BLUE: 2.1
+	GREEN: 2.1
+	ORANGE: 2.1
+	MAR011990: 2.1
+	TOS16: 2.1
+	TOS14: 2.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 5;	selected revisions: 5
+description:
+----------------------------
+revision 2.4
+date: 1992/08/11 00:34:42;  author: kbad;  state: Exp;  lines: +97 -0
+TOS 4.00 Falcon030 first production version
+----------------------------
+revision 2.3
+date: 1991/01/02 19:07:48;  author: unknown;  state: Exp;  lines: +7 -4
+Checkin to shut up rcsdiff: no changes.
+----------------------------
+revision 2.2
+date: 1990/08/03 13:25:10;  author: apratt;  state: Exp;  lines: +7 -4
+TTOS FINAL RELEASE
+----------------------------
+revision 2.1
+date: 1989/02/21 17:47:03;  author: kbad;  state: Rel;  lines: +9 -6
+*** TOS 1.4  FINAL RELEASE VERSION ***
+----------------------------
+revision 1.1
+date: 1987/11/20 14:24:52;  author: lozben;  state: Exp;
+Initial revision
+=============================================================================

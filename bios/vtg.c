@@ -1029,7 +1029,7 @@ VsetMode( WORD mcode )
 	dovtg(modecode);
 	set_regs(modecode);
 
-#ifdef oldway
+#if oldway
 /* this has been moved to setscreen(), because VsetMode isn't
  * supposed to muck with line A at all
  */
@@ -1477,7 +1477,7 @@ vmode:		newmode = ValidMode(newmode);
     if (rez >= 0) *sshiftmd = rez;
 
     newmode = VsetMode(newmode);
-#ifndef oldway
+#if !oldway
 /* moved here from VsetMode */
     if (rez >= 0)
     {

@@ -1,16 +1,21 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.7 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.8 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 90/11/26 13:16:28 $     $Locker:  $
+#  $Author: apratt $	$Date: 91/03/27 12:37:31 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.7  90/11/26  13:16:28  apratt
-#  Flop now has .sx, .e, and .t extensions, though .e and .t
-#  are really the same thing.  (Both TT and MSTE have high-density
-#  floppy capability.)
+#  Revision 2.8  91/03/27  12:37:31  apratt
+#  Changed to add the "pad" machine.  Took out TSXMACHINE; dmaread and clock
+#  are the only files for which multiple machines are really the same binary,
+#  and that's just not enough to worry about.
 #
+# Revision 2.7  90/11/26  13:16:28  apratt
+# Flop now has .sx, .e, and .t extensions, though .e and .t
+# are really the same thing.  (Both TT and MSTE have high-density
+# floppy capability.)
+# 
 # Revision 2.6  90/08/03  13:23:19  apratt
 # TTOS FINAL RELEASE
 # 
@@ -44,20 +49,19 @@
 #
 
 #
-# startup is affected by country, systype, and machine switches:
-# first letter t for TT, e for STe, s for ST.  Systype is the
-# middle letter: a for RAM, o for ROM.  Country is the third
-# letter: u=usa, g=germany, ...
-#
-# dmaread and clock are affected only by machine switches,
-# and then only by TSXMACHINE: t for TT and sx for others.
-#
-# flop is affected by MACHINE, though t and e are actually the same.
+# The switches files have names based on the switches they set:
+# machine switches: first letter t for TT, e for STe, s for ST, p for pad.
+# Systype is the middle letter: a for RAM, o for ROM.
+# Country is the third letter: u=usa, g=germany, ... (see below)
 #
 # bios is affected by machine and country.
 #
-# Set these switches with no spaces.  MACHINE is s, e, or t;
-# TSXMACHINE is sx or t (for dmaread, and clock).
+# flop, dmaread and clock are affected the machine switch only.
+#
+# startup is affected by machine and systype.
+#
+# Set these switches with no spaces.  MACHINE is s, e, p, or t.
+#
 # These are the one-letter country codes used in file names for building TOS:
 # 
 # 	u	usa
@@ -75,11 +79,10 @@
 # 	d	denmark
 # 
 # letters used: abcd fg i k  n    stu w
-# letters free:     e  h j lm opqr   v xyz
+# letters free:     e  h j lm opqr   v xyz0123456789
 
 CCODE=u
-MACHINE=t
-TSXMACHINE=t
+MACHINE=p
 
 # that's all you need to set for different machines or countries.
 ############
@@ -114,7 +117,7 @@ SFILES	=	xinout.o clear.o
 CFILES	=	prtblk.o rwabs.o
 
 allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o \
-			dmaread.$(TSXMACHINE) clock.$(TSXMACHINE) \
+			dmaread.$(MACHINE) clock.$(MACHINE) \
 			bios.$(MACHINE)$(CCODE) flop.$(MACHINE) \
 			$(CFILES) $(SFILES)
 		aln -u -u -p -w -l -o $@ $<
@@ -124,7 +127,7 @@ allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o \
 # add fsstub.o to this list if you define USEDB as 1 in startup.s
 
 allbios.$(MACHINE)a$(CCODE):	startup.$(MACHINE)a \
-			dmaread.$(TSXMACHINE) clock.$(TSXMACHINE) \
+			dmaread.$(MACHINE) clock.$(MACHINE) \
 			bios.$(MACHINE)$(CCODE) flop.$(MACHINE) \
 			$(CFILES) $(SFILES)
 		aln -u -u -p -w -l -o $@ $<
@@ -143,36 +146,17 @@ clear.o:	clear.s
 
 ############
 
-# any switches.t* will do for these three
-
-dmaread.t:	dmaread.s
-		cp switches.tau switches.s
+flop.$(MACHINE): flop.s
+		cp switches.$(MACHINE)au switches.s
 		$(ASM)
 
-flop.t:		flop.s
-		cp switches.tau switches.s
+dmaread.$(MACHINE): dmaread.s
+		cp switches.$(MACHINE)au switches.s
 		$(ASM)
 
-flop.e:		flop.s
-		cp switches.eau switches.s
+clock.$(MACHINE): clock.s
+		cp switches.$(MACHINE)au switches.s
 		$(ASM)
-
-flop.sx:	flop.s
-		cp switches.sau switches.s
-		$(ASM)
-
-dmaread.sx:	dmaread.s
-		cp switches.sau switches.s
-		$(ASM)
-
-clock.sx:	clock.s
-		cp switches.sau switches.s
-		$(ASM)
-
-clock.t:	clock.s
-		cp switches.tau switches.s
-		$(ASM)
-
 
 ############
 

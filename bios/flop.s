@@ -1,18 +1,24 @@
+.super
 ******************* Revision Control System *****************************
 *
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/07 16:28:11 $
+* $Date: 89/09/22 16:43:05 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.6  89/09/22  16:43:05  apratt
+* THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
+* No functional changes from previous revision, which is the last to
+* require Alcyon's AS68 assembler.
+*
 * Revision 2.5  89/09/07  16:28:11  apratt
 * Added SLOWACSI code.  Seems to work, but I'm not happy with it.
-*
+* 
 * Revision 2.4  89/08/30  15:56:23  apratt
 * Added code to handle floppy I/O with fast RAM.  Calls to ??fast
 * either do a pre-copy and change the buffer address on the stack,
@@ -80,7 +86,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.5 $
+* $Revision: 2.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -141,9 +147,10 @@
 *------------------------------------------------------------------------
 	text
 
-*
-* Set TT to 1 if you're on a TT; this uses a TTMFP timer for timeouts,
-* not instruction loops.
+* TT switch moved to switches.s
+
+.include "switches.s"
+
 *
 * Set SLOWACSI to 1 to introduce delays after (possibly) changing
 * the direction bit in the DMA chip; changing the bit resets the
@@ -152,7 +159,6 @@
 * least.
 *
 
-TT		equ	1	; set to 1 for TT @check@
 SLOWACSI	equ	1	; set to 1 for TT(?) @check@
 
 HI_DEN		equ	1		; always enable this code
@@ -372,11 +378,11 @@ fdcprobe:
 *-
 _floprd:
 .if STPAD
-frd2:	btst.b	#5,gpip(a5)		; 1770 done yet?
+	bsr	fdcprobe
 	beq	noflop1			; no floppies!
 	cmp.l	_hz_200,d7
 
-	move.w	#e_nready,curr_err(a5)	; set "timeout" error
+	bsr	change			; test for disk change
 	moveq	#e_read,d0		; set default error#
 	bsr	rdfast
 	bsr	floplock		; lock floppies, setup parameters
@@ -391,19 +397,19 @@ frd1a:	move.w	#e_error,curr_err	; set general error#
 	move.w	#$190,(a6)
 	tst.b	gpip
 	tst.b	gpip
-	move.w	#retries,retrycnt(a5)	; setup retry count
-	addq.w	#1,csect(a5)		; bump sector number
-	add.l	#$200,cdma(a5)		; and DMA pointer for next sector
-	subq.w	#1,ccount(a5)		; if(!--count) return OK;
+	tst.b	gpip
+	tst.b	gpip
+	move.w	#$090,(a6)
+	tst.b	gpip
 	tst.b	gpip
 	tst.b	gpip
 
 * why does this write to diskctl not use wdiskctl? Because it's actually
 * writing to the DMA chip, not the 1770.
-frde:	cmp.w	#midretry,retrycnt(a5)	; are we on the	"middlemost" retry?
+	move.w	#1,diskctl		; set sector count register
 
 	move.w	#$080,(a6)		; startup 1770 "read sector" command
-frd5:	subq.w	#1,retrycnt(a5)		; drop retry count
+	move.w	#$80,d7
 	bsr	wdiskctl
 
 	move.l	_hz_200.w,d7
@@ -419,17 +425,17 @@ frd2:	btst.b	#5,gpip			; 1770 done yet?
 	bra	frde			; (go retry)
 
 *--- check status after read
-	bne.s	eb1
+frd4:	move.w	#$090,(a6)		; examine DMA status register
 	move.w	(a6),d0
 	btst	#0,d0			; bit zero indicates DMA error
 	beq	frde			; (when	its zero -- retry)
-	bne.s	eb1
+
 	move.w	#$080,(a6)		; examine 1770 status register
 	bsr	rdiskctl
 	and.b	#$1c,d0			; check	for RNF, checksum, lost-data
-	bne.s	eb1
-	move	def_error(a5),d1	; use default error#
-eb1:	move.w	d1,curr_err(a5)		; set current error number & return
+	bne	frde1			; (error)
+
+	move.w	#retries,retrycnt.w	; setup retry count
 	addq.w	#1,csect.w		; bump sector number
 	add.l	#$200,cdma.w		; and DMA pointer for next sector
 	subq.w	#1,ccount.w		; if(!--count) return OK;
@@ -462,10 +468,10 @@ err_bits:
 	btst	#4,d0
 	bne	eb1
 
-	move.w	csect(a5),d0		; sector 1
+	moveq	#e_crc,d1		; CRC error?
 
-	or.w	ctrack(a5),d0		; track 0
-	or.w	cside(a5),d0		; side 0
+	btst	#3,d0
+	bne	eb1
 	move	def_error.w,d1		; use default error#
 eb1:	move.w	d1,curr_err.w		; set current error number & return
 	rts
@@ -473,7 +479,7 @@ eb1:	move.w	d1,curr_err.w		; set current error number & return
 
 *+
 * Passed (on the stack):
-fwr1a:	move.w	#e_error,curr_err(a5)	; set general error#
+*	$14(sp) count
 .ifeq SLOWACSI
 	move.w	#$190,(a6)		; toggle DMA chip to clear status
 	move.w	#$090,(a6)
@@ -505,7 +511,7 @@ _flopwr:
 	move.l	_hz_200,d7
 	moveq	#m_changed,d0		; set media change mode to unsure
 	bsr	setdmode		; (boy, is this /ugly/)
-fwr2:	btst.b	#5,gpip(a5)		; done yet?
+
 fwr1:	bsr	select			; select drive
 	cmp.l	_hz_200,d7
 	bcs	flopfail		; EMPTY DRIVE - FAIL NOW
@@ -520,18 +526,18 @@ fwr1a:	move.w	#e_error,curr_err.w	; set general error#
 	move.w	#1,d7			; load sector-count register
 	move.w	#$190,(a6)		; leave	in WRITE mode
 	bsr	wdiskctl
-	move.w	#retries,retrycnt(a5)	; setup retry count
-	addq.w	#1,csect(a5)		; bump sector number
-	add.l	#$200,cdma(a5)		; and DMA pointer for next sector
-	subq.w	#1,ccount(a5)		; if(!--count) return OK;
+.if SPARROW
+spwait1:
+	btst.b	#3,denselect+1		; test DMA status
+	bne	spwait1			; delay while it's nonzero.
 .endif
 
 	move.w	#$180,(a6)		; load "WRITE SECTOR" command
 	move.w	#$a0,d7			; into 1770 cmdreg
-fwre:	cmp.w	#midretry,retrycnt(a5)	; re-seek head in "middle" retry
+
 .if QD
 *
-fwr5:	subq.w	#1,retrycnt(a5)		; decrement retry count
+* QD is only slightly implemented here.  We disable write precompensation
 * if you're at high density at all.  This is not really what we should
 * do, but it is here for testing.
 *
@@ -540,12 +546,12 @@ fwr5:	subq.w	#1,retrycnt(a5)		; decrement retry count
 	or.w	#%10,d7			; OR in disable of write precomp
 noqd0:
 .endif
-*	$14(sp)	interleave		** if -1 then skew sectors use table
+
 	bsr	wdiskctl
 	move.l	_hz_200.w,d7
 	add.l	#timeout,d7		; d7 = _hz_200 value to die at
 
-*	 $8(sp)	NOT USED		** skew table if interleave -1
+fwr2:	btst.b	#5,gpip			; done yet?
 	beq	fwr4			; (yes,	check status)
 	cmp.l	_hz_200.w,d7
 	bhi	fwr2			; (still tickin')
@@ -566,10 +572,10 @@ fwre:	cmp.w	#midretry,retrycnt.w	; re-seek head in "middle" retry
 .endc
 	bne	fwr5			; (not middle retry)
 fwre1:	bsr	reseek			; home head and	seek
-	move.w	$e(sp),spt(a5)		; save sectors-per-track
-	move.w	$14(sp),interlv(a5)	; save interleave factor
-	move.w	$1a(sp),virgin(a5)	; save initial sector data
-	move.l	$8(sp),skewtbl(a5)	; save skew table pointer
+fwr5:	subq.w	#1,retrycnt.w		; decrement retry count
+	bpl	fwr1			; loop if there's still	hope
+	bra	flopfail		; otherwise return error status
+
 *+
 * _flopfmt - format a track
 * Passed (on the stack):
@@ -578,21 +584,21 @@ fwre1:	bsr	reseek			; home head and	seek
 *-
 
 _flopfmt:
-	move.w	ctrack(a5),dcurtrack(a1)	; record current track#
+	cmp.l	#$87654321,$16(sp)	; check for magic# on stack
 	bne	flopfail		; no magic, so we just saved the world
 .if STPAD
-	move.w	#e_error,curr_err(a5)	; vanilla error mode
+	bsr	fdcprobe
 	beq	noflop1			; no floppies!
 .endif
-	move.w	spt(a5),ccount(a5)	; set number of sectors to verify
-	move.w	#1,csect(a5)		; starting sector# = 1
+
+	bsr	change			; check for disk flip
 	moveq	#e_error,d0		; set default error number
 	bsr	fmfast
 	bsr	floplock		; lock floppies, setup parms
-	move.l	cdma(a5),a2		; a2 -> bad sector list
+	bsr	select			; select drive and side
 	move.w	$e(sp),spt.w		; save sectors-per-track
 	move.w	$14(sp),interlv.w	; save interleave factor
-	move.w	#e_badsects,curr_err(a5) ; set error number
+	move.w	$1a(sp),virgin.w	; save initial sector data
 	move.l	$8(sp),skewtbl.w	; save skew table pointer
 
 *--- put drive into "changed" mode
@@ -605,9 +611,9 @@ _flopfmt:
 * parameter written to the controller.
 
 	moveq	#$3,d0			; assume hi den first
-	move.w	#e_write,def_error(a5)	; set default error number
-	move.l	cdma(a5),a2		; a2 ->	prototyping area
-	move.l	skewtbl(a5),a3		; a3 -> skewtbl (if nesssary!)
+	bsr	do_hiden
+.if (TT | SPARROW)
+.else
 	tst.b	_iamanst
 	bne	noden1
 	move.w	d0,denselect
@@ -634,7 +640,7 @@ noden1:
 * Returns:	NE on failure, EQ on success
 * Uses:		almost everything
 * Called-by:	_flopfmt
-	tst.w	interlv(a5)		; if NEG
+*
 *-
 fmtrack:
 	move.w	#1,d3			; start	with sector 1, first pass
@@ -648,8 +654,8 @@ ot1:	move.w	#12-1,d1		; 12 x $00
 	move.b	#$f5,d0
 *	bsr	wmult
 *
-	move.b	ctrack+1(a5),(a2)+	; track#
-	move.b	cside+1(a5),(a2)+	; side#
+*	move.w	#12-1,d1		; 12 x $00 as sync
+*	clr.w	d0
 *	bsr	wmult
 *
 *	move.b	#$f6,d0			; 3 x $C2 as IAM preamble
@@ -668,8 +674,8 @@ ot1:	move.w	#12-1,d1		; 12 x $00
 .endif
 
 	moveq	#120-1,d1		; 2x low-den track leadin
-ot2:	move.b	virgin(a5),(a2)+	; copy high byte
-	move.b	virgin+1(a5),(a2)+	; copy low byte
+	cmp.w	#13,spt.w
+	bhs	d1ok
 	moveq	#60-1,d1		; use recommended track-leadin size
 d1ok:
 	move.w	#40-1,d1		; 40 x $4e
@@ -677,14 +683,14 @@ d1ok:
 
 	clr.w	d3			; init for uses with skew table
 	tst.w	interlv.w		; if NEG
-	tst.w	interlv(a5)		; if interlv is NEG use skew table
+	bmi	use_skewtbl		; use skew table
 
 	moveq	#1,d3			; start	with sector 1, first pass
-	add.w	interlv(a5),d4		; bump sector#
-	cmp.w	spt(a5),d4		; if(d4	<= spt)	then_continue;
+
+*--- address mark
 ot3:	move.w	d3,d4			; d4 = starting	sector (this pass)
 ot1:	moveq	#12-1,d1		; 12 x $00
-	cmp.w	interlv(a5),d3		; if(d3	<= interlv) then_continue;
+	clr.b	d0
 	bsr	wmult
 	moveq	#3-1,d1			; 3 x $f5
 *--- end-of-track
@@ -694,9 +700,9 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	moveq	#3-1,d1			; 3 x $f5
 	moveq	#$fffffff5,d0		; (really just $f5; mas complains)
 	bsr	wmult
-	move.b	cdma+3(a5),dmalow(a5)	; load dma pointer
-	move.b	cdma+2(a5),dmamid(a5)
-	move.b	cdma+1(a5),dmahigh(a5)
+
+*--- data block:
+	move.b	#$fb,(a2)+		; $fb -- data intro
 .ifeq SLOWACSI
 	move.w	#$190,(a6)		; toggle R/W flag and
 	move.w	#$090,(a6)		; select sector-count register
@@ -729,7 +735,7 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	move.w	#1400,d1		; low-density value
 etok:
 	moveq	#$4e,d0			; end-of-track trailer
-otw1:	btst.b	#5,gpip(a5)		; is 1770 done?
+	bsr	wmult
 
 	cmp.l	_hz_200,d7
 	move.b	cdma+3.w,dmalow		; load dma pointer
@@ -739,7 +745,7 @@ otw1:	btst.b	#5,gpip(a5)		; is 1770 done?
 ; reset ACSI chip (see notes)
 	move.w	#$090,(a6)		; select sector-count register
 	tst.b	gpip
-	cmp.w	spt(a5),d3		; are we through all tracks
+	tst.b	gpip
 	tst.b	gpip
 	tst.b	gpip
 	move.w	#$190,(a6)
@@ -812,20 +818,20 @@ wmult:	move.b	d0,(a2)+		; record byte in proto buffer
 *	 $e(sp) sectno
 *	 $c(sp) devno
 *	 $8(sp)	->DSB
-	move.w	#e_read,def_error(a5)	; set default error number
-	move.l	cdma(a5),a2		; a2 -> start of bad sector list
-	add.l	#$200,cdma(a5)		; bump buffer up 512 bytes
+*	 $4(sp) ->buffer (at least 1K long)
+*	 $0(sp)	return address
+*
 * Returns:	NULL.W-terminated list of bad sectors in the buffer if D0 == 0,
 *		OR some kind of error (D0 < 0).
-tvrlp:	move.w	#retries,retrycnt(a5)	; init sector-retry count
+*
 *-
-	move.w	csect(a5),d7		; with 'csect'
+_flopver:
 .if STPAD
 	bsr	fdcprobe
 	beq	noflop1			; no floppies!
-tvr1:	move.b	cdma+3(a5),dmalow(a5)	; load dma pointer
-	move.b	cdma+2(a5),dmamid(a5)
-	move.b	cdma+1(a5),dmahigh(a5)
+.endif
+
+	bsr	change			; hack disk change
 .ifeq SLOWACSI
 	move.w	#$090,(a6)		; toggle R/W (leave in W state)
 	moveq	#e_read,d0		; set default error#
@@ -857,7 +863,7 @@ tvr1:	move.b	cdma+3(a5),dmalow(a5)	; load dma pointer
 *		(buffer+$200..buffer+$3ff used as DMA buffer)
 *
 * Enviroment:	Head seeked to the correct track;
-tvr2:	btst.b	#5,gpip(a5)		; test for 1770	done
+*		Drive and side already selected;
 *		Motor should be spinning (go2track and fmttrack do this).
 	cmp.l	_hz_200,d7
 * Uses:		Almost everything.
@@ -870,7 +876,7 @@ verify1:
 	move.l	cdma.w,a2		; a2 -> start of bad sector list
 	add.l	#$200,cdma.w		; bump buffer up 512 bytes
 
-*--- check 1770 completion status (see if it's happy):
+*--- setup for (next) sector
 tvrlp:	move.w	#retries,retrycnt.w	; init sector-retry count
 	move.w	#secreg,(a6)		; load 1770 sector register
 	move.w	csect.w,d7		; with 'csect'
@@ -878,21 +884,21 @@ tvrlp:	move.w	#retries,retrycnt.w	; init sector-retry count
 
 *--- setup for sector read
 tvr1:	move.b	cdma+3.w,dmalow		; load dma pointer
-tvr6:	addq.w	#1,csect(a5)		; bump sector count
-	subq.w	#1,ccount(a5)		; while(--count) read_another;
+	move.b	cdma+2.w,dmamid
+	move.b	cdma+1.w,dmahigh
 	move.w	#$190,(a6)
-	sub.l	#$200,cdma(a5)		; readjust DMA pointer
+
 ; reset ACSI chip (see notes)
 	tst.b	gpip
 	tst.b	gpip
 	tst.b	gpip
-tvre:	cmp.w	#midretry,retrycnt(a5)	; re-seek head?
+	tst.b	gpip
 	move.w	#$090,(a6)
 	tst.b	gpip
-tvr5:	subq.w	#1,retrycnt(a5)		;	to the current track...
 	tst.b	gpip
-	move.w	csect(a5),(a2)+		; record bad sector
-	bra.s	tvr6			; do next sector
+	tst.b	gpip
+
+	move.w	#1,d7			; set DMA sector count to 1
 	bsr	wdiskctl
 
 	move.w	#$080,(a6)		; load 1770 command register
@@ -901,43 +907,43 @@ tvr5:	subq.w	#1,retrycnt(a5)		;	to the current track...
 	move.l	_hz_200.w,d7
 	add.l	#timeout,d7		; d7 = _hz_200 value to die at
 	clr.l	a5			; a5 -> zeropage base
-	lea	fifo(a5),a6		; a6 -> fifo
-	st.b	_motoron(a5)		; assume motor is on
-	tst.w	flock(a5)		; floppies locked?
+tvr2:	btst.b	#5,gpip			; test for 1770	done
+	beq	tvr4			; (yes,	it completed)
+	cmp.l	_hz_200.w,d7
 	bhi	tvr2			; (still counting down)
 	bsr	reset1770		; reset	controller and return error
 	bra	tvre
-	move.l	_frclock(a5),d0		; check a drive every 8 jiffies
+
 *--- got "done" interrupt, check DMA status:
 tvr4:	move.w	#$090,(a6)		; read DMA error status
 	move.w	(a6),d0
 	btst	#0,d0			; if DMA_ERROR is zero,	then retry
 	beq	tvre
-*--- select drive, record it's WP status:
+
 * --- check 1770 completion status (see if it's happy):
 	move.w	#$080,(a6)		; read 1770 status register
-	lea	_wpstatus(a5),a0	; a0 -> write-protect status table
+	bsr	rdiskctl
 	bsr	err_bits		; set error# from 1770 register
 	and.b	#$1c,d0			; check	for record-not-found, crc-err,
-	cmp.w	_nflops(a5),d0		; if(d0 == _nflops == 1)
+	bne	tvre			;	and lost data; return on error
 
 *--- read next sector (or return if done)
 tvr6:	addq.w	#1,csect.w		; bump sector count
 	subq.w	#1,ccount.w		; while(--count) read_another;
 	bne	tvrlp
 	sub.l	#$200,cdma.w		; readjust DMA pointer
-	move.w	diskctl(a5),d0		; get 1770 status
+	move.w	diskctl.w,d0		; get 1770 status
 	btst	#6,d0			; test Write-Protect status bit
 *--- read failure: retry or record bad sector
 tvre:	cmp.w	#midretry,retrycnt.w	; re-seek head?
 	bsr	setporta
 	bsr	reseek			; yes: back to home and	then back
-fvbl1:	move.w	_wpstatus(a5),d0	; or _wpstatus into _wplatch
-	or.w	d0,_wplatch(a5)		; (catch any WP transitions)
+tvr5:	subq.w	#1,retrycnt.w		;	to the current track...
+	bpl	tvr1
 	move.w	csect.w,(a2)+		; record bad sector
 	bra	tvr6			; do next sector
 
-	tst.w	deselflg(a5)		; floppies already deselected?
+
 *+
 * _flopvbl - floppy vblank handler
 	bsr	fdcprobe
@@ -945,8 +951,8 @@ fvbl1:	move.w	_wpstatus(a5),d0	; or _wpstatus into _wplatch
 
 	move.l	_frclock.w,d0		; check a drive every 8 jiffies
 	move.b	d0,d1			; (save jiffy count)
-	move.w	#1,deselflg(a5)		; indicate floppies deselected
-fvblr1:	clr.w	_motoron(a5)		; indicate motor is OFF
+	and.b	#7,d1			; time yet?
+	bne	fvbl1			; (no)
 	move.w	#cmdreg,(a6)		; select 1770 command/status register
 
 *--- select drive, record its WP status:
@@ -971,24 +977,24 @@ fvbl2:	addq.b	#1,d0			; turn into drive-select bits
 
 fvbl1:	move.w	_wpstatus.w,d0		; or _wpstatus into _wplatch
 	clr.l	a5			; a5 -> zeropage base
-	lea	fifo(a5),a6		; a6 -> fifo
-	st	_motoron(a5)		; kludge motor state = ON
-	move.w	d0,def_error(a5)	; set default error number
-	move.w	d0,curr_err(a5)		; set current error number
-	move.w	#1,flock(a5)		; tell vbl not to touch floppies
-	move.l	8(sp),cdma(a5)		; cdma -> /even/ DMA address
-	move.w	$10(sp),cdev(a5)	; save device# (0 .. 1)
-	move.w	$12(sp),csect(a5)	; save sector# (1 .. 9,	usually)
-	move.w	$14(sp),ctrack(a5)	; save track# (0 .. 39 .. 79 ..)
-	move.w	$16(sp),cside(a5)	; save side# (0	.. 1)
-	move.w	$18(sp),ccount(a5)	; save sector count (1..spt)
-	move.w	#retries,retrycnt(a5)	; setup retry count
+	or.w	d0,_wplatch.w		; (catch any WP transitions)
+
+
+*------ floppy deselect test:
+	tst.w	deselflg.w		; floppies already deselected?
+	bne	fvblr1			; (yes, so don't do it again)
+
+* New test: if _hz_200 has deseltime or later, then delselect them.
+* This removes us from dependence on the motor-on output of the 1772,
+* which never goes away if there's no disk in the drive (on some drives).
+* (New as of 4/24/91)
+
 	move.l	_hz_200.w,d0		; get current time
 	cmp.l	deseltime,d0		; is it at or past drop-dead time?
-	lea	dsb0(a5),a1
-	tst.w	cdev(a5)
+	bhs	dodesel			; yes, so drop dead.
+
 	bsr	rdiskctl		; read 1770 status register
-	lea	dsb1(a5),a1
+
 	btst	#7,d0			; is the motor still on?
 	bne	fvblr			; (yes,	so don't deselect)
 dodesel:
@@ -1003,7 +1009,7 @@ fvblr:	rts				; back to vbl
 *+
 * floplock - lock floppies and setup floppy parameters
 *
-flock1	move.w	#recal,dcurtrack(a1)	; complete failure (what can we do?)
+* Passed (on the stack):
 *	$18(sp) - count.W (sector count)
 *	$16(sp) - side.W (side#)
 *	$14(sp) - track.W (track#)
@@ -1014,9 +1020,9 @@ flock1	move.w	#recal,dcurtrack(a1)	; complete failure (what can we do?)
 *	  4(sp) - ret1.L (caller's return address)
 *	  0(sp) - ret.L (floplock's return address)
 *
-	move.w	curr_err(a5),d0		; get current error number
+* Passed:	D0.W = default error number
 *-
-	bra.s	unlok1			; clobber floppy lock & return
+floplock:
 	movem.l	d3-d7/a3-a6,regsave	; save C registers
 
 	lea	fifo,a6			; a6 -> fifo
@@ -1041,16 +1047,16 @@ flock1	move.w	#recal,dcurtrack(a1)	; complete failure (what can we do?)
 * is checked by the floppy vblank handler, we now use the frame clock
 * (updated EVERY vblank) for _acctim.  890206 kbad
 * 
-	move.w	cdev(a5),d0		; set last-access time for 'cdev'
+flockr:	rts
 
-	lea	_acctim(a5),a0
-	move.l	_frclock(a5),(a0,d0.w)
-	cmp.w	#1,_nflops(a5)		; if (nflops == 1) set other time, too
+
+*+
+* flopfail - unlock floppies and return	error.
 *
-	move.l	_frclock(a5),4(a0)	; set last-accessed time for floppy 1
+*-
 flopfail:
 	moveq	#m_unsure,d0		; disk change mode = UNSURE
-	movem.l	regsave(a5),d3-d7/a3-a6	; restore C registers
+	bsr	setdmode		; set media change mode
 	move.w	curr_err.w,d0		; get current error number
 .ifne TT
 	ext.l	d0			; extend to long
@@ -1113,12 +1119,12 @@ unlok2:	move.l	(sp)+,d0		; restore return value
 * Called-by:	_flopfmt, _flopini
 	bsr	wdiskctl
 	move.w	#$10,d6			; execute "seek" command
-	move.w	ctrack(a5),d7		;  1770's data register
+	bra	flopcmds		; (without verify...can't fail)
 
 
 *+
 	bne	go2trr			; return error on seek failure
-	move.w	ctrack(a5),dcurtrack(a1) ; update current track number
+go2track:
 	and.b	#$18,d7			; check	for RNF, CRC_error, lost_data
 .if HI_DEN
 	move.w	#1,go2count		; init hi-den retry count
@@ -1216,11 +1222,11 @@ padden1:
 	bclr	#7,d1			; clear the bit
 	or.b	d0,d1			; OR in new value
 	move.b	#$e,giselect
-	clr.w	deselflg(a5)		; floppies NOT deselected
-	move.w	cdev(a5),d0		; get device number
+	move.b	d1,giwrite		; write our new value
+	move.w	d2,sr
 	rts
 .endif
-	or.w	cside(a5),d0		; or-in	side number (bit 0)
+
 *+
 * reset1770 - reset disk controller after a catastrophe
 * Passed:	nothing
@@ -1228,16 +1234,16 @@ padden1:
 * Uses:		d7
 *-
 reset1770:
-	clr.b	tmpdma(a5)		; zero bits 24..32 of target DMA addr
+	clr.b	tmpdma.w		; zero bits 24..32 of target DMA addr
 	move.w	#cmdreg,(a6)		; execute 1770 "reset" command
 	move.w	#$d0,d7
 	bsr	wdiskctl
 .if TT
-	move.w	csect(a5),d7		;	caller's parameters
+	move.w	d0,-(sp)
 	move.w	#$0114,d0		; 25 * 1.6us > 32us
-	move.b	cdma+3(a5),dmalow(a5)	; setup	DMA chip's DMA pointer
-	move.b	cdma+2(a5),dmamid(a5)
-	move.b	cdma+1(a5),dmahigh(a5)
+	bsr	ttwait			; delay 32us after reset
+	move.w	(sp)+,d0
+.else
 *
 * Wait >32us using a trick:  assume that Timer C is still as BIOS 
 * programmed it, counting down 5ms in 192 ticks.  Each tick is then
@@ -1271,22 +1277,22 @@ select:
 	lsl.b	#1,d0			; into bits 1 and 2
 	or.w	cside.w,d0		; or-in	side number (bit 0)
 
-wdiskct6:				* write	d6 to diskctl
+	move.w	#trkreg,(a6)		; setup	1770 track register
 	move.w	dcurtrack(a1),d7	;	from current track number
 	bsr	wdiskctl
 	bra	rwdelay			;	delay and return
 *--- alternate entry point: setup R/W parameters on 1770
-wdiskctl:				* write	d7 to diskctl
+select1:
 	move.w	#secreg,(a6)		; setup	requested sector_number	from
 	move.w	csect.w,d7		;	caller's parameters
 	bra	rwdelay			;	delay and return
 	move.b	cdma+3.w,dmalow		; setup	DMA chip's DMA pointer
-rdiskct7:				* read diskctl into d7
+	move.b	cdma+2.w,dmamid
 	move.b	cdma+1.w,dmahigh
 	rts
 	bra	rwdelay			;	delay and return
 
-rdiskctl:				* read diskctl into d0
+*+
 * setporta - set floppy	select bits in PORT A on the sound chip
 * Passed:	d0.b (low three	bits)
 * Uses:		d1
@@ -1350,9 +1356,9 @@ rwd2:	cmp.b	tcdr,d1
 .endif
 *+
 * change - check to see if the "right" floppy has been inserted
-	lea	_diskmode(a5),a0	; a0 -> disk mode table
+	lea	_diskmode.w,a0	; a0 -> disk mode table
 *	$10(sp) - dev.W (device#)
-	move.w	cdev(a5),d0		; d0.w = drive# (index into table)
+*	 $c(sp) - dsb.L (pointer to Device State Block)
 	move.b	(sp)+,(a0,d0.w)		; set drive's mode
 * Returns:	both media "might have changed" condition
 *		and "grace" timers expired.
@@ -1381,12 +1387,12 @@ setdmode:
 	move.b	d0,-(sp)		; (save mode)
 	lea.l	dsb0,a0			; get dsb0 first
 	cmp.w	#1,_nflops		; one floppy?
-	beq.s	rate1			; yes.
+	bne	dmode1			; no - d0 is fine
 	lea.l	dsb1,a0			; no - use dsb1
 rate1:	move.w	dseekrt(a0),d0		; get the old rate
 	rts
 
-	beq.s	ratedone		; yes
+
 	move.w	d1,dseekrt(a0)		; no - do change it.
 *	DRIVE	RAM TOS		11/20/85	4/22/87
 *	  A	 6cb		  a09		  a4f
@@ -1411,7 +1417,7 @@ rate1:	move.w	dseekrt(a1),d0		; get the old rate
 	cmp.w	#-4,d1			; interrogate no-spinup-delay flag?
 	beq	getspinup
 	move.w	d1,dseekrt(a1)		; no - do change it.
-*	lea	_wpstatus(a5),a0
+ratedone:
 	ext.l	d0			; clear high part of return code
 	rts				; and return.
 
@@ -1425,8 +1431,8 @@ setspinup:
 clrspinup:
 .if HI_DEN
 	clr.b	dspinflag(a1)		; clear the flag
-*	move.w	_wpstatus(a5),d0
-*	or.w	d0,_wplatch(a5)	; (catch WP transitions)
+.endif
+	moveq.l	#0,d0			; return zero for fun
 	rts
 
 getspinup:
@@ -1533,7 +1539,7 @@ vrfast:
 fmfast:	cmp.l	#MAXACSI,8(sp)
 	bcs	undone
 	bsr	getfrb
-skewtbl:	ds.l	1		: pointer to skew table if interlv=-1
+	move.l	8(sp),fastbuf		; after op, copy to user's buffer
 	move.l	_frb,8(sp)		; actual DMA to _FRB
 tmpdma:		ds.l	1		; temp for hardware DMA image
 	move.w	#1,fastcnt		; count is one sector

@@ -4,13 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/17 21:48:52 $
+* $Date: 1991/09/29 23:59:46 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.15  1991/09/29  23:59:46  apratt
+* Added the Waketime() XBIOS call, number 47 ($2f).  See the code
+* for documentation of it.  It's meant for STPAD but works for all
+* ST's and STe's but not TT (because TT has a different RTC).
+* Note that this code now computes and sets day-of-week, but
+* never reads it.  DOW participates in the alarm match, so it has
+* to be computed when you set the time, and when you set the alarm.
+*
 * Revision 2.14  1991/09/17  21:48:52  apratt
 * For TT TOS, we have stored "year since 1970" in the RTC.
 * This is wrong: if you do that then leap years are off by two years.
@@ -89,7 +97,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.14 $
+* $Revision: 2.15 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\clock.s,v $
@@ -252,8 +260,6 @@ clkfai:	or	#1,ccr			; set carry
 	rts				; return "failure"
 .endif
 
-
-
 *----------------
 *
 *  Get clock chip date/time
@@ -389,10 +395,21 @@ gclfai:	moveq	#-1,d0			; return -1L on failure
 *
 *    Uses:	C registers
 *
+* Note: as of TOS 2.06 of 9/29/91, this code computes and sets the
+* day-of-week register in the clock chip.  This accomodates the STPAD,
+* which uses the alarm feature of the RTC, because the day of week
+* participates in the alarm match.  Note that the day of week is never
+* read, only set.
+*
+
 _setclock:
 	bsr	clktest			; test for clock chip
 	bcs	sclerr			; punt if chip doesn't exist
 	lea	read1.w,a1		; a1 -> buffer for clock data to write
+
+	move.w	4(sp),a2		; get the date part of the arg
+	bsr	week_day		; compute day-of-week
+	move.b	d0,RDDOW(a1)		; write day-of-week in the buffer
 
 *
 *  Convert time to chip format
@@ -455,14 +472,13 @@ _setclock:
 
 *
 *  Write the clock data;
-*    o  zero day-of-week counter (we don't use it)
+*    o  zero day-of-week counter (we don't use it) (we do now (AKP))
 *    o  clobber 15-stage internal divider to give
 *	us one second to work with;
 *    o  write 24-hour mode;
 *    o  write leap year count (already in D2 at this point);
 *    o  write new clock data.
 *
-	clr.b	RDDOW(a1)		; clobber day-of-week in buffer
 	move.b	#%1110,RTRES(a0)	; clobber 15-stage divider and 1Hz/16Hz
 					; (but don't touch alarm reset)
 	bset.b	#0,RTMODE(a0)		; set "alarm" bank (leave EN's alone)
@@ -490,6 +506,209 @@ sclerr:	moveq	#-1,d0			; return -1L = bad
 read1:	.ds.b	READS
 read2:	.ds.b	READS
 	.even
+	.text
+
+*
+* Given a GEMDOS date in a2.w, return day-of-week, zero-based
+*
+
+week_day:
+	moveq	#2,d2		; d2 accumulates leap years. 1/1/80 was Tue
+	move.w	a2,d0
+	lsr.w	#8,d0
+	lsr.w	#1,d0		; d0 is year
+
+	add.w	d0,d2		; d2 += year (1/1 advances 1 wday/year)
+
+	move.w	d0,d1
+	lsr.w	#2,d1
+	add.w	d1,d2		; d2 += (year/4): add 1 for each leap year
+*	addq.w	#1,d2		; add another because 0 was a leap year
+* but don't really because this balances the -1 later on
+
+	move.w	a2,d1
+	lsr.w	#5,d1
+	and.w	#$f,d1		; d1 is month
+
+	and.w	#3,d0		; d0 is year % 4: is this a leap year?
+	bne	nosub1		; no.
+	cmp.w	#2,d1		; are we in Jan or Feb?
+	bhi	nosub1		; no.
+	subq	#1,d2		; yes: subtract off leap year counted too soon
+nosub1:	
+	subq	#1,d1		; make d1 a zero-based month
+	add.w	d1,d1		; make d1 an offset into the days-so-far tbl
+	add.w	dytbl(PC,d1.w),d2	; add days-so-far to weekday
+
+	move.w	a2,d1
+	and.w	#$1f,d1		; d1 is day of month
+	add.w	d1,d2		; add days so far this month to d2
+*	subq.w	#1,d2		; subtract one off (days are zero-based)
+* This is the -1 that is balanced by commenting out the +1 above.
+
+	; now return (d2 % 7)
+
+	divu	#7,d2
+	swap	d2
+	moveq	#0,d0
+	move.w	d2,d0
+	rts
+
+dytbl:	dc.w	0					; Jan 1
+	dc.w	0+31					; Feb 1
+	dc.w	0+31+28					; Mar 1
+	dc.w	0+31+28+31				; Apr 1
+	dc.w	0+31+28+31+30				; May 1
+	dc.w	0+31+28+31+30+31			; Jun 1
+	dc.w	0+31+28+31+30+31+30			; Jul 1
+	dc.w	0+31+28+31+30+31+30+31			; Aug 1
+	dc.w	0+31+28+31+30+31+30+31+31		; Sep 1
+	dc.w	0+31+28+31+30+31+30+31+31+30		; Oct 1
+	dc.w	0+31+28+31+30+31+30+31+31+30+31		; Nov 1
+	dc.w	0+31+28+31+30+31+30+31+31+30+31+30	; Dec 1
+
+*
+* New BIOS call "Waketime" (decimal 47, $2f): takes a longword.
+*
+* Mostly, if that longword (as datime) is in the future, it's written
+* to the variable "waketime."  However, some values are special:
+*
+*      -1: return the current value of the waketime variable.
+*	0: clear out waketime, un-set the alarm.
+*	1: set the alarm based on waketime.
+*
+* Returns:
+*	0: you won: your time is valid, in the future, and
+* sooner than the current value of waketime.
+*	1: your time is in the past.
+*	2: your time is in the future, but later than waketime.
+*	3: you requested that waketime be zeroed and unset, so it was.
+*	4: you asked that I set the alarm and I did.
+*	5: you asked that I set the alarm but waketime is zero.
+*
+
+.bss
+waketime: ds.l	1
+.text
+
+.globl _waketime
+_waketime:
+	move.l	4(sp),d0
+	beq	clralarm
+	moveq.l	#-1,d1
+	cmp.l	d0,d1
+	beq	readalarm
+	addq.l	#2,d1
+	cmp.l	d0,d1
+	beq	setalarm
+
+* OK, it's really a time & date.  Compare with the globals _date
+* and _time to see if it's really in the future.  If it is, set
+* the waketime variable to this value.
+
+	swap	d0		; get date into low word
+	cmp.w	_date,d0
+	bhi	infuture	; d0 > _date: it's in the future
+	blo	inpast		; d0 < _date: in the past
+	move.w	6(sp),d1	; else it's today: get time argument
+	cmp.w	_time,d1
+	blo	inpast		; d1 < _time: in the past
+
+* OK, it's in the future.  But is it sooner than waketime?
+
+infuture:
+	swap	d0
+	tst.l	waketime
+	beq	youwin		; zero (unset) waketime: you win.
+	cmp.l	waketime,d0
+	bhs	islater
+
+* You win!
+youwin:
+	move.l	d0,waketime
+	moveq.l	#0,d0		; return 0: you won.
+	rts
+
+inpast:
+	moveq.l	#1,d0		; return 1: your request is in the past
+	rts
+
+islater:
+	moveq.l	#2,d0		; return 2: your request is later
+	rts
+
+readalarm:
+	move.l	waketime,d0	; Waketime(1): return the current value
+	rts
+
+clralarm:
+	bsr	clktest		; probe, load a0 with base address
+	bcs	sclerr		; punt if chip doesn't exist
+	move.b	#%1101,RTRES(a0)	; reset alarm
+	clr.l	waketime
+	moveq.l	#3,d0		; return 3: time zeroed.
+	rts
+
+*
+* Waketime(1L): Write the clock chip alarm registers and enable the clock
+* chip alarm out.  Sets the alarm for "waketime".  This calls week_day to
+* compute the day of week it will be and write that, too.
+*
+* Note that the day and day of week participate, but the month doesn't.
+* You're setting the alarm for a Monday which is the 12th, you'll get it
+* the next time there's a Monday the 12th, not necessarily the particular
+* one you want.
+*
+
+setalarm:
+	bsr	clktest			; test for clock chip
+	bcs	sclerr			; punt if chip doesn't exist
+	move.l	#RTCBASE,a0		; a0 -> base of registers
+	bset.b	#0,RTMODE(a0)		; select alarm bank (preserve EN's)
+
+*
+*  Convert time to chip format
+*
+	move.l	waketime,d1		; d1 = GEMDOS format time
+	beq	noalarm
+
+	move.w	d1,d0			; d1 = (time >> 5) & $3f
+	lsr.w	#5,d0			;    = minutes 0..59
+	and.l	#$3f,d0
+	divu	#10,d0			; get minutes/10, minutes
+	move.b	d0,RT10MIN(a0)		; install minutes/10
+	swap	d0
+	move.b	d0,RT01MIN(a0)		; install minutes/1
+
+	move.w	d1,d0
+	lsr.w	#8,d0			; d0 >>= 11
+	lsr.w	#3,d0			;    = hours 0..23
+	ext.l	d0			; clobber upper word
+	divu	#10,d0			; get hours/10, hours
+	move.b	d0,RT10HR(a0)		; install hours/10
+	swap	d0
+	move.b	d0,RT01HR(a0)		; install hours/1
+
+	move.l	d1,d0
+	swap	d0			; get date to d0.w
+	and.w	#$1f,d0			; (just the date, ma'am)
+	ext.l	d0
+	divu	#10,d0
+	move.b	d0,RT10DAY(a0)		; install days/10
+	swap	d0
+	move.b	d0,RT01DAY(a0)		; install days/1
+
+	move.w	waketime,a2		; put date part into a2.w
+	bsr	week_day
+	move.b	d0,RTDOW(a0)		; write day of week
+
+	bset.b	#2,RTMODE(a0)		; set alarm enable
+	bclr.b	#0,RTMODE(a0)		; go back to "time" bank
+	moveq.l	#4,d0			; return 4 "I set the alarm."
+	rts
+noalarm:
+	moveq.l	#5,d0			; return 5 "didn't set alarm"
+	rts
 
 .else
 

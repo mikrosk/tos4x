@@ -1,0 +1,1227 @@
+# MultiTOS 1.00 GEM.SYS in the six languages of its resources, run by C:\AUTO\RUNNER.PRG at boot
+# (commands: build/src/runner.c). S: is the repository, D: the work copy, M: the RAM disk the makeprg rules
+# use. makeprg rules one command at a time (Lattice make cannot run makeprg); the two aln lines of makeprg
+# go to ALN as command files (gemsys/AB.LNK, GEM.LNK; the TOS command line is too short). Each language
+# links its glue as _USARSC; after the link the symbol table is stripped (STRIP68.TOS; the release has
+# none) and prgflags 7 7 is set as makeprg does. D:\MULTITOS\GEM_USA.SYS must be Atari's release
+# (1993-02-04) byte for byte (EXPECT.LST); the other five have no Atari copy.
+
+echo copy the sources to D:
+rmtree D:\
+rmtree M:\
+cptree S:\MULTITOS D:\MULTITOS
+copy C:\GEMSYS\AB.LNK D:\MULTITOS\AB.LNK
+copy C:\GEMSYS\GEM.LNK D:\MULTITOS\GEM.LNK
+
+echo AES binding library aesbin73: Alcyon C (cp68, c068 -f, c168) and MadMac 1.05 (mac -6) per member;
+echo the lost assembler of the original members made addq/moveq of these add/move forms (subst)
+cd D:\MULTITOS\AESBIND
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ header.c header.i
+x C:\BIN\C068.TTP header.i header.1 header.2 header.3 -f
+x C:\BIN\C168.TTP header.1 header.2 header.s
+subst header.s add\s#1, addq\s#1,
+subst header.s add.l\s#1, addq.l\s#1,
+subst header.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 header.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apexit.c apexit.i
+x C:\BIN\C068.TTP apexit.i apexit.1 apexit.2 apexit.3 -f
+x C:\BIN\C168.TTP apexit.1 apexit.2 apexit.s
+subst apexit.s add\s#1, addq\s#1,
+subst apexit.s add.l\s#1, addq.l\s#1,
+subst apexit.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apexit.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ aptplay.c aptplay.i
+x C:\BIN\C068.TTP aptplay.i aptplay.1 aptplay.2 aptplay.3 -f
+x C:\BIN\C168.TTP aptplay.1 aptplay.2 aptplay.s
+subst aptplay.s add\s#1, addq\s#1,
+subst aptplay.s add.l\s#1, addq.l\s#1,
+subst aptplay.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 aptplay.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apfind.c apfind.i
+x C:\BIN\C068.TTP apfind.i apfind.1 apfind.2 apfind.3 -f
+x C:\BIN\C168.TTP apfind.1 apfind.2 apfind.s
+subst apfind.s add\s#1, addq\s#1,
+subst apfind.s add.l\s#1, addq.l\s#1,
+subst apfind.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apfind.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apread.c apread.i
+x C:\BIN\C068.TTP apread.i apread.1 apread.2 apread.3 -f
+x C:\BIN\C168.TTP apread.1 apread.2 apread.s
+subst apread.s add\s#1, addq\s#1,
+subst apread.s add.l\s#1, addq.l\s#1,
+subst apread.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apread.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ aptreco.c aptreco.i
+x C:\BIN\C068.TTP aptreco.i aptreco.1 aptreco.2 aptreco.3 -f
+x C:\BIN\C168.TTP aptreco.1 aptreco.2 aptreco.s
+subst aptreco.s add\s#1, addq\s#1,
+subst aptreco.s add.l\s#1, addq.l\s#1,
+subst aptreco.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 aptreco.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apwrite.c apwrite.i
+x C:\BIN\C068.TTP apwrite.i apwrite.1 apwrite.2 apwrite.3 -f
+x C:\BIN\C168.TTP apwrite.1 apwrite.2 apwrite.s
+subst apwrite.s add\s#1, addq\s#1,
+subst apwrite.s add.l\s#1, addq.l\s#1,
+subst apwrite.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apwrite.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evbutto.c evbutto.i
+x C:\BIN\C068.TTP evbutto.i evbutto.1 evbutto.2 evbutto.3 -f
+x C:\BIN\C168.TTP evbutto.1 evbutto.2 evbutto.s
+subst evbutto.s add\s#1, addq\s#1,
+subst evbutto.s add.l\s#1, addq.l\s#1,
+subst evbutto.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evbutto.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evdclic.c evdclic.i
+x C:\BIN\C068.TTP evdclic.i evdclic.1 evdclic.2 evdclic.3 -f
+x C:\BIN\C168.TTP evdclic.1 evdclic.2 evdclic.s
+subst evdclic.s add\s#1, addq\s#1,
+subst evdclic.s add.l\s#1, addq.l\s#1,
+subst evdclic.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evdclic.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evkeybd.c evkeybd.i
+x C:\BIN\C068.TTP evkeybd.i evkeybd.1 evkeybd.2 evkeybd.3 -f
+x C:\BIN\C168.TTP evkeybd.1 evkeybd.2 evkeybd.s
+subst evkeybd.s add\s#1, addq\s#1,
+subst evkeybd.s add.l\s#1, addq.l\s#1,
+subst evkeybd.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evkeybd.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evmesag.c evmesag.i
+x C:\BIN\C068.TTP evmesag.i evmesag.1 evmesag.2 evmesag.3 -f
+x C:\BIN\C168.TTP evmesag.1 evmesag.2 evmesag.s
+subst evmesag.s add\s#1, addq\s#1,
+subst evmesag.s add.l\s#1, addq.l\s#1,
+subst evmesag.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evmesag.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evmouse.c evmouse.i
+x C:\BIN\C068.TTP evmouse.i evmouse.1 evmouse.2 evmouse.3 -f
+x C:\BIN\C168.TTP evmouse.1 evmouse.2 evmouse.s
+subst evmouse.s add\s#1, addq\s#1,
+subst evmouse.s add.l\s#1, addq.l\s#1,
+subst evmouse.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evmouse.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evmulti.c evmulti.i
+x C:\BIN\C068.TTP evmulti.i evmulti.1 evmulti.2 evmulti.3 -f
+x C:\BIN\C168.TTP evmulti.1 evmulti.2 evmulti.s
+subst evmulti.s add\s#1, addq\s#1,
+subst evmulti.s add.l\s#1, addq.l\s#1,
+subst evmulti.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evmulti.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evtimer.c evtimer.i
+x C:\BIN\C068.TTP evtimer.i evtimer.1 evtimer.2 evtimer.3 -f
+x C:\BIN\C168.TTP evtimer.1 evtimer.2 evtimer.s
+subst evtimer.s add\s#1, addq\s#1,
+subst evtimer.s add.l\s#1, addq.l\s#1,
+subst evtimer.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evtimer.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmalert.c fmalert.i
+x C:\BIN\C068.TTP fmalert.i fmalert.1 fmalert.2 fmalert.3 -f
+x C:\BIN\C168.TTP fmalert.1 fmalert.2 fmalert.s
+subst fmalert.s add\s#1, addq\s#1,
+subst fmalert.s add.l\s#1, addq.l\s#1,
+subst fmalert.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmalert.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmbutton.c fmbutton.i
+x C:\BIN\C068.TTP fmbutton.i fmbutton.1 fmbutton.2 fmbutton.3 -f
+x C:\BIN\C168.TTP fmbutton.1 fmbutton.2 fmbutton.s
+subst fmbutton.s add\s#1, addq\s#1,
+subst fmbutton.s add.l\s#1, addq.l\s#1,
+subst fmbutton.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmbutton.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmcente.c fmcente.i
+x C:\BIN\C068.TTP fmcente.i fmcente.1 fmcente.2 fmcente.3 -f
+x C:\BIN\C168.TTP fmcente.1 fmcente.2 fmcente.s
+subst fmcente.s add\s#1, addq\s#1,
+subst fmcente.s add.l\s#1, addq.l\s#1,
+subst fmcente.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmcente.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmdial.c fmdial.i
+x C:\BIN\C068.TTP fmdial.i fmdial.1 fmdial.2 fmdial.3 -f
+x C:\BIN\C168.TTP fmdial.1 fmdial.2 fmdial.s
+subst fmdial.s add\s#1, addq\s#1,
+subst fmdial.s add.l\s#1, addq.l\s#1,
+subst fmdial.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmdial.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmdo.c fmdo.i
+x C:\BIN\C068.TTP fmdo.i fmdo.1 fmdo.2 fmdo.3 -f
+x C:\BIN\C168.TTP fmdo.1 fmdo.2 fmdo.s
+subst fmdo.s add\s#1, addq\s#1,
+subst fmdo.s add.l\s#1, addq.l\s#1,
+subst fmdo.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmdo.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmerror.c fmerror.i
+x C:\BIN\C068.TTP fmerror.i fmerror.1 fmerror.2 fmerror.3 -f
+x C:\BIN\C168.TTP fmerror.1 fmerror.2 fmerror.s
+subst fmerror.s add\s#1, addq\s#1,
+subst fmerror.s add.l\s#1, addq.l\s#1,
+subst fmerror.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmerror.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmkeybd.c fmkeybd.i
+x C:\BIN\C068.TTP fmkeybd.i fmkeybd.1 fmkeybd.2 fmkeybd.3 -f
+x C:\BIN\C168.TTP fmkeybd.1 fmkeybd.2 fmkeybd.s
+subst fmkeybd.s add\s#1, addq\s#1,
+subst fmkeybd.s add.l\s#1, addq.l\s#1,
+subst fmkeybd.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmkeybd.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fsinput.c fsinput.i
+x C:\BIN\C068.TTP fsinput.i fsinput.1 fsinput.2 fsinput.3 -f
+x C:\BIN\C168.TTP fsinput.1 fsinput.2 fsinput.s
+subst fsinput.s add\s#1, addq\s#1,
+subst fsinput.s add.l\s#1, addq.l\s#1,
+subst fsinput.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fsinput.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fsexinpu.c fsexinpu.i
+x C:\BIN\C068.TTP fsexinpu.i fsexinpu.1 fsexinpu.2 fsexinpu.3 -f
+x C:\BIN\C168.TTP fsexinpu.1 fsexinpu.2 fsexinpu.s
+subst fsexinpu.s add\s#1, addq\s#1,
+subst fsexinpu.s add.l\s#1, addq.l\s#1,
+subst fsexinpu.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fsexinpu.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grdragb.c grdragb.i
+x C:\BIN\C068.TTP grdragb.i grdragb.1 grdragb.2 grdragb.3 -f
+x C:\BIN\C168.TTP grdragb.1 grdragb.2 grdragb.s
+subst grdragb.s add\s#1, addq\s#1,
+subst grdragb.s add.l\s#1, addq.l\s#1,
+subst grdragb.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grdragb.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grgrowb.c grgrowb.i
+x C:\BIN\C068.TTP grgrowb.i grgrowb.1 grgrowb.2 grgrowb.3 -f
+x C:\BIN\C168.TTP grgrowb.1 grgrowb.2 grgrowb.s
+subst grgrowb.s add\s#1, addq\s#1,
+subst grgrowb.s add.l\s#1, addq.l\s#1,
+subst grgrowb.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grgrowb.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grhandl.c grhandl.i
+x C:\BIN\C068.TTP grhandl.i grhandl.1 grhandl.2 grhandl.3 -f
+x C:\BIN\C168.TTP grhandl.1 grhandl.2 grhandl.s
+subst grhandl.s add\s#1, addq\s#1,
+subst grhandl.s add.l\s#1, addq.l\s#1,
+subst grhandl.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grhandl.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grmbox.c grmbox.i
+x C:\BIN\C068.TTP grmbox.i grmbox.1 grmbox.2 grmbox.3 -f
+x C:\BIN\C168.TTP grmbox.1 grmbox.2 grmbox.s
+subst grmbox.s add\s#1, addq\s#1,
+subst grmbox.s add.l\s#1, addq.l\s#1,
+subst grmbox.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grmbox.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grmksta.c grmksta.i
+x C:\BIN\C068.TTP grmksta.i grmksta.1 grmksta.2 grmksta.3 -f
+x C:\BIN\C168.TTP grmksta.1 grmksta.2 grmksta.s
+subst grmksta.s add\s#1, addq\s#1,
+subst grmksta.s add.l\s#1, addq.l\s#1,
+subst grmksta.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grmksta.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grmouse.c grmouse.i
+x C:\BIN\C068.TTP grmouse.i grmouse.1 grmouse.2 grmouse.3 -f
+x C:\BIN\C168.TTP grmouse.1 grmouse.2 grmouse.s
+subst grmouse.s add\s#1, addq\s#1,
+subst grmouse.s add.l\s#1, addq.l\s#1,
+subst grmouse.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grmouse.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grrubbo.c grrubbo.i
+x C:\BIN\C068.TTP grrubbo.i grrubbo.1 grrubbo.2 grrubbo.3 -f
+x C:\BIN\C168.TTP grrubbo.1 grrubbo.2 grrubbo.s
+subst grrubbo.s add\s#1, addq\s#1,
+subst grrubbo.s add.l\s#1, addq.l\s#1,
+subst grrubbo.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grrubbo.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grshrin.c grshrin.i
+x C:\BIN\C068.TTP grshrin.i grshrin.1 grshrin.2 grshrin.3 -f
+x C:\BIN\C168.TTP grshrin.1 grshrin.2 grshrin.s
+subst grshrin.s add\s#1, addq\s#1,
+subst grshrin.s add.l\s#1, addq.l\s#1,
+subst grshrin.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grshrin.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grslide.c grslide.i
+x C:\BIN\C068.TTP grslide.i grslide.1 grslide.2 grslide.3 -f
+x C:\BIN\C168.TTP grslide.1 grslide.2 grslide.s
+subst grslide.s add\s#1, addq\s#1,
+subst grslide.s add.l\s#1, addq.l\s#1,
+subst grslide.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grslide.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grwatch.c grwatch.i
+x C:\BIN\C068.TTP grwatch.i grwatch.1 grwatch.2 grwatch.3 -f
+x C:\BIN\C168.TTP grwatch.1 grwatch.2 grwatch.s
+subst grwatch.s add\s#1, addq\s#1,
+subst grwatch.s add.l\s#1, addq.l\s#1,
+subst grwatch.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grwatch.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnbar.c mnbar.i
+x C:\BIN\C068.TTP mnbar.i mnbar.1 mnbar.2 mnbar.3 -f
+x C:\BIN\C168.TTP mnbar.1 mnbar.2 mnbar.s
+subst mnbar.s add\s#1, addq\s#1,
+subst mnbar.s add.l\s#1, addq.l\s#1,
+subst mnbar.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnbar.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnichec.c mnichec.i
+x C:\BIN\C068.TTP mnichec.i mnichec.1 mnichec.2 mnichec.3 -f
+x C:\BIN\C168.TTP mnichec.1 mnichec.2 mnichec.s
+subst mnichec.s add\s#1, addq\s#1,
+subst mnichec.s add.l\s#1, addq.l\s#1,
+subst mnichec.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnichec.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnienab.c mnienab.i
+x C:\BIN\C068.TTP mnienab.i mnienab.1 mnienab.2 mnienab.3 -f
+x C:\BIN\C168.TTP mnienab.1 mnienab.2 mnienab.s
+subst mnienab.s add\s#1, addq\s#1,
+subst mnienab.s add.l\s#1, addq.l\s#1,
+subst mnienab.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnienab.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnregis.c mnregis.i
+x C:\BIN\C068.TTP mnregis.i mnregis.1 mnregis.2 mnregis.3 -f
+x C:\BIN\C168.TTP mnregis.1 mnregis.2 mnregis.s
+subst mnregis.s add\s#1, addq\s#1,
+subst mnregis.s add.l\s#1, addq.l\s#1,
+subst mnregis.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnregis.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mntext.c mntext.i
+x C:\BIN\C068.TTP mntext.i mntext.1 mntext.2 mntext.3 -f
+x C:\BIN\C168.TTP mntext.1 mntext.2 mntext.s
+subst mntext.s add\s#1, addq\s#1,
+subst mntext.s add.l\s#1, addq.l\s#1,
+subst mntext.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mntext.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnattach.c mnattach.i
+x C:\BIN\C068.TTP mnattach.i mnattach.1 mnattach.2 mnattach.3 -f
+x C:\BIN\C168.TTP mnattach.1 mnattach.2 mnattach.s
+subst mnattach.s add\s#1, addq\s#1,
+subst mnattach.s add.l\s#1, addq.l\s#1,
+subst mnattach.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnattach.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnpopup.c mnpopup.i
+x C:\BIN\C068.TTP mnpopup.i mnpopup.1 mnpopup.2 mnpopup.3 -f
+x C:\BIN\C168.TTP mnpopup.1 mnpopup.2 mnpopup.s
+subst mnpopup.s add\s#1, addq\s#1,
+subst mnpopup.s add.l\s#1, addq.l\s#1,
+subst mnpopup.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnpopup.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnistart.c mnistart.i
+x C:\BIN\C068.TTP mnistart.i mnistart.1 mnistart.2 mnistart.3 -f
+x C:\BIN\C168.TTP mnistart.1 mnistart.2 mnistart.s
+subst mnistart.s add\s#1, addq\s#1,
+subst mnistart.s add.l\s#1, addq.l\s#1,
+subst mnistart.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnistart.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnsetting.c mnsetting.i
+x C:\BIN\C068.TTP mnsetting.i mnsetting.1 mnsetting.2 mnsetting.3 -f
+x C:\BIN\C168.TTP mnsetting.1 mnsetting.2 mnsetting.s
+subst mnsetting.s add\s#1, addq\s#1,
+subst mnsetting.s add.l\s#1, addq.l\s#1,
+subst mnsetting.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnsetting.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mntnorm.c mntnorm.i
+x C:\BIN\C068.TTP mntnorm.i mntnorm.1 mntnorm.2 mntnorm.3 -f
+x C:\BIN\C168.TTP mntnorm.1 mntnorm.2 mntnorm.s
+subst mntnorm.s add\s#1, addq\s#1,
+subst mntnorm.s add.l\s#1, addq.l\s#1,
+subst mntnorm.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mntnorm.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obadd.c obadd.i
+x C:\BIN\C068.TTP obadd.i obadd.1 obadd.2 obadd.3 -f
+x C:\BIN\C168.TTP obadd.1 obadd.2 obadd.s
+subst obadd.s add\s#1, addq\s#1,
+subst obadd.s add.l\s#1, addq.l\s#1,
+subst obadd.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obadd.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obchang.c obchang.i
+x C:\BIN\C068.TTP obchang.i obchang.1 obchang.2 obchang.3 -f
+x C:\BIN\C168.TTP obchang.1 obchang.2 obchang.s
+subst obchang.s add\s#1, addq\s#1,
+subst obchang.s add.l\s#1, addq.l\s#1,
+subst obchang.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obchang.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obdelet.c obdelet.i
+x C:\BIN\C068.TTP obdelet.i obdelet.1 obdelet.2 obdelet.3 -f
+x C:\BIN\C168.TTP obdelet.1 obdelet.2 obdelet.s
+subst obdelet.s add\s#1, addq\s#1,
+subst obdelet.s add.l\s#1, addq.l\s#1,
+subst obdelet.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obdelet.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obdraw.c obdraw.i
+x C:\BIN\C068.TTP obdraw.i obdraw.1 obdraw.2 obdraw.3 -f
+x C:\BIN\C168.TTP obdraw.1 obdraw.2 obdraw.s
+subst obdraw.s add\s#1, addq\s#1,
+subst obdraw.s add.l\s#1, addq.l\s#1,
+subst obdraw.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obdraw.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obedit.c obedit.i
+x C:\BIN\C068.TTP obedit.i obedit.1 obedit.2 obedit.3 -f
+x C:\BIN\C168.TTP obedit.1 obedit.2 obedit.s
+subst obedit.s add\s#1, addq\s#1,
+subst obedit.s add.l\s#1, addq.l\s#1,
+subst obedit.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obedit.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obsysvar.c obsysvar.i
+x C:\BIN\C068.TTP obsysvar.i obsysvar.1 obsysvar.2 obsysvar.3 -f
+x C:\BIN\C168.TTP obsysvar.1 obsysvar.2 obsysvar.s
+subst obsysvar.s add\s#1, addq\s#1,
+subst obsysvar.s add.l\s#1, addq.l\s#1,
+subst obsysvar.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obsysvar.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obfind.c obfind.i
+x C:\BIN\C068.TTP obfind.i obfind.1 obfind.2 obfind.3 -f
+x C:\BIN\C168.TTP obfind.1 obfind.2 obfind.s
+subst obfind.s add\s#1, addq\s#1,
+subst obfind.s add.l\s#1, addq.l\s#1,
+subst obfind.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obfind.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ oboffse.c oboffse.i
+x C:\BIN\C068.TTP oboffse.i oboffse.1 oboffse.2 oboffse.3 -f
+x C:\BIN\C168.TTP oboffse.1 oboffse.2 oboffse.s
+subst oboffse.s add\s#1, addq\s#1,
+subst oboffse.s add.l\s#1, addq.l\s#1,
+subst oboffse.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 oboffse.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ oborder.c oborder.i
+x C:\BIN\C068.TTP oborder.i oborder.1 oborder.2 oborder.3 -f
+x C:\BIN\C168.TTP oborder.1 oborder.2 oborder.s
+subst oborder.s add\s#1, addq\s#1,
+subst oborder.s add.l\s#1, addq.l\s#1,
+subst oborder.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 oborder.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rccopy.c rccopy.i
+x C:\BIN\C068.TTP rccopy.i rccopy.1 rccopy.2 rccopy.3 -f
+x C:\BIN\C168.TTP rccopy.1 rccopy.2 rccopy.s
+subst rccopy.s add\s#1, addq\s#1,
+subst rccopy.s add.l\s#1, addq.l\s#1,
+subst rccopy.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rccopy.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rcequal.c rcequal.i
+x C:\BIN\C068.TTP rcequal.i rcequal.1 rcequal.2 rcequal.3 -f
+x C:\BIN\C168.TTP rcequal.1 rcequal.2 rcequal.s
+subst rcequal.s add\s#1, addq\s#1,
+subst rcequal.s add.l\s#1, addq.l\s#1,
+subst rcequal.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rcequal.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rcinter.c rcinter.i
+x C:\BIN\C068.TTP rcinter.i rcinter.1 rcinter.2 rcinter.3 -f
+x C:\BIN\C168.TTP rcinter.1 rcinter.2 rcinter.s
+subst rcinter.s add\s#1, addq\s#1,
+subst rcinter.s add.l\s#1, addq.l\s#1,
+subst rcinter.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rcinter.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rcunion.c rcunion.i
+x C:\BIN\C068.TTP rcunion.i rcunion.1 rcunion.2 rcunion.3 -f
+x C:\BIN\C168.TTP rcunion.1 rcunion.2 rcunion.s
+subst rcunion.s add\s#1, addq\s#1,
+subst rcunion.s add.l\s#1, addq.l\s#1,
+subst rcunion.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rcunion.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsfree.c rsfree.i
+x C:\BIN\C068.TTP rsfree.i rsfree.1 rsfree.2 rsfree.3 -f
+x C:\BIN\C168.TTP rsfree.1 rsfree.2 rsfree.s
+subst rsfree.s add\s#1, addq\s#1,
+subst rsfree.s add.l\s#1, addq.l\s#1,
+subst rsfree.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsfree.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsgaddr.c rsgaddr.i
+x C:\BIN\C068.TTP rsgaddr.i rsgaddr.1 rsgaddr.2 rsgaddr.3 -f
+x C:\BIN\C168.TTP rsgaddr.1 rsgaddr.2 rsgaddr.s
+subst rsgaddr.s add\s#1, addq\s#1,
+subst rsgaddr.s add.l\s#1, addq.l\s#1,
+subst rsgaddr.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsgaddr.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsload.c rsload.i
+x C:\BIN\C068.TTP rsload.i rsload.1 rsload.2 rsload.3 -f
+x C:\BIN\C168.TTP rsload.1 rsload.2 rsload.s
+subst rsload.s add\s#1, addq\s#1,
+subst rsload.s add.l\s#1, addq.l\s#1,
+subst rsload.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsload.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsobfix.c rsobfix.i
+x C:\BIN\C068.TTP rsobfix.i rsobfix.1 rsobfix.2 rsobfix.3 -f
+x C:\BIN\C168.TTP rsobfix.1 rsobfix.2 rsobfix.s
+subst rsobfix.s add\s#1, addq\s#1,
+subst rsobfix.s add.l\s#1, addq.l\s#1,
+subst rsobfix.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsobfix.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rssaddr.c rssaddr.i
+x C:\BIN\C068.TTP rssaddr.i rssaddr.1 rssaddr.2 rssaddr.3 -f
+x C:\BIN\C168.TTP rssaddr.1 rssaddr.2 rssaddr.s
+subst rssaddr.s add\s#1, addq\s#1,
+subst rssaddr.s add.l\s#1, addq.l\s#1,
+subst rssaddr.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rssaddr.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ scread.c scread.i
+x C:\BIN\C068.TTP scread.i scread.1 scread.2 scread.3 -f
+x C:\BIN\C168.TTP scread.1 scread.2 scread.s
+subst scread.s add\s#1, addq\s#1,
+subst scread.s add.l\s#1, addq.l\s#1,
+subst scread.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 scread.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ scwrite.c scwrite.i
+x C:\BIN\C068.TTP scwrite.i scwrite.1 scwrite.2 scwrite.3 -f
+x C:\BIN\C168.TTP scwrite.1 scwrite.2 scwrite.s
+subst scwrite.s add\s#1, addq\s#1,
+subst scwrite.s add.l\s#1, addq.l\s#1,
+subst scwrite.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 scwrite.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shenvrn.c shenvrn.i
+x C:\BIN\C068.TTP shenvrn.i shenvrn.1 shenvrn.2 shenvrn.3 -f
+x C:\BIN\C168.TTP shenvrn.1 shenvrn.2 shenvrn.s
+subst shenvrn.s add\s#1, addq\s#1,
+subst shenvrn.s add.l\s#1, addq.l\s#1,
+subst shenvrn.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shenvrn.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shfind.c shfind.i
+x C:\BIN\C068.TTP shfind.i shfind.1 shfind.2 shfind.3 -f
+x C:\BIN\C168.TTP shfind.1 shfind.2 shfind.s
+subst shfind.s add\s#1, addq\s#1,
+subst shfind.s add.l\s#1, addq.l\s#1,
+subst shfind.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shfind.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shget.c shget.i
+x C:\BIN\C068.TTP shget.i shget.1 shget.2 shget.3 -f
+x C:\BIN\C168.TTP shget.1 shget.2 shget.s
+subst shget.s add\s#1, addq\s#1,
+subst shget.s add.l\s#1, addq.l\s#1,
+subst shget.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shget.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shput.c shput.i
+x C:\BIN\C068.TTP shput.i shput.1 shput.2 shput.3 -f
+x C:\BIN\C168.TTP shput.1 shput.2 shput.s
+subst shput.s add\s#1, addq\s#1,
+subst shput.s add.l\s#1, addq.l\s#1,
+subst shput.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shput.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shread.c shread.i
+x C:\BIN\C068.TTP shread.i shread.1 shread.2 shread.3 -f
+x C:\BIN\C168.TTP shread.1 shread.2 shread.s
+subst shread.s add\s#1, addq\s#1,
+subst shread.s add.l\s#1, addq.l\s#1,
+subst shread.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shread.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shwrite.c shwrite.i
+x C:\BIN\C068.TTP shwrite.i shwrite.1 shwrite.2 shwrite.3 -f
+x C:\BIN\C168.TTP shwrite.1 shwrite.2 shwrite.s
+subst shwrite.s add\s#1, addq\s#1,
+subst shwrite.s add.l\s#1, addq.l\s#1,
+subst shwrite.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shwrite.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wncalc.c wncalc.i
+x C:\BIN\C068.TTP wncalc.i wncalc.1 wncalc.2 wncalc.3 -f
+x C:\BIN\C168.TTP wncalc.1 wncalc.2 wncalc.s
+subst wncalc.s add\s#1, addq\s#1,
+subst wncalc.s add.l\s#1, addq.l\s#1,
+subst wncalc.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wncalc.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnclose.c wnclose.i
+x C:\BIN\C068.TTP wnclose.i wnclose.1 wnclose.2 wnclose.3 -f
+x C:\BIN\C168.TTP wnclose.1 wnclose.2 wnclose.s
+subst wnclose.s add\s#1, addq\s#1,
+subst wnclose.s add.l\s#1, addq.l\s#1,
+subst wnclose.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnclose.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wncreat.c wncreat.i
+x C:\BIN\C068.TTP wncreat.i wncreat.1 wncreat.2 wncreat.3 -f
+x C:\BIN\C168.TTP wncreat.1 wncreat.2 wncreat.s
+subst wncreat.s add\s#1, addq\s#1,
+subst wncreat.s add.l\s#1, addq.l\s#1,
+subst wncreat.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wncreat.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wndelet.c wndelet.i
+x C:\BIN\C068.TTP wndelet.i wndelet.1 wndelet.2 wndelet.3 -f
+x C:\BIN\C168.TTP wndelet.1 wndelet.2 wndelet.s
+subst wndelet.s add\s#1, addq\s#1,
+subst wndelet.s add.l\s#1, addq.l\s#1,
+subst wndelet.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wndelet.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnfind.c wnfind.i
+x C:\BIN\C068.TTP wnfind.i wnfind.1 wnfind.2 wnfind.3 -f
+x C:\BIN\C168.TTP wnfind.1 wnfind.2 wnfind.s
+subst wnfind.s add\s#1, addq\s#1,
+subst wnfind.s add.l\s#1, addq.l\s#1,
+subst wnfind.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnfind.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnget.c wnget.i
+x C:\BIN\C068.TTP wnget.i wnget.1 wnget.2 wnget.3 -f
+x C:\BIN\C168.TTP wnget.1 wnget.2 wnget.s
+subst wnget.s add\s#1, addq\s#1,
+subst wnget.s add.l\s#1, addq.l\s#1,
+subst wnget.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnget.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnopen.c wnopen.i
+x C:\BIN\C068.TTP wnopen.i wnopen.1 wnopen.2 wnopen.3 -f
+x C:\BIN\C168.TTP wnopen.1 wnopen.2 wnopen.s
+subst wnopen.s add\s#1, addq\s#1,
+subst wnopen.s add.l\s#1, addq.l\s#1,
+subst wnopen.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnopen.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnset.c wnset.i
+x C:\BIN\C068.TTP wnset.i wnset.1 wnset.2 wnset.3 -f
+x C:\BIN\C168.TTP wnset.1 wnset.2 wnset.s
+subst wnset.s add\s#1, addq\s#1,
+subst wnset.s add.l\s#1, addq.l\s#1,
+subst wnset.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnset.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnupdat.c wnupdat.i
+x C:\BIN\C068.TTP wnupdat.i wnupdat.1 wnupdat.2 wnupdat.3 -f
+x C:\BIN\C168.TTP wnupdat.1 wnupdat.2 wnupdat.s
+subst wnupdat.s add\s#1, addq\s#1,
+subst wnupdat.s add.l\s#1, addq.l\s#1,
+subst wnupdat.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnupdat.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wmnew.c wmnew.i
+x C:\BIN\C068.TTP wmnew.i wmnew.1 wmnew.2 wmnew.3 -f
+x C:\BIN\C168.TTP wmnew.1 wmnew.2 wmnew.s
+subst wmnew.s add\s#1, addq\s#1,
+subst wmnew.s add.l\s#1, addq.l\s#1,
+subst wmnew.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wmnew.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apterm.c apterm.i
+x C:\BIN\C068.TTP apterm.i apterm.1 apterm.2 apterm.3 -f
+x C:\BIN\C168.TTP apterm.1 apterm.2 apterm.s
+subst apterm.s add\s#1, addq\s#1,
+subst apterm.s add.l\s#1, addq.l\s#1,
+subst apterm.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apterm.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apsearch.c apsearch.i
+x C:\BIN\C068.TTP apsearch.i apsearch.1 apsearch.2 apsearch.3 -f
+x C:\BIN\C168.TTP apsearch.1 apsearch.2 apsearch.s
+subst apsearch.s add\s#1, addq\s#1,
+subst apsearch.s add.l\s#1, addq.l\s#1,
+subst apsearch.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apsearch.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsfixit.c rsfixit.i
+x C:\BIN\C068.TTP rsfixit.i rsfixit.1 rsfixit.2 rsfixit.3 -f
+x C:\BIN\C168.TTP rsfixit.1 rsfixit.2 rsfixit.s
+subst rsfixit.s add\s#1, addq\s#1,
+subst rsfixit.s add.l\s#1, addq.l\s#1,
+subst rsfixit.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsfixit.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ min.c min.i
+x C:\BIN\C068.TTP min.i min.1 min.2 min.3 -f
+x C:\BIN\C168.TTP min.1 min.2 min.s
+subst min.s add\s#1, addq\s#1,
+subst min.s add.l\s#1, addq.l\s#1,
+subst min.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 min.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ max.c max.i
+x C:\BIN\C068.TTP max.i max.1 max.2 max.3 -f
+x C:\BIN\C168.TTP max.1 max.2 max.s
+subst max.s add\s#1, addq\s#1,
+subst max.s add.l\s#1, addq.l\s#1,
+subst max.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 max.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obgclip.c obgclip.i
+x C:\BIN\C068.TTP obgclip.i obgclip.1 obgclip.2 obgclip.3 -f
+x C:\BIN\C168.TTP obgclip.1 obgclip.2 obgclip.s
+subst obgclip.s add\s#1, addq\s#1,
+subst obgclip.s add.l\s#1, addq.l\s#1,
+subst obgclip.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obgclip.s
+x C:\BIN\AR68.PRG r aesbin73 header.o apexit.o aptplay.o apfind.o apread.o aptreco.o apwrite.o evbutto.o evdclic.o evkeybd.o
+x C:\BIN\AR68.PRG r aesbin73 evmesag.o evmouse.o evmulti.o evtimer.o fmalert.o fmbutton.o fmcente.o fmdial.o fmdo.o fmerror.o
+x C:\BIN\AR68.PRG r aesbin73 fmkeybd.o fsinput.o fsexinpu.o grdragb.o grgrowb.o grhandl.o grmbox.o grmksta.o grmouse.o grrubbo.o
+x C:\BIN\AR68.PRG r aesbin73 grshrin.o grslide.o grwatch.o mnbar.o mnichec.o mnienab.o mnregis.o mntext.o mnattach.o mnpopup.o
+x C:\BIN\AR68.PRG r aesbin73 mnistart.o mnsetting.o mntnorm.o obadd.o obchang.o obdelet.o obdraw.o obedit.o obsysvar.o obfind.o
+x C:\BIN\AR68.PRG r aesbin73 oboffse.o oborder.o rccopy.o rcequal.o rcinter.o rcunion.o rsfree.o rsgaddr.o rsload.o rsobfix.o
+x C:\BIN\AR68.PRG r aesbin73 rssaddr.o scread.o scwrite.o shenvrn.o shfind.o shget.o shput.o shread.o shwrite.o wncalc.o
+x C:\BIN\AR68.PRG r aesbin73 wnclose.o wncreat.o wndelet.o wnfind.o wnget.o wnopen.o wnset.o wnupdat.o wmnew.o apterm.o
+x C:\BIN\AR68.PRG r aesbin73 apsearch.o rsfixit.o min.o max.o obgclip.o
+x C:\SLAV\DOINDEX.PRG aesbin73
+copy aesbin73 D:\MULTITOS\AESBIN73
+copy aesbin73.ndx D:\MULTITOS\AESBIN73.NDX
+setenv PATH=C:\BIN;C:\SLAV;C:\UTIL
+cd D:\MULTITOS
+
+echo OBJ gemstart.o
+x C:\BIN\MAS.TTP -us gemstart.s
+echo OBJ gemaints.oo
+x C:\BIN\CP68.TTP gemaints.c m:\gemaints.i
+x C:\BIN\C068.TTP m:\gemaints.i m:\gemaints.1 m:\gemaints.2 m:\gemaints.3 -f
+x C:\BIN\C168.TTP m:\gemaints.1 m:\gemaints.2 m:\gemaints.s
+x C:\BIN\OPTIMIZE.TOS m:\gemaints.s
+x C:\SLAV\MAC.PRG -6 m:\gemaints.s
+copy m:\gemaints.o gemaints.oo
+del m:\gemaints.*
+echo OBJ gemaplib.oo
+x C:\BIN\CP68.TTP gemaplib.c m:\gemaplib.i
+x C:\BIN\C068.TTP m:\gemaplib.i m:\gemaplib.1 m:\gemaplib.2 m:\gemaplib.3 -f
+x C:\BIN\C168.TTP m:\gemaplib.1 m:\gemaplib.2 m:\gemaplib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemaplib.s
+x C:\SLAV\MAC.PRG -6 m:\gemaplib.s
+copy m:\gemaplib.o gemaplib.oo
+del m:\gemaplib.*
+echo OBJ gemasync.oo
+x C:\BIN\CP68.TTP gemasync.c m:\gemasync.i
+x C:\BIN\C068.TTP m:\gemasync.i m:\gemasync.1 m:\gemasync.2 m:\gemasync.3 -f
+x C:\BIN\C168.TTP m:\gemasync.1 m:\gemasync.2 m:\gemasync.s
+x C:\BIN\OPTIMIZE.TOS m:\gemasync.s
+x C:\SLAV\MAC.PRG -6 m:\gemasync.s
+copy m:\gemasync.o gemasync.oo
+del m:\gemasync.*
+echo OBJ gembase.oo
+x C:\BIN\CP68.TTP gembase.c m:\gembase.i
+x C:\BIN\C068.TTP m:\gembase.i m:\gembase.1 m:\gembase.2 m:\gembase.3 -f
+x C:\BIN\C168.TTP m:\gembase.1 m:\gembase.2 m:\gembase.s
+x C:\BIN\OPTIMIZE.TOS m:\gembase.s
+x C:\SLAV\MAC.PRG -6 m:\gembase.s
+copy m:\gembase.o gembase.oo
+del m:\gembase.*
+echo OBJ gemcli.oo
+x C:\BIN\CP68.TTP gemcli.c m:\gemcli.i
+x C:\BIN\C068.TTP m:\gemcli.i m:\gemcli.1 m:\gemcli.2 m:\gemcli.3 -f
+x C:\BIN\C168.TTP m:\gemcli.1 m:\gemcli.2 m:\gemcli.s
+x C:\BIN\OPTIMIZE.TOS m:\gemcli.s
+x C:\SLAV\MAC.PRG -6 m:\gemcli.s
+copy m:\gemcli.o gemcli.oo
+del m:\gemcli.*
+echo OBJ gemdisp.o
+x C:\BIN\CP68.TTP gemdisp.c m:\gemdisp.i
+x C:\BIN\C068.TTP m:\gemdisp.i m:\gemdisp.1 m:\gemdisp.2 m:\gemdisp.3 -f
+x C:\BIN\C168.TTP m:\gemdisp.1 m:\gemdisp.2 m:\gemdisp.s
+x C:\SLAV\MAC.PRG -6 m:\gemdisp.s
+copy m:\gemdisp.o gemdisp.o
+del m:\gemdisp.*
+echo OBJ gemevlib.oo
+x C:\BIN\CP68.TTP gemevlib.c m:\gemevlib.i
+x C:\BIN\C068.TTP m:\gemevlib.i m:\gemevlib.1 m:\gemevlib.2 m:\gemevlib.3 -f
+x C:\BIN\C168.TTP m:\gemevlib.1 m:\gemevlib.2 m:\gemevlib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemevlib.s
+x C:\SLAV\MAC.PRG -6 m:\gemevlib.s
+copy m:\gemevlib.o gemevlib.oo
+del m:\gemevlib.*
+echo OBJ gemflag.oo
+x C:\BIN\CP68.TTP gemflag.c m:\gemflag.i
+x C:\BIN\C068.TTP m:\gemflag.i m:\gemflag.1 m:\gemflag.2 m:\gemflag.3 -f
+x C:\BIN\C168.TTP m:\gemflag.1 m:\gemflag.2 m:\gemflag.s
+x C:\BIN\OPTIMIZE.TOS m:\gemflag.s
+x C:\SLAV\MAC.PRG -6 m:\gemflag.s
+copy m:\gemflag.o gemflag.oo
+del m:\gemflag.*
+echo OBJ gemfmalt.oo
+x C:\BIN\CP68.TTP gemfmalt.c m:\gemfmalt.i
+x C:\BIN\C068.TTP m:\gemfmalt.i m:\gemfmalt.1 m:\gemfmalt.2 m:\gemfmalt.3 -f
+x C:\BIN\C168.TTP m:\gemfmalt.1 m:\gemfmalt.2 m:\gemfmalt.s
+x C:\BIN\OPTIMIZE.TOS m:\gemfmalt.s
+x C:\SLAV\MAC.PRG -6 m:\gemfmalt.s
+copy m:\gemfmalt.o gemfmalt.oo
+del m:\gemfmalt.*
+echo OBJ gemfmlib.oo
+x C:\BIN\CP68.TTP gemfmlib.c m:\gemfmlib.i
+x C:\BIN\C068.TTP m:\gemfmlib.i m:\gemfmlib.1 m:\gemfmlib.2 m:\gemfmlib.3 -f
+x C:\BIN\C168.TTP m:\gemfmlib.1 m:\gemfmlib.2 m:\gemfmlib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemfmlib.s
+x C:\SLAV\MAC.PRG -6 m:\gemfmlib.s
+copy m:\gemfmlib.o gemfmlib.oo
+del m:\gemfmlib.*
+echo OBJ gemfslib.oo
+x C:\BIN\CP68.TTP gemfslib.c m:\gemfslib.i
+x C:\BIN\C068.TTP m:\gemfslib.i m:\gemfslib.1 m:\gemfslib.2 m:\gemfslib.3 -f
+x C:\BIN\C168.TTP m:\gemfslib.1 m:\gemfslib.2 m:\gemfslib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemfslib.s
+x C:\SLAV\MAC.PRG -6 m:\gemfslib.s
+copy m:\gemfslib.o gemfslib.oo
+del m:\gemfslib.*
+echo OBJ geminit.oo
+x C:\BIN\CP68.TTP geminit.c m:\geminit.i
+x C:\BIN\C068.TTP m:\geminit.i m:\geminit.1 m:\geminit.2 m:\geminit.3 -f
+x C:\BIN\C168.TTP m:\geminit.1 m:\geminit.2 m:\geminit.s
+x C:\BIN\OPTIMIZE.TOS m:\geminit.s
+x C:\SLAV\MAC.PRG -6 m:\geminit.s
+copy m:\geminit.o geminit.oo
+del m:\geminit.*
+echo OBJ gemsigna.oo
+x C:\BIN\CP68.TTP gemsigna.c m:\gemsigna.i
+x C:\BIN\C068.TTP m:\gemsigna.i m:\gemsigna.1 m:\gemsigna.2 m:\gemsigna.3 -f
+x C:\BIN\C168.TTP m:\gemsigna.1 m:\gemsigna.2 m:\gemsigna.s
+x C:\BIN\OPTIMIZE.TOS m:\gemsigna.s
+x C:\SLAV\MAC.PRG -6 m:\gemsigna.s
+copy m:\gemsigna.o gemsigna.oo
+del m:\gemsigna.*
+echo OBJ gemmnlib.oo
+x C:\BIN\CP68.TTP gemmnlib.c m:\gemmnlib.i
+x C:\BIN\C068.TTP m:\gemmnlib.i m:\gemmnlib.1 m:\gemmnlib.2 m:\gemmnlib.3 -f
+x C:\BIN\C168.TTP m:\gemmnlib.1 m:\gemmnlib.2 m:\gemmnlib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemmnlib.s
+x C:\SLAV\MAC.PRG -6 m:\gemmnlib.s
+copy m:\gemmnlib.o gemmnlib.oo
+del m:\gemmnlib.*
+echo OBJ gemobed.oo
+x C:\BIN\CP68.TTP gemobed.c m:\gemobed.i
+x C:\BIN\C068.TTP m:\gemobed.i m:\gemobed.1 m:\gemobed.2 m:\gemobed.3 -f
+x C:\BIN\C168.TTP m:\gemobed.1 m:\gemobed.2 m:\gemobed.s
+x C:\BIN\OPTIMIZE.TOS m:\gemobed.s
+x C:\SLAV\MAC.PRG -6 m:\gemobed.s
+copy m:\gemobed.o gemobed.oo
+del m:\gemobed.*
+echo OBJ gemobjop.oo
+x C:\BIN\CP68.TTP gemobjop.c m:\gemobjop.i
+x C:\BIN\C068.TTP m:\gemobjop.i m:\gemobjop.1 m:\gemobjop.2 m:\gemobjop.3 -f
+x C:\BIN\C168.TTP m:\gemobjop.1 m:\gemobjop.2 m:\gemobjop.s
+x C:\BIN\OPTIMIZE.TOS m:\gemobjop.s
+x C:\SLAV\MAC.PRG -6 m:\gemobjop.s
+copy m:\gemobjop.o gemobjop.oo
+del m:\gemobjop.*
+echo OBJ gempd.oo
+x C:\BIN\CP68.TTP gempd.c m:\gempd.i
+x C:\BIN\C068.TTP m:\gempd.i m:\gempd.1 m:\gempd.2 m:\gempd.3 -f
+x C:\BIN\C168.TTP m:\gempd.1 m:\gempd.2 m:\gempd.s
+x C:\BIN\OPTIMIZE.TOS m:\gempd.s
+x C:\SLAV\MAC.PRG -6 m:\gempd.s
+copy m:\gempd.o gempd.oo
+del m:\gempd.*
+echo OBJ gemqueue.oo
+x C:\BIN\CP68.TTP gemqueue.c m:\gemqueue.i
+x C:\BIN\C068.TTP m:\gemqueue.i m:\gemqueue.1 m:\gemqueue.2 m:\gemqueue.3 -f
+x C:\BIN\C168.TTP m:\gemqueue.1 m:\gemqueue.2 m:\gemqueue.s
+x C:\BIN\OPTIMIZE.TOS m:\gemqueue.s
+x C:\SLAV\MAC.PRG -6 m:\gemqueue.s
+copy m:\gemqueue.o gemqueue.oo
+del m:\gemqueue.*
+echo OBJ gemrlist.oo
+x C:\BIN\CP68.TTP gemrlist.c m:\gemrlist.i
+x C:\BIN\C068.TTP m:\gemrlist.i m:\gemrlist.1 m:\gemrlist.2 m:\gemrlist.3 -f
+x C:\BIN\C168.TTP m:\gemrlist.1 m:\gemrlist.2 m:\gemrlist.s
+x C:\BIN\OPTIMIZE.TOS m:\gemrlist.s
+x C:\SLAV\MAC.PRG -6 m:\gemrlist.s
+copy m:\gemrlist.o gemrlist.oo
+del m:\gemrlist.*
+echo OBJ gemrom.oo
+x C:\BIN\CP68.TTP gemrom.c m:\gemrom.i
+x C:\BIN\C068.TTP m:\gemrom.i m:\gemrom.1 m:\gemrom.2 m:\gemrom.3 -f
+x C:\BIN\C168.TTP m:\gemrom.1 m:\gemrom.2 m:\gemrom.s
+x C:\BIN\OPTIMIZE.TOS m:\gemrom.s
+x C:\SLAV\MAC.PRG -6 m:\gemrom.s
+copy m:\gemrom.o gemrom.oo
+del m:\gemrom.*
+echo OBJ gemrslib.oo
+x C:\BIN\CP68.TTP gemrslib.c m:\gemrslib.i
+x C:\BIN\C068.TTP m:\gemrslib.i m:\gemrslib.1 m:\gemrslib.2 m:\gemrslib.3 -f
+x C:\BIN\C168.TTP m:\gemrslib.1 m:\gemrslib.2 m:\gemrslib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemrslib.s
+x C:\SLAV\MAC.PRG -6 m:\gemrslib.s
+copy m:\gemrslib.o gemrslib.oo
+del m:\gemrslib.*
+echo OBJ gemsclib.oo
+x C:\BIN\CP68.TTP gemsclib.c m:\gemsclib.i
+x C:\BIN\C068.TTP m:\gemsclib.i m:\gemsclib.1 m:\gemsclib.2 m:\gemsclib.3 -f
+x C:\BIN\C168.TTP m:\gemsclib.1 m:\gemsclib.2 m:\gemsclib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemsclib.s
+x C:\SLAV\MAC.PRG -6 m:\gemsclib.s
+copy m:\gemsclib.o gemsclib.oo
+del m:\gemsclib.*
+echo OBJ gemshlib.oo
+x C:\BIN\CP68.TTP gemshlib.c m:\gemshlib.i
+x C:\BIN\C068.TTP m:\gemshlib.i m:\gemshlib.1 m:\gemshlib.2 m:\gemshlib.3 -f
+x C:\BIN\C168.TTP m:\gemshlib.1 m:\gemshlib.2 m:\gemshlib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemshlib.s
+x C:\SLAV\MAC.PRG -6 m:\gemshlib.s
+copy m:\gemshlib.o gemshlib.oo
+del m:\gemshlib.*
+echo OBJ gemtcpip.oo
+x C:\BIN\CP68.TTP gemtcpip.c m:\gemtcpip.i
+x C:\BIN\C068.TTP m:\gemtcpip.i m:\gemtcpip.1 m:\gemtcpip.2 m:\gemtcpip.3 -f
+x C:\BIN\C168.TTP m:\gemtcpip.1 m:\gemtcpip.2 m:\gemtcpip.s
+x C:\BIN\OPTIMIZE.TOS m:\gemtcpip.s
+x C:\SLAV\MAC.PRG -6 m:\gemtcpip.s
+copy m:\gemtcpip.o gemtcpip.oo
+del m:\gemtcpip.*
+echo OBJ gemwmlib.oo
+x C:\BIN\CP68.TTP gemwmlib.c m:\gemwmlib.i
+x C:\BIN\C068.TTP m:\gemwmlib.i m:\gemwmlib.1 m:\gemwmlib.2 m:\gemwmlib.3 -f
+x C:\BIN\C168.TTP m:\gemwmlib.1 m:\gemwmlib.2 m:\gemwmlib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemwmlib.s
+x C:\SLAV\MAC.PRG -6 m:\gemwmlib.s
+copy m:\gemwmlib.o gemwmlib.oo
+del m:\gemwmlib.*
+echo OBJ romcart.oo
+x C:\BIN\CP68.TTP romcart.c m:\romcart.i
+x C:\BIN\C068.TTP m:\romcart.i m:\romcart.1 m:\romcart.2 m:\romcart.3 -f
+x C:\BIN\C168.TTP m:\romcart.1 m:\romcart.2 m:\romcart.s
+x C:\BIN\OPTIMIZE.TOS m:\romcart.s
+x C:\SLAV\MAC.PRG -6 m:\romcart.s
+copy m:\romcart.o romcart.oo
+del m:\romcart.*
+echo OBJ apgrlib.oo
+x C:\BIN\CP68.TTP apgrlib.c m:\apgrlib.i
+x C:\BIN\C068.TTP m:\apgrlib.i m:\apgrlib.1 m:\apgrlib.2 m:\apgrlib.3 -f
+x C:\BIN\C168.TTP m:\apgrlib.1 m:\apgrlib.2 m:\apgrlib.s
+x C:\BIN\OPTIMIZE.TOS m:\apgrlib.s
+x C:\SLAV\MAC.PRG -6 m:\apgrlib.s
+copy m:\apgrlib.o apgrlib.oo
+del m:\apgrlib.*
+echo OBJ apgsxif.oo
+x C:\BIN\CP68.TTP apgsxif.c m:\apgsxif.i
+x C:\BIN\C068.TTP m:\apgsxif.i m:\apgsxif.1 m:\apgsxif.2 m:\apgsxif.3 -f
+x C:\BIN\C168.TTP m:\apgsxif.1 m:\apgsxif.2 m:\apgsxif.s
+x C:\BIN\OPTIMIZE.TOS m:\apgsxif.s
+x C:\SLAV\MAC.PRG -6 m:\apgsxif.s
+copy m:\apgsxif.o apgsxif.oo
+del m:\apgsxif.*
+echo OBJ gembind.oo
+x C:\BIN\CP68.TTP gembind.c m:\gembind.i
+x C:\BIN\C068.TTP m:\gembind.i m:\gembind.1 m:\gembind.2 m:\gembind.3 -f
+x C:\BIN\C168.TTP m:\gembind.1 m:\gembind.2 m:\gembind.s
+x C:\BIN\OPTIMIZE.TOS m:\gembind.s
+x C:\SLAV\MAC.PRG -6 m:\gembind.s
+copy m:\gembind.o gembind.oo
+del m:\gembind.*
+echo OBJ gemgrlib.oo
+x C:\BIN\CP68.TTP gemgrlib.c m:\gemgrlib.i
+x C:\BIN\C068.TTP m:\gemgrlib.i m:\gemgrlib.1 m:\gemgrlib.2 m:\gemgrlib.3 -f
+x C:\BIN\C168.TTP m:\gemgrlib.1 m:\gemgrlib.2 m:\gemgrlib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemgrlib.s
+x C:\SLAV\MAC.PRG -6 m:\gemgrlib.s
+copy m:\gemgrlib.o gemgrlib.oo
+del m:\gemgrlib.*
+echo OBJ gemgsxif.oo
+x C:\BIN\CP68.TTP gemgsxif.c m:\gemgsxif.i
+x C:\BIN\C068.TTP m:\gemgsxif.i m:\gemgsxif.1 m:\gemgsxif.2 m:\gemgsxif.3 -f
+x C:\BIN\C168.TTP m:\gemgsxif.1 m:\gemgsxif.2 m:\gemgsxif.s
+x C:\BIN\OPTIMIZE.TOS m:\gemgsxif.s
+x C:\SLAV\MAC.PRG -6 m:\gemgsxif.s
+copy m:\gemgsxif.o gemgsxif.oo
+del m:\gemgsxif.*
+echo OBJ gemoblib.oo
+x C:\BIN\CP68.TTP gemoblib.c m:\gemoblib.i
+x C:\BIN\C068.TTP m:\gemoblib.i m:\gemoblib.1 m:\gemoblib.2 m:\gemoblib.3 -f
+x C:\BIN\C168.TTP m:\gemoblib.1 m:\gemoblib.2 m:\gemoblib.s
+x C:\BIN\OPTIMIZE.TOS m:\gemoblib.s
+x C:\SLAV\MAC.PRG -6 m:\gemoblib.s
+copy m:\gemoblib.o gemoblib.oo
+del m:\gemoblib.*
+echo OBJ gsx2.o
+x C:\BIN\MAS.TTP -us gsx2.s
+echo OBJ aestrap.o
+x C:\BIN\MAS.TTP -us aestrap.s
+echo OBJ aesdispa.o
+x C:\BIN\MAS.TTP -us aesdispa.s
+echo OBJ dosbind.oo
+x C:\BIN\CP68.TTP dosbind.c m:\dosbind.i
+x C:\BIN\C068.TTP m:\dosbind.i m:\dosbind.1 m:\dosbind.2 m:\dosbind.3 -f
+x C:\BIN\C168.TTP m:\dosbind.1 m:\dosbind.2 m:\dosbind.s
+x C:\BIN\OPTIMIZE.TOS m:\dosbind.s
+x C:\SLAV\MAC.PRG -6 m:\dosbind.s
+copy m:\dosbind.o dosbind.oo
+del m:\dosbind.*
+echo OBJ large.o
+x C:\BIN\MAS.TTP -us large.s
+echo OBJ utility.oo
+x C:\BIN\CP68.TTP utility.c m:\utility.i
+x C:\BIN\C068.TTP m:\utility.i m:\utility.1 m:\utility.2 m:\utility.3 -f
+x C:\BIN\C168.TTP m:\utility.1 m:\utility.2 m:\utility.s
+x C:\BIN\OPTIMIZE.TOS m:\utility.s
+x C:\SLAV\MAC.PRG -6 m:\utility.s
+copy m:\utility.o utility.oo
+del m:\utility.*
+echo OBJ interrup.o
+x C:\BIN\MAS.TTP -us interrup.s
+echo OBJ traps.o
+x C:\BIN\MAS.TTP -us traps.s
+echo OBJ gemctrl.oo
+x C:\BIN\CP68.TTP gemctrl.c m:\gemctrl.i
+x C:\BIN\C068.TTP m:\gemctrl.i m:\gemctrl.1 m:\gemctrl.2 m:\gemctrl.3 -f
+x C:\BIN\C168.TTP m:\gemctrl.1 m:\gemctrl.2 m:\gemctrl.s
+x C:\BIN\OPTIMIZE.TOS m:\gemctrl.s
+x C:\SLAV\MAC.PRG -6 m:\gemctrl.s
+copy m:\gemctrl.o gemctrl.oo
+del m:\gemctrl.*
+echo OBJ ctrlbind.oo
+x C:\BIN\CP68.TTP ctrlbind.c m:\ctrlbind.i
+x C:\BIN\C068.TTP m:\ctrlbind.i m:\ctrlbind.1 m:\ctrlbind.2 m:\ctrlbind.3 -f
+x C:\BIN\C168.TTP m:\ctrlbind.1 m:\ctrlbind.2 m:\ctrlbind.s
+x C:\BIN\OPTIMIZE.TOS m:\ctrlbind.s
+x C:\SLAV\MAC.PRG -6 m:\ctrlbind.s
+copy m:\ctrlbind.o ctrlbind.oo
+del m:\ctrlbind.*
+echo OBJ mn_event.oo
+x C:\BIN\CP68.TTP mn_event.c m:\mn_event.i
+x C:\BIN\C068.TTP m:\mn_event.i m:\mn_event.1 m:\mn_event.2 m:\mn_event.3 -f
+x C:\BIN\C168.TTP m:\mn_event.1 m:\mn_event.2 m:\mn_event.s
+x C:\BIN\OPTIMIZE.TOS m:\mn_event.s
+x C:\SLAV\MAC.PRG -6 m:\mn_event.s
+copy m:\mn_event.o mn_event.oo
+del m:\mn_event.*
+echo OBJ mn_mbar.oo
+x C:\BIN\CP68.TTP mn_mbar.c m:\mn_mbar.i
+x C:\BIN\C068.TTP m:\mn_mbar.i m:\mn_mbar.1 m:\mn_mbar.2 m:\mn_mbar.3 -f
+x C:\BIN\C168.TTP m:\mn_mbar.1 m:\mn_mbar.2 m:\mn_mbar.s
+x C:\BIN\OPTIMIZE.TOS m:\mn_mbar.s
+x C:\SLAV\MAC.PRG -6 m:\mn_mbar.s
+copy m:\mn_mbar.o mn_mbar.oo
+del m:\mn_mbar.*
+echo OBJ mn_popup.oo
+x C:\BIN\CP68.TTP mn_popup.c m:\mn_popup.i
+x C:\BIN\C068.TTP m:\mn_popup.i m:\mn_popup.1 m:\mn_popup.2 m:\mn_popup.3 -f
+x C:\BIN\C168.TTP m:\mn_popup.1 m:\mn_popup.2 m:\mn_popup.s
+x C:\BIN\OPTIMIZE.TOS m:\mn_popup.s
+x C:\SLAV\MAC.PRG -6 m:\mn_popup.s
+copy m:\mn_popup.o mn_popup.oo
+del m:\mn_popup.*
+echo OBJ mn_tools.oo
+x C:\BIN\CP68.TTP mn_tools.c m:\mn_tools.i
+x C:\BIN\C068.TTP m:\mn_tools.i m:\mn_tools.1 m:\mn_tools.2 m:\mn_tools.3 -f
+x C:\BIN\C168.TTP m:\mn_tools.1 m:\mn_tools.2 m:\mn_tools.s
+x C:\BIN\OPTIMIZE.TOS m:\mn_tools.s
+x C:\SLAV\MAC.PRG -6 m:\mn_tools.s
+copy m:\mn_tools.o mn_tools.oo
+del m:\mn_tools.*
+echo OBJ mn_index.oo
+x C:\BIN\CP68.TTP mn_index.c m:\mn_index.i
+x C:\BIN\C068.TTP m:\mn_index.i m:\mn_index.1 m:\mn_index.2 m:\mn_index.3 -f
+x C:\BIN\C168.TTP m:\mn_index.1 m:\mn_index.2 m:\mn_index.s
+x C:\BIN\OPTIMIZE.TOS m:\mn_index.s
+x C:\SLAV\MAC.PRG -6 m:\mn_index.s
+copy m:\mn_index.o mn_index.oo
+del m:\mn_index.*
+echo OBJ mn_menu.oo
+x C:\BIN\CP68.TTP mn_menu.c m:\mn_menu.i
+x C:\BIN\C068.TTP m:\mn_menu.i m:\mn_menu.1 m:\mn_menu.2 m:\mn_menu.3 -f
+x C:\BIN\C168.TTP m:\mn_menu.1 m:\mn_menu.2 m:\mn_menu.s
+x C:\BIN\OPTIMIZE.TOS m:\mn_menu.s
+x C:\SLAV\MAC.PRG -6 m:\mn_menu.s
+copy m:\mn_menu.o mn_menu.oo
+del m:\mn_menu.*
+echo OBJ mn_submn.oo
+x C:\BIN\CP68.TTP mn_submn.c m:\mn_submn.i
+x C:\BIN\C068.TTP m:\mn_submn.i m:\mn_submn.1 m:\mn_submn.2 m:\mn_submn.3 -f
+x C:\BIN\C168.TTP m:\mn_submn.1 m:\mn_submn.2 m:\mn_submn.s
+x C:\BIN\OPTIMIZE.TOS m:\mn_submn.s
+x C:\SLAV\MAC.PRG -6 m:\mn_submn.s
+copy m:\mn_submn.o mn_submn.oo
+del m:\mn_submn.*
+echo OBJ deskstar.o
+x C:\BIN\MAS.TTP -us deskstar.s
+echo OBJ deskact.o
+x C:\BIN\CP68.TTP deskact.c m:\deskact.i
+x C:\BIN\C068.TTP m:\deskact.i m:\deskact.1 m:\deskact.2 m:\deskact.3 -f
+x C:\BIN\C168.TTP m:\deskact.1 m:\deskact.2 m:\deskact.s
+x C:\SLAV\MAC.PRG -6 m:\deskact.s
+copy m:\deskact.o deskact.o
+del m:\deskact.*
+echo OBJ deskapp.o
+x C:\BIN\CP68.TTP deskapp.c m:\deskapp.i
+x C:\BIN\C068.TTP m:\deskapp.i m:\deskapp.1 m:\deskapp.2 m:\deskapp.3 -f
+x C:\BIN\C168.TTP m:\deskapp.1 m:\deskapp.2 m:\deskapp.s
+x C:\SLAV\MAC.PRG -6 m:\deskapp.s
+copy m:\deskapp.o deskapp.o
+del m:\deskapp.*
+echo OBJ deskvdi.o
+x C:\BIN\CP68.TTP deskvdi.c m:\deskvdi.i
+x C:\BIN\C068.TTP m:\deskvdi.i m:\deskvdi.1 m:\deskvdi.2 m:\deskvdi.3 -f
+x C:\BIN\C168.TTP m:\deskvdi.1 m:\deskvdi.2 m:\deskvdi.s
+x C:\SLAV\MAC.PRG -6 m:\deskvdi.s
+copy m:\deskvdi.o deskvdi.o
+del m:\deskvdi.*
+echo OBJ deskbutt.o
+x C:\BIN\CP68.TTP deskbutt.c m:\deskbutt.i
+x C:\BIN\C068.TTP m:\deskbutt.i m:\deskbutt.1 m:\deskbutt.2 m:\deskbutt.3 -f
+x C:\BIN\C168.TTP m:\deskbutt.1 m:\deskbutt.2 m:\deskbutt.s
+x C:\SLAV\MAC.PRG -6 m:\deskbutt.s
+copy m:\deskbutt.o deskbutt.o
+del m:\deskbutt.*
+echo OBJ deskdir.o
+x C:\BIN\CP68.TTP deskdir.c m:\deskdir.i
+x C:\BIN\C068.TTP m:\deskdir.i m:\deskdir.1 m:\deskdir.2 m:\deskdir.3 -f
+x C:\BIN\C168.TTP m:\deskdir.1 m:\deskdir.2 m:\deskdir.s
+x C:\SLAV\MAC.PRG -6 m:\deskdir.s
+copy m:\deskdir.o deskdir.o
+del m:\deskdir.*
+echo OBJ deskdisk.o
+x C:\BIN\CP68.TTP deskdisk.c m:\deskdisk.i
+x C:\BIN\C068.TTP m:\deskdisk.i m:\deskdisk.1 m:\deskdisk.2 m:\deskdisk.3 -f
+x C:\BIN\C168.TTP m:\deskdisk.1 m:\deskdisk.2 m:\deskdisk.s
+x C:\SLAV\MAC.PRG -6 m:\deskdisk.s
+copy m:\deskdisk.o deskdisk.o
+del m:\deskdisk.*
+echo OBJ deskfile.o
+x C:\BIN\CP68.TTP deskfile.c m:\deskfile.i
+x C:\BIN\C068.TTP m:\deskfile.i m:\deskfile.1 m:\deskfile.2 m:\deskfile.3 -f
+x C:\BIN\C168.TTP m:\deskfile.1 m:\deskfile.2 m:\deskfile.s
+x C:\SLAV\MAC.PRG -6 m:\deskfile.s
+copy m:\deskfile.o deskfile.o
+del m:\deskfile.*
+echo OBJ deskinf.o
+x C:\BIN\CP68.TTP deskinf.c m:\deskinf.i
+x C:\BIN\C068.TTP m:\deskinf.i m:\deskinf.1 m:\deskinf.2 m:\deskinf.3 -f
+x C:\BIN\C168.TTP m:\deskinf.1 m:\deskinf.2 m:\deskinf.s
+x C:\SLAV\MAC.PRG -6 m:\deskinf.s
+copy m:\deskinf.o deskinf.o
+del m:\deskinf.*
+echo OBJ deskins.o
+x C:\BIN\CP68.TTP deskins.c m:\deskins.i
+x C:\BIN\C068.TTP m:\deskins.i m:\deskins.1 m:\deskins.2 m:\deskins.3 -f
+x C:\BIN\C168.TTP m:\deskins.1 m:\deskins.2 m:\deskins.s
+x C:\SLAV\MAC.PRG -6 m:\deskins.s
+copy m:\deskins.o deskins.o
+del m:\deskins.*
+echo OBJ deskmem.o
+x C:\BIN\CP68.TTP deskmem.c m:\deskmem.i
+x C:\BIN\C068.TTP m:\deskmem.i m:\deskmem.1 m:\deskmem.2 m:\deskmem.3 -f
+x C:\BIN\C168.TTP m:\deskmem.1 m:\deskmem.2 m:\deskmem.s
+x C:\SLAV\MAC.PRG -6 m:\deskmem.s
+copy m:\deskmem.o deskmem.o
+del m:\deskmem.*
+echo OBJ deskmenu.o
+x C:\BIN\CP68.TTP deskmenu.c m:\deskmenu.i
+x C:\BIN\C068.TTP m:\deskmenu.i m:\deskmenu.1 m:\deskmenu.2 m:\deskmenu.3 -f
+x C:\BIN\C168.TTP m:\deskmenu.1 m:\deskmenu.2 m:\deskmenu.s
+x C:\SLAV\MAC.PRG -6 m:\deskmenu.s
+copy m:\deskmenu.o deskmenu.o
+del m:\deskmenu.*
+echo OBJ deskmisc.o
+x C:\BIN\CP68.TTP deskmisc.c m:\deskmisc.i
+x C:\BIN\C068.TTP m:\deskmisc.i m:\deskmisc.1 m:\deskmisc.2 m:\deskmisc.3 -f
+x C:\BIN\C168.TTP m:\deskmisc.1 m:\deskmisc.2 m:\deskmisc.s
+x C:\SLAV\MAC.PRG -6 m:\deskmisc.s
+copy m:\deskmisc.o deskmisc.o
+del m:\deskmisc.*
+echo OBJ deskmn.o
+x C:\BIN\CP68.TTP deskmn.c m:\deskmn.i
+x C:\BIN\C068.TTP m:\deskmn.i m:\deskmn.1 m:\deskmn.2 m:\deskmn.3 -f
+x C:\BIN\C168.TTP m:\deskmn.1 m:\deskmn.2 m:\deskmn.s
+x C:\SLAV\MAC.PRG -6 m:\deskmn.s
+copy m:\deskmn.o deskmn.o
+del m:\deskmn.*
+echo OBJ deskopen.o
+x C:\BIN\CP68.TTP deskopen.c m:\deskopen.i
+x C:\BIN\C068.TTP m:\deskopen.i m:\deskopen.1 m:\deskopen.2 m:\deskopen.3 -f
+x C:\BIN\C168.TTP m:\deskopen.1 m:\deskopen.2 m:\deskopen.s
+x C:\SLAV\MAC.PRG -6 m:\deskopen.s
+copy m:\deskopen.o deskopen.o
+del m:\deskopen.*
+echo OBJ deskpref.o
+x C:\BIN\CP68.TTP deskpref.c m:\deskpref.i
+x C:\BIN\C068.TTP m:\deskpref.i m:\deskpref.1 m:\deskpref.2 m:\deskpref.3 -f
+x C:\BIN\C168.TTP m:\deskpref.1 m:\deskpref.2 m:\deskpref.s
+x C:\SLAV\MAC.PRG -6 m:\deskpref.s
+copy m:\deskpref.o deskpref.o
+del m:\deskpref.*
+echo OBJ desksele.o
+x C:\BIN\CP68.TTP desksele.c m:\desksele.i
+x C:\BIN\C068.TTP m:\desksele.i m:\desksele.1 m:\desksele.2 m:\desksele.3 -f
+x C:\BIN\C168.TTP m:\desksele.1 m:\desksele.2 m:\desksele.s
+x C:\SLAV\MAC.PRG -6 m:\desksele.s
+copy m:\desksele.o desksele.o
+del m:\desksele.*
+echo OBJ deskshel.o
+x C:\BIN\CP68.TTP deskshel.c m:\deskshel.i
+x C:\BIN\C068.TTP m:\deskshel.i m:\deskshel.1 m:\deskshel.2 m:\deskshel.3 -f
+x C:\BIN\C168.TTP m:\deskshel.1 m:\deskshel.2 m:\deskshel.s
+x C:\SLAV\MAC.PRG -6 m:\deskshel.s
+copy m:\deskshel.o deskshel.o
+del m:\deskshel.*
+echo OBJ deskshow.o
+x C:\BIN\CP68.TTP deskshow.c m:\deskshow.i
+x C:\BIN\C068.TTP m:\deskshow.i m:\deskshow.1 m:\deskshow.2 m:\deskshow.3 -f
+x C:\BIN\C168.TTP m:\deskshow.1 m:\deskshow.2 m:\deskshow.s
+x C:\SLAV\MAC.PRG -6 m:\deskshow.s
+copy m:\deskshow.o deskshow.o
+del m:\deskshow.*
+echo OBJ deskvari.o
+x C:\BIN\CP68.TTP deskvari.c m:\deskvari.i
+x C:\BIN\C068.TTP m:\deskvari.i m:\deskvari.1 m:\deskvari.2 m:\deskvari.3 -f
+x C:\BIN\C168.TTP m:\deskvari.1 m:\deskvari.2 m:\deskvari.s
+x C:\SLAV\MAC.PRG -6 m:\deskvari.s
+copy m:\deskvari.o deskvari.o
+del m:\deskvari.*
+echo OBJ desktop.o
+x C:\BIN\CP68.TTP desktop.c m:\desktop.i
+x C:\BIN\C068.TTP m:\desktop.i m:\desktop.1 m:\desktop.2 m:\desktop.3 -f
+x C:\BIN\C168.TTP m:\desktop.1 m:\desktop.2 m:\desktop.s
+x C:\SLAV\MAC.PRG -6 m:\desktop.s
+copy m:\desktop.o desktop.o
+del m:\desktop.*
+echo OBJ deskupda.o
+x C:\BIN\CP68.TTP deskupda.c m:\deskupda.i
+x C:\BIN\C068.TTP m:\deskupda.i m:\deskupda.1 m:\deskupda.2 m:\deskupda.3 -f
+x C:\BIN\C168.TTP m:\deskupda.1 m:\deskupda.2 m:\deskupda.s
+x C:\SLAV\MAC.PRG -6 m:\deskupda.s
+copy m:\deskupda.o deskupda.o
+del m:\deskupda.*
+echo OBJ deskwin.o
+x C:\BIN\CP68.TTP deskwin.c m:\deskwin.i
+x C:\BIN\C068.TTP m:\deskwin.i m:\deskwin.1 m:\deskwin.2 m:\deskwin.3 -f
+x C:\BIN\C168.TTP m:\deskwin.1 m:\deskwin.2 m:\deskwin.s
+x C:\SLAV\MAC.PRG -6 m:\deskwin.s
+copy m:\deskwin.o deskwin.o
+del m:\deskwin.*
+echo OBJ desksear.o
+x C:\BIN\CP68.TTP desksear.c m:\desksear.i
+x C:\BIN\C068.TTP m:\desksear.i m:\desksear.1 m:\desksear.2 m:\desksear.3 -f
+x C:\BIN\C168.TTP m:\desksear.1 m:\desksear.2 m:\desksear.s
+x C:\SLAV\MAC.PRG -6 m:\desksear.s
+copy m:\desksear.o desksear.o
+del m:\desksear.*
+echo OBJ nosbind.o
+x C:\BIN\MAS.TTP -us nosbind.s
+echo OBJ kballoc.o
+x C:\BIN\CP68.TTP kballoc.c m:\kballoc.i
+x C:\BIN\C068.TTP m:\kballoc.i m:\kballoc.1 m:\kballoc.2 m:\kballoc.3 -f
+x C:\BIN\C168.TTP m:\kballoc.1 m:\kballoc.2 m:\kballoc.s
+x C:\SLAV\MAC.PRG -6 m:\kballoc.s
+copy m:\kballoc.o kballoc.o
+del m:\kballoc.*
+
+echo link with the MultiTOS ALN: ab.lnk once, then for each language its glue, gem.lnk, strip the
+echo symbol table and prgflags (it waits for Return)
+x C:\MTOS\ALN.TOS -c ab.lnk
+
+echo English: glue.usa with NEWGLUE.PRG, one session ita, spa, usa (the bytes newglue never writes keep the
+echo previous country's glue)
+type ita\rspa\rusa\rexit\r
+x C:\GLUE\NEWGLUE.PRG
+x C:\MTOS\ALN.TOS -c gem.lnk
+x C:\SLAV\STRIP68.TOS gem.sys
+key
+x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
+copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_USA.SYS
+
+echo German: glue.grm with NEWGLUE.PRG, a session of grm alone (the bytes newglue never writes stay
+echo as the fresh buffer has them, zero)
+type grm\rexit\r
+x C:\GLUE\NEWGLUE.PRG
+subst D:\MULTITOS\GEM.LNK glue.usa\s_USARSC glue.grm\s_USARSC
+x C:\MTOS\ALN.TOS -c gem.lnk
+x C:\SLAV\STRIP68.TOS gem.sys
+key
+x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
+copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_GRM.SYS
+
+echo French: glue.fre with NEWGLUE.PRG, a session of fre alone
+type fre\rexit\r
+x C:\GLUE\NEWGLUE.PRG
+subst D:\MULTITOS\GEM.LNK glue.grm\s_USARSC glue.fre\s_USARSC
+x C:\MTOS\ALN.TOS -c gem.lnk
+x C:\SLAV\STRIP68.TOS gem.sys
+key
+x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
+copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_FRE.SYS
+
+echo Italian: glue.ita with NEWGLUE.PRG, a session of ita alone
+type ita\rexit\r
+x C:\GLUE\NEWGLUE.PRG
+subst D:\MULTITOS\GEM.LNK glue.fre\s_USARSC glue.ita\s_USARSC
+x C:\MTOS\ALN.TOS -c gem.lnk
+x C:\SLAV\STRIP68.TOS gem.sys
+key
+x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
+copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_ITA.SYS
+
+echo Spanish: glue.spa with NEWGLUE.PRG, a session of spa alone
+type spa\rexit\r
+x C:\GLUE\NEWGLUE.PRG
+subst D:\MULTITOS\GEM.LNK glue.ita\s_USARSC glue.spa\s_USARSC
+x C:\MTOS\ALN.TOS -c gem.lnk
+x C:\SLAV\STRIP68.TOS gem.sys
+key
+x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
+copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_SPA.SYS
+
+echo Swedish: glue.swe with NEWGLUE.PRG, a session of swe alone
+type swe\rexit\r
+x C:\GLUE\NEWGLUE.PRG
+subst D:\MULTITOS\GEM.LNK glue.spa\s_USARSC glue.swe\s_USARSC
+x C:\MTOS\ALN.TOS -c gem.lnk
+x C:\SLAV\STRIP68.TOS gem.sys
+key
+x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
+copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_SWE.SYS
+
+del D:\MULTITOS\GEM.SYS
+
+echo compare with the expected checksums
+check C:\EXPECT.LST

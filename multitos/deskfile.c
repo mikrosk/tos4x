@@ -24,6 +24,7 @@
 
 EXTERN	BYTE	*get_fstring();
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 EXTERN	APP	*app_icon();
 EXTERN	BYTE	*r_slash();
 EXTERN	BYTE	*scasb();
@@ -436,7 +437,7 @@ read_files( win, attr )
 	if ( ret == EFILNF )		/* file not found	*/
 	  goto r_2;
 
-	addr = malloc( 0xFFFFFFFFL ); /* we should have memory*/
+	addr = Malloc( 0xFFFFFFFFL ); /* we should have memory*/
 
 	if ( !addr )			/* No memory		*/
 	{
@@ -447,7 +448,7 @@ read_files( win, attr )
 					/* How many files we can store*/
 	volume = ((LONG) addr) / (LONG)(sizeof( DIR ));
 
-	if ( !( addr = malloc( addr ) ) )
+	if ( !( addr = Malloc( addr ) ) )
 	  goto r_1;
 
 	win->w_memory = (BYTE*)addr;

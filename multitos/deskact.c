@@ -32,6 +32,7 @@ EXTERN	BYTE	*r_slash();
 EXTERN	BYTE	*get_fstring();
 EXTERN	WORD	strlen();
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 EXTERN	BYTE	*g_name();
 EXTERN	BYTE	*strcpy();
 EXTERN	BYTE	*lp_fill();
@@ -364,12 +365,12 @@ file_op( dest, mode )
 	      strcat( dest, &addr[1] );			
 	      if ( !( ret = shel_write( 0, 0, 1, bptr, addr ) ) )
 	        fill_string( bptr, FTOLAUNCH );
-	      Mfree( addr );	
+	      free( addr );	
 	    }	
 	    else
 	      ret = FALSE;	
 
-	    Mfree( tail );	
+	    free( tail );	
 	    if ( ret )	/* OK */
 	      return;	
 	
@@ -1159,7 +1160,7 @@ h_4:		  pt.y -= offy;
 
 	ghost_icon( 0, 0, itype );		/* erase ghost icon	*/
 
-	Mfree( gh_buffer );
+	free( gh_buffer );
 
 	desk_mice( ARROW );
 
@@ -1439,7 +1440,7 @@ d_dragdrop( apid, winid, msx, msy )
 	} else {
 	  do1_alert( NODROP );
 	}
-	Mfree( addr );
+	free( addr );
 }
 
 /*

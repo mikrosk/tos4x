@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.22 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.23 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/30 16:07:56 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 17:13:30 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.23  1991/06/20  17:13:30  apratt
+* changed version number because production GEMDOS is now $2000
+*
 * Revision 2.22  1991/05/30  16:07:56  apratt
 * Added uchar data type and made "attrib" fields that type.
 *
@@ -114,11 +117,14 @@ extern volatile void __assert(const char *exp,const char *file,long line);
  * 
  * 0x1800 is for TT TOS of around 5/90.
  * 0x1900 is for TT TOS from 7/19 on (hopefully final TT TOS).
- * 0x2000 is something I'm hacking up (1/91).
+ * 0x3000 is something I'm hacking up (1/91).
+ *
+ * It's probably a good idea to use only the high byte in case people
+ * aren't byte-swapping it.
  */
 
 /* GEMDOS version number (byte-reversed, nybble-packed, only in fshand.c) */
-#define	VERS_NUM	0x2000L
+#define	VERS_NUM	0x3000L
 
 /*
  * Feature-enabling switches
@@ -477,6 +483,7 @@ DMD
 	uint	m_rbm; 		/* mask: (2^rblog)-1 */
 	uint	m_clblog;	/* log2 of clsizb */
 	uint	m_16;		/* 16 bit fat flag */
+	uint	m_onefat;	/* only one FAT flag */
 };
 
 

@@ -4,23 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/04/30 18:44:45 $
+* $Date: 90/05/09 16:45:37 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.47  90/05/09  16:45:37  apratt
+* Added _FPU cookie; see the comments there for details.
+* Boot color: sky blue.
+*
 * Revision 2.46  90/04/30  18:44:45  apratt
 * Changed Getmpb call to conform to new GEMDOS style: one MD for both
 * ST RAM and alternative RAM, with the low bit of the block start address
 * nonzero for alt. RAM.
-*
+* 
 * Noblank and noblank1 clobber Timer B always, so it doesn't survive a rez
 * change ever -- see comments there.
-*
+* 
 * Added nvmaccess call to XBIOS list ($2e).  It's implemented in clock.s.
-*
+* 
 * Revision 2.45  90/03/19  16:00:50  apratt
 * Changed TT to TT+STPLUS w.r.t. SCU: catch & ignore bus errors in the
 * init code for SCU so it runs on either STe or Mega STe.
@@ -442,7 +446,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.46 $
+* $Revision: 2.47 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -531,9 +535,9 @@ date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .else
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$04271990	; TT date, $MMDDYYYY @check@
+date		equ	$05221990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010010011011 ; April 27, 1990
+dosdate		equ	%0001010010110110 ; May 22, 1990
 .endc
 
 *******************************************************************************
@@ -2066,6 +2070,77 @@ gotem:	move.l	a1,$8
 	move.l	d1,(a0)+		; set _SND value
 .endc
 * other values are undefined, but will eventually mean stuff like 2.88MB. 
+* The low three bytes of the cookie is to be used by vendors who want to
+* identify their products; they should register their desires with somebody
+* (as of 4/25/91 it's Bill Rehbock).  "ATC" means Atari's 1772-clone that
+*
+* We're being cagey about this because we don't want to preannounce the
+* coprocessor; if found, the cookie value is 0000 0001.  
+* at the switches directly if we can help it.  So, like DMASND, you get a
+* cookie based on a switch.
+*
+* In addition, if the switch is thrown, we set nospindelay so the floppy
+* BIOS knows you're using an Epson SMD-340 or something like it.  See
+* comments in flop.s for the rationale.
+* switches.
+*
+
+* 	0001 = SFP004 floating-point peripheral
+* The FPU cookie: 0002 0000 on a TT if you have a 68881; can be changed 
+* 	0003 = 68882 definitely (currently not probed)
+* 	0004 = 68040's built-in FPU
+* 
+* a 6888x coprocessor: a value of %001 means either 68881 or 68882,
+* %010 means 68881 explicitly, %011 means 68882 explicitly, and
+* %100 means the 68040's built-in floating-point hardware.
+*
+* The reason for this scheme is that you may actually have both an
+* SFP004-equivalent peripheral installed AND a 6888x coprocessor,
+* Usually, the low word is zero when you have a 68881, because there's
+* no need for S/W emulation.  However, when you have the SFP004, you
+* might also have software that turns line-F instructions into the
+* corresponding SFP004 commands, and with a 68040, you might have
+* software that dealt with the missing FP instructions.
+*	0001 = SFP004
+* This code always installs SOME cookie so software emulators can just
+* find the cookie & change it, rather than installing their own.
+* 	0004 = 68881
+*	0005 = 68881 + SFP004
+*	0006 = 68882
+*	0007 = 68882 + SFP004
+.ifne TT
+.mc68881
+* probe for FPU: line-F exception means there is none.
+*
+	move.l	sp,a2
+* instructions, and the high bit of the low word means whatever you've got
+* functions which are present in that processor.
+	move.l	#$20000,(a0)+
+* 	LOW WORD
+* 
+* 	0000 = no software FPU emulation
+	clr.l	(a0)+			; FPU cookie zero means none found
+* 		High bit means S/W is 68040-FPU aware.
+*
+	move.l	a2,sp
+* also have software that turns line-F instructions into the corresponding
+.else
+
+*
+* This code always installs SOME cookie so software emulators can just find
+	move.l	#fpuberr,$8		; catch bus error
+*
+	move.l	#$00010000,(a0)+	; found it: cookie is 0001 0000
+	bra	fpudone
+
+fpuberr:
+	clr.l	(a0)+			; FPU cookie zero means none found
+fpudone:
+* violation does, too, but should "never happen." However, it did in some
+* machines, so here it is.  I think it actually means there's something
+* wrong on the data bus...
+.endif
+
 .ifne TT
 * If there's fast RAM, put the _FRB cookie in the cookie jar.
 * It points to 64K of space available for anybody to do copies
@@ -2909,7 +2984,7 @@ _rts:	rts
 .ifeq TT
 	dc.w	$fff			; 0 white
 .else
-	dc.w	$730			; 0 orange - 4/27 version
+	dc.w	$55f			; 0 blue - 5/90 version
 .endc
 *	Passed:		d1.l = offset
 *			a0 = base of pattern ($1f8 bytes long)

@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/12 18:22:34 $
+* $Date: 88/04/20 15:05:32 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.7  88/04/20  15:05:32  apratt
+* Changed the comments around Rsconf; no code changes.
+*
 * Revision 1.6  88/04/12  18:22:34  apratt
 * Added baudrate variable in BSS (just forgot this...)
-*
+* 
 * Revision 1.5  88/04/08  17:41:07  apratt
 * Added baud-rate interrogation code: Rsconf(-2) will return old baud
 * rate index (0-15).
@@ -37,7 +40,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.6 $
+* $Revision: 1.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -83,7 +86,7 @@ TURKEY		equ     9 ***DON'T  CHANGE***
 FINLAND		equ     5 ***DON'T  CHANGE*** same as swedish keyboard
 NORWAY		equ    11 ***DON'T  CHANGE***
 
-COUNTRY	equ	SPAIN	;set country of origin
+COUNTRY	equ	USA	;set country of origin
 
 
 
@@ -434,9 +437,9 @@ minsize		equ	$80
 
 *************************************************************************
 *		operating system memory space				*
-*       Baud rate shadow variable -- returned by Rsconf(-2)
+*	Baud rate shadow variable -- returned by Rsconf(-2)
 *
-baudrate        ds.w    1
+baudrate	ds.w	1
 
 *
 *************************************************************************
@@ -2190,11 +2193,11 @@ devtab:
 	dc.l	mbufrec
 
 *************************************************************************
-*	void	rsconf(baudrate,flow,ucr,rsr,tsr,scr)			*
+*									*
 *		configure rs-232 port of MFP				*
 *									*
 *	entry:								*
-
+*									*
 *	long	rsconf(baudrate,flow,ucr,rsr,tsr,scr)			*
 *									*
 *	word	baudrate - baud rate setting (table index to get	*
@@ -2204,13 +2207,23 @@ devtab:
 *			h - cts/rts/dtr					*
 *			s - software xon/xoff				*
 *			1 - on, 0 - off					*
+*	word	ucr -	MFP ucr register setting			*
+*	word	rsr -	MFP rsr register setting			*
+*	word	tsr -	MFP tsr register setting			*
+*	word	scr -	MFP scr register setting			*
+*									*
+*	Arguments with value -1 mean "no change" to the corresponding	*
+*	setting.							*
+*									*
+*	If baudrate is -2, the current baud rate is returned.  That is,	*
+*	the last nonnegative baudrate value passed to this function.	*
+*	(No other arguments are needed, and no changes are made.)	*
 * cause loss of a pending character, but only if it arrives while at	*
 * IPL 7.  This is not likely, and when you're fooling with Rsconf you	*
 * the function pointer in maprsconf.  For the STMFP port (default),
 * is called rsconf.
 *
-*	move.w	sr,-(sp)	;save sr for now
-	ori.w	#$700,sr	;no interrupts for now
+	bne	auxnorm		;no: act normally
 	move.b	brate(a0),d0
 	lea	ribufptr,a0
 	lea	mfp,a1
@@ -2281,7 +2294,6 @@ auxc5	tst.w	$e(sp)		;if -1 then don't change
 auxc6
 	move.b	$d(sp),tsr(a2)
 auxc5:	tst.w	$e(sp)		;if -1 then don't change
-*	move.w	(sp)+,sr	;restore sr for now
 	bmi.b	auxc6
 	move.b	$f(sp),scr(a2)
 auxc6:

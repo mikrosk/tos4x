@@ -1,22 +1,27 @@
 /*
 ******************* Revision Control System *****************************
 *
-* $Author: lozben $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 87/11/20 14:24:34 $
+* $Date: 88/02/26 17:02:16 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 1.2  88/02/26  17:02:16  apratt
+* Changed boot params to match MSDOS better: floppies get 3 sectors/FAT
+* and a media-descriptor byte of F9.
+* Also changed to look for a boot sector on floppy regardless of bootdev.
+*
 * Revision 1.1  87/11/20  14:24:34  lozben
 * Initial revision
-*
+* 
 * =======================================================================
 *
-* $Revision: 1.1 $
+* $Revision: 1.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
@@ -33,6 +38,10 @@
  * (C)1985 Atari Corp.
  *
  *----
+ * 26-Feb-1988 akp	Changed boot params to match MSDOS better.
+ *			Floppies get 3 sec/FAT, media byte F9.
+ *			Also changed to look for a boot sector on floppy 0
+ *			regardless of bootdev.
  * 23-Feb-1985 lmd	Added multiple-sector floppy read support.
  * 23-Feb-1985 lmd	Added "rand()" function.
  * 24-Feb-1985 lmd	Added hard disk hooks.
@@ -557,14 +566,18 @@ LONG rand()
 
 
 /*
- * Boot from floppy or hard disk.
+ * Boot from floppy.
  * Returns OK if diskbuf[] contains an executable
  * boot sector.
+ *
+ * Used to boot from floppy only if bootdev < 2... and never booted
+ * from hard disk as advertised.  Now tries to find a boot sector
+ * on floppy 0 regardless.
  */
 boot()
 {
     extern WORD _hinit();
-    extern WORD bootdev;
+/*    extern WORD bootdev; */
     extern LONG floprd();
     register WORD err;
 
@@ -577,13 +590,15 @@ boot()
     /*
      * Attempt to load boot sector from floppy "bootdev":
      */
-    err = nflops ? NO_DRIVE : COULDNT_LOAD;
-    if (nflops && (bootdev < 2))
+    if (nflops)
     {
-	if (!floprd(diskbuf, 0L, bootdev, 1, 0, 0, 1))
+        err = COULDNT_LOAD;
+	if (!floprd(diskbuf, 0L, 0, 1, 0, 0, 1))
 	    err = OK;
 	    else if (!wpstatus[0]) return UNREADABLE;
     }
+    else err = NO_DRIVE;
+
     if (err != OK) return err;
 
     /*
@@ -611,13 +626,21 @@ char proto_tab[] =
 	0x00,0x02,0x02,0x01,0x00,0x02,0x70,0x00,0xd0,0x02,
 	0xfd,0x02,0x00,0x09,0x00,0x02,0x00,0x00,0x00,
 
+ /* AKP: these (below) had five sectors/fat -- changed to 3 */
+
 		/* 80 tracks single sided */
-	0x00,0x02,0x02,0x01,0x00,0x02,0x70,0x00,0xd0,0x02,
-	0xf8,0x05,0x00,0x09,0x00,0x01,0x00,0x00,0x00,
+ /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
+	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0x70,0x00, 0xd0,0x02,
+
+ /*      MD    sec/fat   sec/track  nsides      N hidden */
+	0xf9, 0x03,0x00, 0x09,0x00, 0x01,0x00, 0x00,0x00,
+ /* was 0xf8 -- AKP 2/88 */
 
 		/* 80 tracks double sided */
-	0x00,0x02,0x02,0x01,0x00,0x02,0x70,0x00,0xa0,0x05,
-	0xf9,0x05,0x00,0x09,0x00,0x02,0x00,0x00,0x00
+ /*	bytes/sec sec/cl  res secs  NFATS N RD ents  N Sectors on media */
+	0x00,0x02, 0x02, 0x01,0x00, 0x02, 0x70,0x00, 0xa0,0x05,
+ /*      MD    sec/fat   sec/track  nsides      N hidden */
+	0xf9, 0x03,0x00, 0x09,0x00, 0x02,0x00, 0x00,0x00
 };
 
 

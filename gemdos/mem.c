@@ -1,0 +1,666 @@
+/*
+***************************      MEM.C     ******************************
+*
+* $Revision: 2.9 $	$Source: /u2/MRS/osrevisions/gemdos/mem.c,v $
+* =======================================================================
+* $Author: apratt $ 	$Date: 90/08/03 13:42:12 $    $Locker:  $
+* =======================================================================
+*
+* $Log: mem.c,v $
+* Revision 2.9  90/08/03  13:42:12  apratt
+* TTOS FINAL RELEASE
+* 
+* Revision 2.8  90/05/21  12:52:30  apratt
+* Old Alcyon doesn't implement unsigned long, so I had to implement it
+* by hand in freeit() for sorting the free list based on address: 
+* legitimate RAM addresses (i.e. A24/D16 VME RAM) can be signed-negative.
+* 
+* Revision 2.7  90/04/30  15:32:40  apratt
+* Added a check to QUANTize the block passed in to xmaddalt.
+* 
+* Revision 2.6  90/04/24  11:00:48  apratt
+* Changed from the two-pmd system for alt. RAM to a single PMD. The
+* low bit of the start address is 1 for alt. RAM.  Removed use of rover.
+* Added QUANTUM (compile-time constant) for rounding initial blocks
+* and requests to word, long, or MMU-page-size boundaries.  Added xmfreeall,
+* used by ixterm, and xaddalt, a user call for adding alt. RAM.
+* 
+* Revision 2.5  89/12/27  14:42:29  apratt
+* Split code which handles the second discontiguous memory block out
+* to be compiled only ifdef FASTRAM.
+* 
+* Revision 2.4  89/07/31  18:08:26  apratt
+* Previous rev had FASTBASE at 00200000, for testing on a 4M machine.
+* This rev has it at 01000000 as TT requires.
+* 
+* Revision 2.3  89/07/18  14:07:09  apratt
+* Added code to handle two noncontiguous RAM blocks and p_hflags.
+* 
+* Revision 2.2  89/04/17  17:15:08  kbad
+* YA header change
+* 
+* Revision 2.1  89/02/21  17:21:19  kbad
+* *** TOS 1.4  FINAL RELEASE VERSION ***
+* 
+* Revision 1.3  88/09/01  15:59:41  apratt
+* Added new function xmchown(block,pid) which changes the
+* owner of a block, when all you know is its starting address.
+* Used by Pexec mode 6 (which is what mode 4 should have been).
+* 
+* Revision 1.2  88/06/13  15:06:39  apratt
+* Header style change
+* 
+* Revision 1.1  88/04/26  14:48:26  apratt
+* Version used 4/22/88 to make test ROMs
+* 
+*************************************************************************
+*/
+
+/* mem.c */
+
+/***************************************************************************\
+* 									     *
+* GEMDOS TPA management							     *
+* (C)1986 Atari Corp.							     *
+* 									     *
+* ---- Edit history (reverse order, please): ------------------------------  *
+* 									     *
+* 15-Apr-1988 akp	Fixed a fatfinger: xsetblk which didn't shrink any   *
+*			actually caused the block to be freed!  Fixed now.   *
+* 09-Mar-1988 akp	Changed MGET(MD) to getsmall().			     *
+* 03-Mar-1988 akp	Split ospool code out to pool.c			     *
+* 23-Feb-1988 akp	Added test for zero return from xmgetblk in xsetblk. *
+* 22-Feb-1988 akp	Started backing out Malloc changes.  OSPool blocks   *
+*			are now of two sizes, not one.			     *
+* 18-Feb-1988 akp	Lintified.					     *
+* 03-Feb-1988 akp	Changed some register declarations.		     *
+* 12-Dec-1988 akp	Removed panics except in mget().		     *
+* 29-Dec-1987 akp	Added callno placement in low byte of word before    *
+*			an OSPOOL block.  High byte is block size.	     *
+* 21-Dec-1987 akp	Added panic in xminit for badly-formed initial mpb.  *
+* 17-Dec-1987 akp	Changed again so free blocks have critical info in   *
+*			the *middle* of the block.  Microsoft Write and	     *
+*			First Word (Plus?) failed when critical info was     *
+*			at the end.					     *
+* 18-Nov-1987 akp	Changed scheme so free blocks have the pointer info  *
+*			at the *end* so overflowing an allocated block is    *
+*			less likely to do damage and critical information    *
+*			is clustered (free-block info is immediately	     *
+*			followed by allocated-block info).		     *
+*			Specifically, there is a bug in the desktop which    *
+*			copies more than the number of bytes allocated	     *
+*			(in app_rdicon, the call to rom_ram(4,...)).	     *
+*			Also add sanity checks for critical info (-DSANITY). *
+*			Beartrap below removed: it stopped happening or I    *
+*			fixed it; I can't remember which.		     *
+* 02-Nov-1987 akp	Added beartrap in ffit: mem blk points to itself!    *
+*			Find out how this can happen!			     *
+* 15-Oct-1987 akp	Added freleaf call to xmgetblk.			     *
+* 13-Oct-1987 akp	Added entry point for xmunhook, called by xtermres.  *
+*    Oct-1987 akp	Changed Malloc to use TPA for its structures.        *
+*			Added xminit entry to initialize this (called by     *
+*			cinit()).					     *
+* 29-Sep-1987 akp	Split process routines out to proc.c.		     *
+*			Added code to make all ospool requests the same size *
+*			(as computed in fs.h -- the max of pool structs).    *
+* 17-Jan-1986 lmd	Commented and prettified from Digital Research	     *
+* 			source code.					     *
+* 									     *
+\****************************************************************************/
+#include "fs.h"
+#include "fsdecl.h"
+#include "gemerror.h"
+
+
+MPB pmd;
+extern PD *run;
+
+/************************************************************************
+ *									*
+ *	TPA MEMORY MANAGEMENT						*
+ *									*
+ * Once, this Code was grand: it used the TPA itself to keep track of	*
+ * the free and allocated blocks.  But then the Word came, and the Word	*
+ * was Backward-Compatibility.  And so, the Code was backed out.  Now	*
+ * you see before you the tattered shreds of code, with OSpool used to	*
+ * keep track of memory blocks: back to the Bad Old Days.		*
+ *									*
+
+Originally, for TT (the first machine with more than just ST RAM), this
+code managed two separate MPB's: "pmd" and "pmdfast".  Now there's just
+one again, and the MD's on the list contain information about the
+block.
+
+There are two types of memory in the system as far as GEMDOS is
+concerned: "ST RAM" and "ALTERNATIVE RAM."  The chief characteristic of
+alternative RAM is that you can't put a screen there.  You also can't
+do ACSI DMA to there, but drivers take care of that.  There are other
+things you can't do from there: DMA sound, and possibly blits.  The
+point is that some programs can run in any memory, and some _must_ have
+ST RAM (primarily because they do double-buffering).
+
+The code structure here is as follows: ffit has an extra argument, the
+kind(s) of RAM which are eligible for satisfying this request:
+
+	0	ST RAM only
+	1	Alternative RAM only
+	2	Either, ST RAM preferred
+	3	Either, Alternative RAM preferred
+
+Cases 1 and 2 will only come from user requests; xmalloc and xexec use
+0 and 3, based on the hflags field of the process (either the one
+running or the one being loaded).  This means that alternative RAM is
+always preferred if it's available and eligible.
+
+The low bit in the MD m_start field is used to distinguish one kind of
+RAM from the other: when this bit is zero, the block is in ST RAM. Even
+when contiguous, blocks do not coalesce when they're of different
+types.
+
+The Getmpb call to the BIOS returns an MPB which might have more than
+one free block on it: there is one free block per chunk of memory which
+the BIOS found.  User programs can inform GEMDOS of more memory with
+the Maddalt(start,size) call.  It gets put on the alternative RAM list;
+presumably the ROMs found all the ST RAM.  A user on a TT or Mega STe
+with a RAM card would put a program which calls Maddalt() in his AUTO
+folder: this is sort of a "memory driver" and approaches the
+long-awaited software-DRAM technology Atari's been working on.
+
+This code gets rid of the dumb "rover" idea.  What a dog!
+
+ ************************************************************************/
+
+#define FLAG(val) (((long)(val)) & 1)
+#define UNFLAG(val) ((MD *)(((long)(val)) & (~1)))
+#define PUTFLAG(val,flag) ((char *)(((long)val) | flag))
+
+/*
+ * If you define QUANTUM to anything other than 2, you will change 
+ * the maxim "two successive Malloc() calls probably return contiguous 
+ * memory."  If you've changed that for other reasons, fine, but this 
+ * is another contributing factor in that maxim.
+ *
+ * On the other hand, QUANTUM had better be at LEAST 2, since otherwise 
+ * you would get odd-sized blocks, and the next block would start on an 
+ * odd boundary!
+ */
+
+#define QUANTUM (2L)
+
+/*
+ * initialize memory allocator
+ */
+
+xminit()
+{
+REG MD *p;
+REG MD **q;
+REG long s;
+REG long adjust;
+
+    getmpb(&pmd);
+
+    /* 
+     * Make sure that each free block we got back 
+     * starts on a quantum boundary, and
+     * is an even number of quanta long.
+     *
+     * If that results in any zero-length blocks, 
+     * tough luck: life gets slower but no harm's done.
+     */
+
+    for (p = pmd.mp_mfl; p; p = p->m_link) {
+	if (s = (((long)(UNFLAG(p->m_start))) & (QUANTUM-1))) {
+	    adjust = QUANTUM - s;
+	    p->m_start += adjust;
+	    p->m_length -= adjust;
+	}
+	p->m_length = p->m_length & ~(QUANTUM-1);
+	if (p->m_length < 0) p->m_length = 0;
+    }
+}
+
+long 
+mbiggest(mp,type)
+MPB *mp;
+int type;
+{
+    REG MD *p;
+    REG long maxval;
+
+    maxval = 0;
+
+    for (p = mp->mp_mfl; p ; p = p->m_link) {
+	/* if ST-only, stop at first alt RAM */
+	if (type == 0 && FLAG(p->m_start)) break;
+	/* else if alt only, don't count ST RAM */
+	else if (type == 1 && !FLAG(p->m_start)) continue;
+
+	if (p->m_length > maxval) maxval = p->m_length;
+    }
+    return maxval;
+}
+
+
+/*
+ * Allocate memory from TPA.
+ */
+MD
+*ffit(amount,mp,type)
+MPB *mp;
+long amount;
+int type;
+{
+REG MD *p;
+REG MD **q, **q1;
+REG MD *p1;
+REG int fval;
+
+    p = *(q = &mp->mp_mfl);		/* start at the beginning */
+
+    if (!p)
+	    return(0); /* no way */
+
+    if (amount == 0) return NULPTR;
+
+    /* round up to the next quantum */
+    amount = (amount + (QUANTUM-1)) & ~(QUANTUM-1);
+
+    fval = 1;
+    switch (type) {
+	case 0: fval = 0; /* then FALL THROUGH to case 1 */
+	case 1: {
+	    while (p && 
+		   (p->m_length < amount ||
+		    FLAG(p->m_start) != fval)) {
+			p = *(q = &p->m_link);
+	    }
+	    if (p == NULPTR) return NULPTR;
+	    break;
+	}
+	case 2:
+	case 3: {
+	    while (p && p->m_length < amount) {
+		p = *(q = &p->m_link);
+	    }
+	    /* p is NULL, or first fit of any type */
+	    if (p == NULPTR) return NULPTR;
+
+	    /* if p is not ST RAM, or if our preference is ST RAM, */
+	    /* then p is our match. */
+	    if (FLAG(p->m_start) || (type == 2))
+		break;
+
+	    /* we get here only when pref. is alt, and p is ST: */
+	    /* scan past ST RAM, look for ffit in alt RAM. */
+
+	    p1 = p; q1 = q;
+
+	    /* scan to end of ST RAM */
+	    while (p && !FLAG(p->m_start)) {
+		p = *(q = &p->m_link);
+	    }
+	    /* find first fit in alt RAM */
+	    while (p && p->m_length < amount) {
+		p = *(q = &p->m_link);
+	    }
+	    if (p == NULPTR) {
+		/* no match in alt RAM, set p to our ST RAM match */
+		p = p1;
+		q = q1;
+	    }
+	} /* end case 2,3 */
+    } /* end switch */
+    
+    /* now p is either ST RAM match or alt RAM match */
+
+    if (p->m_length == amount) {
+	/* take the whole thing */
+	*q = p->m_link;
+    }
+    else {
+	/* break it up */
+	if (!(p1=getsmall()))
+	    return(0);
+
+	p1->m_length = p->m_length - amount;
+	p1->m_start = p->m_start + amount;	/* preserves flags */
+	p1->m_link = p->m_link;
+	p->m_length = amount;
+	*q = p1;
+    }
+
+    /* put matched block at head of allocated list (unsorted) */
+    p -> m_link = mp->mp_mal;
+    mp->mp_mal = p;
+    p->m_own = run;
+    return(p);
+}
+
+
+/*
+ * Shrink an allocated block.
+ */
+long
+xsetblk(n,blk,x_len)
+int n;
+char *blk;
+long x_len;
+{
+REG	MD *m;
+REG	MD *p;
+REG	long len;
+
+	len = x_len;
+
+/*
+ * Traverse the list of memory descriptors looking for this block.
+ */
+	for (p = pmd.mp_mal; p; p = p->m_link)
+		if (blk == UNFLAG(p->m_start))
+			goto found;
+
+/*
+ * If block address doesn't match any memory descriptor, then abort.
+ */
+	return(EIMBA);
+
+found:
+
+/*
+ * Always shrink to a block-granularity length
+ */
+	len = (len + (QUANTUM-1)) & ~(QUANTUM-1);
+
+/*
+ * If the caller is not shrinking the block size, then abort.
+ */
+	if (p->m_length < len)
+		return(EGSBF);
+
+/*
+ * AKP: if not shrinking at all, just return.
+ *	if shrinking to zero size, just free.
+ */
+
+	if (len == p->m_length) return E_OK;
+
+	if (!len) {
+	    freeit(p,&pmd);
+	    return E_OK;
+	}
+/*
+ * Create a memory descriptor for the freed portion of memory.
+ */
+	if (!(m = getsmall())) return ERROR;
+	m->m_start = p->m_start + len;		/* preserves flag */
+	m->m_length = p->m_length - len;
+	p->m_length = len;
+	freeit(m,&pmd);
+
+	return(E_OK);
+}
+
+
+/*
+ * Free block of TPA memory.
+ */
+freeit(x_m,mp)
+MD *x_m;
+MPB *mp;
+{
+REG	MD *m;
+REG	MD *p;
+REG	MD **q;
+	MD *p1;
+REG	long ptemp;
+REG	long mtemp;
+
+	m = x_m;
+	p1 = 0;		/* this is p's prev */
+
+	/*
+	 * Find where this block belongs in the free list.
+	 * Blocks are sorted in ascending address order.
+	 * Block p goes after m (or NULL), p1 goes before (or NULL)
+	 *
+	 * The "start" field may be odd for alt RAM.  That
+	 * won't hurt anything, and is preserved even through
+	 * the coalescing phase.
+	 *
+	 * Addresses are unsigned!  Since the old Alcyon compiler
+	 * (4.0 something) doesn't implement unsigned long, we have
+	 * to fake it... Sigh. (5/90)
+	 */
+
+	mtemp = m->m_start;
+	for (p = *(q = &mp->mp_mfl); p ; p1=p, p = *(q = &p->m_link)) {
+	    ptemp = p->m_start;
+	    if ((ptemp > 0) && (mtemp > 0) && (mtemp < ptemp)) break;
+	    else if ((ptemp < 0) && (mtemp > 0)) break;
+	    else if ((ptemp < 0) && (mtemp < 0) && (mtemp < ptemp)) break;
+	}
+
+	m->m_link = p;
+	*q = m;
+
+	/*
+	 * m is linked in; now coalesce if possible.
+	 * Un-like memory blocks will not coalesce, even if contiguous,
+	 * because start1+length1 != start2 when either start is odd 
+	 * and the other isn't.
+	 */
+
+	if (p) {
+		if (m->m_start + m->m_length == p->m_start) {
+			/* join to higher neighbor */
+			m->m_length += p->m_length;
+			m->m_link = p->m_link;
+
+			freesmall(p);
+		}
+	}
+
+	/* if there's a prev, join to lower neighbor */
+	if (p1) {
+		if (p1->m_start + p1->m_length == m->m_start) {
+			/* join to lower neighbor */
+			p1->m_length += m->m_length;
+			p1->m_link = m->m_link;
+
+			freesmall(m);
+		}
+	}
+}
+
+
+/*
+ * Allocate memory; friendly version, with arg telling where
+ * to get it from.  Values for the flag are:
+ *
+ *	0: slow only
+ *	1: fast only
+ *	2: slow or fast, slow preferred
+ *	3: fast or slow, fast preferred
+ *
+ * FMalloc(-1L,0) tells how big the largest single block is in slow RAM.
+ * Ditto (-1L,1) for fast RAM.  Modes 2 and 3 with arg -1L both give
+ * the largest block available, without regard to where.
+ *
+ * The hflags field of your PRG header dictates which mode (0 or 3) you
+ * get when you use the old Malloc() call.
+ */
+
+long
+xfmalloc(amount,mode)
+long amount;
+int mode;
+{
+    REG MD *ret;
+
+    if (amount == -1L) return mbiggest(&pmd,mode);
+    else {
+	ret = ffit(amount,&pmd,mode);
+	if (ret != NULPTR) return UNFLAG(ret->m_start);
+	else return NULPTR;
+    }
+}
+
+
+/*
+ * Allocate Memory;
+ * friendly version.
+ *
+ * Needs to know what *kind* of memory to allocate...  If P_RAMALLOC
+ * is set, try fast RAM first, then slow RAM.  Else just slow.
+ */
+long
+xmalloc(amount)
+long amount;
+{
+	if (run->p_hflags & P_RAMALLOC) 
+	    return xfmalloc(amount,3);
+	else 
+	    return xfmalloc(amount,0);
+}
+
+/*
+ * Free memory;
+ * (friendly version.)
+ */
+long
+xmfree(addr)
+long addr;
+{
+REG	MD *p;
+REG	MD **q;
+
+	for (p = *(q = &pmd.mp_mal); p; p = *(q = &p->m_link)) {
+		if (addr == UNFLAG(p->m_start)) goto found;
+	}
+
+	return(EIMBA);
+
+	/* unlink & pass to freeit */
+found:
+	*q = p->m_link;
+
+	freeit(p,&pmd);
+
+	return(E_OK);
+}
+
+/*
+ * unhook allocated memory from both allocated and free lists:
+ * this is called by xtermres.
+ */
+
+xmunhook(pid)
+PD *pid;
+{
+    REG MD *m;
+    REG MD **q;
+    
+    for (m = *(q = &pmd.mp_mal); m; ) {
+	if (m->m_own == pid) {
+	    /* here's one: link prev's next to m's next (and change m) */
+	    *q = m = m->m_link;
+	}
+	else {
+	    /* not one: move m and q onward */
+	    m = *(q = &m->m_link);
+	}
+    }
+}
+
+/*
+ * free all memory owned by a given PID.
+ * This is called by ixterm.
+ */
+
+xmfreeall(pid)
+PD *pid;
+{
+    REG MD *m;
+    REG MD **q;
+    
+    for (m = *(q = &pmd.mp_mal); m; ) {
+	if (m->m_own == pid) {
+	    /* here's one: unlink from allocated list, then freeit() */
+	    *q = m->m_link;
+	    freeit(m,&pmd);
+	    m = *q;
+	}
+	else {
+	    /* not one: move m and q onward */
+	    m = *(q = &m->m_link);
+	}
+    }
+}
+
+/*
+ * new function by AKP 8/30/88: change ownership of a block
+ * when all you know is its starting address.  Used by new
+ * Pexec mode 6 (which is "just go" as God intended it to be).
+ */
+
+xmchown(x_blk,pid)
+char *x_blk;
+PD *pid;
+{
+    REG MD *m;
+    REG char *blk;
+
+    blk = x_blk;
+
+    for (m = pmd.mp_mal; m; m = m->m_link) {
+	if (UNFLAG(m->m_start) == blk) {
+	    m->m_own = pid;
+	    return;
+	}
+    }
+}
+
+/*
+ * New function 4/90: inform GEMDOS that a block of (alternate) RAM
+ * exists and should be used for programs, etc.
+ *
+ * Usage: Maddalt(char *block,long size)
+ */
+
+long
+xaddalt(blk,siz)
+char *blk;
+long siz;
+{
+    REG MD *m;
+    REG long s;
+
+    /* 
+     * Make sure that the new block we get
+     * starts on a quantum boundary, and
+     * is an even number of quanta long.
+     *
+     * If that results in a zero-length block, 
+     * we return success but don't do anything.
+     */
+
+    if (s = (((long)blk) & (QUANTUM-1))) {
+	s = QUANTUM-s;
+	blk += s;
+	siz -= s;
+    }
+    siz &= ~(QUANTUM-1);
+    if (siz <= 0) return 0;
+
+    if ((m = getsmall()) == NULPTR) return ERROR;
+
+    m->m_start = PUTFLAG(blk,1);
+    m->m_length = siz;
+    m->m_link = NULPTR;
+    m->m_own = 0;
+    freeit(m,&pmd);
+    return 0L;
+} 
+    return (s_start = (void *)newstart);
+}

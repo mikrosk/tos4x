@@ -4,19 +4,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/11/12 16:23:51 $
+* $Date: 90/11/20 18:49:17 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.61  90/11/20  18:49:17  apratt
+* changed version numbers
+*
+* Revision 2.61  90/11/20  18:49:17  apratt
+* changed version numbers
+* 
 * Revision 2.60  90/11/12  16:23:51  apratt
 * Changed date & version number, changed code to test result of
 * _iclock correctly, and added code to clobber Timer A after
-* the boot-up sequence is done with it (for compatibility with
-* programs that do enabling steps in an unsafe order).
-*
 * the boot-up sequence is done with it (for compatibility with
 * programs that do enabling steps in an unsafe order).
 * 
@@ -45,7 +48,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.60 $
+* $Revision: 2.61 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -109,21 +112,21 @@ DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
-version		equ	$0203		; version number
-date		equ	$11121990	; STPLUS date, $MMDDYYYY @check@
+version		equ	$0204		; version number
+date		equ	$11201990	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101101100 ; November 12, 1990
+dosdate		equ	%0001010101110100 ; November 20, 1990
 .else
 .ifne TT
-version		equ	$0303		; version number (need not be even)
-date		equ	$11121990	; TT date, $MMDDYYYY @check@
+version		equ	$0304		; version number (need not be even)
+date		equ	$11201990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101101100 ; November 12, 1990
+dosdate		equ	%0001010101110100 ; November 20, 1990
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
 version		equ	$0144
-date		equ	$11121990
+date		equ	$11201990
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010101101100 ; November 12, 1990
+dosdate		equ	%0001010101110100 ; November 20, 1990
 .endc
 .endc
 

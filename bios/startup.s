@@ -1,19 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/10/03 15:01:09 $
+* $Date: 88/10/12 17:25:57 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.16  88/10/12  17:25:57  apratt
+* Added table entry for floprate call: see flop.s for more.
+*
 * Revision 1.15  88/10/03  15:01:09  kbad
 * Incorporated changes for new build method (several things were made
 * obsolete -- look for the keyword "newbuild" to find these changes).
-*
+* 
 * Revision 1.14  88/09/21  15:08:19  apratt
 * Whoops.. dmaread claimed to try twice, but really tried once.
 * Now it tries twice.
@@ -75,7 +78,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.15 $
+* $Revision: 1.16 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -436,7 +439,7 @@ osconf		equ	%11001
 	.globl	pconfig			; printer configuration word
 	.globl	_prtblk			; _prtblk primitive
 	.globl	_osi			; initialize OS
-*	.globl	_flopwp			; check wp state of floppies
+	.globl	initmfp			; init character I/O
 	.globl	esc_init		; init glass tty
 	.globl	initmous		; mouse vector init
 	.globl	_mediach		; media change inquiry
@@ -2109,7 +2112,7 @@ trp13tab:
 	dc.l	_shift			; 11: get/set keyboard shift bits
 
 	dc.l	unimpl			; 40: used by AKP's DB alpha vers.
-	dc.l	unimpl			; 41: was _flopwp (briefly)
+
 	dc.l	unimpl			; 42: unused
 	dc.l	unimpl			; 43: unused
 	dc.l	unimpl			; 44: unused
@@ -2136,6 +2139,9 @@ trp13tab:
 	dc.l	unimpl			; 63: unused
 	dc.l	ikbdws			; 25: write string to ikbd
 
+* NOTE: I have given away sections of the XBIOS function-number space.
+* Unfortunately, I have forgotten which ones.  They're all just above
+* decimal 64, though.  Watch this space.
 	dc.l	dosound			; 32: startup sound daemon
 	dc.l	unimpl			; 50: assigned
 	dc.l	unimpl			; 66: assigned

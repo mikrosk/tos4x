@@ -1,12 +1,15 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\sup.c,v $
+* $Revision: 2.17 $	$Source: d:/tos/dos\rcs\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/31 17:28:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 17:14:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.17  1991/06/20  17:14:06  apratt
+* changes for new newcl/Getfat code
+*
 * Revision 2.16  1991/05/31  17:28:36  apratt
 * Fixed a bug in osif: the pw variable wasn't being forced
 * out of a register correctly.  Also, created ppw as a
@@ -78,6 +81,8 @@ PD *pdtab[NUMPDS];
 PD *run;
 DFD *dfd_head;
 OFD *ofd_head;
+char *clsave;		/* see fscl.c */
+BCB *clbcb;		/* see fscl.c */
 
 DMD drvtbl[MAXDEVS];	/* drive media descriptor for each dev */
 
@@ -260,6 +265,8 @@ int *pw;
     uint i;
     int *ppw;
 
+    clsave = (clbcb = bufl[0])->b_bufr;
+
 restrt:
     &fn, &pw;		/* take addr so these are not put in regs */
     fn = pw[0];
@@ -363,6 +370,9 @@ osi()
  	 */
 	bufl[0] = &bcbx[0];
 	bufl[1] = e1+1;
+
+	clbcb = bufl[0];
+	clsave = bufl[0]->b_bufr;
 
 	/*
 	 * Initialize OS, login boot device:

@@ -77,6 +77,7 @@ _STSoftList:	dc.l	sb_cell			; cell_xfer subroutine
 		dc.l	ST_PUTPIX		; output pixel out to screen
 		dc.l	ST_GETPIX		; get pixel value at X,Y
 
+		.globl  spx_scrup,spx_scrdn
 		.globl	spx_cell,spx_blank,px_cur_display,px_cur_replace
 		.globl	spx_neg_cell,_sp_vq_color,_sp_vs_color,spx_bitblt
 		.globl	_Init16Pal,_Init32Pal,spx_vline,spx_hline,PX_ABLINE
@@ -110,8 +111,8 @@ _PixSoftList:	dc.l	spx_cell		; done
 		dc.l	PX_GETPIX		; get pixel value at X,Y
 
 _SPPixSoftList:	dc.l	spx_cell		; done
-		dc.l	sb_scrup		; done
-		dc.l	sb_scrdn		; done
+		dc.l	spx_scrup		; done
+		dc.l	spx_scrdn		; done
 		dc.l	spx_blank		; done
 		dc.l	spx_bitblt		; done
 		dc.l	spx_mono		; done
@@ -133,8 +134,8 @@ _SPPixSoftList:	dc.l	spx_cell		; done
 		dc.l	PX_GETPIX		; get pixel value at X,Y
 
 _SPPixHardList:	dc.l	spx_cell		; done
-		dc.l	sb_scrup		; done
-		dc.l	sb_scrdn		; done
+		dc.l	spx_scrup		; done
+		dc.l	spx_scrdn		; done
 		dc.l	spx_blank		; done
 		dc.l	hpx_bitblt		; done
 		dc.l	spx_mono		; done

@@ -10,6 +10,7 @@
 *******************************************************************************
 */
 
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -34,14 +35,14 @@ extern	FONT_HEAD	f8x16, f8x8, f16x32;
 /* 
  * v_opnwk():	OPEN_WORKSTATION:
  */
-VOID v_opnwk()
+VOID v_opnwk( VOID )
 {
 	REG WORD	i, *sp, *dp, videoMode;
 
 	if (INTIN[0] == SETMODEFLAG) {
 	    videoMode = SETMODE(-1);		/* get current video mode    */
-	    if (videoMode != INTOUT[0])		/* see if cur mode != dsred  */
-		SETMODE(INTOUT[0]);		/* set the video to new mode */
+	    if (videoMode != PTSOUT[0])		/* see if cur mode != dsred  */
+		SETMODE(PTSOUT[0]);		/* set the video to new mode */
 	}
 	else {
 	    if (FindDevice(INTIN[0]) == NULL) {
@@ -156,6 +157,7 @@ WORD	devId;
 /* 
  * This function is here for soft loaded vdi. We init the CUR_DEV if we can.
  */
+VOID
 SetCurDevice(curRez)
 WORD	curRez;
 {
@@ -171,7 +173,8 @@ WORD	curRez;
     }
 }
 /*----------------------------------------------------------------------------*/
-InitFonts()
+VOID
+InitFonts( VOID )
 {
     /* 
      * copy the font headers to ram so they can be altered
@@ -181,7 +184,8 @@ InitFonts()
     ram16x32 = f16x32;
 }
 /*----------------------------------------------------------------------------*/
-InitDevTabInqTab()
+VOID 
+InitDevTabInqTab( VOID )
 {
     REG SCREENDEF	*dev;
 

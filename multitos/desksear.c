@@ -17,6 +17,7 @@
 #include <extern.h>
 
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 EXTERN	WINDOW	*alloc_win();
 EXTERN	WINDOW	*w_gfirst();
 EXTERN 	WORD	f_level;	/* local level counter same as deskdir	*/
@@ -267,7 +268,7 @@ s_more:
 	}/* while		*/
 
 s_exit:	
-	Mfree( dtabuf );
+	free( dtabuf );
 	Fsetdta( savedta );
 	return( status );		
 }
@@ -286,13 +287,12 @@ display( filename )
 	REG WORD	i;
 	WORD		newi,ret,first;
 
-	size = malloc( 0xFFFFFFFFL );
-	if ( size )
+	addr = malloc( 4096L );
+	if ( addr )
 	{
-	  addr = malloc( size );
 	  Dgetpath( addr, 0 );
 	  i = strlen( addr ) + 20;
-	  Mfree( addr );		/* free the memory		*/
+	  free( addr );		/* free the memory		*/
 	  addr = malloc( (LONG)i );
 	  addr[0] = Dgetdrv() + 'A';	/* get the default drive	*/
 	  addr[1] = ':';
@@ -306,7 +306,7 @@ display( filename )
 	     {
 	       win = w_gfirst();
 	       strcpy( addr, win->w_path );
-	       Mfree( addr );
+	       free( addr );
 	       first = TRUE;
 	
 	       if ( open_subdir( win, 0, FALSE, FALSE, FALSE ) )
@@ -330,7 +330,7 @@ display( filename )
 	     }
 	     else
 	     {
-	       Mfree( addr );
+	       free( addr );
 	       return( FALSE );
 	     }
 	  }
@@ -351,7 +351,7 @@ display( filename )
 	    else
 	      ret = FALSE;	
 
-	    Mfree( addr );
+	    free( addr );
 
 	    if ( !ret )
 	      return( FALSE );

@@ -1,6 +1,6 @@
 /*	GEMDOS.H			9/23/92		D.Mui		*/
 
-#include	<portab.h>
+#include	"portab.h"
 
 #define	X_TABOUT	0x02
 #define	X_PRTOUT	0x05

@@ -16,9 +16,9 @@
 *	-------------------------------------------------------------
 */
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
+#include "compiler.h"
+#include "machine.h"
+#include "pdstruct.h"
 
 GLOBAL	PD	*rlr;		/* processes ready to run list		*/
 GLOBAL	PD	*drl;		/* processes' event is satisfied and 	*/

@@ -2,14 +2,11 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.0 $	$Source: f:\multitos/RCS/crysbind.h,v $
+*  $Revision: 2.1 $	$Source: /u2/MRS/osrevisions/aes/crysbind.h,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/02/03 21:26:46 $	$Locker:  $
+*  $Author: kbad $	$Date: 89/02/22 05:18:27 $	$Locker: mui $
 * =======================================================================
-*  $Log: crysbind.h,v $
-*  Revision 1.0  93/02/03  21:26:46  ersmith
-*  MultiTOS version 1.0
-*
+*  $Log:	crysbind.h,v $
 * Revision 2.1  89/02/22  05:18:27  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
 * 
@@ -29,7 +26,7 @@
 #define G_SIZE 	15
 #define I_SIZE 	16
 #define O_SIZE 	8
-#define AI_SIZE 2	/* number of in address	*/
+#define AI_SIZE 3	/* number of in address	*/
 #define AO_SIZE 1
 
 				/* Application Manager			*/

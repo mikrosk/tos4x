@@ -11,10 +11,10 @@
 *	-------------------------------------------------------------
 */
 
-#include <portab.h>
-#include <machine.h>
-#include <obdefs.h>
-#include <vdidefs.h>
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "vdidefs.h"
 
 
 EXTERN VOID	gsx_blt();
@@ -29,7 +29,7 @@ EXTERN WORD	gl_width;
 EXTERN WORD	gl_height;
 EXTERN WORD	intin[];
 
-
+VOID
 gr_inside(pt, th)
 REG	GRECT		*pt;
 REG	WORD		th;

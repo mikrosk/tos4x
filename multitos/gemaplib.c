@@ -27,14 +27,14 @@
 *	-------------------------------------------------------------
 */
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <dispvars.h>
-#include <aesmint.h>
-#include <signal.h>
+#include "compiler.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "obdefs.h"
+#include "gemlib.h"
+#include "dispvars.h"
+#include "aesmint.h"
+#include "signal.h"
 
 #define TCHNG 0
 #define BCHNG 1
@@ -140,9 +140,9 @@ ap_search( mode, name, type, paesid )
 	LONG	*l1;
 	WORD	*w1;	
 	PD	*p;
-	WORD	id;
 
-	w1 = l1 = pcrys_blk->cb_pglobal;
+	w1 = (WORD *)pcrys_blk->cb_pglobal;
+	l1 = (LONG *)pcrys_blk->cb_pglobal;
 	
 /*	p = (PD*)0;	*/
 
@@ -231,7 +231,7 @@ ap_init( pglobal )
 
 	LWSET(pglobal+4, currpd->p_pid);
 	LWSET(pglobal+20, gl_nplanes);
-	LLSET(pglobal+22, currpd);
+	LLSET(pglobal+22, (LONG)currpd);
 					/* Max character height	*/
 	LWSET(pglobal+26, gl_ws.ws_chmaxh );
 					/* Min character height	*/
@@ -267,7 +267,7 @@ ap_exit( p, pcrys_blk )
 
 	swap_next( p, FALSE );	
 
-	l1 = pcrys_blk->cb_pglobal;
+	l1 =(LONG *) pcrys_blk->cb_pglobal;
 	
 	l1[0] = 0x0L;	/* erase aes signature */
 	return( TRUE );
@@ -449,8 +449,8 @@ ap_find( pname )
 	if ( !pname )
 	  return( currpd->p_pid );	
 
-	loword = (long)pname & 0x0000FFFFL;
-	hiword = ( (long)pname & 0xFFFF0000L ) >> 16;
+	loword = (WORD)((long)pname & 0x0000FFFFL);
+	hiword = (WORD)(( (long)pname & 0xFFFF0000L ) >> 16);
 
 	if ( hiword == 0xFFFF )		/* Look for AES Id */
 	{
@@ -492,7 +492,7 @@ ap_tplay(pbuff, length, scale)
 	FPD		f;
 	LONG		ad_f;
 
-	ad_f = &f;
+	ad_f = (LONG)(&f);
 
 	Syield();			/* dispatch everybody	*/
 
@@ -591,18 +591,18 @@ ap_trecd(pbuff, length)
 	for(i=0; i<length; i++)
 	{
 	  code = 0x0L;
-	  trash = LLGET(pbuff);
-	  if(trash == &tchange)
+	  trash = (BYTE *)(LLGET(pbuff));
+	  if(trash == (BYTE *)(&tchange))
 	  {
 	    code = TCHNG;		/*    WORD is changed to LONG	*/
 /*	    LLSET(pbuff+sizeof(LONG *), LLGET(pbuff+sizeof(LONG *)) * 
 			gl_ticktime);	*/
 	  }
-	  if(trash == &mchange)
+	  if(trash == (BYTE *)(&mchange))
 	    code = MCHNG;
-	  if(trash == &kchange)
+	  if(trash == (BYTE *)(&kchange))
 	    code = KCHNG;
-	  if(trash == &bchange)
+	  if(trash == (BYTE *)(&bchange))
 	    code = BCHNG;
 	  LLSET(pbuff, code);
 	  pbuff += sizeof(FPD);

@@ -696,7 +696,7 @@ opt1:	      ins_icons();
 		  else
 		    do1_alert( ILLMAT );
 
-		  Mfree( afile );
+		  free( afile );
 		}
 
 		Fclose( handle );

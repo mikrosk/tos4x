@@ -14,11 +14,11 @@
 *	-------------------------------------------------------------
 */
 
-#include <portab.h>
-#include <machine.h>
-#include <obdefs.h>
-#include <vdidefs.h>
-#include <aesmint.h>
+#include "portab.h"
+#include "machine.h"
+#include "obdefs.h"
+#include "vdidefs.h"
+#include "aesmint.h"
 
 EXTERN	WORD	min();
 EXTERN	BYTE	AE_PNTSIZE[];
@@ -86,7 +86,7 @@ GLOBAL GRECT	gl_rcenter;	/* center of the screen		*/
 GLOBAL GRECT	gl_rmenu;	/* menu area			*/
 
 
-	VOID
+	BOOLEAN
 gsx_sclip(pt)
 	GRECT		*pt;
 {
@@ -304,7 +304,7 @@ gsx_xcbox(pt)
 	gsx_xline( 3, &ppts[0] );
 }
 
-
+VOID
 gsx_fix(pfd, theaddr, wb, h)
 	REG FDB			*pfd;
 	REG LONG		theaddr;
@@ -330,7 +330,7 @@ gsx_fix(pfd, theaddr, wb, h)
 }
 
 
-	WORD
+	VOID
 gsx_blt(saddr, sx, sy, swb, daddr, dx, dy, dwb, w, h, rule, fgcolor, bgcolor)
 	LONG		saddr;
 	REG UWORD		sx, sy, swb;
@@ -405,7 +405,7 @@ s_pntsize( buffer )
 	
 	if ( asctobin( buffer, &l ) )
 	{
-	  if ( size = l )
+	  if ( size = (WORD)l )
 	  {
 	    if ( gl_fsm )
 	      vst_arbpt( size, &gl_wptschar, &gl_hptschar, &gl_wchar, &gl_hchar );
@@ -449,7 +449,7 @@ gsx_lfont( buffer )
 }
 
 
-	WORD
+	VOID
 gsx_start()
 {
 /*	REG WORD	nc;*/
@@ -552,7 +552,7 @@ gsx_start()
 	r_set(&gl_rcenter, (gl_width-gl_wbox)/2, (gl_height-(2*gl_hbox))/2, 
 			gl_wbox, gl_hbox);
 	r_set(&gl_rmenu, 0, 0, gl_width, gl_hbox);
-	ad_intin = ADDR(&intin[0]);
+	ad_intin = (LONG)(ADDR(&intin[0]));
 }
 
 
@@ -614,7 +614,7 @@ ch_height(fn)
 
 /*	Calculate where to put the text		*/
 
-	WORD
+	VOID
 gsx_tcalc(font, ptext, ptextw, ptexth, pnumchs)
 	REG WORD		font;
 	LONG		ptext;
@@ -642,7 +642,7 @@ gsx_tcalc(font, ptext, ptextw, ptexth, pnumchs)
 }  /* gsx_tcalc */
 
 
-	WORD
+	VOID
 gsx_tblt(tb_f, x, y, tb_nc)
 	REG WORD		tb_f;
 	REG WORD		x, y;

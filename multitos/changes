@@ -1,3 +1,11 @@
+Changes made 2/2/93:
+
+desk*.c,utility.c:
+	Changed the desktop to use Allan & Ken's malloc() code instead
+	of calling the OS Malloc function directoy, in hopes of saving
+	some memory. So far, only 8K has been saved :-(, but perhaps
+	tuning will help.
+
 Changes made 1/25/93:
 
 gemgrm.rsc,deskgrm.rsc:

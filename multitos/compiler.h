@@ -18,7 +18,7 @@
 #define	EXTERN	extern				/* External variable	   */
 #define	MLOCAL	static				/* Local to module	   */
 #define	GLOBAL	/**/				/* Global variable	   */
-#define	VOID	/**/				/* Void function return	   */
+#define	VOID	void				/* Void function return	   */
 #define UBYTE	char				/* Unsigned byte 	   */
 
 /****************************************************************************/

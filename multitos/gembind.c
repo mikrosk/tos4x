@@ -19,17 +19,17 @@
 *	-----------------------------------------------------------
 */	
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <objaddr.h>
-#include <gemlib.h>
-#include <windlib.h>
-#include <crysbind.h>
-#include <aesmint.h>
-#include <gemusa.h>
+#include "compiler.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "obdefs.h"
+#include "objaddr.h"
+#include "gemlib.h"
+#include "windlib.h"
+#include "crysbind.h"
+#include "aesmint.h"
+#include "gemusa.h"
 
 EXTERN	PD	*idtopd();
 EXTERN	WINDOW	*srchwp();
@@ -80,7 +80,7 @@ do_chg(tree, iitem, chgvalue, dochg, dodraw, chkdisabled)
 
 	if ( dodraw )
 	{			/* make sure it is the current menu */
-	  if ( tree != idtopd( gl_mnpid )->p_mnaddr )
+	  if ( tree != (OBJECT *)(idtopd( gl_mnpid )->p_mnaddr) )
 	    dodraw = FALSE;
 	  else
 	    gsx_sclip( &gl_rscreen );
@@ -102,7 +102,7 @@ crysbind( pcrys_blk )
 	LONG		*addr_in,*addr_out;
 	LONG		tmparm,buparm,tree;
 	LONG		value,ad_rso;
-	WORD		ret,i,offset;
+	WORD		ret;
 	UWORD		*control;
 
 	if ( currpd->p_state == PS_ZOMBIE )
@@ -111,12 +111,12 @@ crysbind( pcrys_blk )
 	  goto c_1;
 	}
 
-	control = pcrys_blk->cb_pcontrol;
-	global_in = pcrys_blk->cb_pglobal;
-	int_in = pcrys_blk->cb_pintin;
-	addr_in = pcrys_blk->cb_padrin;
-	int_out = pcrys_blk->cb_pintout;
-	addr_out = pcrys_blk->cb_padrout;
+	control = (UWORD *)(pcrys_blk->cb_pcontrol);
+	global_in = (LONG *)(pcrys_blk->cb_pglobal);
+	int_in = (WORD *)(pcrys_blk->cb_pintin);
+	addr_in = (LONG *)(pcrys_blk->cb_padrin);
+	int_out = (WORD *)(pcrys_blk->cb_pintout);
+	addr_out = (LONG *)(pcrys_blk->cb_padrout);
 
 	ret = TRUE;
 
@@ -492,7 +492,7 @@ crysbind( pcrys_blk )
 		break;
 	  default:
 	 	value = (LONG)OP_CODE;
-		fm_show( ALRTNOFUNC, &value, 1 );
+		fm_show( ALRTNOFU, &value, 1 );
 		ret = -1;
 		break;
 	}
@@ -519,7 +519,7 @@ chkbind( pcrys_blk, what )
 	REG WORD	*int_in,*int_out;
 	LONG		*addr_in,*addr_out;
 	LONG		tree,tmparm,buparm,ad_rso;     
-	WORD		ret,i,wait;
+	WORD		ret,wait;
 	UWORD		*control;
 
 	if ( currpd->p_state & PS_NEW )
@@ -535,12 +535,12 @@ chkbind( pcrys_blk, what )
 	  goto c_out; 
 
 		  
- 	control = pcrys_blk->cb_pcontrol;
-	global_in = pcrys_blk->cb_pglobal;
-	int_in = pcrys_blk->cb_pintin;
-	addr_in = pcrys_blk->cb_padrin;
-	int_out = pcrys_blk->cb_pintout;
-	addr_out = pcrys_blk->cb_padrout;
+ 	control = (UWORD *)(pcrys_blk->cb_pcontrol);
+	global_in = (LONG *)(pcrys_blk->cb_pglobal);
+	int_in = (WORD *)(pcrys_blk->cb_pintin);
+	addr_in = (LONG *)(pcrys_blk->cb_padrin);
+	int_out = (WORD *)(pcrys_blk->cb_pintout);
+	addr_out = (LONG *)(pcrys_blk->cb_padrout);
 
 	Debug7( currpd->p_name );
 	Debug7( " calls chkbind " );

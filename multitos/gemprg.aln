@@ -1,0 +1,12 @@
+-u -s -o gem14.prg gemjstrt,geminit,apgrlib,apgsxif,
+deskapp,deskact,deskdir,deskdisk,deskif,deskfpd,deskinf,deskins,deskfun,
+deskobj,deskpro,deskshow,desksupp,rainbo,desktop,deskwin,
+jdispa,jdos,jbind,
+gemaints,gemasync,gembase,gemcli,gemctrl,gemdisp,
+gemflag,geminput,gempd,gemqueue,gemwrect,
+gembind,
+gemaplib,gemevlib,gemfmalt,gemfmlib,gemfslib,gemgrlib,gemgsxif,
+gemmnlib,gemobed,gemoblib,gemrslib,gemsclib,gemshlib,gemwmlib,
+gsx2,large,optimize,gemobjop,ratrbp,romcart,trap14,
+gemrom,gemglobe
+

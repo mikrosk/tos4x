@@ -1,8 +1,8 @@
 /*	CTRLBIND.C			7/26/91			D.Mui	*/
 			
-#include <portab.h>
-#include <crysbind.h>
-#include <obdefs.h>
+#include "portab.h"
+#include "crysbind.h"
+#include "obdefs.h"
 
 
 EXTERN  WORD	crystal();
@@ -77,12 +77,12 @@ kickaes()
 	UWORD
 appl_init()
 {
-	c.cb_pcontrol = &control[0]; 
-	c.cb_pglobal = &global[0];
-	c.cb_pintin = &int_in[0];
-	c.cb_pintout = &int_out[0];
-	c.cb_padrin = &addr_in[0];
-	c.cb_padrout = &addr_out[0];
+	c.cb_pcontrol = (long)(&control[0]); 
+	c.cb_pglobal = (long)(&global[0]);
+	c.cb_pintin = (long)(&int_in[0]);
+	c.cb_pintout = (long)(&int_out[0]);
+	c.cb_padrin = (long)(&addr_in[0]);
+	c.cb_padrout = (long)(&addr_out[0]);
 
 	crys_if( APPL_INIT );
 	return( RET_CODE );
@@ -102,7 +102,7 @@ appl_exit()
 appl_find( name )
 	BYTE	*name;
 {
-	addr_in[0] = name;
+	addr_in[0] = (LONG)name;
 	crys_if( APPL_FIND );
 	return( int_out[0] );
 }
@@ -115,7 +115,7 @@ appl_search( mode, name, type, id )
 	WORD	*type,*id;
 {
 	int_in[0] = mode;
-	addr_in[0] = name;
+	addr_in[0] = (LONG)name;
 	crys_if( APPL_SEARCH );
 	*type = int_out[1];
 	*id = int_out[2];
@@ -140,7 +140,7 @@ appl_write(rwid, length, pbuff)
 {
 	AP_RWID = rwid;
 	AP_LENGTH = length;
-	AP_PBUFF = pbuff;
+	AP_PBUFF = (LONG)pbuff;
 	return( crys_if(APPL_WRITE) );
 }
 
@@ -218,7 +218,7 @@ form_alert( button, string )
 	BYTE	*string;
 {
 	FM_DEFBUT = button;
-	FM_ASTRING = string;
+	FM_ASTRING = (LONG)string;
 	return( crys_if( FORM_ALERT ) );
 }
 
@@ -251,7 +251,7 @@ fsel_exinput(pipath, pisel, pbutton, label)
 {
 	FS_IPATH = pipath;
 	FS_ISEL = pisel;
-	FS_LABEL = label;
+	FS_LABEL = (LONG)label;
 /*
 	control[0] = FSEL_EXINPUT;
 	control[1] = 0;
@@ -301,7 +301,7 @@ graf_dragbox(w, h, sx, sy, xc, yc, wc, hc, pdx, pdy)
 
 
 
-	WORD
+	VOID
 graf_mkstate(pmx, pmy, pmstate, pkstate)
 	WORD		*pmx, *pmy, *pmstate, *pkstate;
 {
@@ -335,7 +335,7 @@ graf_slidebox(tree, parent, obj, isvert)
 	OBJECT		*tree;
 	WORD		parent,obj,isvert;
 {
-	GR_TREE = tree;
+	GR_TREE = (LONG)tree;
 	GR_PARENT = parent;
 	GR_OBJ = obj;
 	GR_ISVERT = isvert;
@@ -350,7 +350,7 @@ graf_watchbox(tree, obj, instate, outstate)
 	WORD		obj;
 	UWORD		instate, outstate;
 {
-	GR_TREE = tree;
+	GR_TREE = (LONG)tree;
 	GR_OBJ = obj;
 	GR_INSTATE = instate;
 	GR_OUTSTATE = outstate;
@@ -364,7 +364,7 @@ menu_bar(tree, showit)
 	OBJECT		*tree;
 	WORD		showit;
 {
-	MM_ITREE = tree;
+	MM_ITREE = (LONG)tree;
 	SHOW_IT = showit;
 	return( crys_if(MENU_BAR) );
 }
@@ -496,7 +496,7 @@ objc_find(tree, startob, depth, mx, my)
 	OBJECT		*tree;
 	WORD		startob, depth, mx, my;
 {
-	OB_TREE = tree;
+	OB_TREE = (LONG)tree;
 	OB_STARTOB = startob;
 	OB_DEPTH = depth;
 	OB_MX = mx;
@@ -511,7 +511,7 @@ objc_offset(tree, obj, poffx, poffy)
 	WORD		obj;
 	WORD		*poffx, *poffy;
 {
-	OB_TREE = tree;
+	OB_TREE = (LONG)tree;
 	OB_OBJ = obj;
 	crys_if(OBJC_OFFSET);
 	*poffx = OB_XOFF;

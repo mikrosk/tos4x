@@ -50,6 +50,7 @@
 
 EXTERN	char	*get_fstring();
 EXTERN	char	*malloc();
+EXTERN	VOID	free();
 EXTERN	char	*r_slash();
 EXTERN	char 	*strcat();
 EXTERN	char 	*strcpy();
@@ -325,12 +326,12 @@ redel:
 	}
 
 endright:
-	Mfree(fixsrc);
+	free(fixsrc);
 
 	if (opcode == OP_DELETE)
-	  Mfree(temp);
+	  free(temp);
 	else
-	  Mfree(fixdst);
+	  free(fixdst);
 
 	return(retmsg);
 }
@@ -553,7 +554,7 @@ clnfile:
 mvend:
 	Fsetdta( saved );
 	f_level--;
-	Mfree( dumb );	
+	free( dumb );	
 	return( retmsg );
 }
 
@@ -654,7 +655,7 @@ countrec()
 
 endrec:
 	Fsetdta( saved );	/* reset the dta	*/
-	Mfree( dumb );
+	free( dumb );
 	return(retmsg);
 }
 
@@ -716,16 +717,24 @@ ww_3:	  f_abort = 1;
 	   goto y2;
 	}
 
-	if ( !( bufsiz = ( LONG )malloc( -1L ) ) )
-	  goto y2;
-
-	if ( !( buffer = (char *)malloc( bufsiz ) ) )
-	  goto y2;
-	 
 	copysiz = mydta->d_fsize;
+	buffer = (char *)malloc( copysiz );
+	if ( buffer )
+	{
+	  bufsiz = copysiz;
+	}
+	else
+	{
+	  for (bufsiz = 128*1024L; bufsiz >= 1024L; bufsiz /= 2)
+	  {
+	    if ((buffer = (char *)malloc( bufsiz )) != 0)
+	      break;
+	  }
+	  if (!buffer)
+	    goto y2;
+	}
+  
 	Fdatime( &time, inhand, 0 );	/* read the time and date */
-
-
 
 rechkd:
 	switch(chkdf(fstr, CPFILE))
@@ -857,13 +866,13 @@ create:
 y0:
 	Fclose(outhand);
 y1:
-	Mfree(buffer);
+	free(buffer);
 y2:
 	updatnum(NUMFILE, --numfiles);
 	Fsetdta(saved);
 y3:
 	Fclose(inhand);
-	Mfree(mydta);
+	free(mydta);
 
 	if ( ( opcode == OP_MOVE ) && ( retmsg == TRUE ) )
 	  upfdesk( fixsrc, fixdst );
@@ -912,8 +921,8 @@ getinfo(s, d)
 	       ret = created( filestr );	/* create the 1st folder */
 	       if ( ( !ret ) || ( ret == SKIP ) )
 	       {
-		 Mfree( fixsrc );
-		 Mfree( fixdst );
+		 free( fixsrc );
+		 free( fixdst );
 		 return( ret );
 	       }
 	       strcat(bckslsh, fixdst);
@@ -1054,7 +1063,7 @@ chkbuf(len, bufsiz, src)
 	  ptr = *src;
 	  *src = (char *)malloc( (long)bufsiz );
 	  strcpy(ptr, *src);
-	  Mfree(ptr);
+	  free(ptr);
 	}
 	len += FILE_LEN;
 }

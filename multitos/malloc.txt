@@ -1,0 +1,65 @@
+gemgsxif.c:/*	At gsx_wsopen, at gsx_malloc					*/
+gemgsxif.c:gsx_malloc()
+gemgsxif.c:gsx_malloc()
+geminit.c:/*	Change at gsx_malloc for new size  7/26/89	D.Mui		*/
+geminit.c:/*	Fix at gsx_malloc to save 1/2 of the screen	7/19/90	D.Mui	*/
+gemoblib.c: * In either case, the memory will be malloced so that we can avoid the
+gemoblib.c: * be freeable memory for every icon, since fixup even mallocs memory
+gemshlib.c:EXTERN	WORD	gsx_malloc();
+gemshlib.c:	gsx_malloc();				/* allocate screen space*/
+mn_index.c: * It will free the clusters in reverse order ( last malloc'ed,
+mn_menu.c: * remove the malloc'ed memory that this call creates.
+mn_menu.c: * This routine mallocs the node that the menu structure
+mn_menu.c:   REG MENU_PTR newptr;		/* Ptr to the New malloced node */
+dosbind.c:dos_xalloc(nbytes, type)
+dosbind.c:	Debug1( "AES Dos_xalloc " );
+gemfslib.c:/*	Use Mxalloc instead of Malloc			3/30/92		*/
+gemfslib.c:EXTERN	BYTE	*dos_xalloc();
+gemfslib.c:	pxpath = dos_xalloc( (LONG)( ( WORD )LPATH * ( WORD )( DEVICES + 1 ) ), 
+gemfslib.c:	ad_fsdta = dos_xalloc( 0x00000100L, 3 );	
+gemfslib.c:	mul = dos_xalloc( -1L, 3 );
+gemfslib.c:	  ad_fsnames = dos_xalloc( mul, 3 );  
+gemgsxif.c:EXTERN 	LONG	dos_xalloc();
+gemgsxif.c:	if ( !( gl_tmp.fd_addr = dos_xalloc( gl_mlen, 0x23 ) ) )
+gemgsxif.c:	  if ( !( gl_crit.fd_addr = dos_xalloc( gl_mlen, 0x23 ) ) )
+gemgsxif.c:	if ( !( gl_tmp.fd_addr = dos_xalloc( gl_mlen, 0x23 ) ) )
+gemgsxif.c:	  if ( !( gl_crit.fd_addr = dos_xalloc( gl_mlen, 0x23 ) ) )
+geminit.c:EXTERN	BYTE	*dos_xalloc();
+geminit.c:	if ( bptr = dos_xalloc( (LONG)size, 0x43 ) )
+geminit.c:	DGLO->s_save = dos_xalloc( (LONG)SIZE_AFILE, 3 );
+geminit.c:	  if ( ad_aescnf = dos_xalloc( (*lptr) + 1 , 3 ) )
+geminit.c:	  if ( ad_aescnf = dos_xalloc( (*lptr) + 1 , 3 ) )
+geminit.c:	if ( !( pbuf = dos_xalloc( (LONG)((UWORD)bsize), 3 ) ) )
+gemmnlib.c:EXTERN	BYTE	*dos_xalloc();
+gemmnlib.c:	mn_addr = dos_xalloc( (LONG)( ( mn_maxitem + 1 ) * sizeof( OBJECT ) ), 3 );
+gemoblib.c:BYTE	*dos_xalloc();
+gemoblib.c:		tempbuffer = (WORD *)dos_xalloc( tot_size, 3 );
+gemoblib.c:		databuffer = (WORD *)dos_xalloc( tot_size, 3 );
+gemoblib.c:		    selbuffer = (WORD *)dos_xalloc( tot_size, 3 );
+gemoblib.c:		databuffer = (WORD *)dos_xalloc( tot_size, 3 );
+gemoblib.c:		    selbuffer = (WORD *)dos_xalloc( tot_size, 3 );
+gempd.c:EXTERN	BYTE	*dos_xalloc();
+gempd.c:	if ( p1 = dos_xalloc( (LONG)sizeof( PD ), 0x23 ) )	/* alloc memory	*/
+gemrlist.c:EXTERN	BYTE	*dos_xalloc();
+gemrlist.c:		dos_xalloc((LONG)(NUMRECT*sizeof(RLIST)+sizeof(MEMHDR)),3 )) 
+gemrom.c:EXTERN	LONG	dos_xalloc();
+gemrom.c:	if ( !( gl_pglue = dos_xalloc( (LONG)tosrsc[2], 3 ) ) )
+gemrslib.c:EXTERN	LONG	dos_xalloc();
+gemrslib.c:	     if ( rs_hdr = dos_xalloc( rslsize, 3 ) )
+gemshlib.c:EXTERN	BYTE	*dos_xalloc();
+gemshlib.c:	if ( addr = dos_xalloc( (LONG)( len + len1 + strlen( file ) 
+gemshlib.c:	    if ( newaddr = dos_xalloc( (LONG)length, 0x03 ) )
+gemshlib.c:		   dptr = dos_xalloc( (LONG)length, 0x03 );
+gemshlib.c:	  if ( addr = dos_xalloc( (LONG)len, 3 ) )
+gemshlib.c:	  if ( !( new = dest = dos_xalloc( (long)len, 0x43 ) ) )
+gemwmlib.c:EXTERN	BYTE	*dos_xalloc();
+gemwmlib.c:	    dos_xalloc((LONG)(NUMWIN*sizeof(WINDOW)+sizeof(MEMHDR)), 3 )) 
+gemwmlib.c:	    dos_xalloc((LONG)(NUMRECT*sizeof(RLIST)+sizeof(MEMHDR)), 3 )) 
+gemwmlib.c:		dos_xalloc((LONG)(NUMWIN*sizeof(WINDOW)+sizeof(MEMHDR)), 3)) 
+mn_event.c:EXTERN	BYTE	*dos_xalloc();
+mn_event.c:       MBUFFER( MenuPtr ) = dos_xalloc( size, 3 );
+mn_index.c:EXTERN	BYTE	*dos_xalloc();
+mn_index.c:    if( (NewPtr = ( PNODE_PTR )dos_xalloc( (LONG)sizeof( PNODE ), 3 )) > NULLPTR )
+mn_index.c:    if( ( NewPtr = ( CNODE_PTR )dos_xalloc( ( LONG )sizeof( CNODE ), 3 )) > NULLPTR )
+mn_menu.c:EXTERN	BYTE	*dos_xalloc();
+mn_menu.c:   if( ( newptr = ( MENU_PTR )dos_xalloc( ( LONG )sizeof( MENU_NODE ), 3 ) ) == NULL )

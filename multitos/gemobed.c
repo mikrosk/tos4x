@@ -2,14 +2,11 @@
 *************************************************************************
 *			REVISION144 Control System
 * =======================================================================
-*  $Revision: 1.0 $	$Source: /u2/MRS/osrevisions/aes/gemobed.c,v $
+*  $Revision: 2.2 $	$Source: /u2/MRS/osrevisions/aes/gemobed.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/02/03 21:26:46 $	$Locker:  $
+*  $Author: mui $	$Date: 89/04/26 18:25:25 $	$Locker: kbad $
 * =======================================================================
-*  $Log: gemobed.c,v $
-*  Revision 1.0  93/02/03  21:26:46  ersmith
-*  MultiTOS version 1.0
-*
+*  $Log:	gemobed.c,v $
 * Revision 2.2  89/04/26  18:25:25  mui
 * TT
 * 

@@ -27,13 +27,13 @@
 *	-------------------------------------------------------------
 */
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "compiler.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "obdefs.h"
+#include "gemlib.h"
+#include "aesmint.h"
 						/* in OPTIMIZE.C	*/
 						/* in DSPTCH88.C	*/
 EXTERN	PD	*ch_mowner();
@@ -229,7 +229,7 @@ iasync( afunc, aparm )
 	  
 	e->e_nextp = currpd->p_evlist;		/* link the EVB to the	*/
 	currpd->p_evlist = e;			/* PD evlist		*/
-	e->e_pd = currpd;
+	e->e_pd = (BYTE *)currpd;
 						/* find a free bit in	*/
 						/*   in the mask	*/
 

@@ -1,0 +1,48 @@
+
+Compiling deskfile.c
+#define WINICON 2  	/* TREE */
+                   	          ^
+deskusa.h 99 Warning 84: redefinition of pre-processor symbol "WINICON"
+	  dir = win->w_memory;
+	                      ^
+deskfile.c 86 Warning 30: pointers do not point to same type of object
+deskfile.c 118 Warning 93: no reference to identifier "type"
+	      fill_string( buf, STDISKFULL );
+	                                    ^
+deskfile.c 173 Error 9: undefined identifier "STDISKFULL"
+	    if ( do1_alert( STFOEXIST ) == 2 )
+	                               ^
+deskfile.c 180 Error 9: undefined identifier "STFOEXIST"
+deskfile.c 205 Warning 93: no reference to identifier "nameold"
+deskfile.c 205 Warning 93: no reference to identifier "i"
+	dir = win->w_memory;
+	                    ^
+deskfile.c 224 Warning 30: pointers do not point to same type of object
+	  return;		
+	         ^
+deskfile.c 328 Warning 85: function return value mismatch
+	dir = win->w_memory;
+	                    ^
+deskfile.c 338 Warning 30: pointers do not point to same type of object
+	obj1 = get_tree( TEXTLINES );
+	                            ^
+deskfile.c 342 Error 9: undefined identifier "TEXTLINES"
+	    ((CICONBLK*)(obj->ob_spec))->monoblk.ib_ptext = &dir[i].d_name[0];
+	                                                                      ^
+deskfile.c 354 Warning 30: pointers do not point to same type of object
+	  obj->ob_states = dir[i].d_state;
+	                ^
+deskfile.c 364 Error 14: undefined member "ob_states"
+	addr =  gemdos(0x48, 0xFFFFFFFFL ) ; /* we should have memory*/
+	                                    ^
+deskfile.c 440 Warning 30: pointers do not point to same type of object
+	if ( !( addr =  gemdos(0x48, addr )  ) )
+	                                      ^
+deskfile.c 451 Warning 30: pointers do not point to same type of object
+	    dtabuf.dirfile.d_order = items;
+	                                   ^
+deskfile.c 481 Warning 135: Assignment to shorter data type (precision may be lost)
+Compiler return code 12
+
+Total files: 1, Compiled OK: 0, Failed to compile: 1
+

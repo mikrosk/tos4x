@@ -28,13 +28,13 @@
 *	-------------------------------------------------------------
 */
 
-#include <compiler.h>
-#include <machine.h>
-#include <pdstruct.h>
-#include <dispvars.h>
-#include <obdefs.h>
-#include <gemlib.h>
-#include <aesmint.h>
+#include "compiler.h"
+#include "machine.h"
+#include "pdstruct.h"
+#include "dispvars.h"
+#include "obdefs.h"
+#include "gemlib.h"
+#include "aesmint.h"
 
 EXTERN	BYTE	*sh_name();
 EXTERN	BYTE	*scasb();

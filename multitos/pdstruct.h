@@ -11,7 +11,7 @@
 *	-------------------------------------------------------------
 */
 
-#include	<vdidefs.h>
+#include	"vdidefs.h"
 
 #define PD	struct pd		/* process descriptor		*/
 #define UDA	struct uda		/* user stack data area		*/

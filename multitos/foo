@@ -1,0 +1,11 @@
+
+Compiling apgrlib.c
+	  tmp = fgcol;	
+	              ^
+apgrlib.c 190 Warning 94: uninitialised auto variable "fgcol"
+	  fgcol = bgcol;
+	                ^
+apgrlib.c 191 Warning 94: uninitialised auto variable "bgcol"
+Module size P=00000384 D=00000000 U=00000000
+
+Total files: 1, Compiled OK: 1

@@ -79,8 +79,8 @@ DESKOBJ = 	deskstart.o deskact.o deskapp.o deskvdi.o deskbutt.o \
 		deskdir.o deskdisk.o deskfile.o deskinf.o deskins.o \
 		deskmem.o deskmenu.o deskmisc.o deskmn.o deskopen.o \
 		deskpref.o desksele.o deskshel.o deskshow.o deskvari.o\
-		desktop.o deskupda.o deskwin.o desksear.o aesbin73 nosbind.o 
-
+		desktop.o deskupda.o deskwin.o desksear.o aesbin73 nosbind.o\
+		kballoc.o
 ##
 #### Actions
 ##
@@ -95,9 +95,12 @@ gem.sys:	$(STARTUP) $(AB) $(AESOBJ) $(DESKOBJ) $(RSC1) $(RSC2) $(RSC3)\
 		-k _mn_free -k _mn_new -k _mn_init -k _ArrowScroll\
 		-k _PushArrowTe -o ab.o $(AB)
 
+#		aln -u -s -o gem.sys $(STARTUP) $(AESOBJ) ab.o $(DESKOBJ)\
+#		-i $(RSC1) _USARSC -i $(RSC2) _GRMRSC -i $(RSC3) _FRERSC\
+#		-i $(RSC4) _ITARSC -i $(RSC6) _SPARSC
+
 		aln -u -s -o gem.sys $(STARTUP) $(AESOBJ) ab.o $(DESKOBJ)\
-		-i $(RSC1) _USARSC -i $(RSC2) _GRMRSC -i $(RSC3) _FRERSC\
-		-i $(RSC4) _ITARSC -i $(RSC6) _SPARSC
+		-i $(RSC1) _USARSC
 
 		prgflags 7 7 gem.sys
 #		copy gem.sys c:\gem.sys				

@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/12 01:32:14 $
+* $Date: 1992/02/28 08:25:22 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.29  1992/02/28  08:25:22  apratt
+* Changed cache handling to be .if M68030 rather than .if SCSI.  This lets
+* us make ROMs for Sparrow.
+*
 * Revision 1.28  1992/02/12  01:32:14  apratt
 * Much Sparrow stuff. Also fixed a bug in slow ACSI devices.
 *
@@ -132,7 +136,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.28 $
+* $Revision: 1.29 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\dmaread.s,v $
@@ -153,6 +157,11 @@
 *
 * As of 9/91 we want One Rom To Rule Them All, so ALL machines have IDE_AT.
 *
+
+* SPARROW and TT are both M68030.
+
+*M68030		equ	(SPARROW | TT)	; normallly, but see below:
+.include "m68030.s"
 
 SCSI		=	TT
 IDE_AT		=	1	; Always! (AKP 9/91)
@@ -468,7 +477,7 @@ ide2:	bsr	_idewrite		; write sectors
 ide3:	adda	#16,sp			; clean up stack
 .endif	
 rw1:	
-.if	SCSI
+.if	M68030
 	move.w	sr,-(sp)		; go to IPL 7
 	ori	#$700,sr		; no interrupts right now please
 	movec	cacr,d1			; d1 = (cache control register)
@@ -622,7 +631,7 @@ _endcmd:
 	bsr	_fdone			; wait for operation complete
 	bmi.b	endce			; (timed-out, so complain)
 
-.if	SCSI				; dump D cache
+.if	M68030				; dump D cache
 	move.w	sr,-(sp)		; go to IPL 7
 	ori.w	#$700,sr		; no interrupts right now kudasai
 	movec	cacr,d0			; d0 = (cache control register)

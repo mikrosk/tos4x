@@ -4,13 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/30 16:45:58 $
+* $Date: 1991/10/01 20:12:52 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.17  1991/10/01  20:12:52  apratt
+* When you try to set the alarm (Waketime(1)), we now return
+* zero for success (i.e. no time to set, or time is in the past,
+* or successfully set), and -1 for the special case where you
+* are trying to set the alarm for the same minute you're already in.
+*
 * Revision 2.16  1991/09/30  16:45:58  apratt
 * Another rev for STBOOK alarm stuff; see comments above waketime.
 *
@@ -100,7 +106,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.16 $
+* $Revision: 2.17 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\clock.s,v $
@@ -594,16 +600,13 @@ dytbl:	dc.w	0					; Jan 1
 *	1: your time is in the past.
 *	2: your time is in the future, but later than waketime.
 *	3: you requested that waketime be zeroed and unset, so it was.
-*	4: you asked that I set the alarm and I did.
-*	5: you asked that I set the alarm but waketime is zero.
 *
-*
-* I am not sure of the hardware in the book, but there are some
-* strangenesses here: when I tried it on a Mega STe, I didn't seem to have
-* to clear the Alarm Enable to make the alarm signal go away: the bit in
-* the reset register was enough.  In the book I seem to have to clear the
-* EN as well.  BUT: when I do that, I get another interrupt!  I guess it's
-* triggered on both edges(?).
+* If you call this with "1" as the arg (to set the alarm), the returns are:
+*	 0: Success.  Either waketime was zero and no alarm is set,
+*	   or the RTC failed (not likely), or the alarm was set.
+*	-1: Failure.  You have asked me to set the alarm to "right now."
+*	   This return is treated specially in power.prg, the only
+*	   legitimate caller of Waketime(1).
 *
 
 .bss
@@ -682,18 +685,30 @@ clralarm:
 * the next time there's a Monday the 12th, not necessarily the particular
 * one you want.
 *
+* If you set the alarm for "right now" (within the same minute) this code
+* does not set the alarm and it returns -1.  Otherwise it returns zero.
+* power.prg uses this return for special things.
+*
 
 setalarm:
-	bsr	clktest			; test for clock chip
-	bcs	sclerr			; punt if chip doesn't exist
+	bsr	_getclock		; get RTC date & time into _date & _time
+	cmp.l	#-1,d0			; did it fail?
+	beq	noalarm			; can't set the alarm. Sorry!
+
 	move.l	#RTCBASE,a0		; a0 -> base of registers
 	bset.b	#0,RTMODE(a0)		; select alarm bank (preserve EN's)
 
+	move.l	waketime,d1
+	beq	noalarm			; no waketime to set! Bye!
+	and.b	#%11100000,d1		; round down to minute boundary
+	and.b	#%11100000,d0		; round "now" (from _getclock) down
+	cmp.l	d0,d1
+	beq	badnews			; you're trying to set alarm to "now"
+	
 *
 *  Convert time to chip format
 *
 	move.l	waketime,d1		; d1 = GEMDOS format time
-	beq	noalarm
 
 	move.w	d1,d0			; d1 = (time >> 5) & $3f
 	lsr.w	#5,d0			;    = minutes 0..59
@@ -727,11 +742,13 @@ setalarm:
 
 	bset.b	#2,RTMODE(a0)		; set alarm enable
 	bclr.b	#0,RTMODE(a0)		; go back to "time" bank
-	moveq.l	#4,d0			; return 4 "I set the alarm."
-	rts
 noalarm:
-	moveq.l	#5,d0			; return 5 "didn't set alarm"
+	moveq.l	#0,d0			; return 0 "I set the alarm."
 	rts
+
+badnews:
+	moveq.l	#-1,d0			; Return -1: you tried to set alarm
+	rts				; for "this minute" and I won't.
 
 .else
 

@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/15 15:04:18 $
+* $Date: 1991/11/06 22:42:16 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.27  1991/11/06  22:42:16  apratt
+* Fixed a BIG OOPS: at qd0 the label 'sdelay' was wrong so that
+* the add of _hz_200 to d0 was INSIDE the loop.  Oops.  Fixed.
+*
 * Revision 1.26  1991/10/15  15:04:18  apratt
 * Fixed a bug in the caller of strcmp.
 *
@@ -125,7 +129,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.26 $
+* $Revision: 1.27 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\dmaread.s,v $
@@ -565,8 +569,8 @@ _qdone:	move.l	#ACSTMOUT,d0
 
 qd0:	move.l	d0,-(sp)		; save timeout value
 	moveq	#2,d0			; busy-wait delay for slow ACSI
-sdelay:	add.l	_hz_200,d0		; minimum 20 microsec.
-	cmp.l	_hz_200,d0
+	add.l	_hz_200,d0		; minimum 20 microsec.
+sdelay:	cmp.l	_hz_200,d0
 	bge.b	sdelay
 	move.l	(sp)+,d0		; restore timeout value
 

@@ -4,16 +4,19 @@
 * $Author: minna $
 * =======================================================================
 *
-* $Date: 90/10/19 16:05:22 $
+* $Date: 90/10/29 15:52:12 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.10  90/10/29  15:52:12  minna
+* Base address of IDE bus has been moved to $C00040 (long word boundary).
+*
 * Revision 1.9  90/10/19  16:05:22  minna
 * Added code to handle drives on the IDE-AT bus.
-*
+* 
 * Revision 1.8  90/08/03  13:22:48  apratt
 * TTOS FINAL RELEASE
 * 
@@ -46,7 +49,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.9 $
+* $Revision: 1.10 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -94,6 +97,8 @@
 ; Oct-16-1990	ml.	Added in code to handle drives on the IDE-AT bus
 ;			also.  The code comes from DRIVER.PRG v4.50 (dated
 ;			Oct 16 1990), and is slightly modified.
+; Oct-29-1990	ml.	Base address of the IDE bus has been moved to
+;			$C00040 (long word boundary).
 ;-
 
 .globl	_dmaread
@@ -127,8 +132,9 @@ EREADF	equ	(-11)		; READ Fault
 EWRITF	equ	(-10)		; WRITe Fault
 
 ; Offsets for registers addressing on data bus
-REGBASE	equ	1		; most are on odd part of data bus
-REGSTEP	equ	2		; most registers are on word boundaries
+REGBASE		equ	1	; most are on odd part of data bus
+REGSTEP		equ	2	; for regs that are on word boundaries
+REGLSTEP	equ	4	; for regs that are on long word boundaries
 
 
 ;+
@@ -946,32 +952,32 @@ setscltmout:
 
 ; AT disk interface I/O locations for Read functions
 
-bAT	equ	$FFFFFC20+REGBASE	; base address
+bAT	equ	$FFC00040+REGBASE	; base address
 
-ATDR	equ	bAT-REGBASE+($00*REGSTEP); Data Register (16-bit reg)
-ATER	equ	bAT+($01*REGSTEP)	; Error Register
-ATSC	equ	bAT+($02*REGSTEP)	; Sector Count
-ATSN	equ	bAT+($03*REGSTEP)	; Sector Number
-ATCL	equ	bAT+($04*REGSTEP)	; Cylinder Low
-ATCH	equ	bAT+($05*REGSTEP)	; Cylinder High (2 bits)
-ATSDH	equ	bAT+($06*REGSTEP)	; SDH register
-ATSR	equ	bAT+($07*REGSTEP)	; Status Register
-ATASR	equ	bAT+($0E*REGSTEP)	; Alternate Status Register
-ATDAR	equ	bAT+($0F*REGSTEP)	; Drive Address Register
+ATDR	equ	bAT-REGBASE+($00*REGLSTEP); Data Register (16-bit reg)
+ATER	equ	bAT+($01*REGLSTEP)	; Error Register
+ATSC	equ	bAT+($02*REGLSTEP)	; Sector Count
+ATSN	equ	bAT+($03*REGLSTEP)	; Sector Number
+ATCL	equ	bAT+($04*REGLSTEP)	; Cylinder Low
+ATCH	equ	bAT+($05*REGLSTEP)	; Cylinder High (2 bits)
+ATSDH	equ	bAT+($06*REGLSTEP)	; SDH register
+ATSR	equ	bAT+($07*REGLSTEP)	; Status Register
+ATASR	equ	bAT+($0E*REGLSTEP)	; Alternate Status Register
+ATDAR	equ	bAT+($0F*REGLSTEP)	; Drive Address Register
 
 
 
 ; AT disk interface I/O locations for Write functions
 
-;ATDR	equ	bAT-REGBASE+($00*REGSTEP); Data Register (16-bit reg)
-ATWPR	equ	bAT+($01*REGSTEP)	; Write Precomp Register (not used)
-;ATSC	equ	bAT+($02*REGSTEP)	; Sector Count
-;ATSN	equ	bAT+($03*REGSTEP)	; Sector Number
-;ATCL	equ	bAT+($04*REGSTEP)	; Cylinder Low
-;ATCH	equ	bAT+($05*REGSTEP)	; Cylinder High (2 bits)
-;ATSDH	equ	bAT+($06*REGSTEP)	; SDH register
-ATCR	equ	bAT+($07*REGSTEP)	; Command Register
-ATDOR	equ	bAT+($0E*REGSTEP)	; Digital Output Register
+;ATDR	equ	bAT-REGBASE+($00*REGLSTEP); Data Register (16-bit reg)
+ATWPR	equ	bAT+($01*REGLSTEP)	; Write Precomp Register (not used)
+;ATSC	equ	bAT+($02*REGLSTEP)	; Sector Count
+;ATSN	equ	bAT+($03*REGLSTEP)	; Sector Number
+;ATCL	equ	bAT+($04*REGLSTEP)	; Cylinder Low
+;ATCH	equ	bAT+($05*REGLSTEP)	; Cylinder High (2 bits)
+;ATSDH	equ	bAT+($06*REGLSTEP)	; SDH register
+ATCR	equ	bAT+($07*REGLSTEP)	; Command Register
+ATDOR	equ	bAT+($0E*REGLSTEP)	; Digital Output Register
 
 
 ; Byte indices into buffer return by the Identify command
@@ -1173,9 +1179,10 @@ id0:	rts
 ;	a0.l = buffer to hold data read from sector buffer
 ;-
 readbuf:
+	lsr.w	#1,d0		; d0 = # of longs of data to read
 	subq.w	#1,d0		; dbra likes one less
 	lea	ATDR,a1		; a1 -> data bus
-rb0:	move.w	(a1),(a0)+	; read data from bus
+rb0:	move.l	(a1),(a0)+	; read data from bus
 	dbra	d0,rb0		;  repeat until all done
 	rts
 
@@ -1188,9 +1195,10 @@ rb0:	move.w	(a1),(a0)+	; read data from bus
 ;	a0.l = buffer with data to write to sector buffer
 ;-
 wrtbuf:
+	lsr.w	#1,d0		; d0 = # of longs of data to write
 	subq.w	#1,d0		; dbra likes one less
 	lea	ATDR,a1		; a1 -> data bus
-wb0:	move.w	(a0)+,(a1)	; write data to bus
+wb0:	move.l	(a0)+,(a1)	; write data to bus
 	dbra	d0,wb0		;  repeat until all done
 	rts
 	rts

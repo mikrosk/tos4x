@@ -4,25 +4,29 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/19 16:00:42 $
+* $Date: 90/03/20 13:33:54 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.17  90/03/20  13:33:54  apratt
+* Bug in Bconmap causes it to fail to detect devno values which are
+* out of range (higher than maptabsize+6), fixed.
+*
 * Revision 2.16  90/03/19  16:00:42  apratt
 * Added comments at Rsconf to the effect that it's always been broken.
 * No code change for that because it's mostly harmless.
-*
+* 
 * Fixed Bconmap range-check to be (devno >= maxdev) not (devno > maxdev).
 * Pre-cleared d0 in ttmfp Rsconf when returning baud rate (bug fix).
-*
+* 
 * Added move.l d7,d0 at the end of Rsconf for SCC (bug fix).
-*
+* 
 * Increased Iorec initialization table for SCC to include initial 
 * baud rate of 1 (9600).
-*
+* 
 * Revision 2.15  90/03/06  15:22:27  apratt
 * Fixed a fatfinger: if you get a bus error while initting SCC,
 * the code is supposed to return safely.  Now it does.
@@ -190,7 +194,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.16 $
+* $Revision: 2.17 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2836,7 +2840,7 @@ _bconmap:
 	cmp.w	#-1,d1		; Bconmap(-1) returns current map device
 	beq	mapend		; just return old number if -1
 	move.l	#maptab,d0	; preload return value for -2
-	cmp.w	maptabsize.w,d0
+	cmp.w	#-2,d1		; Bconmap(-2) returns ptr to bconmap
 	beq	mapend		; he wants the pointer
 	moveq.l	#0,d0		; preload error code (zero)
 	subq.w	#6,d1

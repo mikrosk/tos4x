@@ -1,16 +1,19 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: unknown $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/05/18 23:07:48 $
+* $Date: 1992/07/27 20:12:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.22  1992/07/27  20:12:04  kbad
+* Nearly last Sparrow test BIOS
+*
 * Revision 2.21  1992/05/18  23:07:48  unknown
 * SPARROW now uses motorola clock chip; added stub waketime
 *
@@ -122,7 +125,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.21 $
+* $Revision: 2.22 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\clock.s,v $
@@ -145,9 +148,7 @@
 *									:
 *------------------------------------------------------------------------
 
-* TT equate moved to switches.s
-
-.include "switches.s"
+* TT equate moved to command line
 
 *
 * This file switches on the symbols RICOH and MOTO; here is the formula for

@@ -1,16 +1,19 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: unknown $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/05/18 23:08:08 $
+* $Date: 1992/07/27 20:12:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.40  1992/07/27  20:12:04  kbad
+* Nearly last Sparrow test BIOS
+*
 * Revision 2.39  1992/05/18  23:08:08  unknown
 * Added USE_DISK_CHANGE to use that bit.  It's sparrow-only; TT has the bit
 * in a different place, and besides, TT can have external floppies that don't
@@ -142,7 +145,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.39 $
+* $Revision: 2.40 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $
@@ -159,9 +162,8 @@
 
 .text
 
-* TT switch moved to switches.s
+* TT and SPARROW switches must be specified on the command line
 
-.include "switches.s"
 
 * SPARROW and TT are both M68030.
 
@@ -430,7 +432,7 @@ fi_nok:	bra	flopfail		; return failure
 *
 
 init_noflops:
-	move.w	#$0202,_diskmode.w	; make both appear "changed."
+	move.w	#$0202,_diskmode	; make both appear "changed."
 	moveq.l	#0,d0			; return "success" to rwabs.c,
 	tst.w	_nflops.w		; if this is the first time through
 	beq	i1
@@ -1790,7 +1792,7 @@ ch_r:	rts
 * systems can be found in _curflop.
 *-
 setdmode:
-	lea	_diskmode.w,a0		; a0 -> disk mode table
+	lea	_diskmode,a0		; a0 -> disk mode table
 	move.b	d0,-(sp)		; (save mode)
 	move.w	cdev.w,d0		; d0.w = drive# (index into table)
 	cmp.w	#1,_nflops		; one floppy?

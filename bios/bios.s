@@ -4,13 +4,16 @@
 * $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/07/01 21:47:00 $
+* $Date: 1992/07/27 20:12:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.51  1992/07/27  20:12:04  kbad
+* Nearly last Sparrow test BIOS
+*
 * Revision 2.50  1992/07/01  21:47:00  kbad
 * last akp revision
 *
@@ -148,7 +151,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.50 $
+* $Revision: 2.51 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\RCS\bios.s,v $
@@ -2916,7 +2919,14 @@ imapvecs:
 	dc.l	aistat,ain,aostat,aout,arsconf,chaibufptr
 
 deftabsize	equ	3
+
+* On Sparrow, the default device must be SCCB; the MFP ain't hooked up!
+.if SPARROW
+defmap		equ	1
+.else
 defmap		equ	0
+.endif
+
 .endif
 
 **********************************************************************
@@ -3340,7 +3350,9 @@ inittab:
 *
 * set the PSG bit which selects LAN vs NOT LAN to the NOT LAN position.
 *
+* On Sparrow, this bit is IDE reset.
 
+.if (SPARROW == 0)
 nolan:
 	move.w	sr,d1
 	or.w	#$0700,sr
@@ -3351,6 +3363,7 @@ nolan:
 	move.b	d0,giselect+2
 	move.w	d1,sr
 	rts
+.endif
 
 **********************************************************************
 *
@@ -3392,7 +3405,9 @@ vloop:	move.l	(a1)+,(a0)+
 	clr.w	sccctl		; disable DMA
 .endif
 
+.if (SPARROW == 0)
 	bsr	nolan		; select DB9, not lan connector
+.endif
 
 * initialize the IORECs: write constant data to each, then change the
 * two differences: the input and output buffer pointers

@@ -4,13 +4,16 @@
 * $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/07/01 21:48:18 $
+* $Date: 1992/07/27 20:12:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.98  1992/07/27  20:12:04  kbad
+* Nearly last Sparrow test BIOS
+*
 * Revision 2.97  1992/07/01  21:48:18  kbad
 * last akp revision
 *
@@ -31,7 +34,7 @@
 * but was really x.07.  Back to .06 for STPAD ROMs of this date.
 *
 * Revision 2.93  1992/03/11  01:24:22  apratt
-* Clear the high byte of d0.w before writing into SPAR_VMC.  This wasn't in
+* Clear the high byte of d0.w before writing into sp_VMC.  This wasn't in
 * the first one, the one before the cartridge-port check.  In the first
 * write, also, write ff8260 to set ST shift mode.
 *
@@ -59,7 +62,7 @@
 * talking about.  This lets us build ROMs for Sparrow/030, which isn't a TT
 * in any other way. (Well, it has the same clock chip.)
 *
-* The Sparrow people in Dallas want the SPAR_CONF register to be read
+* The Sparrow people in Dallas want the sp_config register to be read
 * and the appropriate bits written to VMC even before the diag cart is
 * checked, so I moved the code.
 *
@@ -350,7 +353,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.97 $
+* $Revision: 2.98 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -389,9 +392,8 @@
 *
 *-
 
-* The switches TT, STPLUS, systype, and country
-* are all moved to the file "switches.s" which is normally a copy
-* of one of the canned switch settings files.
+* The switches TT, SPARROW, STPAD, systype, and country are now set
+* on the command line.  switches.s contains rom/ram and country defines
 
 .include "switches.s"
 
@@ -418,7 +420,7 @@ vershi		equ	$02
 .endif
 
 * set the low byte of the version number each release.
-verslo		equ	$06
+verslo		equ	$07
 
 
 * The date is now in another file, which is updated automatically
@@ -493,6 +495,8 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	end_os
 	.globl	phystop
 
+	.globl	_wvbl			; exports for setmode.c
+
 *--------------	Imports:
 .if systype == rom
 	.globl	endaesbss
@@ -525,6 +529,7 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	_osi			; initialize OS
 	.globl	initmfp			; init character I/O
 	.globl	esc_init		; init glass tty
+	.globl	__esc_init		; init glass tty
 	.globl	initmous		; mouse vector init
 	.globl	_mediach		; media change inquiry
 	.globl	_proto_bt		; prototype boot sector
@@ -533,8 +538,11 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	_flopfmt		; format track
 	.globl	_floprate		; get/set floppy seek rate code
 	.globl	_rand			; generate random number
-	.globl	blt_init		; init the blitter chip
 
+
+.if (SPARROW == 0)
+	.globl	blt_init		; init the blitter chip
+.endif
 	.globl auxistat			; input-status
 	.globl constat
 	.globl midstat
@@ -603,7 +611,7 @@ df_seek		equ	$0003		; default seek-rate (3ms)
 dnvbls		equ	8		; default number of vbl queue entries
 nlevels		equ	5		; max # recursive BIOS calls
 savsiz		equ	23		; size (.W) of BIOS trap save-context
-DEFCSIZE	equ	$10		; default to room for 16 cookies
+DEFCSIZE	equ	$20		; default to room for 32 cookies
 
 
 
@@ -653,11 +661,8 @@ cartsize	equ $20000		; size of cartridge (128K)
 *--- Memory controller
 memconf		equ	$ffff8001	; memory controller
 
-*--- SPARROW memory configuration
-SPAR_CONF	equ	$ffff8006	; read here to auto-config
-
-*--- SPARROW video master control register
-SPAR_VMC	equ	$ffff82c0	; video master control
+*--- SPARROW equates
+.include "sparrequ.s"
 
 *--- Shifter:
 syncmode	equ	$ffff820a	; video	sync mode
@@ -1037,15 +1042,17 @@ reseth:
 * [ROM only]
 .endif
 
+
+
 .if SPARROW
 	moveq	#0,d1
-	move.b	SPAR_CONF,d0	; d0=vvmmrrbf
+	move.b	sp_config,d0	; d0=vvmmrrbf
 	move.b	d0,d1		; d1=vvmmrrbf
 	lsl.b	#6,d1		; d1=bf000000
 	and.b	#$80,d1		; d1=b0000000
 	lsr.b	#6,d0		; d0=000000vv
 	or.b	d0,d1		; d1=b00000vv
-	move.w	d1,SPAR_VMC	; write to VMC.
+	move.w	d1,sp_VMC	; write to VMC.
 	moveq	#0,d1
 	cmp.b	#1,d0
 	beq	spar_set
@@ -1053,8 +1060,26 @@ reseth:
 	tst.b	d0
 	bne	spar_nos
 spar_set:
-	move.w	d1,$ffff8260	; write 0 to set shift mode
+
 spar_nos:
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 .endif
 
@@ -1099,8 +1124,9 @@ tdis:	dc.l	0
 *
 * Boot the sparrow up at 16MHz; there is little if any reason not to.
 * Makes the boot, including the CRC and RAM tests, faster.
+* Also set the sparrow shifter to 16MHz, and turn on address bus errors.
 *
-	or.b	#1,$ffff8007
+	or.b	#$25,sp_clock.w
 .endif
 
 *+
@@ -1116,6 +1142,8 @@ tdis:	dc.l	0
 *  We don't use the SCU on Mega STe, because we can't handle a bus error
 *  yet (no RAM), and we want the same ROMs to work with either STe or
 *  Mega STe.
+*
+*  On Sparrow, bit 6 of sp_clock is reset by power up.
 *-
 .if systype == rom
 
@@ -1123,6 +1151,11 @@ tdis:	dc.l	0
 	btst.b	#0,ttscu1		; this bit set?
 	beq	reset3			; no, this is a cold boot.
 .endif
+.if SPARROW
+	btst.b	#6,sp_clock
+	beq	reset3
+.endif
+
 
 	lea	ret_1(pc),a6		; load return addr
 	bra	val_memval		; check memory configuration validity
@@ -1210,8 +1243,8 @@ reset3:
 * bit 3: *rts
 * bit 4: *dtr
 * bit 5: *strobe
-* bit 6: *SPKR_DIS (TT), *IDERESET (STPAD, SPARROW)
-* bit 7: *LAN (TT), FDD_HIDEN (STPAD)
+* bit 6: *SPKR_DIS (TT,SPARROW), *IDERESET (STPAD)
+* bit 7: *LAN (TT), FDD_HIDEN (STPAD), *IDERESET (SPARROW)
 *
 * Note: The floppy side and selects are inverted, so writing 1 disables them.
 * Other outputs are initialized to zero here: *DTR, *RTS, STROBE,
@@ -1285,11 +1318,22 @@ notpal:
 *  their default values.
 *-
 	lea	color0,a1		; a1 ->	hardware reg
-	move.w	#16-1,d0		; setup	16 colors
+	moveq	#16-1,d0		; setup	16 colors
 	lea	colors(pc),a0		; a0 ->	table of default colors
 sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 	dbra	d0,sysic1		; (loop for more colors)
 
+.if SPARROW
+* Also initialize Sparrow palette
+* a0 now points to spcolors (right after colors)
+
+	move.b	#0,sp_shift		; hit the Sparrow shifter
+	lea	sp_color0,a1		; initialize the 1st 16 colors
+	moveq	#16-1,d0
+spsic1:	move.l	(a0)+,(a1)+
+	dbra	d0,spsic1
+	move.b	#0,shiftmd		; hit the ST shifter
+.endif
 
 .if systype == rom
 *+
@@ -1381,8 +1425,8 @@ sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 .if (TT == 0)
 
 .if SPARROW
-	move.w	SPAR_CONF,d0		; read to auto-config mem cntrlr
-;	bset.b	#6,$ffff8007		; test and set power-fail bit
+	move.w	sp_config,d0		; read to auto-config mem cntrlr
+;	bset.b	#6,sp_clock		; test and set power-fail bit
 ;	beq	sp_cold			; yes, cold-boot
 	cmp.l	#memmagic,memvalid.w	; check first magic number
 	bne	sp_cold			; no - this is a cold boot
@@ -1394,7 +1438,7 @@ sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 * On Sparrow, detected cold boot.  So determine memory size.
 * Take mmb as a number; phystop is 512KB << mmb clamped to 14MB maximum.
 sp_cold:
-	move.w	SPAR_CONF,d0	; read again just for fun
+	move.w	sp_config,d0	; read again just for fun
 	lsr.w	#8,d0		; get switches in low word: d0=vvmmrrbf
 	lsr.b	#1,d0		; d0=0vvmmrrb
 	move.b	d0,d1
@@ -1890,17 +1934,18 @@ scuberr:
 * Transfer the sparrow config value to the corresponding bits in VMC (video
 * master control): VVmmrrBf goes into BhvcesVV in VMC.
 * 
-* Also, touch ST color palette because that puts us in ST video mode.
+* Also, don't touch ST color palette because that puts us in ST video mode.
+* and we don't know yet whether we're VGA.
 *
 
-	move.b	SPAR_CONF,d0	; d0=vvmmrrbf
+	move.b	sp_config,d0	; d0=vvmmrrbf
 	move.b	d0,d1		; d1=vvmmrrbf
 	lsl.b	#6,d1		; d1=bf000000
 	and.b	#$80,d1		; d1=b0000000
 	lsr.b	#6,d0		; d0=000000vv
 	or.b	d0,d1		; d1=b00000vv
-	move.w	d1,SPAR_VMC	; write to VMC.
-	tst.w	color0
+	move.w	d1,sp_VMC	; write to VMC.
+*	tst.w	color0
 .endif
 
 * Zap the DMA sound controller, if you have DMA sound in this machine.  You
@@ -2043,14 +2088,17 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 *
 *  Backing off by 256 bytes means the defualt low byte is zero, and the
 *  screen doesn't abut the end of memory, so this solves both problems.
+*
+*  On Sparrow, this doesn't matter much, because the screen is realloc'ed
+*  after initializing GEMDOS.
 *-
 	move.l	phystop.w,a0		; video_base = phystop - 0x8000
-.if (TT == 0)
-	sub.l	#$8000,a0
-	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero
-.else
+.if TT
 	sub.l	#$25900,a0		; One TT screen plus $100 bytes.
 	move.w	#$2590-1,d1		; clear d1*16 bytes
+.else
+	sub.l	#$8000,a0
+	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero
 .endif
 	move.l	a0,_v_bas_ad.w
 	move.b	_v_bas_ad+1.w,dbaseh	; load high addr
@@ -2204,7 +2252,7 @@ ill_1:	move.l	a1,a7		; restore old ssp
 	move.l	#"_VDO",(a0)+
 	move.l	#$00030000,(a0)+	; Sparrow video
 	move.l	#"_MCH",(a0)+
-	move.l	#$00010100,(a0)+	; STe w/minor 0100
+	move.l	#$00030000,(a0)+	; Sparrow machine
 .else
 * else decide what kind of ST/STPLUS we are: ST, STe, Mega STe, and STe-PLUS.
 	tst.b	_iamanst
@@ -2248,8 +2296,11 @@ gotmch:	move.l	a1,$8
 	move.l	d0,(a0)+
 cdone1:
 .endif
+* if !SPARROW
 .endif
+* if !STPAD
 .endif
+* if !TT
 
 * OK, the CPU, VDO, and MCH cookies are set.  TT and STPLUS have
 * configuration switches.  Set that cookie and use the high bit to set _SND
@@ -2602,6 +2653,12 @@ ikbdlp1:
 * palette registers are initialized, to get a screen on pad sooner.
 * However, we do that stuff again here, too, and write "shadow shadow"
 * now, after the code which cleared all of low RAM.
+*
+* The Sparrow code is a little different; we find out what mode to set
+* and hand it off to Setmode, which does the right thing.
+* The screen is set to an ST resolution for the carts, the user pref.
+* is read later for the actual boot screen.  (Sheesh, there's an awful
+* lot of screen-setting going on here for Sparrow!)
 *-
 
 .if STPAD
@@ -2609,20 +2666,36 @@ ikbdlp1:
 	move.b	#$80,$889		; $889 is "shadow shadow"
 	moveq.l	#2,d1			; STPAD is always mono
 .else
-.if (TT == 0)
-	moveq.l	#0,d1			; pre-select low rez
-	btst	#7,gpip			; test mono bit
-	bne	nomono			; no mono - d1 is fine
-	moveq	#2,d1			; st/mono: choose mode 2 (ST HIGH)
-.else
+ .if TT
 	moveq.l	#4,d1			; pre-select TT MED rez
 	btst	#7,gpip			; test mono bit
 	bne	nomono			; no mono - d1 is fine
 	moveq	#6,d1			; tt/mono: choose mode 6 (TT HIGH)
-.endif
+ .else
+  .if SPARROW
+	moveq	#3,d1			; Sparrow video
+	move.w	_modecode.w,d2
+	bne.b	nomono
+	move.w	#$82,d2			; default modecode (ST, 40 col, 4 bpp)
 
+
+
+
+
+
+
+  .else
+	moveq.l	#0,d1			; pre-select low rez
+	btst	#7,gpip			; test mono bit
+	bne	nomono			; no mono - d1 is fine
+	moveq	#2,d1			; st/mono: choose mode 2 (ST HIGH)
+  .endif
+ .endif
 .endif
 nomono:
+
+
+.if 0
 
 .if (TT == 0)
 * on ST, you'd better not change mode during a vblank; what we do
@@ -2630,18 +2703,48 @@ nomono:
 * THEN we can change modes.  (Note: noblank1 clobbers d0.)
 *
 * This may not be good enough for Sparrow - sometimes it comes up wrong.
+* On Sparrow, we do the opposite: wait until we *are* in Vblank.  Setmode
+* (called above) waits for vblank to set the registers up, 
 *
-
+.if (SPARROW == 0)
 	lea.l	nb_r1(PC),a6
 	bra	noblank			; wait until we're NOT in a vblank
 nb_r1:
 .endif
+.endif
+
 	move.b	d1,shiftmd		; set hardware
 	move.b	d1,sshiftmd.w		; set software
+.else
+*
+* Let's just let Setscreen() handle this, eh?
+*
+.if (SPARROW == 0)
+* @DEBUG: setscreen after _osi, so the debug stub is installed
+	move.w	d2,-(sp)		; modecode
+	move.w	d1,-(sp)		; rez #
+	move.l	_v_bas_ad.w,a0
+	move.l	a0,-(sp)		; physbase
+	move.l	a0,-(sp)		; logbase
+	jsr	_setscreen(pc)
+	lea	12(sp),sp
+.else
+	move.w	d2,_modecode.w
+.endif	
+
+.endif
+
+.if (0 & SPARROW)
+	tst.w	color0			; hit color 0 to go ST video
+.endif
 
 	bsr	_TEST_BLT		; D0 = 0:no chip, 2:chip exists
+.if (SPARROW == 0)
+
+
 	jsr	blt_init		; init the blitter chip (with D0)
 	jsr	esc_init		; clear screen, init cursor
+.endif
 
 	move.l	#reseth,swv_vec.w	; RESET system on monitor change
 	move.w	#1,vblsem.w		; enable vblank processing for real
@@ -2708,9 +2811,37 @@ kbloop:	cmp.l	_hz_200.w,d0
 *	if the desktop ever exits to us (or COMMAND.PRG exits)
 *		then go back to RESETH and start over ....
 *
+*
+* If Sparrow, we temporarily subvert _memtop here so that GEMDOS
+* can manage the screen memory.  (920710 sparrow Setscreen() calls the new
+* GEMDOS Srealloc ($15) to allocate the screen.
 *-
 
+.if SPARROW
+	move.l	phystop.w,_memtop.w
+.endif
+
 	jsr	_osi			; initialize DOS
+
+.if SPARROW
+DB_STUB = 0
+* @DEBUG: cause a stop before setscreen
+.if DB_STUB
+	pea	Mstop		; message text
+	move.w	#$f000,-(sp)	; MSG_MSG
+	move.w	#$5,-(sp)	; SC_MSG
+	move.w	#$b,-(sp)	; fn code 11
+	trap	#$e		; Debug trap
+	lea	$a(sp),sp
+.endif
+
+	move.w	_modecode.w,-(sp)	; setscreen(0L,0L,3,modecode)
+	move.w	#3,-(sp)
+	clr.l	-(sp)
+	clr.l	-(sp)
+	jsr	_setscreen
+	lea	12(sp),sp
+.endif
 
 	move.w	os_dosdate,_date	; set file system date
 	jsr	_iclock			; initialize clock chip
@@ -3962,6 +4093,9 @@ val_mr:	jmp	(a6)			; return EQ/NE
 *
 * Full-magnitude is f, not 7, because on TT and STe the high bit of the
 * nybble is the low bit of the gun value, and on ST it's a don't-care.
+*
+* The Sparrow color table must be contiguous with the ST color table for
+* Sparrow palette initialization code at 'spsic1' to work.
 *-
 
 colors:
@@ -3981,6 +4115,28 @@ colors:
 	dc.w	$f3f			; 13 light magenta
 	dc.w	$3ff			; 14 light cyan
 	dc.w	$000			; 15 black
+
+.if SPARROW
+* Sparrow palette is rrrrrr-- gggggg-- -------- bbbbbb--
+spcolors:
+*		 rrggxxbb
+	dc.l	$ffff00ff		; 0 - boot color (white in production)
+	dc.l	$ff000000		; 1 red
+	dc.l	$00ff0000		; 2 green
+	dc.l	$ffff0000		; 3 yellow
+	dc.l	$000000ff		; 4 blue
+	dc.l	$ff0000ff		; 5 magenta
+	dc.l	$00ff00ff		; 6 cyan
+	dc.l	$aaaa00aa		; 7 "low white"
+	dc.l	$55550055		; 8 grey
+	dc.l	$ff550055		; 9 light red
+	dc.l	$55ff0055		; 10 light green
+	dc.l	$ffff0055		; 11 light yellow
+	dc.l	$555500ff		; 12 light blue
+	dc.l	$ff5500ff		; 13 light magenta
+	dc.l	$55ff00ff		; 14 light cyan
+	dc.l	$00000000		; 15 black
+.endif
 
 *+
 * hbl - force caller to IPL 3
@@ -4199,6 +4355,7 @@ _rte:	rte
 * AKP 9/91: drop IPL to somewhere from 0 to 3, not always to zero.
 * If we're already at three, the normal level for TOS, it isn't changed.
 *-
+_wvbl:
 wvbl:
 	move.w	sr,-(sp)		; save psw
 	and.w	#$FBFF,sr		; (IPL &= %011: allow IPL 4)
@@ -4329,161 +4486,8 @@ b_exit1:
 	move.l	a1,savptr		; update save-pointer
 	rte				; return to caller
 
-
-*------ jump table for BIOS functions:
-
-.if (M68030 == 0)
-ibit	equ	$80000000	; on not-M68030, we check hi bit for indirect
-.else
-ibit	equ	$00000001	; on M68030, we check lo bit for indirect
-.endif
-
-trp13tab:
-	dc.w	12			; number of entries in jump table
-	dc.l	_get_mpb		; 0: get memory parameter block
-	dc.l	bconstat		; 1: console status (input)
-	dc.l	bconin			; 2: console input
-	dc.l	bconout			; 3: console output
-.if M68030
-	dc.l	m030_rw			; 4: disk read/write with clrcache
-.else
-	dc.l	hdv_rw + ibit		; 4: [indirect] disk read/write
-.endif
-	dc.l	_setexc			; 5: set exception vector
-	dc.l	_tickcal		; 6: return tick calibration
-	dc.l	hdv_bpb + ibit		; 7: [indirect] get BPB
-	dc.l	bcostat			; 8: console status (output)
-	dc.l	hdv_mediach + ibit	; 9: [indirect] media change inquiry
-	dc.l	_drvmap			; 10: get active-drive bit vector
-	dc.l	_shift			; 11: get/set keyboard shift bits
-
-* BIOS function $11 is assigned for DIAB630 unless I can get around it.
-
-
-*------ jump table for Atari BIOS extensions:
-trp14tab:
-.if (TT == 0)
-	dc.w	65			; number of entry points
-.else
-	dc.w	96			; number of TT entry points
-.endif
-	dc.l	initmous		; 0: initialize mouse
-	dc.l	_rts			; 1: (reserved)
-	dc.l	_physbase		; 2: get physical screen base
-	dc.l	_logbase		; 3: get logical screen base
-	dc.l	_getrez			; 4: get screen resolution
-	dc.l	_setscreen		; 5: set video parameters
-	dc.l	_setpalette		; 6: set palette
-	dc.l	_setcolor		; 7: set single color
-	dc.l	_floprd			; 8: read floppy sector(s)
-	dc.l	_flopwr			; 9: write floppy sector
-	dc.l	_flopfmt		; 10: format floppy track
-	dc.l	_getdsb			; 11: no-op (but returns 0L);
-					; 11 is also used by AKP's debugger, DB
-	dc.l	midiws			; 12: write string to MIDI port
-	dc.l	mfpint			; 13: initialize MFP interrupt
-	dc.l	iorec			; 14: set I/O record
-	dc.l	rsconf			; 15: configure RS-233 communications
-	dc.l	keytrans		; 16: set keyboard translation tables
-
-	dc.l	_rand			; 17: generate 24-bit random number
-	dc.l	_proto_bt		; 18: prototype boot sector
-	dc.l	_flopver		; 19: floppy verify
-
-	dc.l	_dumpit			; 20: dump screen
-	dc.l	_cursconf		; 21: get/set cursor configuration
-	dc.l	setclock		; 22: set ikbd/clock chip time
-	dc.l	getclock		; 23: get ikbd/clock chip time
-	dc.l	bioskeys		; 24: reset keyboard to powerup default
-	dc.l	ikbdws			; 25: write string to ikbd
-
-	dc.l	jdisint			; 26: disable mfp interrupt
-	dc.l	jenabint		; 27: enable mfp interrupt
-	dc.l	giaccess		; 28: read/write sound chip
-	dc.l	offgibit		; 29: reset bit in sound chip register
-	dc.l	ongibit			; 30: set bit in sound chip register
-	dc.l	xbtimer			; 31: initialize mfp timer
-	dc.l	dosound			; 32: startup sound daemon
-	dc.l	setprt			; 33: get/set printer configuration
-	dc.l	ikbdvecs		; 34: return ptr to base of kbd vars
-	dc.l	kbrate			; 35: get/set keyboard repeat rate
-	dc.l	_prtblk			; 36: _prtblk primitive
-	dc.l	wvbl			; 37: wait for next vblank
-	dc.l	supexec			; 38: execute in super mode
-	dc.l	puntaes			; 39: throw away AES
-
-	dc.l	unimpl			; 40: COOK THIS!  Kbad's cookie call
-	dc.l	_floprate		; 41: get/set floppy seek rate
-
-	dc.l	_dmaread		; 42: _dmaread call
-	dc.l	_dmawrite		; 43: _dmawrite call
-	dc.l	_bconmap		; 44: _bconmap call
-	dc.l	unimpl			; 45: bconctl (when ready)
-.if (TT | SPARROW)
-	dc.l	NVMaccess		; 46: nvmaccess
-.else
-	dc.l	unimpl
-.endif
-	dc.l	_waketime		; 47: Waketime
-
-* 0x30..0x3f: assigned to M.Schmal's MetaDOS
-
-	dc.l	unimpl			; 48: assigned
-	dc.l	unimpl			; 49: assigned
-
-	dc.l	unimpl			; 50: assigned
-	dc.l	unimpl			; 51: assigned
-	dc.l	unimpl			; 52: assigned
-	dc.l	unimpl			; 53: assigned
-	dc.l	unimpl			; 54: assigned
-	dc.l	unimpl			; 55: assigned
-	dc.l	unimpl			; 56: assigned
-	dc.l	unimpl			; 57: assigned
-	dc.l	unimpl			; 58: assigned
-	dc.l	unimpl			; 59: assigned
-
-	dc.l	unimpl			; 60: assigned
-	dc.l	unimpl			; 61: assigned
-	dc.l	unimpl			; 62: assigned
-	dc.l	unimpl			; 63: assigned
-	dc.l	Blitmode		; 64: Blitmode(mode)
-
-.if TT
-	dc.l	unimpl			; 65: assigned to Arabic TOS
-	dc.l	unimpl			; 66: assigned
-	dc.l	unimpl			; 67: assigned
-	dc.l	unimpl			; 68: assigned
-	dc.l	unimpl			; 69: assigned
-
-	dc.l	unimpl			; 70: assigned
-	dc.l	unimpl			; 71: assigned end of Arabic TOS
-	dc.l	unimpl			; 72: (0x48) assigned
-	dc.l	unimpl			; 73: assigned
-	dc.l	unimpl			; 74: assigned
-	dc.l	unimpl			; 75: assigned
-	dc.l	unimpl			; 76: assigned
-	dc.l	unimpl			; 77: assigned
-	dc.l	unimpl			; 78: assigned
-	dc.l	unimpl			; 79: assigned
-
-	dc.l	_EsetShift		; 80: TT shifter stuff
-	dc.l	_EgetShift		; 81
-	dc.l	_EsetBank		; 82
-	dc.l	_EsetColor		; 83
-	dc.l	_EsetPalette		; 84
-	dc.l	_EgetPalette		; 85
-	dc.l	_EsetGray		; 86
-	dc.l	_EsetSmear		; 87
-	dc.l	unimpl			; 88: assigned (more more VDI calls)
-	dc.l	unimpl			; 89: assigned
-
-	dc.l	unimpl			; 90: assigned
-	dc.l	unimpl			; 91: assigned
-	dc.l	unimpl			; 92: assigned
-	dc.l	unimpl			; 93: assigned
-	dc.l	unimpl			; 94: assigned
-	dc.l	unimpl			; 95: assigned
-.endif
+* trp13tab & trp14tab (BIOS/XBIOS function tables)
+* are now at the end of this file.
 
 .if M68030
 *+
@@ -4761,12 +4765,16 @@ _getrez:
 	rts				; return rez
 
 
+.if SPARROW
+* _setscreen and _getrez are in vtg.c
+	.globl _setscreen,_getrez
+
+.else
 *+
 * _setscreen - set screen location(s), rez
 *	_setscreen(logicalLoc, physicalLoc, rez)
 *	LONG logicalLoc, physicalLoc;
 *	WORD rez;
-*
 *-
 _setscreen:
 
@@ -4800,7 +4808,7 @@ f5b:	tst.w	$c(sp)			; if(rez < 0) then ignore it
 	jsr	esc_init		; re-initialize glass tty routines
 	move.w	#1,vblsem.w		; re-enable vblanks
 f5r:	rts
-
+.endif
 
 *+
 * _setpalette - set palette (on next vblank)
@@ -6418,5 +6426,204 @@ stmr1:	rts
 
 .endif
 * End of TT video calls
+
+*------ jump table for BIOS functions:
+
+.if (M68030 == 0)
+ibit	equ	$80000000	; on not-M68030, we check hi bit for indirect
+.else
+ibit	equ	$00000001	; on M68030, we check lo bit for indirect
+.endif
+
+trp13tab:
+	dc.w	12			; number of entries in jump table
+	dc.l	_get_mpb		; 0: get memory parameter block
+	dc.l	bconstat		; 1: console status (input)
+	dc.l	bconin			; 2: console input
+	dc.l	bconout			; 3: console output
+.if M68030
+	dc.l	m030_rw			; 4: disk read/write with clrcache
+.else
+	dc.l	hdv_rw + ibit		; 4: [indirect] disk read/write
+.endif
+	dc.l	_setexc			; 5: set exception vector
+	dc.l	_tickcal		; 6: return tick calibration
+	dc.l	hdv_bpb + ibit		; 7: [indirect] get BPB
+	dc.l	bcostat			; 8: console status (output)
+	dc.l	hdv_mediach + ibit	; 9: [indirect] media change inquiry
+	dc.l	_drvmap			; 10: get active-drive bit vector
+	dc.l	_shift			; 11: get/set keyboard shift bits
+
+* BIOS function $11 is assigned for DIAB630 unless I can get around it.
+
+
+*------ jump table for Atari BIOS extensions:
+trp14tab:
+.if (TT+SPARROW == 0)
+	dc.w	65			; number of entry points
+.else
+.if (SPARROW == 0)
+	dc.w	96			; number of TT entry points
+.else
+	dc.w	160
+.endif
+.endif
+	dc.l	initmous		; 0: initialize mouse
+	dc.l	_rts			; 1: (reserved)
+	dc.l	_physbase		; 2: get physical screen base
+	dc.l	_logbase		; 3: get logical screen base
+	dc.l	_getrez			; 4: get screen resolution
+	dc.l	_setscreen		; 5: set video parameters
+	dc.l	_setpalette		; 6: set palette
+	dc.l	_setcolor		; 7: set single color
+	dc.l	_floprd			; 8: read floppy sector(s)
+	dc.l	_flopwr			; 9: write floppy sector
+	dc.l	_flopfmt		; 10: format floppy track
+	dc.l	_getdsb			; 11: no-op (but returns 0L);
+					; 11 is also used by AKP's debugger, DB
+	dc.l	midiws			; 12: write string to MIDI port
+	dc.l	mfpint			; 13: initialize MFP interrupt
+	dc.l	iorec			; 14: set I/O record
+	dc.l	rsconf			; 15: configure RS-233 communications
+	dc.l	keytrans		; 16: set keyboard translation tables
+
+	dc.l	_rand			; 17: generate 24-bit random number
+	dc.l	_proto_bt		; 18: prototype boot sector
+	dc.l	_flopver		; 19: floppy verify
+
+	dc.l	_dumpit			; 20: dump screen
+	dc.l	_cursconf		; 21: get/set cursor configuration
+	dc.l	setclock		; 22: set ikbd/clock chip time
+	dc.l	getclock		; 23: get ikbd/clock chip time
+	dc.l	bioskeys		; 24: reset keyboard to powerup default
+	dc.l	ikbdws			; 25: write string to ikbd
+
+	dc.l	jdisint			; 26: disable mfp interrupt
+	dc.l	jenabint		; 27: enable mfp interrupt
+	dc.l	giaccess		; 28: read/write sound chip
+	dc.l	offgibit		; 29: reset bit in sound chip register
+	dc.l	ongibit			; 30: set bit in sound chip register
+	dc.l	xbtimer			; 31: initialize mfp timer
+	dc.l	dosound			; 32: startup sound daemon
+	dc.l	setprt			; 33: get/set printer configuration
+	dc.l	ikbdvecs		; 34: return ptr to base of kbd vars
+	dc.l	kbrate			; 35: get/set keyboard repeat rate
+	dc.l	_prtblk			; 36: _prtblk primitive
+	dc.l	wvbl			; 37: wait for next vblank
+	dc.l	supexec			; 38: execute in super mode
+	dc.l	puntaes			; 39: throw away AES
+
+	dc.l	unimpl			; 40: COOK THIS!  Kbad's cookie call
+	dc.l	_floprate		; 41: get/set floppy seek rate
+
+	dc.l	_dmaread		; 42: _dmaread call
+	dc.l	_dmawrite		; 43: _dmawrite call
+	dc.l	_bconmap		; 44: _bconmap call
+	dc.l	unimpl			; 45: bconctl (when ready)
+.if (TT | SPARROW)
+	dc.l	NVMaccess		; 46: nvmaccess
+.else
+	dc.l	unimpl
+.endif
+	dc.l	_waketime		; 47: Waketime
+
+* 0x30..0x3f: assigned to M.Schmal's MetaDOS
+
+	dc.l	unimpl			; 48: Minit(a)
+	dc.l	unimpl			; 49: Mopen(a,b)
+
+	dc.l	unimpl			; 50: Mclose(a)
+	dc.l	unimpl			; 51: Mread(a,b,c,d)
+	dc.l	unimpl			; 52: (?) Mwrite(a,b,c,d)
+	dc.l	unimpl			; 53: Mseek(a,b)
+	dc.l	unimpl			; 54: Mstatus(a,b)
+	dc.l	unimpl			; 55: assigned
+	dc.l	unimpl			; 56: assigned
+	dc.l	unimpl			; 57: assigned
+	dc.l	unimpl			; 58: CDread_aud(a,b,c,d)
+	dc.l	unimpl			; 59: CDstart_aud(a,b,c)
+
+	dc.l	unimpl			; 60: CDstop_aud(a)
+	dc.l	unimpl			; 61: CDset_songtime(a,b,c,d)
+	dc.l	unimpl			; 62: CDget_toc(a,b,c)
+	dc.l	unimpl			; 63: CDdisc_info(a,b)
+	dc.l	Blitmode		; 64: Blitmode(mode)
+
+.if (TT+SPARROW)
+	dc.l	unimpl			; 65: assigned to Arabic TOS
+	dc.l	unimpl			; 66: assigned
+	dc.l	unimpl			; 67: assigned
+	dc.l	unimpl			; 68: assigned
+	dc.l	unimpl			; 69: assigned
+
+	dc.l	unimpl			; 70: assigned
+	dc.l	unimpl			; 71: assigned end of Arabic TOS
+	dc.l	unimpl			; 72: (0x48) assigned
+	dc.l	unimpl			; 73: assigned
+	dc.l	unimpl			; 74: assigned
+	dc.l	unimpl			; 75: assigned
+	dc.l	unimpl			; 76: assigned
+	dc.l	unimpl			; 77: assigned
+	dc.l	unimpl			; 78: assigned
+	dc.l	unimpl			; 79: assigned
+.endif
+.if TT
+	dc.l	_EsetShift		; 80: TT shifter stuff
+	dc.l	_EgetShift		; 81
+	dc.l	_EsetBank		; 82
+	dc.l	_EsetColor		; 83
+	dc.l	_EsetPalette		; 84
+	dc.l	_EgetPalette		; 85
+	dc.l	_EsetGray		; 86
+	dc.l	_EsetSmear		; 87
+	dc.l	unimpl			; 88: assigned (more more VDI calls)
+	dc.l	unimpl			; 89: assigned
+
+	dc.l	unimpl			; 90: assigned
+	dc.l	unimpl			; 91: assigned
+	dc.l	unimpl			; 92: assigned
+	dc.l	unimpl			; 93: assigned
+	dc.l	unimpl			; 94: assigned
+	dc.l	unimpl			; 95: assigned
+.endif
+.if SPARROW
+* 80-87 unimplemented on Sparrow
+
+	dc.l	unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl
+
+* 88-95 Sparrow video calls from vtg.o
+
+	dc.l	_VsetMode		; 88
+	dc.l	_VgetMonitor		; 89
+
+	dc.l	_VsetSync		; 90
+	dc.l	_VgetSize		; 91
+	dc.l	_VsetVars		; 92
+	dc.l	_VsetRGB		; 93
+	dc.l	_VgetRGB		; 94
+	dc.l	_ValidMode		; 95
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+.endif
+
+ .data
+
+.if DB_STUB
+Mstop:	dc.b	"Stopped.",0
+.endif
 
 .end

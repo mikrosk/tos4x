@@ -4,17 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/05/09 16:45:37 $
+* $Date: 90/05/16 11:54:21 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.48  90/05/16  11:54:21  apratt
+* Added some ifne TT conditionals, so it compiles for not-TT.
+* Also changed boot color to dark blue, because light blue was taken.
+*
 * Revision 2.47  90/05/09  16:45:37  apratt
 * Added _FPU cookie; see the comments there for details.
 * Boot color: sky blue.
-*
+* 
 * Revision 2.46  90/04/30  18:44:45  apratt
 * Changed Getmpb call to conform to new GEMDOS style: one MD for both
 * ST RAM and alternative RAM, with the low bit of the block start address
@@ -446,7 +450,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.47 $
+* $Revision: 2.48 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -797,11 +801,12 @@ osconf		equ	%11001
 	.globl	_p_cookie		; pointer to cookie jar
 .ifne TT
 
+.if TT
+.endif
 .endc
 .endc
 .if (TT == 0)
 	.globl	_waketime		; alarm maintenance for STPAD
-	.globl	_bconmap		; (soon-obsolete) XBIOS call
 .endif
 .if TT
 	.globl	NVMaccess		; read/write/init non-volatile RAM
@@ -809,7 +814,6 @@ osconf		equ	%11001
 	.globl	osconf			; equate imported from BIOS.S
 	.globl	_bconmap		; (soon-obsolete) XBIOS call
 	.globl	endos, the_magic	; ashes of the build process
-	.globl	NVMaccess		; read/write/init non-volatile RAM
 	.globl	_dmaread,_dmawrite	; for booting
 
 	.globl	_date,_time		; GEMDOS date and time
@@ -2984,7 +2988,7 @@ _rts:	rts
 .ifeq TT
 	dc.w	$fff			; 0 white
 .else
-	dc.w	$55f			; 0 blue - 5/90 version
+	dc.w	$0cf			; 0 blue - 5/16/90 version
 .endc
 *	Passed:		d1.l = offset
 *			a0 = base of pattern ($1f8 bytes long)
@@ -3424,7 +3428,11 @@ trp14tab:
 	dc.l	unimpl
 .endc
 	dc.w	65			; number of entry points
+.ifne TT
 	dc.w	96			; number of TT entry points
+.endif
+	dc.l	initmous		; 0: initialize mouse
+.endc
 	dc.l	unimpl			; 47: unused ($2f)
 	dc.l	_setcolor		; 7: set single color
 	dc.l	_floprd			; 8: read floppy sector(s)

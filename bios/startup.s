@@ -4,17 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/07/19 18:52:11 $
+* $Date: 90/07/25 14:24:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.54  90/07/25  14:24:45  apratt
+* Re-added clear of bootdev at reset time when you're a RAM TOS so the
+* floppy's AUTO folder gets executed, not the hard disk's.
+*
+* Improved privilege violation handler (again and for the last time!)
+* to handle D registers as dest of move.
+*
 * Revision 2.53  90/07/19  18:52:11  apratt
 * Changed date to 7/19 and color to slightly yellow, pulsing from
 * full yellow to full white.  Added pulsing for non-TT, too.
-*
+* 
 * Revision 2.52  90/07/19  15:17:54  apratt
 * Moved TT screen base to phystop-screen_size-$100, so the low byte is
 * zero and programs which double buffer and write directly to the shifter
@@ -502,7 +509,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.53 $
+* $Revision: 2.54 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2023,10 +2030,16 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 	move.l	os_magic(pc),a0		; get pointer to magic
 	cmp.l	#$87654321,(a0)		; is the magic there?
 	beq	usem			; yes -- use numbers there
-*	clr.w	_bootdev.w		; clear this (NEW 5/5/88)
+.ifeq systype-ram
+					; MAS BUG: don't use "os_end-4(PC)"
+.endc
+	move.l	8(a0),exec_os.w		; init default-shell pointer
 
 *--- Disk vectors:
 	move.l	#_dskinit,hdv_init.w	; initialization
+	move.l	#_rwabs,hdv_rw.w	; read/write absolute sectors
+	move.l	#_getbpb,hdv_bpb.w	; get BIOS parameter block
+	move.l	#_mediach,hdv_mediach.w ; media change inquiry
 	move.l	#_boot,hdv_boot.w	; boot-from-device
 
 *--- Prtblk vectors:
@@ -2494,18 +2507,19 @@ kbloop:	cmp.l	_hz_200.w,d0
 
 * install a handler for privilege violation which handles move 
 * from sr: it clobbers the offending instruction into a move from CCR. 
-priv:	move.l	a0,-(sp)		; save separately
-	movem.l	d0-d2,-(sp)
-	move.l	$12(sp),a0		; get PC of offending instr
+* Works only for moves in RAM.  If the instr is in ROM, this will give
+* bus error, not privilege violation... Slightly harder to debug.  
+* And doesn't work at all if the code actually uses the high byte of sr.
+* It does work on any 68010-68030, though.
 
 *
 * Take 2: copy the dest EA bits and extension words of the instruction into
 * a "move.w (a0),ea" instruction elsewhere in memory, point a0 to the
 * SR from the exception stack, and jsr there.
 *
-	move.w	#%0011000000010000,pspace.w	; "move.w (a0),<ea>"
-	move.l	#$4e714e71,pspace+2.w	; nop nop (extension words)
-	move.w	#$4e75,pspace+6.w	; rts
+
+	move.l	#priv,$20		; set priv viol exception vector
+	bra	priv2			; skip past this cruft.
 
 * clrcache: common subroutine to clear both caches; clobbers d0.
 * Called also at the tail end of any Rwabs call with bit 0 clear (reads).
@@ -2520,32 +2534,95 @@ clrcache:
 	rts				; return.
 
 .bss
+.even
+pspace:	ds.w	4
 .text
-	beq	p1ext			; yes, one extension word
+
 priv:	movem.l	d0-d2,-(sp)		; save D regs
-	bne	psdone			; not 7: setup done
+	move.l	a1,-(sp)		; save A regs
+	move.l	a0,-(sp)
 	move.l	$16(sp),a0		; get PC of offending instr
-	beq	p1ext			; reg 0: just one ext word
+	move.w	(a0),d0			; get the instr itself
 	move.w	d0,d1			; copy to d1
 	and.w	#$ffc0,d0		; zero the EA bits
-p1ext:	addq	#2,d2			; count the first ext word
+	cmp.w	#$40c0,d0		; is it move from sr?
 	bne	priv1			; no.
-psdone:	add.l	d2,18(sp)		; update PC for RTE
+
 	move.l	#$30004e71,pspace.w	; "move.w d0,<ea> / nop"
-* setup done; put the exception SR address in a0 and jsr to pspace
+	move.l	#$4e714e75,pspace+4.w	; "nop / rts"
+
+	move.w	d1,d0
 	and.w	#%111,d0		; isolate register bits
+	lsl.w	#8,d0
+	lsl.w	#1,d0
+	or.w	d0,pspace.w		; OR them in
+	move.w	d1,d0
+	and.w	#%111000,d0		; isolate mode bits
+	lsl.w	#3,d0
+	or.w	d0,pspace.w		; OR them in
+
+	moveq	#2,d2			; d2 is size of this instruction
+
+	cmp.w	#%110000000,d0		; look for mode 6
+	beq	priv1			; can't handle mode 6
+	tst.w	d0			; look for mode 0 (a D register)
 .ifne TT
 	cmp.w	#%101000000,d0		; look for mode 5
 .endc
+	cmp.w	#%111000000,d0		; look for mode 7
+	bne	pnot7			; not 7: setup done
+* handle mode 7
+	and.w	#%111,d1		; check for reg 0 or 1
+	beq	p71ext			; reg 0: just one ext word
+	addq	#2,d2			; count the second ext word
+	move.w	4(a0),pspace+4.w	; move second extension word
 p71ext:	addq	#2,d2			; count the first ext word
-	movem.l	(sp)+,d0-d2
-	lea.l	4(sp),a0
-	jsr	pspace
-	move.l	(sp)+,a0
+	move.w	2(a0),pspace+2.w	; move first extension word
+	bra	psdone
+
+* handle mode 5
+pmode5:	addq	#2,d2			; count the first ext word
+	move.w	2(a0),pspace+2.w	; move the first ext word
+
+* handle all modes 2-5: if reg not 7, we're done, else use a1=usp
+pnot7:	and.w	#%111,d1		; get reg bits
+	cmp.w	#%111,d1		; is reg a7?
+	bne	psdone
+
+.ifne TT
+* add to PC on stack, put exception SR in d0, put usp in a1, 
+.endc
+* restore d0-d1/a0-a1 and finish.
+
+	move.l	usp,a1
+	and.w	#%1111001111111111,pspace.w ; change a7 to a1 in dest of move
+	add.l	d2,$16(sp)		; update PC for RTE
+.if M68030
 	bsr	clrcache
 .endif
-priv1:	movem.l	(sp)+,d0-d2
-	move.l	(sp)+,a0
+	move.w	$14(sp),d0		; $14(sp) is exception sr
+	jsr	pspace.w
+	move.l	a1,usp			; save possibly changed "usp"
+	move.l	(sp)+,a0		; restore A regs
+	move.l	(sp)+,a1
+	movem.l	(sp)+,d0-d2		; restore D regs
+	rte
+
+.ifne TT
+* are restored before the call, and (a0) points to the place on
+.endc
+* of the move is a D register.
+
+* setup done: add to PC on the stack, put addr of exception SR in a0,
+* restore d0-d2 from the stack, change the instruction to a move
+* from (a0), jsr to pspace, restore a0-a1, and finish.
+
+psused0:
+	add.l	d2,$16(sp)		; update PC for RTE
+	or.w	#%010000,pspace.w	; change to move (a0),<ea>
+.if M68030
+	bsr	clrcache
+.endif
 .ifne TT
 	movem.l	8(sp),d0-d2		; get these off the stack now
 	jsr	pspace.w

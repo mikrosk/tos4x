@@ -1,12 +1,15 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\mem.c,v $
+* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/11/20 19:44:04 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.20  1991/11/20  19:44:04  apratt
+* Memory protection, first cut (no workee yet)
+*
 * Revision 2.19  1991/06/18  17:52:02  apratt
 * Updated to DB release 3 (new print)
 *
@@ -113,7 +116,8 @@ This code gets rid of the dumb "rover" idea.  What a dog!
  * odd boundary!
  */
 
-#define QUANTUM (4L)	/* longword-align everything */
+/* MEMORY PROTECTION VERSION: the quantum for Malloc is the page size, 8K */
+#define QUANTUM (0x2000L)
 
 /*
  * initialize memory allocator
@@ -125,6 +129,7 @@ xminit()
     MD *p;
     unsigned long s;
     unsigned long adjust;
+    long tbl;
 
     (void)getmpb(&pmd);
 
@@ -145,6 +150,13 @@ xminit()
 	p->m_length = p->m_length & ~(QUANTUM-1);
 	if (p->m_length < 0) p->m_length = 0;
     }
+
+    /* grab 16K from the base of the first free block for the tables */
+    p = pmd.mp_mfl;
+    tbl = p->m_start;
+    p->m_start += 2*QUANTUM;
+    p->m_length -= 2*QUANTUM;
+    init_tables((void *)tbl,&pmd);
 }
 
 unsigned long 
@@ -173,6 +185,12 @@ int type;
 
 /*
  * Allocate memory from TPA.
+ *
+ * MEMORY PROTECTION VERSION: the QUANTUM is the page size (so programs
+ * which do lots of small Mallocs will lose big-time).  The memory
+ * is made accessible rather than causing bus error; that's the only
+ * level of protection we can offer globally.  For mfree and mshrink
+ * we turn the memory off again.
  */
 MD
 *ffit(amount,mp,type)
@@ -265,6 +283,10 @@ int type;
     p -> m_link = mp->mp_mal;
     mp->mp_mal = p;
     p->m_own = run;
+
+    /* MEMORY PROTECTION VERSION: turn on access to this region */
+    mark_region(p,1);
+
     return(p);
 }
 
@@ -350,6 +372,11 @@ MPB *mp;
     DBCMD(0x80,"print freeit -x (lpeek (`a6 + 8)) mpb: -x (lpeek (`a6 + c));_c");
 
     p1 = 0;		/* this is p's prev */
+
+    /*
+     * MEMORY PROTECTION VERSION: "turn off" access to this memory
+     */
+    mark_region(m,0);
 
     /*
      * Find where this block belongs in the free list. Blocks are sorted in
@@ -488,7 +515,7 @@ void
 xmunhook(pid)
 PD *pid;
 {
-    REG MD *m;
+    REG MD *m, *hold;
     REG MD **q;
     
     DBCMD(0x80,"print xmunhook pid: -x (lpeek (`a6 + 8));_c");
@@ -496,7 +523,9 @@ PD *pid;
     for (m = *(q = &pmd.mp_mal); m; ) {
 	if (m->m_own == pid) {
 	    /* here's one: link prev's next to m's next (and change m) */
+	    hold = m;
 	    *q = m = m->m_link;
+	    freesmall(hold);
 	}
 	else {
 	    /* not one: move m and q onward */
@@ -560,6 +589,8 @@ PD *pid;
  * and should be used for programs, etc.
  *
  * Usage: Maddalt(char *block,long size)
+ *
+ * MEMORY PROTECTION VERSION: this doesn't work at all.
  */
 
 long

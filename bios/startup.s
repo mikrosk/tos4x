@@ -4,20 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/15 15:31:41 $
+* $Date: 91/08/20 11:47:17 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.75  91/08/20  11:47:17  apratt
+* Changes for STPAD: clear the conversion-done interrupt during startup,
+* vector NMI to RTE because when it happens, Pterm is always the wrong thing
+* to do, and check for a stylus-button-click to abort the 80-second timeout
+* (because STylus has no keyboard to use for aborting this timeout).
+*
+* to do, and check for a stylus-button-click to abort the 80-second timeout
+* (because STylus has no keyboard to use for aborting this timeout).
+* 
 * Revision 2.74  91/08/15  15:31:41  apratt
 * Moved STPAD power-control initialization; it was in the wrong place.
 * Documented the _MCH cookie better and set it for STe/AT (see _MCH).  Added
 * "cart1" processing for STPAD; see cartscan.  Changed memory test and HD
 * delay completely; search for "spaghetti" for details.  Explained dmaboot
-* device-number sequence (see dmarfail).
-*
 * device-number sequence (see dmarfail).
 * 
 * 
@@ -145,7 +152,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.74 $
+* $Revision: 2.75 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1032,6 +1039,8 @@ vtend:	move.w	(a0)+,d0
 	move.b	#2,shiftmd
 	move.b	#$80,$ffff827e		; write LCD and power control
 	move.b	#$80,$889		; $889 is "shadow shadow"
+	tst.w	$d00000			; read the conversion register
+					; to clear its interrupt
 .endc
 .endif
 
@@ -1921,6 +1930,16 @@ sei1:	move.l	a1,(a0)+
 .endc
 *
 *  Exception vectors are pointed to the system critical error handler
+.ifne STPAD
+* on STPAD, vector NMI to RTE; it's possible to get NMI when the
+*  the exception number.  If TT, the exception number comes off the stack
+*  in the frame word.
+*
+*  Trap 2, Divide-by-zero, and NMI are pointed at an RTE.
+*
+*  The HBLANK, VBLANK, line 1010, [someday: line 1111], trap 13, trap 14,
+.endc
+*  and "extended" trap vectors are initialized appropriately.
 *
 * New code: we set all these exceptions to vector to 'coldboot' on the
 * theory that a bus error while TOS is booting is A Bad Thing. We will
@@ -2875,8 +2894,12 @@ dskb1:	rts				; return status
 *	d4.w: _dmaread device number
 *	d5.w: user-preference value from NVM or input or something
 *		(zero for now)
+*	others: garbage
+*
+* _dmaread returns zero for success, -1 for timeout (don't retry),
 * and some other (negative) number for retryable errors (like
 * media change and reset error, which some drives use to signal
+* those conditions).
 *
 * USER PREFERENCE:
 * 
@@ -2909,10 +2932,7 @@ dskb1:	rts				; return status
 * 	}
 * 	(continuation of bar shrinking here; label nomt)
 * 	if (now >= next_bar_time) {
-.ifeq STPAD
-* This whole timeout business only applies if you are not STPAD.
-
-	move.w	#0,a5
+	move.w	#0,a5			; a5 is the memory-test-done flag
 
 * 	    next_bar_time += bar_interval;
 * 	}
@@ -3022,6 +3042,13 @@ dmab_sp:
 	move.l	#$00010002,-(sp)
 	trap	#$d			; poll for char: Bconstat(2)
 	addq.l	#4,sp
+.ifne STPAD
+	move.w	#' ',4(sp)
+	move.w	$d00006,d0
+	move.w	#27,4(sp)
+	bne	dmab_abrt		; yes, abort
+.endc
+	move.w	#'q',4(sp)
 
 * we jump here when we're counting time and the memory test is done.
 
@@ -3031,7 +3058,12 @@ nomt:
 *   output a backspace
 *   add 200 to d6
 
+dmab_abort:
+	move.l	d7,_hz_200		; set the time to EIGHTY_SECONDS
+					; so we don't do all this again
 	bra	dmab_skip		; and we're done
+	cmp.l	_hz_200,d6
+	bhi	dmab_ns
 	move.l  #$00030002,-(sp)
 	trap	#$d
 	move.w	#'K',4(sp)
@@ -3046,27 +3078,7 @@ nomt:
 dmab_ns:
 
 * this is the end of the memory-test/shrinking bar sequence.  We check
-* this else is the end of the timeout code, which is gone if you are STPAD.
-* If you are STPAD you do get the memory test, and you can interrupt it.
-.else
-dmab_mt:
-	bsr	mem_test_next		; test next block of memory
-	bne	dmab_mtdone		; memory test done
-	move.l	#$00010002,-(sp)
-	trap	#$d
-	addq.l	#4,sp
-	tst.l	d0
-	beq	dmab_mt			; no key; loop.
-
-	move.l	#$00020002,-(sp)
-	trap	#$d			; Bconin(2) -- get the char.
-	addq.l	#4,sp
-
-	bsr	mem_abort		; aborted memory test
-
-dmab_mtdone:
-	move.l	#EIGHTY_SECONDS,_hz_200	; so we don't test RAM again
-.endc
+* this else is the end of the timeout code
 
 * to see if we're actually done (gasp!) and also for user interruption.
 

@@ -1,17 +1,13 @@
 #
-# $Header: /home/mikro/atari/tos/work/bios/rcs/rcs-repaired/makefile,v 1.3 88/10/12 14:44:51 kbad Exp $
+# $Header: /u2/MRS/osrevisions/aes/foo,v 1.4 89/01/23 12:18:41 kbad Exp $
 #
 # Author Slavik Lozben
 # This makefile builds the bios object files
 #
-# 880701 kbad
-# Modified to rely on Mark Williams make control files:
-#
-# 880824 kbad
-# added actions to makefile
-#
-# 880922 kbad
-# changed makefile for new build method (now uses alnnew)
+# 890123 kbad	changed `alnnew' refs to `aln' (new aln is now "OK")
+# 880922 kbad	changed makefile for new build method (now uses alnnew)
+# 880824 kbad	added actions to makefile
+# 880701 kbad	Modified to rely on Mark Williams make control files:
 #
 TMPDIR	=	m:
 .SUFFIXES: .o .c .s
@@ -35,7 +31,7 @@ SFILES	=	flop.o xinout.o clear.o clock.o bios.o
 CFILES	=	prtblk.o rwabs.o
 
 allbios.o:	$(STARTUP) $(SFILES) $(CFILES) allbios.aln
-		alnnew -c allbios.aln
+		aln -c allbios.aln
 		cp $@ ..\build
 		@echo $@ linked.
 

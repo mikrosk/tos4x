@@ -3,17 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/19 13:58:39 $
+* $Date: 89/07/20 15:36:50 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.12  89/07/20  15:36:50  apratt
+* Changed ttdelay code to use TTMFP timer A.  Also added code to catch
+* the return from Rwabs calls and clobber the cache if the operation
+* was a read.  (This is a lose for ramdisks and drivers which do it
+* on their own, but it's a win because you can use ST drivers.)
+*
 * Revision 2.11  89/07/19  13:58:39  apratt
 * Added ttwait/ttdelay calls to remove some instruction-loop
 * delays.  These entry points are also used by bios.s and flop.s.
-*
+* 
 * Revision 2.10  89/06/15  15:43:11  apratt
 * Changed STPLUSVIDEO to STPLUS, because it covers everything STPLUS
 * unique (DMASND covers other things).  Changed version number to 1.6,
@@ -236,7 +242,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.11 $
+* $Revision: 2.12 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -300,7 +306,7 @@ denmark		=      13 ***DON'T  CHANGE***
 * code is stopgap, such as programming the memory controller for 2Meg
 * and short-circuiting the RTC.  Caveat programmer.
 * The switches TT, STPLUS, systype, and country
-TT		=	1	; @check@
+TT		=	0	; @check@
 * of one of the canned switch settings files.
 
 * set MOVEVBL to 1 to make vblqueue processing first in the vblank
@@ -309,7 +315,7 @@ TT		=	1	; @check@
 * beam starts drawing.  May not turn out to be necessary, and
 * may turn out to be dangerous (I'm not sure how...).
 
-MOVEVBL		=	1	; @check@
+MOVEVBL		=	0	; @check@
 
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
 * the chip actually exists (so clearing the control register will
@@ -322,12 +328,12 @@ DMASND		=	1	; @check@
 * monomon when DMA sound chip is idle.  Older STPLUS and TT machine
 * do this, newer ones have the idle state noninverting.
 
-DMAINV		=	1	; @check@
+DMAINV		=	0	; @check@
 
 * set STPLUS to 1 for ST PLUS specific things like memory layout
 * and video (four bits per gun, any-word alignment).
 
-STPLUS		=	0	; @check@
+STPLUS		=	1	; @check@
 
 * Set LONGFRAME to 1 for code which runs on 68000 *or* 680[1-3]0.
 * Even if this is zero, the new system variable _longframe at $59e
@@ -341,7 +347,7 @@ country		=	usa     ; 'usa', etc.... @check@
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
 
 .ifeq TT
-version		equ	$0104		; version number *MUST BE EVEN*
+version		equ	$0106		; version number *MUST BE EVEN*
 date		equ	$03301989	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
@@ -1084,7 +1090,7 @@ sizeof_hdr = *-ostext			; = size of OS header
 *  or when the RESET button is pressed,
 *
 * There is code here to reset the ACSI chip and leave it in the read state.
-	reset				; reset	hardware
+*	reset				; reset	hardware (removed AKP 7/89)
  endc
 	move.w	#$2700,sr		; super mode, no interrupts
 
@@ -1917,11 +1923,24 @@ setvb2:	move.l	#reseth,swv_vec(a5)	; RESET system on monitor change
 .if STPAD
 	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
 * bus error, not privelege violation... Slightly harder to debug.  
-* And doesn't work at all if the code uses the high byte of sr. Tough.
+	move.w	#$2300,sr		; go to IPL 3
+	moveq	#1,d0			; magic bit# = 1
 	bsr	cartscan		; execute cartridge aps
 	move.l	#priv,$20(a5)		; set priv viol exception vector
 	bra.s	priv2
 * to allow characters the keyboard controller is trying to send to come
+* through, then clear the kbshift state variable.  This is because
+* we can get here via control-alt-delete, and those keys will have
+* been down when the keyboard was reset, and the new IKBD controller
+* successfully sends "make" codes for those keys when it comes up.
+* Having ALT down in DMABOOT is bad, because it inhibits hard disk
+* booting.  So we flush out the channel and nuke the state variable.
+*
+
+	move.l	_hz_200.w,d0
+	addq.l	#3,d0
+kbloop:	cmp.l	_hz_200.w,d0
+	bhi	kbloop
 priv:	movem.l	d0/a0,-(sp)
 	move.l	$a(sp),a0		; get PC of offending instr
 
@@ -1931,9 +1950,7 @@ priv:	movem.l	d0/a0,-(sp)
 	move.b	#$42,(a0)		; clobber the instruction
 .ifne TT
 * if TT, need to clear caches after this instruction
-	dc.w	$4e7a, $0002		; (movec cacr,d0) get cacr
-	or.l	#$808,d0		; set "clear" bits of both caches
-	dc.w	$4e7b, $0002		; (movec d0,cacr)
+	cmp.w	#%101000000,d0		; look for mode 5
 .endc
 	movem.l	(sp)+,d0/a0
 	bsr	clrcache
@@ -2784,7 +2801,7 @@ b_supr:	move.w	(sp)+,d0		; get function#
 	dc.l	hdv_mediach+$80000000	; 9: [indirect] media change inquiry
 .endc
 .ifne TT
-	dc.l	1+hdv_rw		; 4: [indirect] disk read/write
+	dc.l	tt_rw			; 4: disk read/write (see below)
 	dc.l	_setexc			; 5: set exception vector
 	dc.l	_tickcal		; 6: return tick calibration
 	dc.l	1+hdv_bpb		; 7: [indirect] get BPB
@@ -2920,7 +2937,26 @@ trp13tab:
 
 .endc
 	dc.l	unimpl			; 49: assigned
+.ifne TT
 	dc.l	unimpl			; 50: assigned
+	dc.l	unimpl			; 51: assigned
+	dc.l	unimpl			; 52: assigned
+	dc.l	unimpl			; 53: assigned
+	dc.l	unimpl			; 54: assigned
+	dc.l	unimpl			; 55: assigned
+	bne.s	tt_write		; not read, don't change return PC
+	dc.l	unimpl			; 57: assigned
+	dc.l	unimpl			; 58: assigned
+	move.l	hdv_rw(a5),a0		; load vector
+
+	dc.l	unimpl			; 60: assigned
+	dc.l	unimpl			; 61: assigned
+	dc.l	unimpl			; 62: assigned
+	dc.l	unimpl			; 63: assigned
+	dc.l	Blitmode		; 64: Blitmode(mode)
+.endc
+.if TT
+	dc.l	unimpl			; 65: assigned to Arabic TOS
 	dc.l	unimpl			; 66: assigned
 	dc.l	unimpl			; 67: assigned
 	dc.l	unimpl			; 68: assigned
@@ -3899,7 +3935,10 @@ TB_e:	move.l	a1,8(a0)		;; restore original bus error vector
 *-
 	.globl	_GETBLT
 	.globl	_SETBLT
-* Uses Timer B of the TT MFP. (could use any timer in any MFP)
+* Uses Timer A of the TT MFP. (could use any timer in any MFP)
+* For documentation purposes, say, "Timer A of the TT MFP is used by
+* TOS to time short delays; it can be used anywhere outside TOS.
+* No initial state is assumed by TOS, and its state is not restored."
 	move.w	d0,d4			; save blt chip status
 	move.w	d0,d5			; save blt chip status
 	lsr.w	#1,d5			; blit chip installed mask (0 or 1)
@@ -3912,6 +3951,7 @@ TB_e:	move.l	a1,8(a0)		;; restore original bus error vector
 	or.w	d4,d0			; replace installed status
 *		When the time has elapsed, bit 0 of TT_ipra gets set.
 Bmd_1:	move.w	d3,d0			; return "old" blit mode
+	rts
 
 *
 *	==> D0 = 0, no chip
@@ -3950,59 +3990,62 @@ TB_e:	move.l	a1,8(a0)		; restore original bus error vector
 * bit 0 of TT_ipra: it becomes 1 when the time has expired.
 *
 * (Procedures used by other parts of the BIOS for timing delays.)
-TT_mfp	equ	$fffffa80
-TT_gpip	= TT_mfp+1			; general purpose I/O
-TT_aer	= TT_mfp+3			; active edge reg
-TT_ddr	= TT_mfp+5			; data direction reg
-TT_iera	= TT_mfp+7			; interrupt enable A & B
-TT_ierb	= TT_mfp+9
-TT_ipra	= TT_mfp+$b		; interrupt pending A & B
-TT_iprb	= TT_mfp+$d
-TT_isra	= TT_mfp+$f		; interrupt inService A & B
-TT_isrb	= TT_mfp+$11
-TT_imra	= TT_mfp+$13		; interrupt mask A & B
-TT_imrb	= TT_mfp+$15
-TT_vbr	= TT_mfp+$17		; interrupt vector base
-TT_tacr	= TT_mfp+$19		; timer A control
-TT_tbcr	= TT_mfp+$1b		; timer B control
-TT_tcdcr = TT_mfp+$1d		; timer C & D control
-TT_tadr	= TT_mfp+$1f		; timer A data
-TT_tbdr	= TT_mfp+$21		; timer B data
-TT_tcdr	= TT_mfp+$23		; timer C data
-TT_tddr	= TT_mfp+$25		; timer D data
-TT_scr	= TT_mfp+$27		; sync char
-TT_ucr	= TT_mfp+$29		; USART control reg
-TT_rsr	= TT_mfp+$2b		; receiver status
-TT_tsr	= TT_mfp+$2d		; transmit status
-TT_udr	= TT_mfp+$2f		; USART data
+TT_mfp	equ	$fffffa81
+TT_gpip	=	0		; general purpose I/O
+TT_aer	=	2		; active edge reg
+TT_ddr	=	4		; data direction reg
+TT_iera	=	6		; interrupt enable A & B
+TT_ierb	=	8
+TT_ipra	=	$a		; interrupt pending A & B
+TT_iprb	=	$c
+TT_isra	=	$e		; interrupt inService A & B
+TT_isrb	=	$10
+TT_imra	=	$12		; interrupt mask A & B
+TT_imrb	=	$14
+TT_vbr	=	$16		; interrupt vector base
+TT_tacr	=	$18		; timer A control
+TT_tbcr	=	$1a		; timer B control
+TT_tcdcr =	$1c		; timer C & D control
+TT_tadr	=	$1e		; timer A data
+TT_tbdr	=	$20		; timer B data
+TT_tcdr	=	$22		; timer C data
+TT_tddr	=	$24		; timer D data
+TT_scr	=	$26		; sync char
+TT_ucr	=	$28		; USART control reg
+TT_rsr	=	$2a		; receiver status
+TT_tsr	=	$2c		; transmit status
+TT_udr	=	$2e		; USART data
 
-MFPBIT	equ	0			; change this for different timers
-*					; zero is Timer B
+MFPBIT		equ	5		; Timer A (TB is easy; others hard)
+NOTMFPBIT	equ	$df		; ~(1<<MFPBIT)
 * For documentation purposes, say, "Timer C of the TT MFP is used by
 *
 *	ttwait	delays for a time specified in D0.W: the high
 *		byte is the value for the countdown.  When
 *		are used.
 *
-twait1:	btst.b	#MFPBIT,TT_ipra		; while not pending
+twait1:	btst.b	#MFPBIT,TT_mfp+TT_ipra	; while not pending
 *		When the time has elapsed, WAITBIT of WAITREG gets set.
-	move.b	#0,TT_tbcr		; stop the timer
+	clr.b	TT_mfp+TT_tacr		; stop the timer
 	rts				; and return
 *		(The timer will run ad infinitum, but who cares?)
 *		(This is not actually used at this time.)
+	move.l	a0,-(sp)		; save a0
+	lea.l	TT_mfp,a0
 *	dowait	is either ttwait or stwait, for use during boot.
 *		Only TT can use ttwait after the boot; stwait uses
-	move.b	#$10,TT_tbcr		; stop timer
-	bclr.b	#MFPBIT,TT_iera		; disable int
-	move.b	#$fe,TT_ipra		; clear pending
-	bclr.b	#MFPBIT,TT_imra		; mask int
-	bset.b	#MFPBIT,TT_iera		; enable int
+	clr.b	TT_tacr(a0)		; stop timer
+	bclr.b	#MFPBIT,TT_iera(a0)	; disable int
+	move.b	#NOTMFPBIT,TT_ipra(a0)	; clear pending
+	bclr.b	#MFPBIT,TT_imra(a0)	; mask int
+	bset.b	#MFPBIT,TT_iera(a0)	; enable int
 *	3 (/16)		 6   us		  1.6 ms
 
-	move.b	d0,TT_tbdr		; set data value
-	lsr.w	#8,d0			; get mode byte into d0.b
-	move.b	d0,TT_tbcr		; start the clock (mode from d0)
-	lsl.w	#8,d0			; restore d0
+	move.b	d0,TT_tadr(a0)		; set data value
+	ror.w	#8,d0			; get mode byte into d0.b
+	move.b	d0,TT_tacr(a0)		; start the clock (mode from d0)
+	move.b	tttcdcr,d1		; don't disturb timer D's state
+	move.l	(sp)+,a0		; restore a0
 	and.b	#$0f,d1
 .endc
 	clr.w	d1

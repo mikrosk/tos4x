@@ -4,13 +4,16 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/29 23:59:46 $
+* $Date: 1991/09/30 16:45:58 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.16  1991/09/30  16:45:58  apratt
+* Another rev for STBOOK alarm stuff; see comments above waketime.
+*
 * Revision 2.15  1991/09/29  23:59:46  apratt
 * Added the Waketime() XBIOS call, number 47 ($2f).  See the code
 * for documentation of it.  It's meant for STPAD but works for all
@@ -97,7 +100,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.15 $
+* $Revision: 2.16 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\clock.s,v $
@@ -219,9 +222,12 @@ iclfai:	rts
 *  is also a good indication that the chip isn't around....
 *
 *    Returns:	a0 -> clock hardware base
+*		RTC in time bank, not alarm bank
+*		RTC test register zeroed
+*		(on STPAD: both periodic interrupts off)
 *		CC: clock exists
 *		CS: clock doesn't exist (bad RAM test)
-*
+* 
 *    Uses:	d0-d2/a0-a2
 *
 * Originally, this code didn't have the bus error handling; that
@@ -234,6 +240,7 @@ clktest:
 	move.w	#RTCBASE,a0		; fulfill return requirement
 	move.b	#0,RTTEST(a0)		; clobber test register
 	move.b	#%1100,RTRES(a0)	; and turn off periodic outputs
+	bclr	#0,RTMODE(a0)		; select time bank, not alarm
 	moveq.l	#0,d0			; clear the carry bit - clock exists.
 	rts
 .else
@@ -241,7 +248,8 @@ clktest:
 	move.l	$8.w,d2			; save bus error vector
 	move.l	sp,a2			; save stack pointer for cleaning up
 	move.l	#clkerr,$8.w		; write bus error vector
-	move.b	#%1001,RTMODE(a0)	; set "alarm" bank
+*	move.b	#%1001,RTMODE(a0)	; set "alarm" bank
+	bset	#0,RTMODE(a0)		; set "alarm" bank (leave ENs alone)
 	move.l	d2,8.w			; no bus error - restore vector
 	move.w	#$0a05,d0		; d0 = test pattern
 	movep.w	d0,RT01MIN(a0)		; write two registers
@@ -250,7 +258,8 @@ clktest:
 	cmp.w	d0,d1			; compare?
 	bne	clkfai			; (no --- fail)
 	move.b	#%0001,RT01SEC(a0)	; set 16.384Khz CKOUT mode
-	move.b	#%1000,RTMODE(a0)	; set "normal" bank
+*	move.b	#%1000,RTMODE(a0)	; set "normal" bank
+	bclr.b	#0,RTMODE(a0)		; set "normal" bank (leave ENs alone)
 	move.b	#0,RTTEST(a0)		; clobber test register
 	rts				; return OK
 
@@ -485,6 +494,7 @@ _setclock:
 	move.b	#%0001,RT10MON(a0)	; set 24-hour mode
 	move.b	d2,RT01YR(a0)		; write leap-year count
 	bclr.b	#0,RTMODE(a0)		; set "normal" bank (leave EN's alone)
+	bclr.b	#3,RTMODE(a0)		; disable timer while we're setting it
 
 	moveq	#READS-1,d0		; d0 = count
 	moveq	#RT01SEC,d1		; d1 = index to hardware registers
@@ -492,6 +502,7 @@ sclp:	move.b	(a1,d0.w),(a0,d1.w)	; copy byte to clock chip
 	addq.w	#2,d1			; bump register index
 	dbra	d0,sclp
 
+	bset.b	#3,RTMODE(a0)		; enable timer after setting it
 	moveq	#0,d0			; return 0 = OK
 	rts
 
@@ -586,6 +597,14 @@ dytbl:	dc.w	0					; Jan 1
 *	4: you asked that I set the alarm and I did.
 *	5: you asked that I set the alarm but waketime is zero.
 *
+*
+* I am not sure of the hardware in the book, but there are some
+* strangenesses here: when I tried it on a Mega STe, I didn't seem to have
+* to clear the Alarm Enable to make the alarm signal go away: the bit in
+* the reset register was enough.  In the book I seem to have to clear the
+* EN as well.  BUT: when I do that, I get another interrupt!  I guess it's
+* triggered on both edges(?).
+*
 
 .bss
 waketime: ds.l	1
@@ -594,34 +613,37 @@ waketime: ds.l	1
 .globl _waketime
 _waketime:
 	move.l	4(sp),d0
-	beq	clralarm
+	beq	clralarm	; Waketime(0): clear the alarm
 	moveq.l	#-1,d1
 	cmp.l	d0,d1
-	beq	readalarm
+	beq	readalarm	; Waketime(-1): read the current value
 	addq.l	#2,d1
 	cmp.l	d0,d1
-	beq	setalarm
+	beq	setalarm	; Waketime(1): set the alarm
 
-* OK, it's really a time & date.  Compare with the globals _date
-* and _time to see if it's really in the future.  If it is, set
-* the waketime variable to this value.
+*
+* OK, it's really a time & date.  Compare with the globals _date and _time
+* to see if it's really in the future.  If it is, then check to see if this
+* time "wins."   This time "wins" if (A) waketime is currently zero, or (B)
+* waketime is in the past (has already happened), or (C) the new time is
+* sooner than the current value of waketime.  If the new time wins,
+* set waketime to that value.
+*
 
-	swap	d0		; get date into low word
-	cmp.w	_date,d0
-	bhi	infuture	; d0 > _date: it's in the future
-	blo	inpast		; d0 < _date: in the past
-	move.w	6(sp),d1	; else it's today: get time argument
-	cmp.w	_time,d1
-	blo	inpast		; d1 < _time: in the past
+	move.w	_date,d1
+	swap	d1
+	move.w	_time,d1
+	cmp.l	d1,d0
+	blo	inpast		; (d0 => now): it's in the future
 
 * OK, it's in the future.  But is it sooner than waketime?
 
-infuture:
-	swap	d0
-	tst.l	waketime
-	beq	youwin		; zero (unset) waketime: you win.
-	cmp.l	waketime,d0
-	bhs	islater
+	move.l	waketime,d2
+	beq	youwin		; no waketime: you win.
+	cmp.l	d2,d1		; is waketime in the past?
+	bhi	youwin		; yes: you win.
+	cmp.l	d2,d0		; is the new time same or sooner than waketime?
+	bhs	islater		; no: you lose.
 
 * You win!
 youwin:
@@ -638,15 +660,16 @@ islater:
 	rts
 
 readalarm:
-	move.l	waketime,d0	; Waketime(1): return the current value
+	move.l	waketime,d0	; Waketime(-1): return the current value
 	rts
 
 clralarm:
-	bsr	clktest		; probe, load a0 with base address
-	bcs	sclerr		; punt if chip doesn't exist
+	bsr	clktest			; probe, load a0 with base address
+	bcs	sclerr			; punt if chip doesn't exist
+	bclr	#2,RTMODE(a0)		; clear Alarm EN
 	move.b	#%1101,RTRES(a0)	; reset alarm
 	clr.l	waketime
-	moveq.l	#3,d0		; return 3: time zeroed.
+	moveq.l	#3,d0			; return 3: time zeroed.
 	rts
 
 *

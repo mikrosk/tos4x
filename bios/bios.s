@@ -3,16 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/06 12:20:25 $
+* $Date: 89/02/13 12:03:37 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.21  89/02/13  12:03:37  apratt
+* Check for reboot used to include ASCII part of the key code, so if you
+* redefined the keyboard it wouldn't reboot.  Now just the
+* scan code and kbshift bits are checked.  This will be trouble
+* if any keyboard doesn't have delete on the same scan code ($53).
+*
 * Revision 1.20  89/02/06  12:20:25  apratt
 * Added a timeout to Gettime ... if time doesn't arrive in 1 sec, return 0.
-*
+* 
 * Revision 1.19  88/12/21  12:15:42  apratt
 * Added comments around the ctl-alt-delete reset code, and saved 1 word
 * nearby.  Big deal.
@@ -92,7 +98,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.20 $
+* $Revision: 1.21 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3276,9 +3282,10 @@ ari13	cmp.w	bufhead(a0),d1 ;head=tail?
 	lsr.w	#$8,d0		;improved conin format ($kkss00aa)
 
 *
-	cmp.l	#$0c53001f,d2	;ctl-alt-delete value
+*	now test for the boot combinations ALT-CTRL-(shift)-DELETE (AKP 2/88)
+*
 
-	cmp.l	#$0d53001f,d2	;ctl-alt-rshft-delete value
+	move.l	d0,d2
 	bclr.l	#KBCL+24,d2	;mask off caps-lock state
 	swap	d2		;get high word
 	cmp.w	#$0c53,d2	;ctl-alt plus delete's scan-code

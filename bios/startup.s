@@ -1,16 +1,20 @@
 .super
 ****************** Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: ersmith $
 * =======================================================================
 *
-* $Date: 1992/08/11 00:34:42 $
+* $Date: 1993/02/25 00:40:26 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.100  1993/02/25  00:40:26  ersmith
+* Fixed the devconnect() call in the startup code, added CTRL-ALT-UNDO during
+* bootup to reset NVRAM in case a dumb user (or virus) messed that up.
+*
 * Revision 2.99  1992/08/11  00:34:42  kbad
 * TOS 4.00 Falcon030 first production version
 *
@@ -356,7 +360,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.99 $
+* $Revision: 2.100 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -418,7 +422,7 @@ ONLY_LONGFRAME	equ	TT
 
 .if SPARROW
 vershi		equ	$04
-verslo		equ	$02
+verslo		equ	$03
 .else
 
 .if TT
@@ -2354,11 +2358,11 @@ noswi:
 
 * Switch values are in d0: this fact is used to set _SND below.
 
-#if SPARROW
+.if SPARROW
 	moveq.l	#$1f,d1			; Sparrow: PSG|8bit|16bit|CODEC|DSP
-#else
+.else
 	moveq.l	#3,d1			; pre-load "dma and normal sound"
-#endif
+.endif
 	move.l	#"_SND",(a0)+
 	btst	#7,d0			; test the (possibly fake) sound SWI
 	bne	gotsnd
@@ -2890,7 +2894,7 @@ DB_STUB = 0
 	lea	$a(sp),sp
 .endif
 
-	move.w	_modecode.w,-(sp)	; setscreen(0L,0L,3,modecode)
+	move.w	_modecode.w,-(sp)	; Setscreen(0L,0L,3,modecode)
 	move.w	#3,-(sp)
 	clr.l	-(sp)
 	clr.l	-(sp)
@@ -2901,11 +2905,18 @@ DB_STUB = 0
 	jsr	_Dsp_Init(pc)
 
 * Initialize the sound system
-	moveq	#8,d0			; src=dmaplay, dst=DAC
-	move.l	d0,-(sp)
+*	moveq	#8,d0			; src=dmaplay, dst=DAC
+*	move.l	d0,-(sp)
+*
+*	moveq	#1,d0			; src clk=int, 1 prescale
+*	move.l	d0,-(sp)		
+*	move.w	#1,-(sp)		; use protocol
 
-	clr.l	-(sp)
-	move.w	#1,-(sp)		; use protocol
+	move.w	#1,-(sp)
+	move.w	#0,-(sp)
+	move.w	#0,-(sp)
+	move.w	#8,-(sp)
+	move.w	#0,-(sp)
 	jsr	devconnect(pc)
 	addq	#6,sp			; leave 2 words on stack
 	
@@ -4057,7 +4068,7 @@ dmab_notime:
 	bne	dmab_abort		; yes, at least one's down: abort
 .endif
 
-	move.l	#$00010002,-(sp)
+ 	move.l	#$00010002,-(sp)
 	trap	#$d			; poll for char: Bconstat(2)
 	addq.l	#4,sp
 	tst.l	d0
@@ -4065,6 +4076,30 @@ dmab_notime:
 	move.l	#$00020002,-(sp)	; get the char: Bconin(2)
 	trap	#$d
 	addq.l	#4,sp
+*
+* UNDO checking
+* if the Undo key is held down, together with CTRL and ALT,
+* then re-initialize NVRam (helps out users who have screwed themselves)
+*
+	and.l	#$00ff0000,d0		; strip out all but scan key
+	cmp.l	#$00610000,d0		; look for UNDO
+	bne	no_undo
+	move.b	kbshift.w,d0		; check for CTRL-ALT
+	and.b	#$c,d0
+	cmp.b	#$c,d0
+	bne	no_undo
+	clr.l	-(sp)
+	clr.l	-(sp)
+	move.w	#$0002,-(sp)		; NVMaccess(2,0,0,0)
+	move.w	#$2e,-(sp)		; NVMaccess opcode
+	trap	#$e
+	add.l	#12,sp
+	jmp	coldboot		; do a cold boot
+
+no_undo:
+*
+* End of UNDO checking
+*
 
 dmab_abort:
 	cmpa.w	#0,a5			; was memory test done?
@@ -6941,21 +6976,21 @@ trp14tab:
  .globl	_DspBlkWords,		_DspBlkBytes,		_DspHStat
  .globl	_DspSetVectors,		_DspMultBlocks
 
-	dc.l 	_DspDoBlock		; 96
+	dc.l 	_DspDoBlock			; 96
 	dc.l	_DspBlkHandShake	; 97
 	dc.l	_DspBlkUnpacked		; 98
 	dc.l	_DspInStream		; 99
 	dc.l	_DspOutStream		; 100
 	dc.l	_DspIOStream		; 101
-	dc.l	_DspRemoveInterrupts	; 102
+	dc.l	_DspRemoveInterrupts; 102
 	dc.l	_DspGetWordSize		; 103
-	dc.l	_DspLock		; 104
-	dc.l	_DspUnlock		; 105
+	dc.l	_DspLock			; 104
+	dc.l	_DspUnlock			; 105
 	dc.l	_DspAvailable		; 106
-	dc.l	_DspReserve		; 107
-	dc.l	_DspLdProg		; 108
-	dc.l	_DspExProg		; 109
-	dc.l	_DspExBoot		; 110
+	dc.l	_DspReserve			; 107
+	dc.l	_DspLdProg			; 108
+	dc.l	_DspExProg			; 109
+	dc.l	_DspExBoot			; 110
 	dc.l	_DspLodToBinary		; 111
 	dc.l	_DspTriggerHC		; 112
 	dc.l	_DspRequestUniqueAbility ; 113
@@ -6964,13 +6999,13 @@ trp14tab:
 	dc.l	_DspLdSubroutine	; 116
 	dc.l	_DspInqSubrAbility	; 117
 	dc.l	_DspRunSubroutine	; 118
-	dc.l	_DspHf0			; 119
-	dc.l	_DspHf1			; 120
-	dc.l	_DspHf2			; 121
-	dc.l	_DspHf3			; 122
+	dc.l	_DspHf0				; 119
+	dc.l	_DspHf1				; 120
+	dc.l	_DspHf2				; 121
+	dc.l	_DspHf3				; 122
 	dc.l	_DspBlkWords		; 123
 	dc.l	_DspBlkBytes		; 124
-	dc.l	_DspHStat		; 125
+	dc.l	_DspHStat			; 125
 	dc.l	_DspSetVectors		; 126
 	dc.l	_DspMultBlocks		; 127
 
@@ -6988,7 +7023,7 @@ trp14tab:
 	dc.l	setmode			; 132 Set sound 8/16 bit stereo/mono.
 	dc.l	settrack		; 133 Set number of tracks.
 	dc.l	setmontrack		; 134 Set monitor track.
-	dc.l	setinterrupt		; 135 Set interrupt type.
+	dc.l	setinterrupt	; 135 Set interrupt type.
 	dc.l	buffoper		; 136 Set rec/play buffer operations.
 	dc.l	dsptristate		; 137 Tristates DSP bus
 	dc.l	gpio			; 138 Talks to gpio acording to mode.
@@ -7030,13 +7065,13 @@ mtestmsg:	dc.b	"Memory Test:",13,10
 	.even
 M0curs:	dc.l	$1b592720 ; Position cursor at row 7, column 0
 
+	.globl	nv_defs		; used in clock.s
 * NVRAM defaults
 nv_defs:
-	dc.w	0		; _upref
-	dc.l	0		; manuf
-	dc.w	0		; _AKP
+	dc.w	0			; _upref
+	dc.l	0			; manuf
+	dc.w	0			; _AKP
 	dc.b	0,'/'		; _IDT
 	dc.l	$20ffffff	; spin/scan
-	dc.w	0		; _modecode
-
+	dc.w	0			; _modecode
 .end

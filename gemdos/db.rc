@@ -1,0 +1,288 @@
+load c:\apratt\db.rc
+
+# b_link ........ b_bufdrv . b_buftyp . b_bufrec .... b_dirty . 
+# b_dmd ........ b_bufr ........
+
+procedure bcb a
+  print -n b_link (lpeek `a);xa (+ `a 4)
+  print -n b_bufdrv (wpeek `a);xa (+ `a 2)
+  print -n b_buftyp (wpeek `a);xa (+ `a 2)
+  print -n b_bufrec (wpeek `a);xa (+ `a 2)
+  print b_dirty (wpeek `a);xa (+ `a 2)
+
+  print -n b_dmd (lpeek `a);xa (+ `a 4)
+  print b_bufr (lpeek `a);xa (+ `a 4)
+.
+
+# recsiz xxxx clsiz xxxx clsizb xxxx rdlen xxxx fsiz xxxx 
+# fatrec xxxx datrec xxxx numcl xxxx b_flags xxxx
+
+procedure bpb a
+  print -n recsiz (wpeek `a);xa (+ `a 2)
+  print -n clsiz (wpeek `a);xa (+ `a 2)
+  print -n clsizb (wpeek `a);xa (+ `a 2)
+  print -n rdlen (wpeek `a);xa (+ `a 2)
+  print fsiz (wpeek `a);xa (+ `a 2)
+
+  print -n fatrec (wpeek `a);xa (+ `a 2)
+  print -n datrec (wpeek `a);xa (+ `a 2)
+  print -n numcl (wpeek `a);xa (+ `a 2)
+  print b_flags (wpeek `a);xa (+ `a 2)
+.
+
+# dfd_next xxxxxxxx dfd_use xxxx dfd_time xxxx dfd_date xxxx dfd_strtcl xxxx
+# dfd_fileln xxxxxxxx dfd_attrib xx dfd_dirty xx dfd_dev xxxx 
+# dfd_dircl xxxx dfd_dirrec xxxx dfd_diroffs xxxx
+
+procedure dfd a
+  print -n dfd_next (lpeek `a);xa (+ `a 4)
+  print -n dfd_use (wpeek `a);xa (+ `a 2)
+  print -n dfd_time (wpeek `a);xa (+ `a 2)
+  print -n dfd_date (wpeek `a);xa (+ `a 2)
+  print dfd_strtcl (wpeek `a);xa (+ `a 2)
+
+  print -n dfd_fileln (lpeek `a);xa (+ `a 4)
+  print -n dfd_attrib (peek `a);xa (+ `a 1)
+  print -n dfd_dirty (peek `a);xa (+ `a 1)
+  print dfd_dev (wpeek `a);xa (+ `a 2)
+
+  print -n dfd_dircl (wpeek `a);xa (+ `a 2)
+  print -n dfd_dirrec (wpeek `a);xa (+ `a 2)
+  print dfd_diroffs (wpeek `a);xa (+ `a 2)
+.
+
+# dir_dev xx dir_clust xxxx dir_curcl xxxx dir_recno xxxx dir_recoffs xxxx
+# dir_bcb xxxxxxxx dir_fcb xxxxxxxx
+
+procedure dir a
+  print -n dir_dev (wpeek `a);xa (+ `a 2)
+  print -n dir_clust (wpeek `a);xa (+ `a 2)
+  print -n dir_curcl (wpeek `a);xa (+ `a 2)
+  print -n dir_recno (wpeek `a);xa (+ `a 2)
+  print dir_recoffs (wpeek `a);xa (+ `a 2)
+
+  print -n dir_bcb (lpeek `a);xa (+ `a 4)
+  print -n dir_fcb (lpeek `a);xa (+ `a 4)
+.
+
+
+# m_recfat xxxx  m_recrd xxxx m_recdata xxxx m_drvnum xxxx m_fsiz xxxx 
+# m_clsiz xxxx m_clsizb xxxx m_recsiz xxxx m_numcl xxxx m_clrlog xxxx  
+# m_clrm xxxx m_rblog xxxx m_rbm xxxx m_clblog xxxx m_16 xxxx
+
+procedure dmd a
+  print -n m_recfat (wpeek `a);xa (+ `a 2)
+  print -n m_recrd (wpeek `a);xa (+ `a 2)
+  print -n m_recdata (wpeek `a);xa (+ `a 2)
+  print -n m_drvnum (wpeek `a);xa (+ `a 2)
+  print m_fsiz (wpeek `a);xa (+ `a 2)
+
+  print -n m_clsiz (wpeek `a);xa (+ `a 2)
+  print -n m_clsizb (wpeek `a);xa (+ `a 2)
+  print -n m_recsiz (wpeek `a);xa (+ `a 2)
+  print -n m_numcl (wpeek `a);xa (+ `a 2)
+  print m_clrlog (wpeek `a);xa (+ `a 2)
+
+  print -n m_clrm (wpeek `a);xa (+ `a 2)
+  print -n m_rblog (wpeek `a);xa (+ `a 2)
+  print -n m_rbm (wpeek `a);xa (+ `a 2)
+  print -n m_clblog (wpeek `a);xa (+ `a 2)
+  print m_16 (wpeek `a);xa (+ `a 2)
+.
+
+# dta_sname xxxxxxxxxxx dta_attr xx dta_clust xxxx dta_curcl xxxx 
+# dta_recno xxxx dta_recoffs xxxx dta_dev x
+# fattrib xx ftime xxxx fdate xxxx flength xxxxxxxx fname xxxxxxxx.xxx
+
+procedure dta a
+  print -n dta_sname -sb `a;xa (+ `a b)
+  print -n dta_attr (peek `a);xa (+ `a 1)
+  print -n dta_clust (wpeek `a);xa (+ `a 2)
+  print dta_curcl (wpeek `a);xa (+ `a 2)
+  print -n dta_recno (wpeek `a);xa (+ `a 2)
+  print -n dta_recoffs (wpeek `a);xa (+ `a 2)
+  print dta_dev (peek `a);xa (+ `a 1)
+  print -n fattrib (peek `a);xa (+ `a 1)
+  print -n ftime (wpeek `a);xa (+ `a 2)
+  print -n fdate (wpeek `a);xa (+ `a 2)
+  print -n flength (lpeek `a);xa (+ `a 4)
+  print fname -s `a;xa (+ `a 4)
+.
+
+
+procedure fcb a
+  print -n f_name -s11 `a;xa (+ `a 4)
+  print -n f_attrib (peek `a);xa (+ `a 1)
+  print f_fill {a};xa (+ `a a)
+
+  print -n f_time (wpeek `a);xa (+ `a 2)
+  print -n f_date (wpeek `a);xa (+ `a 2)
+  print -n f_clust (wpeek `a);xa (+ `a 2)
+  print f_fileln (lpeek `a);xa (+ `a 4)
+.
+
+
+procedure ftab a
+  print -n f_own (lpeek `a);xa (+ `a 4)
+  print f_ofd (lpeek `a);xa (+ `a 4)
+.
+
+procedure md a
+  print -n m_link (lpeek `a);xa (+ `a 4)
+  print -n m_start (lpeek `a);xa (+ `a 4)
+  print -n m_length (lpeek `a);xa (+ `a 4)
+  print m_own (lpeek `a);xa (+ `a 4)
+.
+
+procedure mpb a
+  print -n mp_mfl (lpeek `a);xa (+ `a 4)
+  print -n mp_mal (lpeek `a);xa (+ `a 4)
+  print mp_rover (lpeek `a);xa (+ `a 4)
+.
+
+# o_next xxxxxxxx o_use xxxx o_mode xxxx o_dfd xxxxxxxx
+# o_bytnum xxxxxxxx o_curcl xxxx o_currec xxxx
+
+procedure ofd a
+  print -n o_next (lpeek `a);xa (+ `a 4)
+  print -n o_use (wpeek `a);xa (+ `a 2)
+  print -n o_mode (wpeek `a);xa (+ `a 2)
+  print o_dfd (lpeek `a);xa (+ `a 4)
+
+  print -n o_bytnum (lpeek `a);xa (+ `a 4)
+  print -n o_curcl (wpeek `a);xa (+ `a 2)
+  print o_currec (wpeek `a);xa (+ `a 2)
+.
+
+# p_lowtpa xxxxxxxx p_hitpa xxxxxxxx p_tbase xxxxxxxx p_tlen xxxxxxxx
+# p_dbase xxxxxxxx p_dlen xxxxxxxx p_bbase xxxxxxxx p_blen xxxxxxxx
+# p_xdta xxxxxxxx p_parent xxxxxxxx p_hflags xxxxxxxx p_env xxxxxxxx
+# p_uft xx xx xx xx xx xx xx xx p_minfast xx p_curdrv xx p_1fill {8}
+# p_curdir xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+# ======== xxxx xxxx xxxx xxxx xxxx xxxx xxxx xxxx
+# p_3fill {8} p_dreg xxxxxxxx p_areg {5}
+# p_cmdlin xx ...
+
+procedure pd a
+  print -n p_lowtpa (lpeek `a);xa (+ `a 4)
+  print -n p_hitpa (lpeek `a);xa (+ `a 4)
+  print -n p_tbase (lpeek `a);xa (+ `a 4)
+  print p_tlen (lpeek `a);xa (+ `a 4)
+
+  print -n p_dbase (lpeek `a);xa (+ `a 4)
+  print -n p_dlen (lpeek `a);xa (+ `a 4)
+  print -n p_bbase (lpeek `a);xa (+ `a 4)
+  print p_blen (lpeek `a);xa (+ `a 4)
+
+  print -n p_xdta (lpeek `a);xa (+ `a 4)
+  print -n p_parent (lpeek `a);xa (+ `a 4)
+  print -n p_hflags (lpeek `a);xa (+ `a 4)
+  print p_env (lpeek `a);xa (+ `a 4)
+
+  print -n p_uft 
+  print -n -x02 (peek `a) ;xa (+ `a 1)
+  print -n -x02 (peek `a) ;xa (+ `a 1)
+  print -n -x02 (peek `a) ;xa (+ `a 1)
+  print -n -x02 (peek `a) ;xa (+ `a 1)
+  print -n -x02 (peek `a) ;xa (+ `a 1)
+  print -n -x02 (peek `a) ;xa (+ `a 1)
+  print -n p_minfast (peek `a);xa (+ `a 1)
+  print -n p_curdrv (peek `a);xa (+ `a 1)
+  print p_1fill {8};xa (+ `a 8)
+
+  print -n p_curdir -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -x04 (wpeek `a);xa (+ `a 2)
+
+  print -n -x04 ======== (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+  print -n -x04 (wpeek `a);xa (+ `a 2)
+
+  print -n p_3fill {8};xa (+ `a 8)
+  print -n p_dreg (lpeek `a);xa (+ `a 4)
+  print p_areg {5};xa (+ `a a)
+  print p_cmdlin (peek `a) -s (+ `a 1);xa (+ `a 80)
+.
+
+
+
+# g_magic xxxx g_tsize xxxxxxxx g_dsize xxxxxxxx g_bsize xxxxxxxx
+# g_ssize xxxxxxxx g_junk1 xxxxxxxx g_hflags xxxxxxxx g_absflag xxxx
+
+procedure prg a
+  print -n g_magic (wpeek `a);xa (+ `a 2)
+  print -n g_tsize (lpeek `a);xa (+ `a 4)
+  print -n g_dsize (lpeek `a);xa (+ `a 4)
+  print g_bsize (lpeek `a);xa (+ `a 4)
+
+  print -n g_ssize (lpeek `a);xa (+ `a 4)
+  print -n g_junk1 (lpeek `a);xa (+ `a 4)
+  print -n g_hflags (lpeek `a);xa (+ `a 4)
+  print g_absflg (wpeek `a);xa (+ `a 2)
+.
+
+procedure pmd
+  local a
+  echo ***** PMD
+  dl.pmd[c]
+  set a (lpeek (+ .pmd 4))
+  echo ***** ALLOCATED LIST
+#:loop
+	if `a "dl`a[10];xa (lpeek `a);goto loop"
+
+  set a (lpeek .pmd)
+  echo ***** FREE LIST
+#:loop2
+	if `a "dl`a[10];xa (lpeek `a);goto loop2"
+.
+
+procedure pmdfast
+  local a
+  echo ***** PMDFAST
+  dl.pmd[c]
+  set a (lpeek (+ .pmd 4))
+  echo ***** ALLOCATED LIST
+#:loop
+	if `a "dl`a[10];xa (lpeek `a);goto loop"
+
+  set a (lpeek .pmd)
+  echo ***** FREE LIST
+#:loop2
+	if `a "dl`a[10];xa (lpeek `a);goto loop2"
+.
+
+alias showall "pmd;pmdfast"
+
+procedure sft
+	local sft sftend
+	set sft .sft
+	set sftend (+ .sft (* @10 8))
+
+#:loop
+	print -n slot `sft :
+	ftab `sft
+	if (&& (lpeek `sft) (! (& (lpeek (+ `sft 4)) 1))) do_ofd (lpeek (+ `sft 4))
+	set sft (+ `sft 8)
+	if (< `sft `sftend) goto loop
+.
+
+procedure do_ofd ofd
+	local dfd
+
+	echo >
+	ofd `ofd
+	echo >>
+	dfd (lpeek (+ `ofd 8))
+	echo <<
+	echo <
+.

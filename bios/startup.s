@@ -4,13 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/29 21:24:18 $
+* $Date: 1992/03/11 01:24:22 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.93  1992/03/11  01:24:22  apratt
+* Clear the high byte of d0.w before writing into SPAR_VMC.  This wasn't in
+* the first one, the one before the cartridge-port check.  In the first
+* write, also, write ff8260 to set ST shift mode.
+*
+* Added comments for meanings of PSG output bits in the place where they're
+* set.
+*
+* Commented out the new code for FPU probe .if STPAD, because I'm building
+* STPAD ROMs and the code isn't tested.
+*
+* Fixed a bug in the code that points "coldboot" vectors to "term."
+*
 * Revision 2.92  1992/02/29  21:24:18  apratt
 * Moved and improved FPU probe and Frestore.  Haven't really tested it.
 *
@@ -318,7 +331,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.92 $
+* $Revision: 2.93 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -1164,6 +1177,15 @@ reset3:
 *  Make ports A and B output-only;
 *  initialize floppy select lines (so
 *  that none are selected).
+*
+* bit 0: *side
+* bit 1: *sel0
+* bit 2: *sel1
+* bit 3: *rts
+* bit 4: *dtr
+* bit 5: *strobe
+* bit 6: *SPKR_DIS (TT), *IDERESET (STPAD, SPARROW)
+* bit 7: *LAN (TT), FDD_HIDEN (STPAD)
 *
 * Note: The floppy side and selects are inverted, so writing 1 disables them.
 * Other outputs are initialized to zero here: *DTR, *RTS, STROBE,
@@ -2347,6 +2369,10 @@ nofdc:
 
 	move.l	#"_FPU",(a0)+		; always install SOME cookie
 
+* we have to ship STPAD ROMs *now* and I haven't tested this code,
+* so I am taking it out .if STPAD.
+.if STPAD
+
 * Frestore a null state to zap that FPU.  This involves catching all the
 * possible exceptions that can cause:
 *
@@ -2397,6 +2423,10 @@ nofpu:
 	move.l	(sp)+,$c8
 
 	move.l	d7,(a0)+	; write d7 as _FPU cookie's value
+
+.else
+	clr.l	(a0)+		; STPAD: never an FPU (for now)
+.endif
 
 * Probe for SFP004 (always)
 
@@ -4023,7 +4053,7 @@ swmon2:	move.b	d0,sshiftmd.w
 	jsr	(a0)
 swmon3:
 
-* end of monitor-change stuff, ALL MISSING IF STPAD!
+* end of monitor-change stuff, ALL MISSING IF STPAD or SPARROW!
 .endif
 
 	jsr	blink			; blink cursor

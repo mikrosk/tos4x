@@ -1,21 +1,24 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/03/23 17:32:00 $
+* $Date: 89/03/30 04:35:49 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.6  89/03/30  04:35:49  kbad
+* Changed return code of _term from 1 to -1 ($ffff), "error."
+*
 * Revision 2.5  89/03/23  17:32:00  apratt
 * Added real memory controller programming and memory sizing for TT.
 * The memory sizing is actually not TT-dependent.
 * Also fixed some things in the DMA SOUND vblank handler... Now
 * it really works.
-*
+* 
 * Revision 2.4  89/03/22  13:48:22  apratt
 * Changed monochrome detect code in vblank -- it would wait until GPIP
 * read the same way twice, which might *never* happen.  Now it waits
@@ -200,7 +203,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.5 $
+* $Revision: 2.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -292,9 +295,9 @@ country		=	usa     ; 'usa', etc.... @check@
 
 .ifeq TT
 version		equ	$0104		; version number *MUST BE EVEN*
-date		equ	$02221989	; date, $MMDDYYYY
+date		equ	$03301989	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001001010110 ; Feb 22, 1989
+dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .endc
 
 .ifne TT
@@ -3138,7 +3141,7 @@ puntaes:
 	bne	paes1			; no -- just return
 
 	move.l	#savend,savptr(a5)	; clobber BIOS top level
-	move.w	#1,-(sp)		; "error" return condition
+	bge	paes1			; yes -- we can't do anything about it
 	clr.l	(a0)			; clobber AES!
 	bra	reseth			; restart the system
 

@@ -4,21 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/05 14:22:34 $
+* $Date: 91/08/05 15:28:11 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.73  91/08/05  15:28:11  apratt
+* Added a bad hack for STPAD: fifteen ms after enabling interrupts,
+* we clobber kbshift.  This way if you reset with ctl-alt-delete,
+* the dmaboot code won't see the alt key still down.  Don't know how
+* well this works yet.
+*
+* the dmaboot code won't see the alt key still down.  Don't know how
+* well this works yet.
+* 
 * Revision 2.72  91/08/05  14:22:34  apratt
 * Changed version system: now version.s exports date and dosdate,
 * and it's maintained by biosvers.prg.  startup.s imports these,
 * and the high byte of the version number comes from the system type,
 * and the low byte from a constant in startup.s.  Also, moved STPAD screen
-* init higher, changed spindelay (see flop.s), enabled cache on TT more,
-* and added a memory test.
-*
 * init higher, changed spindelay (see flop.s), enabled cache on TT more,
 * and added a memory test.
 * 
@@ -132,7 +138,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.72 $
+* $Revision: 2.73 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2041,6 +2047,26 @@ setvb2:	move.l	#reseth,swv_vec.w	; RESET system on monitor change
 .if (TT == 0)
 * on ST, you'd better not change mode during a vblank; what we do
 * is call noblank1, which returns when it's sure we are NOT in a vblank.
+	bra	noblank			; wait until we're NOT in a vblank
+.ifne STPAD
+.endif
+	move.b	d1,shiftmd		; set hardware
+	move.b	d1,sshiftmd.w		; set software
+
+	bsr	_TEST_BLT		; D0 = 0:no chip, 2:chip exists
+	jsr	blt_init		; init the blitter chip (with D0)
+	jsr	esc_init		; clear screen, init cursor
+
+	move.l	#reseth,swv_vec.w	; RESET system on monitor change
+	move.w	#1,vblsem.w		; enable vblank processing for real
+
+
+*+
+*  [1] Fire up %%0 cartridges;
+*  [2] Enable interrupts;
+*  [3] Fire up %%1 cartridges
+*
+.endc
 	clr.w	d0			; magic bit# = 0
 	bsr	cartscan		; execute cartridge aps
 .if STPAD

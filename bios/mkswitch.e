@@ -63,18 +63,18 @@ store-procedure do-countries
   run dofile
   set %ccode b
   run dofile
-  set %ccode t
-  run dofile
-  set %ccode c
-  run dofile
-  set %ccode n
-  run dofile
-  set %ccode d
-  run dofile
+;  set %ccode t
+;  run dofile
+;  set %ccode c
+;  run dofile
+;  set %ccode n
+;  run dofile
+;  set %ccode d
+;  run dofile
 !endm
 
 ; args to this procedure are:
-;	%machine	e, p, s, or t
+;	%machine	e, p, w, or t
 ;	%ccode		the one-letter country code
 ;	%systype	a or o (ram or rom)
 

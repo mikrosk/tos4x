@@ -3,16 +3,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/07/25 18:21:00 $
+* $Date: 88/08/08 17:56:44 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.13  88/08/08  17:56:44  apratt
+* Removed 32K limit on serial input/output buffers.  Limit
+* is now 64K (actually 64K-1 for AUX, MIDI and 64K-4 for KB).
+*
 * Revision 1.12  88/07/25  18:21:00  apratt
 * Got rid of the damn '.w' after 8 in coldboot code.  Gremlins.
-*
+* 
 * Revision 1.11  88/07/21  12:17:34  apratt
 * Fixed fatfinger in reboot code: adding wrong offset to KBCL
 * (was adding 16 bits, but 24 bits is right) meant you could
@@ -58,7 +62,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.12 $
+* $Revision: 1.13 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -980,7 +984,8 @@ midin:
 
 *	check for wrap of pointer
 mwi1	move.l	bufptr(a0),a1	;get base address of buffer
-	move.b	0(a1,d1),d0	;get character
+	addq.w	#1,d1		;i=h+1
+	bcs.b	mwi1		;no...
 	moveq	#$0,d1		;wrap pointer
 mwi2	move	(sp)+,sr
 	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
@@ -1330,7 +1335,8 @@ conin:
 
 *	check for wrap of pointer
 cwi1	move.l	bufptr(a0),a1	;get base address of buffer
-	move.l	0(a1,d1),d0	;get character
+	addq.w	#4,d1		;i=h+4
+	cmp.w	bufsize(a0),d1	;? i>= current bufsiz?
 	bcs.b	cwi1		;no...
 cwi2	move	(sp)+,sr
 cwi1:	move.l	bufptr(a0),a1	;get base address of buffer
@@ -2040,7 +2046,8 @@ sendone:
 *
 putbyte:
 	move.w	buftail(a0),d1
-	move.b	d0,(a1,d1)	* Put to tail
+	jsr	bumptr
+putwait:
 	cmp.w	bufhead(a0),d1
 	beq	putwait		* WHILE (Buffer Full) DO Wait
 	move.l	bufptr(a0),a1
@@ -2073,7 +2080,8 @@ putbyte:
 *
 getbyte:
 	move.w	bufhead(a0),d1	* REPEAT
-	move.b	(a1,d1),d0	* d0 = data byte from head
+	cmp.w	buftail(a0),d1
+	beq	getbyte		* UNTIL (Buffer NOT Empty)
 	bsr	bumptr		* Now we index byte to send
 	move.l	bufptr(a0),a1	* a1 -> output buffer
 	moveq	#0,d0
@@ -3174,7 +3182,8 @@ ari13	cmp.w	bufhead(a0),d1 ;head=tail?
 	btst.b	#$3,conterm(a5)
 	bne.s	ari14z		;set, so store this pig!
 *	now we test the kludge bit (#3) of conterm to see if we really
-ari14z	move.l	d0,0(a2,d1)	;store the data
+ari14z	and.l	#$0000ffff,d1	;d1.l = (unsigned long)d1.w
+*
 	btst.b	#$3,conterm.w
 ari14	rts
 	andi.l	#$00ffffff,d0	;mask off KBSHIFT byte portion..."sigh"
@@ -3209,7 +3218,8 @@ sysmidi:
 mi13	cmp.w	bufhead(a0),d1 ;head=tail?
 	addq	#1,d1		;index = tail + 1
 	cmp.w	bufsize(a0),d1	;check to see if buffer should wrap
-	move.b	d0,0(a2,d1)	;store the data
+	bcs.b	mi13		;no...
+	moveq	#$0,d1		;wrap pointer
 mi13:	cmp.w	bufhead(a0),d1 ;head=tail?
 mi14	rts
 	move.l	bufptr(a0),a2	;get buffer pointer

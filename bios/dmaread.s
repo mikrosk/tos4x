@@ -1,19 +1,22 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: minna $
 * =======================================================================
 *
-* $Date: 90/08/03 13:22:48 $
+* $Date: 90/10/19 16:05:22 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.9  90/10/19  16:05:22  minna
+* Added code to handle drives on the IDE-AT bus.
+*
 * Revision 1.8  90/08/03  13:22:48  apratt
 * TTOS FINAL RELEASE
-*
+* 
 * Revision 1.7  90/03/06  16:09:16  apratt
 * Moved .globl _resetscsi into the TT conditional; otherwise
 * MAS thinks it's external, even though it's never used!
@@ -32,7 +35,7 @@
 * 
 * Revision 1.3  89/09/07  16:30:02  apratt
 * Added delay after (potentially) resetting ACSI DMA chip; see SLOWACSI
-* code in flop.s.
+* code in flop.b.
 * 
 * Revision 1.2  89/08/25  16:49:18  apratt
 * Moved lastacstm from text seg to bss.
@@ -43,10 +46,10 @@
 *
 * =======================================================================
 *
-* $Revision: 1.8 $
+* $Revision: 1.9 $
 * =======================================================================
 *
-* $Source: /u2/MRS/osrevisions/bios/dmaread.b,v $
+* $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -55,13 +58,20 @@
 
 .include "switches.s"
 
+;+ Temporary equ's
+;TT	equ	0
+;IDE_AT	equ	1
+;-
+
 ;+
 ; DMAREAD(), DMAWRITE() - 
 ;	New XBIOS calls to read from or write to hard disk on the
-; ACSI or SCSI bus.  This is a low-level read/write which does not
-; do a lot of checking.  Amount of data requested on each ACSI read
-; or write _must_ be smaller than or equal to 254 sectors.  On SCSI,
-; all I/O are done by handshaking.
+; ACSI, SCSI or IDE-AT bus.  This is a low-level read/write which 
+; does not do a lot of checking.  Amount of data requested on each 
+; ACSI read or write MUST be smaller than or equal to 254 physical
+; (512-byte) sectors.  On SCSI, all I/O are done by handshaking.  
+; Amount of data requested on each IDE-AT read or write MUST be 
+; smaller than or equal to 256 physical (512-byte) sectors.
 ;
 ; Jul-24-1989	ml.	Started this from AHDI 3.50 of Jul 24 1989.
 ; Aug-23-1989	ml.	Added in code to do hand-shake I/O, instead of
@@ -77,37 +87,65 @@
 ;			UPTIME as timeout counter rather than the regular
 ;			SC?TMOUT value.
 ; Mar-02-1990	ml.	Undid (again?!!) modifications made since Feb 28.
-;			Will use regular SC?TMOUT values.  Bios will keep
+;			Will use regular SC?TMOUT values.  BIOS will keep
 ;			calling _dmaread() at boot time until the drive
-;			responses, Bios' timeout count expires, or when 
+;			responses, BIOS' timeout count expires, or when 
 ;			Bios receive a quit message from the user.
-;
+; Oct-16-1990	ml.	Added in code to handle drives on the IDE-AT bus
+;			also.  The code comes from DRIVER.PRG v4.50 (dated
+;			Oct 16 1990), and is slightly modified.
 ;-
 
 .globl	_dmaread
 .globl	_dmawrite
 
 
-flock	equ	$43e		; FIFO lock variable
-_hz_200	equ	$4ba		; system 200hz timer
-READ	equ	$08		; opcode for Read
-WRITE	equ	$0a		; opcode for Write
-NCMD	equ	6		; normal command length (6 bytes)
-MAXSCSI	equ	15		; highest SCSI unit#
-MAXACSI	equ	7		; highest ACSI unit#
-EUNDEV	equ	(-15)		; error code for unknown device
-EREADF	equ	(-11)		; error code for read fault
-EWRITF	equ	(-10)		; error code for write fault
+; System variables
+flock		equ	$43e	; FIFO lock variable
+_hz_200		equ	$4ba	; system 200hz timer
+
+; For ACSI and SCSI drives
+READ		equ	$08	; opcode for Read sectors
+WRITE		equ	$0a	; opcode for Write sectors
+NCMD		equ	6	; normal command length (6 bytes)
+MAXACSI		equ	7	; highest ACSI unit#
+MAXSCSI		equ	15	; highest SCSI unit#
+
+; For IDE-AT drives
+ATREAD		equ	$20	; opcode Read sectors
+ATWRITE		equ	$30	; opcode Write sectors
+INITPARM	equ	$91	; Initialize Drive Parameters
+IDENTIFY	equ	$ec	; Identify Drive
+D_WORST		equ	2000	; worst case delay (10s)
+MAXAT		equ	17	; highest IDE-AT unit#
+ATDPLEN		equ	4	; length of structure to store drive
+				;  parameters of each AT unit
+
+; Error codes to return to BIOS
+EUNDEV	equ	(-15)		; UNknown DEVice
+EREADF	equ	(-11)		; READ Fault
+EWRITF	equ	(-10)		; WRITe Fault
+
+; Offsets for registers addressing on data bus
+REGBASE	equ	1		; most are on odd part of data bus
+REGSTEP	equ	2		; most registers are on word boundaries
 
 
 ;+
 ; Declarations
 ;-
 .bss
-_cmdblk:	ds.b	10	; command block
 lastacstm:	ds.l	1	; controller last accessed time
-cachexst:	ds.b	1	; 0: no cache	1: cache exists
+_cmdblk:	ds.b	10	; command block
 rwflag:		ds.b	1	; 0: read	1: write
+
+.ifne IDE_AT
+init:		ds.b	1	; bit 0 set - AT unit 0 initialized already
+				; bit 1 set - AT unit 1 initialized already
+sbuf:		ds.b	16	; scratch buffer
+atdp:		ds.b	2*ATDPLEN  ; structure to store drive parameters
+.endc
+
 .even
 
 .text
@@ -121,15 +159,15 @@ rwflag:		ds.b	1	; 0: read	1: write
 ; BYTE	*buf;		$a(sp).l	$b(sp)=high $c(sp)=mid $d(sp)=low
 ; WORD	pdev;		$e(sp).w
 ;
-; Returns 0 for success.
-; Returns a negative number for failure: 
-;	EUNDEV (-15L) for unknown device (bad dev number)
-;	EREADF (-11L) for read failure
-;	EWRITF (-10L) for write failure
-;	-1L for timed-out
+; Returns 0 if successful.
+; Returns a negative number if failure: 
+;	EUNDEV (-15L) if unknown device (bad dev number)
+;	EREADF (-11L) if read failure
+;	EWRITF (-10L) if  write failure
+;	       (-1L)  if timed-out
 ;
 ; Comments:
-;	Right now, only ACSI and SCSI devices are supported.
+;	ACSI, SCSI and IDE-AT drives are supported.
 ;-
 	.globl	_dmaread
 _dmaread:
@@ -144,13 +182,22 @@ _dmawrite:
 	
 dmarw:	moveq	#EUNDEV,d0		; assume it's an unknown device
 
-.ifeq TT
-	cmpi.w	#MAXACSI,$e(sp)		; unit# > ACSI unit# 0-7?
+.ifne IDE_AT
+	cmpi.w	#MAXAT,$e(sp)		; unit# > IDE-AT unit# 16-17?
 .else
+.ifne TT
 	cmpi.w	#MAXSCSI,$e(sp)		; unit# > SCSI unit# 8-15?
+.else
+	cmpi.w	#MAXACSI,$e(sp)		; unit# > ACSI unit# 0-7?
 .endc
-	bhi.b	rwend			; if so, return with error
+.endc
+	bhi	rwend			; if so, return with error
 
+.ifne IDE_AT
+	cmp.w	#MAXSCSI,$e(sp)		; an IDE-AT unit?
+	bhi	at			; if so, talk IDE-AT
+.endc
+					; else talk ACSI or SCSI
 	lea	_cmdblk,a0		; a0 -> beginning of command block
 	move.b	d1,(a0)+		; byte 0 = opcode
 	move.b	5(sp),(a0)+		; byte 1 = msb of logical block addr
@@ -168,9 +215,62 @@ dmarw:	moveq	#EUNDEV,d0		; assume it's an unknown device
 	tst.b	rwflag			; read or write?
 	bne.b	rw0			; it's a write
 	bsr	_dorcmd			; send a receive data command
-	bra.b	rw1
+	bra	rw1
 rw0:	bsr	_dowcmd			; send a write data command
 
+.ifne IDE_AT
+	bra	rw1
+
+at:	lea	atdp,a1			; a1 -> beginning of atdp struct
+	btst.b	#0,$f(sp)		; IDE-AT unit 0 or 1?
+	beq.b	at0			; if unit 0, go check unit 0
+	addq	#ATDPLEN,a1		; else index to structure for unit 1
+	btst.b	#1,init			; and check if unit 1 has been init'ed
+	bne	atrw			; if init'ed, can go r/w
+	bset.b	#1,init			; else go init unit now
+	bra.b	at1
+at0:	btst.b	#0,init			; check if unit 0 has been init'ed
+	bne	atrw			; if init'ed, can go r/w
+	bset.b	#0,init			; else init unit now
+at1:	move.l	a1,-(sp)		; save -> drive parameters
+	move.l	#sbuf,-(sp)		; scratch buffer for drive parameters
+	move.w	#8,-(sp)		; only want 1st 8 words of data
+	move.w	$18(sp),-(sp)		; AT unit#
+	bsr	_identify		; identify()
+	addq	#8,sp			; clean up stack
+	move.l	(sp)+,a1		; restore -> drive parameters
+	tst.w	d0			; successful?
+	bmi	rwend			; if timed-out, return
+	bne	rw2			; if error, return with error code
+					; else, get phys parameters of unit
+	lea	sbuf,a0			; a0 -> beginning of scratch buffer
+	move.w	NHEAD(a0),(a1)		; store # of heads
+	move.w	NSPT(a0),2(a1)		; store # of physical sectors/track
+					; switch unit to native mode
+	move.l	a1,-(sp)		; save -> drive parameters
+	move.w	NSPT(a0),-(sp)		; sectors per track
+	move.w	NHEAD(a0),-(sp)		; number of heads
+	move.w	$16(sp),-(sp)		; physical unit #
+	bsr	_initparm		; initialize drive parameters
+	addq	#6,sp			; clean up stack
+	move.l	(sp)+,a1		; restore -> drive parameters
+	tst.w	d0			; successful?
+	bmi	rwend			; if timed-out, return
+	bne	rw2			; if error, return with error code
+					; else can r/w
+atrw:	move.w	$e(sp),-(sp)		; physical unit #
+	move.l	$c(sp),-(sp)		; buffer
+	move.w	$e(sp),-(sp)		; count
+	move.l	$c(sp),-(sp)		; logical block address
+	move.w	2(a1),-(sp)		; # physical sectors per track
+	move.w	(a1),-(sp)		; # data heads
+	tst.b	rwflag			; read or write?
+	bne.b	at2			; (write)
+	bsr	_atread			; read sectors
+	bra.b	at3
+at2:	bsr	_atwrite		; write sectors
+at3:	adda	#16,sp			; clean up stack
+.endc	
 rw1:	
 .ifne	TT
 	move.w	sr,-(sp)		; go to IPL 7
@@ -184,12 +284,18 @@ rw1:
 	beq.b	rwend			; if no error, return
 	bmi.b	rwend			; if timed-out, return
 					; else, there's an error
-	moveq	#EREADF,d0		; assume it's a read error
+rw2:	moveq	#EREADF,d0		; assume it's a read error
 	tst.b	rwflag			; read or write?
 	beq.b	rwend			; if read, done
 	moveq	#EWRITF,d0		; else, it's a write error
 rwend:	rts
 
+
+;+++++++++++++++++++++++++++++++;
+;				;
+;    ACSI and SCSI specific	;
+;				;
+;+++++++++++++++++++++++++++++++;
 
 ;+
 ; dorcmd() - send a command which will receive data from the target
@@ -314,8 +420,8 @@ _endcmd:
 
 	move.w	d1,WDL
 	move.w	WDC,d0			; get the result
-	and.w	#$00ff,d0		; (clean it up), if non-zero should
-					; do a ReadSense command to learn more
+	and.w	#$00ff,d0		; (clean it up) if non-0 should do a
+					; RequestSense command to learn more
 endce:	move.l	_hz_200,lastacstm	; update controller last accessed time
 	addq.l	#2,lastacstm		; lastacstm = _hz_200 + 2;
 	rts				
@@ -502,11 +608,6 @@ rstdelay:
 ;+++++++++++++++++++++++++++++++;
 
 .globl	_resetscsi
-
-; Definitions
-REGBASE	equ	1	; most are on odd part of data bus
-REGSTEP	equ	2	; most registers are on word boundaries
-
 
 ; SCSI Interface (NCR 5380) for READ operations
 bSCSI	equ	$FFFF8780+REGBASE
@@ -829,6 +930,268 @@ setscltmout:
 	movea.l	#_hz_200,a0	; a0 -> 200 hz clock
 	move.l	#SCLTMOUT,d1	; d0 = SCLTMOUT _hz_200 clicks
 	add.l	(a0),d1		; d0 = curr time + # clicks to wait
+	rts
+
+.endc
+
+
+
+.ifne IDE_AT
+
+;+++++++++++++++++++++++++++++++;
+;				;
+;	IDE-AT specific		;
+;				;
+;+++++++++++++++++++++++++++++++;
+
+; AT disk interface I/O locations for Read functions
+
+bAT	equ	$FFFFFC20+REGBASE	; base address
+
+ATDR	equ	bAT-REGBASE+($00*REGSTEP); Data Register (16-bit reg)
+ATER	equ	bAT+($01*REGSTEP)	; Error Register
+ATSC	equ	bAT+($02*REGSTEP)	; Sector Count
+ATSN	equ	bAT+($03*REGSTEP)	; Sector Number
+ATCL	equ	bAT+($04*REGSTEP)	; Cylinder Low
+ATCH	equ	bAT+($05*REGSTEP)	; Cylinder High (2 bits)
+ATSDH	equ	bAT+($06*REGSTEP)	; SDH register
+ATSR	equ	bAT+($07*REGSTEP)	; Status Register
+ATASR	equ	bAT+($0E*REGSTEP)	; Alternate Status Register
+ATDAR	equ	bAT+($0F*REGSTEP)	; Drive Address Register
+
+
+
+; AT disk interface I/O locations for Write functions
+
+;ATDR	equ	bAT-REGBASE+($00*REGSTEP); Data Register (16-bit reg)
+ATWPR	equ	bAT+($01*REGSTEP)	; Write Precomp Register (not used)
+;ATSC	equ	bAT+($02*REGSTEP)	; Sector Count
+;ATSN	equ	bAT+($03*REGSTEP)	; Sector Number
+;ATCL	equ	bAT+($04*REGSTEP)	; Cylinder Low
+;ATCH	equ	bAT+($05*REGSTEP)	; Cylinder High (2 bits)
+;ATSDH	equ	bAT+($06*REGSTEP)	; SDH register
+ATCR	equ	bAT+($07*REGSTEP)	; Command Register
+ATDOR	equ	bAT+($0E*REGSTEP)	; Digital Output Register
+
+
+; Byte indices into buffer return by the Identify command
+
+NHEAD	equ	6		; Number of heads
+NSPT	equ	12		; Number of physical sectors/track
+
+
+;+
+; Wait for status to come back
+;-
+w4int:	move.l	#D_WORST,d0	; d0 = timeout limit
+	add.l	_hz_200,d0	; d0 = expiration time
+wi0:	btst.b	#5,GPIP		; interrupt?
+	beq.b	wi1		; if so, out of the loop
+	cmp.l	_hz_200,d0	; timeout?
+	bhi.b	wi0		; if not, wait some more
+	moveq	#-1,d0		; else, return timeout
+	bra.b	wi3
+wi1:	move.b	ATSR,d0		; d0.b = status returned
+	btst	#0,d0		; any error?
+	bne.b	wi2		; if yes, return error code
+	btst	#3,d0		; else DRQ?
+	bne.b	wi3		; if so, just return
+	moveq	#0,d0		; else return OK
+	bra.b	wi3
+wi2:	move.b	ATER,d0		; else d0.b = error bits
+wi3:	rts			; return status or error code
+
+
+
+;+
+; atread() - reads from 1 to 256 sectors as specified in the Task File,
+;		beginning at the specified sector.
+;	   - sector count equal to 0 requests 256 sectors.
+;
+; Comments:
+;	The unit is assumed to be in native mode when conversion from
+; logical block address to physical address is done.
+;
+; atread(nhd, nspt, sectnum, count, buf, pdev)
+; WORD	nhd;		4(sp).w		; # of data heads on pdev
+; WORD	nspt;		6(sp).w		; # of physical sectors per track
+; LONG	sectnum;	8(sp).l		; logical block address
+; WORD	count;		$c(sp).w
+; BYTE	*buf;		$e(sp).l	$f(sp)=high $10(sp)=mid $11(sp)=low
+; WORD	pdev;		$12(sp).w
+;-
+	.globl	_atread
+_atread:
+	bsr	set_dhcs	; set physical address
+	move.l	$e(sp),a0	; a0 -> buffer to read into
+	move.w	#256,d1		; d1 = word count
+	lea	ATSC,a2		; a2 -> sector count register
+	move.b	$d(sp),(a2)	; set sector count
+	move.b	#0,ATDOR	; enable interrupt
+	move.b	#ATREAD,ATCR	; set command code
+atr0:	bsr	w4int		; wait for interrupt
+	btst	#3,d0		; DRQ?
+	beq.b	atr1		; if not, return
+	move.w	d1,d0		; initialize word count
+	bsr	readbuf		; fill sector buffer
+	tst.b	(a2)		; more to read?
+	bne.b	atr0		; if so, continue
+	moveq	#0,d0		; everything's fine
+atr1:	rts
+
+
+;+
+; atwrite() - writes from 1 to 256 sectors as specified in the Task File,
+;		beginning at the specified sector.
+;	    - sector count equal to 0 requests 256 sectors.
+;
+; Comments:
+;	The unit is assumed to be in native mode when conversion from
+; logical block address to physical address is done.
+;
+; atwrite(nhd, nspt, sectnum, count, buf, pdev)
+; WORD	nhd;		4(sp).w		; # of data heads on pdev
+; WORD	nspt;		6(sp).w		; # of physical sectors per track
+; LONG	sectnum;	8(sp).l		; logical block address
+; WORD	count;		$c(sp).w
+; BYTE	*buf;		$e(sp).l	$f(sp)=high $10(sp)=mid $11(sp)=low
+; WORD	pdev;		$12(sp).w
+;-
+	.globl	_atwrite
+_atwrite:	
+	bsr	set_dhcs	; set physical address
+	move.l	$e(sp),a0	; a0 -> buffer to write from
+	move.w	#256,d1		; d1 = word count
+	lea	ATSC,a2		; a2 -> sector count register
+	move.b	$d(sp),(a2)	; set sector count
+	move.b	#0,ATDOR	; enable interrupt
+	move.b	#ATWRITE,ATCR	; set command code
+atw0:	btst.b	#3,ATASR	; DRQ?
+	beq.b	atw0		; if not, wait longer
+atw1:	move.w	d1,d0		; initialize word count
+	bsr	wrtbuf		; fill sector buffer
+	bsr	w4int		; wait for interrupt
+	btst	#3,d0		; DRQ?
+	beq.b	atw2		; if not, return
+	tst.b	(a2)		; more to write?
+	bne.b	atw1		; if so, continue
+	moveq	#0,d0		; everything's fine
+atw2:	rts
+
+
+;+
+; set_dhcs() - convert a logical block address into a physical address.
+;	     - set drive #, head #, cylinder # and sector # in task file.
+;
+; Passed:
+;	8(sp).w = nhd = # of data heads
+;	$a(sp).w = nspt = # of physical sectors per track
+;	$c(sp).l = logical block address
+;	$16(sp).w = physical unit #
+;-
+set_dhcs:
+	move.l	$c(sp),d1	; d1.l = logical block address
+	move.w	8(sp),d2	; d2.w = # of data heads
+	move.w	$a(sp),d0	; d0.w = # of physical sectors per track
+	mulu	d0,d2		; d2.l = # of sectors per cylinder
+				;      = # heads * # of sectors per track
+	divu.w	d2,d1		; d1.w = cylinder #
+				;      = log block addr / #spc
+	move.b	d1,ATCL		; set cylinder low
+	lsr.l	#8,d1		; d1.b = cylinder high
+	move.b	d1,ATCH		; set cylinder high
+	lsr.l	#8,d1		; d1.l = sector # within the cyl
+	divu.w	d0,d1		; d1.w = head #
+				;      = sector # within cyl / #spt
+	move.w	$16(sp),d0	; d0.w = physical unit #
+	andi.b	#7,d0		; mask off flags from physical unit #
+	lsl.b	#4,d0		; shift unit # to place
+	or.b	d0,d1		; or in drive #
+	move.b	d1,ATSDH	; set drive and head #
+	swap	d1		; d1.w = sector # (base 0)
+	addq.w	#1,d1		;      = sector # + 1 (base 1)
+	move.b	d1,ATSN		; set sector #
+	rts
+
+;+
+; initparm() - enables the host to set the head switch and cylinder
+;	       increment points for multiple sector operations.
+;
+; initparm(pdev, head, spt)
+; WORD 	pdev;	4(sp).w
+; WORD	head;	6(sp).w
+; WORD	spt;	8(sp).w
+;-
+	.globl	_initparm
+_initparm:
+	move.w	4(sp),d0	; d0 = physical unit #
+	andi.b	#7,d0		; mask off flags
+	lsl.w	#4,d0		; shift it into place
+	move.b	d0,ATSDH	; set physical unit #
+	move.w	6(sp),d0	; d0 = # of heads
+	subq.b	#1,d0		; maximum head #
+	or.b	d0,ATSDH	; set head #
+	move.b	9(sp),ATSC	; set sectors per track
+	move.b	#0,ATDOR	; enable interrupt
+	move.b	#INITPARM,ATCR	; set command code
+	bra	w4int		; go wait for interrupt
+
+
+;+
+; identify() - allows the Host to receive parameter information from
+;	       the drive.
+;
+; identify(pdev, len, buf)
+; WORD	pdev;	4(sp).w		; physical unit #
+; WORD	len;	6(sp).w		; number of words of data requested
+; BYTE	*buf;	8(sp).l		; buffer to put data
+;-
+	.globl	_identify
+_identify:
+	move.w	4(sp),d0	; d0 = physical unit #
+	andi.b	#7,d0		; mask off flags (if any)
+	lsl.b	#4,d0		; shift unit # to place
+	move.b	d0,ATSDH	; set drive #
+	move.b	#0,ATDOR	; enable interrupt
+	move.b	#IDENTIFY,ATCR	; set command code
+	bsr	w4int		; wait for interrupt
+	btst	#3,d0		; DRQ?
+	beq.b	id0		; if not, return with error
+	move.l	8(sp),a0	; else a0 -> buffer
+	move.w	6(sp),d0
+	bsr	readbuf		; read data
+	moveq	#0,d0		; return successful
+id0:	rts 
+
+
+;+
+; readbuf() - reads given number of words of data from the sector
+;		buffer.
+;
+; Passed:
+;	d0.w = number of words of data to read
+;	a0.l = buffer to hold data read from sector buffer
+;-
+readbuf:
+	subq.w	#1,d0		; dbra likes one less
+	lea	ATDR,a1		; a1 -> data bus
+rb0:	move.w	(a1),(a0)+	; read data from bus
+	dbra	d0,rb0		;  repeat until all done
+	rts
+
+
+;+
+; wrtbuf() - writes 512 bytes (255 words) of data to sector buffer.
+;
+; Passed:
+;	d0.w = number of words of data to write
+;	a0.l = buffer with data to write to sector buffer
+;-
+wrtbuf:
+	subq.w	#1,d0		; dbra likes one less
+	lea	ATDR,a1		; a1 -> data bus
+wb0:	move.w	(a0)+,(a1)	; write data to bus
+	dbra	d0,wb0		;  repeat until all done
 	rts
 	rts
 .endc

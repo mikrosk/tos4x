@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/06 14:50:56 $
+* $Date: 1991/09/12 19:56:18 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.20  1991/09/12  19:56:18  apratt
+* Changed to assemble IDE_AT for ALL MACHINES, now that there's no
+* distinction at assembly time between ST and STPLUS.
+*
 * Revision 1.19  1991/09/06  14:50:56  apratt
 * Changed all "ifne" to "if" and "ifeq" to "if !" and "endc" to "endif."
 *
@@ -99,7 +103,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.19 $
+* $Revision: 1.20 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\dmaread.s,v $
@@ -117,9 +121,12 @@
 * Those STPLUS machines which use these ROMs but don't actually have an IDE
 * bus will still get the IDE code, but using it will fail right away
 * because it always probes for the IDE bus and returns if it doesn't exist.
+*
+* As of 9/91 we want One Rom To Rule Them All, so ALL machines have IDE_AT.
+*
 
 SCSI		=	TT
-IDE_AT		=	STPLUS
+IDE_AT		=	1	; Always! (AKP 9/91)
 
 ;+
 ; DMAREAD(), DMAWRITE() - 

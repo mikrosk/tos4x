@@ -1,122 +1,129 @@
-#########################  GEMDOS MAKEFILE  #############################
-#
-# $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\makefile.,v $
+# Makefile for GEMDOS - requires Lattice or GNU make
 # =======================================================================
-# $Author: unknown $ 	$Date: 1991/12/12 23:46:10 $     $Locker:  $
+# $Id: makefile.,v 2.22 1992/07/05 01:01:10 kbad Exp $
+# History is in the above file in the RCS directory (use rlog to see it).
+
+# Rules
 # =======================================================================
-#
-# $Log: makefile,v $
-# Revision 2.21  1991/12/12  23:46:10  unknown
-# Changed some flags
-#
-# Revision 2.20  1991/11/20  19:44:04  apratt
-# Memory protection, first cut (no workee yet)
-#
-# Revision 2.19  1991/06/03  15:29:50  apratt
-# Changed to use fsstub, not fsstpar, the better to make available
-# to alpha testers who have only MIDI-port remote debugging, if any.
-#
-# Revision 2.18  1991/04/30  12:12:38  apratt
-# Converted DBCMDs to new infix DB style
-#
-# Revision 2.17  1991/04/05  18:38:22  apratt
-# Misc fixes making it work
-#
-# Revision 2.16  1991/03/28  17:39:36  apratt
-# THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
-#
-# Revision 2.15  1991/03/13  17:51:44  apratt
-# Don't know.
-#
-# Revision 2.14  1991/03/12  18:25:26  apratt
-# Making gtest.prg works and lets you test functions in this version
-#
-# Revision 2.13  1991/02/21  03:07:32  apratt
-# This version performs this testbed perfectly.
-#
-# Revision 2.12  1991/02/15  18:45:40  apratt
-# CI at the end of the week...
-#
-# Revision 2.11  1991/02/12  18:20:10  apratt
-# *** empty log message ***
-#
-# Revision 2.10  91/01/23  14:30:40  apratt
-# Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-# 
-#########################################################################
 
-TMPDIR	=	m:
-.SUFFIXES: .o .oo .c .s .mac .gas
+.SUFFIXES:
+.SUFFIXES: .o .ot .ol .og .c .s .mac .gas
 
-# un-comment this whole section to compile with GCC
-MEMPROT=-DNO_MEMPROT=0 -m68020
-CC=gcc
-CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
-	-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem $(MEMPROT)
-.s.o:
-	$(CC) -c $*.s
-
-# un-comment these lines if you want to use MAC to assemble GCC's output
-.c.o:
-	$(CC) $(CFLAGS) -S -o temp.s $*.c
-	emacs @gas2mac.rc temp.s 
-	mas -u -3 temp.s
-	mv temp.o $*.o
-	rm temp.s
-
+# Assembler rules
+# -----------------------------------------------------------------------
+AS=pasm
+ASFLAGS=-U -3 -B #-B for pasm
 .mac.o:
-	mas -u $*.mac
-
-.gas.o:
+	$(AS) $(ASFLAGS) $*.mac
+.gas.og:
 	gcc-as -o $*.o $*.gas
 
-all: gtest.prg dos.sys
+# Lattice rules
+# -----------------------------------------------------------------------
+CDEF=
+CERR=-j135i
+#135: Assignment to shorter data type (precision may be lost)
+CMOD=-w
+COPT=-d -O
+.c.ol:
+	$(CC) -m3 -c $(CFLAGS) -o$@ $<
 
-################
+ifdef USELC
+# Lattice-specific rules
+# -----------------------------------------------------------------------
+CC=lcc
+CFLAGS=$(CDEF) $(CERR) $(CMOD) $(COPT)
+.c.ot:
+	$(CC) -m3 -z2 -c $(CFLAGS) -o$@ $<
+.c.o:
+	$(CC) -z2 -c $(CFLAGS) -o$@ $<
+
+else
+# GCC rules
+# -----------------------------------------------------------------------
+CC=gcc
+CFLAGS=-fcall-used-d2 -fcall-used-a2 -fcall-saved-d3 -fcall-saved-a3 \
+	-O -Wall -mshort -fstrength-reduce -fcombine-regs -fforce-mem
+
+.s.o:
+	$(CC) -c $<
+.s.ot:
+	$(CC) -m68020 -c $<
+
+# comment out the .c.o .c.ot rules to use gas as gcc's back end
+.c.o:
+	$(CC) $(CFLAGS) -S -o $*.1 $<
+	sed -f gass $*.1 > $*.2
+	$(AS) $(ASFLAGS) $*.2 -O=$*.o
+	rm $*.1 $*.2
+
+#	emacs @gas2mac.rc temp.s
+
+.c.ot:
+	$(CC) -m68020 $(CFLAGS) -S -o $*.1 $<
+	sed -f gass $*.1 > $*.2
+	$(AS) $(ASFLAGS) $*.2 -O=$*.ot
+	rm $*.1 $*.2
+
+#	emacs @gas2mac.rc temp.s
+endif
 
 
+# Macros
+# =======================================================================
 
-CFILES =	fscl.c fsdir.c fsfs.c fshand.c scan.c \
-		time.c panic.c mem.c pool.c sup.c con.c \
-		fsproc.c memprot.c
+CFILES = fscl.c fsdir.c fsfs.c fshand.c scan.c \
+	time.c panic.c mem.c pool.c sup.c con.c \
+	fsproc.c
 
-OFILES =	fscl.o fsdir.o fsfs.o fshand.o scan.o \
-		time.o panic.o mem.o pool.o sup.o con.o \
-		fsproc.o memprot.o
+# rwa.o is in the middle so everything can call it pc-relative
+OFILES = fscl.o fsdir.o fsfs.o fshand.o scan.o \
+	time.o panic.o rwa.o mem.o pool.o sup.o con.o \
+	fsproc.o
 
-DS=dossys
-LDOBJS	=	$(DS)\self.o $(DS)\ld_dos.o $(DS)\clear.o $(DS)\clock.o \
-			$(DS)\announce.o $(DS)\fsstpar.o
+OTFILES = fscl.ot fsdir.ot fsfs.ot fshand.ot scan.ot \
+	time.ot panic.ot rwa.o mem.ot pool.ot sup.ot con.ot \
+	fsproc.ot
 
-dos.sys:	gemdos.o
-		mkvers $(DS)\announce.o
-		aln -l -o dos.sys $(LDOBJS) gemdos.o
-
-
-gemdos.o:	rwa.o $(OFILES) 
-		aln -u -p -l -o $@ $<
-
-fs.h:		fsdecl.h gemerror.h
-
-proto.h:	$(CFILES)
-		mkptypes -z $< >proto.h
-
-# Compile these things with your "native" compiler, rather than using GCC
-# and then messing with the assembly language.  If your "native" compiler
-# *is* GCC, you're golden.
-
-ftest.o: ftest.c
-		cc -c ftest.c
-fcmds.o: fcmds.c
-		cc -c fcmds.c
+# S= directory where loader files live
+S=sys
+LOADER=$S\self.o $S\ld_dos.o $S\clear.o $S\clock.o $S\announce.o $S\fsstpar.o
 
 
-############
+# Targets
+# =======================================================================
 
-# set these to .mac or .gas as appropriate
+default:
+	@echo 'use: make [USELC=] [all] [dos.sys] [gemdos.030] [gemdos.68k] [gtest.prg]'
 
+all: dos.sys gemdos.68k gtest.prg
+
+
+dos.sys: $(LOADER) gemdos.030
+	mkvers $S\announce.o
+	aln -l -o dos.sys $<
+
+gemdos.030: $(OTFILES) 
+	aln -u -p -l -o $@ $<
+
+gemdos.68k: $(OFILES)
+	aln -u -p -l -o $@ $<
+
+ftest.prg: ftest.ol fcmds.ol
+	lcc $(CDEF) $(CMOD) $(COPT) -o$@ $<
+
+# Dependencies
+# =======================================================================
+
+fs.h: fsdecl.h gemerror.h
+
+proto.h: $(CFILES)
+	mkptypes -z $< >proto.h
+
+# Assembler objects
 docall.o: docall.mac
 traps.o: traps.mac
 rwa.o: rwa.mac
-
-
+docall.og: docall.gas
+traps.og: traps.gas
+rwa.og: rwa.gas

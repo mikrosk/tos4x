@@ -1,19 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/01/13 15:41:07 $
+* $Date: 89/01/23 11:43:21 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.27  89/01/23  11:43:21  kbad
+* Restored `nop' after jsr in _term, it's required because of dumb AS68.
+*
 * Revision 1.26  89/01/13  15:41:07  apratt
 * NO CODE CHANGE: just comment changes around trp13tab and trp14tab
 * documenting assigned BIOS and XBIOS function numbers.
-*
+* 
 * Revision 1.25  88/12/30  11:42:22  apratt
 * Change for STPLUS only: dbasell was defined as the address of the
 * register as a WORD, but was being used as a byte.  Now it's the
@@ -144,7 +147,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.26 $
+* $Revision: 1.27 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2649,6 +2652,13 @@ _setpalette:
 	move.l	4(sp),colorptr.w	; set software pointer
 _term:
 	jsr	savp_2			; stack PC, then zero hi byte of PC
+* _setcolor - set single color, return old color
+**** WARNING: the `nop' below is required for silly AS68 behaviour, to wit:
+**** the jsr above will get optimized to a bsr, which gets further optimized
+**** to a bsr.b, which can't go to the next address, so AS68 decides you want
+**** a nop instead of a bsr.  We don't want a nop, we want to stack the PC.
+* though.  The ST-compatible registers shadow 16 of the TT registers
+	nop
 savp_2:	clr.l	a5
 	move.l	(sp)+,proc_pc(a5)	; save bogus PC + exception number
 	movem.l	d0-d7/a0-a7,proc_regs(a5) ; common registers

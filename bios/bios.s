@@ -4,17 +4,29 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/06 15:22:27 $
+* $Date: 90/03/19 16:00:42 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.16  90/03/19  16:00:42  apratt
+* Added comments at Rsconf to the effect that it's always been broken.
+* No code change for that because it's mostly harmless.
+*
+* Fixed Bconmap range-check to be (devno >= maxdev) not (devno > maxdev).
+* Pre-cleared d0 in ttmfp Rsconf when returning baud rate (bug fix).
+*
+* Added move.l d7,d0 at the end of Rsconf for SCC (bug fix).
+*
+* Increased Iorec initialization table for SCC to include initial 
+* baud rate of 1 (9600).
+*
 * Revision 2.15  90/03/06  15:22:27  apratt
 * Fixed a fatfinger: if you get a bus error while initting SCC,
 * the code is supposed to return safely.  Now it does.
-*
+* 
 * Revision 2.14  90/03/02  10:47:58  apratt
 * Added initialization of ST MFP Timer B to something other than 1.
 * See startup.s, at the label noblank, for why this is necessary
@@ -178,7 +190,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.15 $
+* $Revision: 2.16 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2534,6 +2546,18 @@ devtab:
 *	If baudrate is -2, the current baud rate is returned.  That is,	*
 *	the last nonnegative baudrate value passed to this function.	*
 *	(No other arguments are needed, and no changes are made.)	*
+*									*
+*	Otherwise, returns the old ucr,rsr,tsr,src settings in the	*
+*	four bytes of D0.L.						*
+*	(THIS WAS ALWAYS THE CASE but was only documented for 4/88.)	*
+*									*
+* 									*
+* This routine has always been broken: the fourth parameter writes to	*
+* the SCR byte, but the low-order byte in the return value reads  the	*
+* UDR register, so it isn't symmetrical.  Since nobody does synchronous	*
+* I/O or uses this call to read the UDR anyway, it's been redocumented	*
+* as "should always be -1 on input" and a "don't care" on output.	*
+* (Actually using Rsconf causes a spurious read of the UDR, which COULD	*
 * cause loss of a pending character, but only if it arrives while at	*
 * IPL 7.  This is not likely, and when you're fooling with Rsconf you	*
 * aren't in a critical section anyway.  Some rationalization!)  This	*
@@ -2813,7 +2837,7 @@ _bconmap:
 	beq	mapend		; just return old number if -1
 	move.l	#maptab,d0	; preload return value for -2
 	cmp.w	maptabsize.w,d0
-	bhi	mapend		; error if greater than maptabsize
+	beq	mapend		; he wants the pointer
 	moveq.l	#0,d0		; preload error code (zero)
 	subq.w	#6,d1
 	bmi	mapend		; error if < 6
@@ -3104,6 +3128,7 @@ tttxerror:
 	lea	ttmfp,a0
 	bra	txecommon
 
+	moveq.l	#0,d0
 	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
 	bne	ttauxnorm	;no: act normally
 	move.w	ttbrate,d0
@@ -3399,11 +3424,11 @@ nolan:
 
 	bsr	nolan		; select DB9, not lan connector
 
-	moveq	#rssize,d0
+* initialize the IORECs: write constant data to each, then change the
 * two differences: the input and output buffer pointers
 
 	lea.l	chaibufptr.w,a0
-	moveq	#rssize,d0
+	lea.l	iorecinit(PC),a1
 	moveq	#rssize+2,d0
 	bsr	lbmove		; do block move
 	lea.l	chbibufptr.w,a0
@@ -3907,6 +3932,7 @@ rs3:
 rs3a:	bclr.b	#4,wr5(a0)	; test & clear: was it clear before?
 	beq	rs4		; yes - this is no-op.
 	SCCw	#5,wr5(a0)	; no - write new value
+
 rs4:
 
 * finished with the things we can decode.  End of rsconf.
@@ -3964,7 +3990,8 @@ iorecinit:	dc.l	chaibuffer	; ibufptr
 		dc.l	chaobuffer	; ditto, obuf
 		dc.w	rbufsize
 		dc.w	0,0
-		dc.b	1,0		; flow,sendnow
+		dc.w	rbufsize/2
+		dc.w	1		; initial baud rate
 		dc.b	%11101010	; wr5 shadow: dtr/8bits/txen/rts
 		dc.b	0,0		; rxoff,txoff
 		dc.b	1,0		; flow,sendnow (rssize ends here)

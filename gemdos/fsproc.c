@@ -1,12 +1,15 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
+* $Revision: 2.22 $	$Source: d:/tos/gd2\RCS\fsproc.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/11/20 19:44:04 $    $Locker:  $
+* $Author: unknown $ 	$Date: 1991/12/13 02:55:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.22  1991/12/13  02:55:48  unknown
+* Only call init_t2 if mode == 0
+*
 * Revision 2.21  1991/11/20  19:44:04  apratt
 * Memory protection, first cut (no workee yet)
 *
@@ -257,7 +260,7 @@ char *v;		/* enviroment string (0, 3, 5, 7) */
 	long fastmax, slowmax, minfast;
 	OFD **uftstart;
 
-	if (!mem_initted) {
+	if (mode == 0 && !mem_initted) {
 	    mem_initted = 1;
 	    DBCMD(1,"print call init_t2;_c");
 	    init_t2();

@@ -1,18 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/09/06 11:39:52 $
+* $Date: 88/09/21 15:08:19 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.14  88/09/21  15:08:19  apratt
+* Whoops.. dmaread claimed to try twice, but really tried once.
+* Now it tries twice.
+*
 * Revision 1.13  88/09/06  11:39:52  kbad
 * Added osconf word for denmark.
-*
+* 
 * Revision 1.12  88/05/06  16:06:38  apratt
 * In dmaread: removed "retry on no error/no data" and replaced it
 * with "retry on any error" (except timeout).
@@ -67,7 +71,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.13 $
+* $Revision: 1.14 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1589,7 +1593,7 @@ dmb_2:	add.b	#$20,d7		; next devno
 * (Should it? TBD.)
 *-
 dmaread:
-	clr.w	d5		; set for two iterations (dbra at end)
+	moveq	#1,d5		; set for two iterations (dbra at end)
 
 dmaagain:
 	lea	fifo,a6		; a6 -> DMA control register

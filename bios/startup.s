@@ -4,18 +4,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/22 17:51:41 $
+* $Date: 90/02/26 17:27:28 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.41  90/02/26  17:27:28  apratt
+* Fixed up conditionals, using else rather than endc/if. Added stwait,
+* using STMFP timer A for delays, suitable for delays during boot
+* (applications can use timer A later on). Used calls to dowait in boot,
+* (stwait or ttwait as appropriate), to replace ttwait in TT, and
+* instruction loops in not-TT. Removed VBLQ1ST once and for all - now
+* vblq is always 1st. Hope this doesn't hurt if we ever build ST ROMS
+* again! Changed _term to use dc.w's to get what I'm after: a jsr (not
+* bsr) to the next instruction.
+*
 * Revision 2.40  90/02/22  17:51:41  apratt
 * Changed bootup BG color from yellow to magenta.  Added moveq #0,d0
 * to clear screen so it doesn't turn green.  Removed twin color
 * tables: $f is full-magnitude on STe and TT, and eq to $7 on ST.
-*
+* 
 * Revision 2.39  90/02/16  16:50:17  apratt
 * Fixed an oops in the startup code which made RAM TOSes not work. Also,
 * initialize ssp to its ultimate destination (_supstk+supsiz) rather than
@@ -394,7 +404,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.40 $
+* $Revision: 2.41 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -467,8 +477,7 @@ denmark		=      13 ***DON'T  CHANGE***
 
 .ifne TT+STPLUS
 DMASND		equ	1
-.endc
-.ifeq TT+STPLUS
+.else
 DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
@@ -482,9 +491,7 @@ version		equ	$0106		; version number *MUST BE EVEN*
 date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
-.endc
-
-.ifne TT
+.else
 version		equ	$0300		; version number *MUST BE EVEN*
 date		equ	$03011990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
@@ -2040,8 +2047,7 @@ xfpudone:
 	clr.l	(a0)+			; last entry is null
 	add.l	#$01000000,a1		; bump vector number in bits 24..31
 	move.l	#DEFCSIZE,(a0)+		; with size for its value
-.endc
-.ifne TT
+.else
 * TT: point all exceptions to _term, because the ex number is on
 * the stack, in the exception frame type word.
 	lea	_term(pc),a1
@@ -2126,29 +2132,18 @@ chdev1:	move.l	(a0)+,(a1)+
 
 	move.l	$8,a0
 	move.l	sp,a1
-.ifne TT
 	move.l	#scuberr,$8
-	bsr	ttwait		; delay before resetting keyboard
-.endc
+.if (SPARROW == 0)
 	move.b	#$40,ttvmeimsk		; enable int priority 6
 	move.b	#$14,ttsysimsk		; enable int priorities 2, 4
 .endif
 
-.ifne TT
+scuberr:
 	move.l	a0,$8
 	move.l	a1,sp
 
-	bsr	ttwait
+*+
 *  "The other half" of the BIOS handles character I/O;
-.else
-*
-* 68000: do a bsr/rts 32K times... Not very robust.
-*
-	move.l	#$7fff,d0
-ikbdlp1:
-	bsr	dskb1		; (this is a rts instruction)
-	dbra	d0,ikbdlp1	; waste aprox 300ms for ikbd to digest reset
-.endc
 *  call its initialization hook.
 *  (It can "never fail".  This will get interesting
 *   if we ever do a detachable keyboard ....)
@@ -2253,8 +2248,7 @@ priv:	movem.l	d0/a0,-(sp)
 priv1:	movem.l	(sp)+,d0/a0
 .ifne TT
 	movem.l	8(sp),d0-d2		; get these off the stack now
-.endc
-.ifeq TT
+	jsr	pspace.w
 	move.l	(sp)+,a0		; restore A regs
 	move.l	(sp)+,a1
 .endc
@@ -2851,7 +2845,6 @@ val_mr:	jmp	(a6)			; return EQ/NE
 
 colors:
 	dc.w	bootcolor		; 0 - boot color (white in production)
-.ifne VBLQ1ST
 	dc.w	$f00			; 1 red
 	dc.w	$0f0			; 2 green
 	dc.w	$ff0			; 3 yellow
@@ -2864,7 +2857,6 @@ colors:
 	dc.w	$3f3			; 10 light green
 	dc.w	$ff3			; 11 light yellow
 	dc.w	$33f			; 12 light blue
-.endc
 	dc.w	$f3f			; 13 light magenta
 	dc.w	$3ff			; 14 light cyan
 *** ST PLUS:
@@ -2885,7 +2877,7 @@ colors:
 *-
 hbl:	move.w	d0,-(sp)		; save d0
 hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
- .ifne DMASND
+.ifne DMASND
 *-
 vbl:
 	addq.l	#1,_frclock		; bump frame clock
@@ -2908,13 +2900,13 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	beq	v_read2
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
 v_read2:
- .endc
+.endc
 
 *** non-STPLUS equivalent: just get the input from gpip
 
- .ifeq DMASND
+.ifeq DMASND
 	move.b	gpip,d1			; get "High Rez" input
- .endc
+.endc
 
 *** When DMASND is TRUE:
 *** If DMA sound is active, the MONOMON line is inverted (that is,
@@ -2922,8 +2914,7 @@ v_read2:
 ***	READ sound status (to d0)
 ***	READ gpip (to d1)
 ***	IF gpip != d1 then try again
-.endc
-.ifne TT
+***	IF sound status != d0 try again
 ***	IF d0 != 0 invert d1
 ***
 *** Then proceed with the old code to check for the appropriate value
@@ -2935,15 +2926,16 @@ v_read2:
 *** doesn't quite ensure lack of trouble, but it does give some hope.
 ***
 *** STPAD doesn't have any of this cruft - you can't change monitors!
+* (But wait 2-3ms first "to wait for mono monitor's window of 
+* vulnerability to end.")
+***
+	move.w	#$0203,d0
+	bsr	dowait			; this is ttwait or stwait
+* (it's OK to use stwait, which uses Timer A, because we're resetting anyway)
+
 .ifeq TT
-	move.w	#2000,d0		; delay 2..3 ms to wait for mono's
-v_d23:	dbra	d0,v_d23		;  window of vulnerability to end
 	move.b	#2,d0			; set mode 2 (high rez)
-.endc
-.ifne TT
-* AKP: is this delay necessary on TT?  I don't know.
-	move.w	#$0203,d0		; delay 3 * 1ms = 3ms
-	bsr	ttwait
+
 	move.w	sr,-(sp)
 .endc
 v_read1:
@@ -2958,8 +2950,7 @@ v_read1:
 	bne	v_read1			; no - start over
 	cmp.b	dmasndc+1,d0		; sound state still the same?
 	bne	v_read1			; go try again
-.endc
-.ifne TT
+	move.w	(sp)+,sr		; restore SR
 
 * d0 now holds good DMA sound state value; d1 holds good I7 value
 
@@ -2998,21 +2989,6 @@ swmon1:	btst.l	#7,d1			; bit is 1 when no mono
 	beq	swmon3			; no change (still highrez)
 	move.b	defshiftmd.w,d0		; get preferred rez
 .if (TT == 0)
-.ifeq VBLQ1ST
-*------	Call deferred interrupt	vectors:
-	move.w	nvbls,d7		; d7 = # of deferred vblank vectors
-	beq	vbl12			; (punt	if no vectors)
-	subq.l	#1,d7			; turn into DBRA count
-	move.l	_vblqueue.w,a0		; a0 ->	vectors
-vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
-	cmp.l	#0,a1			; if(a1	== NULL) continue;
-	beq	vbl11
-	movem.l	d7/a0,-(sp)		; save registers
-	jsr	(a1)			; call routine
-	movem.l	(sp)+,d7/a0		; restore registers
-vbl11:	dbra	d7,vbl10		; loop for more	vectors
-.endc
-
 	cmp.b	#2,d0			; if high-rez, then force low rez
 	blt	swmon2			; (low or med rez)
 	clr.b	d0
@@ -3135,8 +3111,7 @@ _critic:
 .ifeq TT
 	move.l	d0,a0			; (quick and dirty test-for-negative)
 *		This is to ensure that you can tell old ROMs from new ones:
-.endc
-.ifne TT
+*		For the interrogative calls, the fn number must be used
 *		to signal the "old ROM" case.
 	bclr.l	#0,d0			; clear & test odd bit
 	move.l	d0,a0			; doesn't affect ccr!
@@ -3179,8 +3154,7 @@ b_supr:	move.w	(sp)+,d0		; get function#
 	dc.l	hdv_bpb+$80000000	; 7: [indirect] get BPB
 	bpl	b_1			; points to code
 	dc.l	hdv_mediach+$80000000	; 9: [indirect] media change inquiry
-.endc
-.ifne TT
+.else
 	dc.l	tt_rw			; 4: disk read/write (see below)
 	dc.l	_setexc			; 5: set exception vector
 	dc.l	_tickcal		; 6: return tick calibration
@@ -3195,12 +3169,10 @@ b_supr:	move.w	(sp)+,d0		; get function#
 .endif
 	move.l	(a0),a0			; indirect through RAM...
 *
+* BIOS functions are called with a5=0, and I won't back that part out
 .ifeq TT
-trp14tab:
 *
-.endc
-.ifne TT
-trp14tab:
+b_1:	clr.l	a5			; a5 -> zero page
 	jsr	(a0)			; call BIOS function
 .endc
 * restore registers, cleanup stack and return:
@@ -3566,8 +3538,7 @@ nottram:
 	clr.l	a0
 .ifeq TT
 	bmi	setex1			; punt if (d1 < 0)
-.endc
-.ifne TT
+	move.l	d1,(a0)			; set vector address
 setex1:	rts
 .endc
 
@@ -3603,8 +3574,7 @@ phydone:
 * _logbase - get logical display base
 .ifeq TT
 *-
-.endc
-.ifne TT
+_logbase:
 	move.l	_v_bas_ad.w,d0	; set software shadow
 	rts
 
@@ -3645,8 +3615,7 @@ _setscreen:
 	bmi	f5a
 .ifeq STPLUS+TT
 *--- set physical location:
-.endc
-.ifne STPLUS+TT
+.else
 	and.w	#$0fff,d0		; STPLUS/TT have other dirty bits
 .endc
 	tst.w	6(sp)			; if new color is <0, don't set it
@@ -3681,21 +3650,22 @@ f5r:	rts
 _setpalette:
 	move.l	4(sp),colorptr.w	; set software pointer
 	rts				; (updated by vbl handler)
+
+
 .ifeq TT
-_term:
-	jsr	savp_2			; stack PC, then zero hi byte of PC
 * _setcolor - set single color, return old color
-**** WARNING: the `nop' below is required for silly AS68 behaviour, to wit:
-**** the jsr above will get optimized to a bsr, which gets further optimized
-**** to a bsr.b, which can't go to the next address, so AS68 decides you want
-**** a nop instead of a bsr.  We don't want a nop, we want to stack the PC.
+*	_setcolor(WORD colorNum, WORD colorValue)
+*
+* For TT, this call is still useful: it reads and writes the ST-compatible
+* color registers, not the TT color registers.  It only does 16 of them,
 * though.  The ST-compatible registers shadow 16 of the TT registers
-	nop
+* (which 16 is set with EsetBank) but have the 3 MSBs of the gun value
+* in the 3 LSBs of the nybble: rRRRgGGGbBBB (where 'r' is the least-
+* significant bit of red).
 *-
 _setcolor:
-.endc
+	move.w	4(sp),d1		; get color number
 	add.w	d1,d1			; turn into word index
-.ifne TT
 	and.w	#$1f,d1			; force color range (prevent buserr)
 	lea	color0,a0		; a0 -> base of palette memory
 	move.w	(a0,d1.w),d0		; return old color
@@ -4316,10 +4286,14 @@ cphbra:	bra	cphjmp
 	bmi	Bmd_1			; (don't set if mode is negative)
 	and.w	d5,d0			; force to soft mode if no chip
 	or.w	d4,d0			; replace installed status
-*		When the time has elapsed, bit 0 of TT_ipra gets set.
+*		When the time has elapsed, bit 5 of ipra gets set.
 Bmd_1:	move.w	d3,d0			; return "old" blit mode
 	rts
 
+
+*+
+*
+*  Test for blit chip
 *
 *	==> D0 = 0, no chip
 *		 2, chip exists
@@ -4354,46 +4328,24 @@ TB_e:	move.l	a1,8(a0)		; restore original bus error vector
 *
 * ttdelay sets up the timer & starts it counting down, then returns
 * while the timer's counting.  You can tell it timed out by checking
-* bit 0 of TT_ipra: it becomes 1 when the time has expired.
+* bit 5 of ipra: it becomes 1 when the time has expired.
 *
 * (Procedures used by other parts of the BIOS for timing delays.)
 TT_mfp	equ	$fffffa81
-TT_gpip	=	0		; general purpose I/O
-TT_aer	=	2		; active edge reg
-TT_ddr	=	4		; data direction reg
-TT_iera	=	6		; interrupt enable A & B
-TT_ierb	=	8
-TT_ipra	=	$a		; interrupt pending A & B
-TT_iprb	=	$c
-TT_isra	=	$e		; interrupt inService A & B
-TT_isrb	=	$10
-TT_imra	=	$12		; interrupt mask A & B
-TT_imrb	=	$14
-TT_vbr	=	$16		; interrupt vector base
-TT_tacr	=	$18		; timer A control
-TT_tbcr	=	$1a		; timer B control
-TT_tcdcr =	$1c		; timer C & D control
-TT_tadr	=	$1e		; timer A data
-TT_tbdr	=	$20		; timer B data
-TT_tcdr	=	$22		; timer C data
-TT_tddr	=	$24		; timer D data
-TT_scr	=	$26		; sync char
-TT_ucr	=	$28		; USART control reg
-TT_rsr	=	$2a		; receiver status
-TT_tsr	=	$2c		; transmit status
-TT_udr	=	$2e		; USART data
 
-MFPBIT		equ	5		; Timer A (TB is easy; others hard)
-NOTMFPBIT	equ	$df		; ~(1<<MFPBIT)
+WAITBIT		equ	5		; Timer A (TB is easy; others hard)
+* Uses Timer C of the TT MFP. (could use any timer in any MFP).
 * For documentation purposes, say, "Timer C of the TT MFP is used by
 *
 *	ttwait	delays for a time specified in D0.W: the high
+*		byte is the value for the divider, and the low
 *		byte is the value for the countdown.  When
+*		the time expires, ttwait returns.  No interrupts
 *		are used.
 *
-twait1:	btst.b	#MFPBIT,TT_mfp+TT_ipra	; while not pending
+twait1:	btst.b	#WAITBIT,TT_mfp+ipra	; while not pending
 *		When the time has elapsed, WAITBIT of WAITREG gets set.
-	clr.b	TT_mfp+TT_tacr		; stop the timer
+	clr.b	TT_mfp+tacr		; stop the timer
 	rts				; and return
 *		(The timer will run ad infinitum, but who cares?)
 *		(This is not actually used at this time.)
@@ -4401,16 +4353,56 @@ twait1:	btst.b	#MFPBIT,TT_mfp+TT_ipra	; while not pending
 	lea.l	TT_mfp,a0
 *	dowait	is either ttwait or stwait, for use during boot.
 *		Only TT can use ttwait after the boot; stwait uses
-	clr.b	TT_tacr(a0)		; stop timer
-	bclr.b	#MFPBIT,TT_iera(a0)	; disable int
-	move.b	#NOTMFPBIT,TT_ipra(a0)	; clear pending
-	bclr.b	#MFPBIT,TT_imra(a0)	; mask int
-	bset.b	#MFPBIT,TT_iera(a0)	; enable int
+	clr.b	tacr(a0)		; stop timer
+	bclr.b	#WAITBIT,iera(a0)	; disable int
+	move.b	#NOTWAITBIT,ipra(a0)	; clear pending
+	bclr.b	#WAITBIT,imra(a0)	; mask int
+	bset.b	#WAITBIT,iera(a0)	; enable int
 *	3 (/16)		 6   us		  1.6 ms
 
-	move.b	d0,TT_tadr(a0)		; set data value
+	move.b	d0,tadr(a0)		; set data value
 	ror.w	#8,d0			; get mode byte into d0.b
-	move.b	d0,TT_tacr(a0)		; start the clock (mode from d0)
+	move.b	d0,tacr(a0)		; start the clock (mode from d0)
+	rol.w	#8,d0			; restore d0
+	move.l	(sp)+,a0		; restore a0
+*	5 (/64)		26   us		  6.6 ms
+*	6 (/100)	40   us		 10   ms
+*	7 (/200)	80   us		 20   ms
+*
+* This code works this way:
+*
+*	Stop the timer
+* after that.  You can use 200Hz for timing later, but its granularity
+* is crummy.  I can't think of a good solution.
+*	Clear the pending bit
+*	Set the timer's mode (starts the timer)
+* counts down to 0 it'll set the bit in the interrupt-pending register.
+* We never actually use this interrupt, just the pending bit.
+*
+
+WAITBIT		equ	5		; Timer A
+NOTWAITBIT	equ	$df		; ~(1<<WAITBIT)
+
+swait1:	btst.b	#WAITBIT,mfp+ipra
+WAITREG		equ	ttiprb
+	clr	mfp+tacr
+	.globl	ttwait
+	.globl	ttdelay
+	.globl	dowait
+	move.l	a0,-(sp)
+	lea.l	mfp,a0
+
+dowait:
+	clr.b	tacr(a0)		; stop timer
+	bclr.b	#WAITBIT,iera(a0)	; disable int
+	move.b	#NOTWAITBIT,ipra(a0)	; clear pending
+	bclr.b	#WAITBIT,imra(a0)	; mask int
+	bset.b	#WAITBIT,iera(a0)	; enable int
+
+ttdelay:
+	move.b	d0,tadr(a0)		; set data value
+	move.w	sr,-(sp)
+	move.b	d0,tacr(a0)		; start the clock (mode from d0)
 	move.b	tttcdcr,d1		; don't disturb timer D's state
 	move.l	(sp)+,a0		; restore a0
 	and.b	#$0f,d1

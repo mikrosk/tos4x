@@ -3,19 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/30 15:56:23 $
+* $Date: 89/09/07 16:28:11 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.5  89/09/07  16:28:11  apratt
+* Added SLOWACSI code.  Seems to work, but I'm not happy with it.
+*
 * Revision 2.4  89/08/30  15:56:23  apratt
 * Added code to handle floppy I/O with fast RAM.  Calls to ??fast
 * either do a pre-copy and change the buffer address on the stack,
 * or they set up a post-copy using fastbuf and fastcnt.  unfast handles
 * the post-copy, called at the common floppy return point unlok1.
-*
+* 
 * Revision 2.3  89/08/18  14:31:51  apratt
 * Added some calls to clrcache -- putting it at RWABS isn't good enough.
 * 
@@ -77,7 +80,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.4 $
+* $Revision: 2.5 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -138,7 +141,19 @@
 *------------------------------------------------------------------------
 	text
 
-TT	equ	1		; set to 1 for TT, 0 for ST & STE @check@
+*
+* Set TT to 1 if you're on a TT; this uses a TTMFP timer for timeouts,
+* not instruction loops.
+*
+* Set SLOWACSI to 1 to introduce delays after (possibly) changing
+* the direction bit in the DMA chip; changing the bit resets the
+* chip, and you can't talk to it for 16 clocks (at 16MHz) after
+* resetting it.  Four non-cacheable reads should be 16 clocks, at
+* least.
+*
+
+TT		equ	1	; set to 1 for TT @check@
+SLOWACSI	equ	1	; set to 1 for TT(?) @check@
 
 HI_DEN		equ	1		; always enable this code
 
@@ -323,9 +338,31 @@ fdcprobe:
 	bne	noflop			; no - no floppies
 	cmp.b	#$ff,d0			; still $ff?
 					; (leave ccr set)
+.ifeq SLOWACSI
 	move.w	#$090,(a6)		; toggle DMA data direction,
 	move.w	#$190,(a6)		;	leave hardware in READ state
 	move.w	#$090,(a6)
+.endc
+.ifne SLOWACSI
+	move.w	#$090,(a6)
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+					; (doesn't affect ccr)
+	eor.w	#4,sr			; flip Z bit
+	rts				; EQ means no floppies
+.endif
+
+*+
+* floprd - read	sector from floppy
+* Passed (on the stack):
+*	$14(sp) count
+*	$12(sp) sideno
+.endc
+*	$10(sp) trackno
+*	 $e(sp) sectno
+*	 $c(sp) devno
 *	 $8(sp)	->DSB
 *	 $4(sp) ->buffer
 *	 $0(sp)	return address
@@ -437,9 +474,29 @@ eb1:	move.w	d1,curr_err.w		; set current error number & return
 *+
 * Passed (on the stack):
 fwr1a:	move.w	#e_error,curr_err(a5)	; set general error#
+.ifeq SLOWACSI
 	move.w	#$190,(a6)		; toggle DMA chip to clear status
 	move.w	#$090,(a6)
 	move.w	#$190,(a6)		; leave	in WRITE mode
+.endc
+.ifne SLOWACSI
+	move.w	#$190,(a6)		; toggle DMA chip to clear status
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+*	 $e(sp) sectno
+*	 $c(sp) devno
+*	 $8(sp)	->DSB
+*	 $4(sp) ->buffer (unused)
+*	 $0(sp)	return address
+*
+* Returns:	EQ, the write won (on all sectors),
+*		NE, the write failed (on some sector).
+*-
+_flopwr:
+.endc
+.if STPAD
 	bsr	fdcprobe
 	beq	noflop1			; no floppies!
 .endif
@@ -478,7 +535,6 @@ fwr5:	subq.w	#1,retrycnt(a5)		; decrement retry count
 * if you're at high density at all.  This is not really what we should
 * do, but it is here for testing.
 *
-
 	tst.w	dseekrt(a1)
 	beq	noqd0
 	or.w	#%10,d7			; OR in disable of write precomp
@@ -641,9 +697,29 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	move.b	cdma+3(a5),dmalow(a5)	; load dma pointer
 	move.b	cdma+2(a5),dmamid(a5)
 	move.b	cdma+1(a5),dmahigh(a5)
+.ifeq SLOWACSI
 	move.w	#$190,(a6)		; toggle R/W flag and
 	move.w	#$090,(a6)		; select sector-count register
 	move.w	#$190,(a6)
+.endc
+.ifne SLOWACSI
+	move.w	#$190,(a6)		; toggle R/W flag and
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+	move.b	virgin+1.w,(a2)+	; copy low byte
+	dbra	d1,ot2			; fill 512 bytes
+	move.b	#$f7,(a2)+		; $f7 -- write checksum
+	moveq	#40-1,d1		; 40 x $4e
+	moveq	#$4e,d0
+	bsr	wmult
+
+
+	tst.w	interlv.w		; if interlv is NEG use skew table
+	bmi	use_skewtbl		; 
+.endc
+
 	move.w	#$1f,d7			; (absurd sector count)
 	cmp.w	spt.w,d4		; if(d4	<= spt)	then_continue;
 	ble	ot1			; proto	more sectors this pass
@@ -750,9 +826,28 @@ tvrlp:	move.w	#retries,retrycnt(a5)	; init sector-retry count
 tvr1:	move.b	cdma+3(a5),dmalow(a5)	; load dma pointer
 	move.b	cdma+2(a5),dmamid(a5)
 	move.b	cdma+1(a5),dmahigh(a5)
+.ifeq SLOWACSI
 	move.w	#$090,(a6)		; toggle R/W (leave in W state)
 	moveq	#e_read,d0		; set default error#
 	move.w	#$090,(a6)
+.endc
+.ifne SLOWACSI
+	move.w	#$090,(a6)		; toggle R/W (leave in W state)
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+	tst.b	gpip
+	move.w	#$190,(a6)
+	bsr	select			; select floppy
+	bsr	go2track		; go to track
+	bne	flopfail		; (punt if that fails)
+					; (incl. EMPTY DRIVE - FAIL NOW)
+
+	bsr	verify1			; verify some sectors
+	bra	flopok			; return "OK"
+
+
+.endc
 * verify1 - verify sectors on a single track
 * Passed:	csect = starting sector#
 *		ccount = number of sectors to verify
@@ -1173,6 +1268,8 @@ select:
 	clr.w	deselflg.w		; floppies NOT deselected
 	move.w	cdev.w,d0		; get device number
 	addq.b	#1,d0			; add and shift	to get select bits
+	lsl.b	#1,d0			; into bits 1 and 2
+	or.w	cside.w,d0		; or-in	side number (bit 0)
 
 wdiskct6:				* write	d6 to diskctl
 	move.w	dcurtrack(a1),d7	;	from current track number
@@ -1191,9 +1288,8 @@ rdiskct7:				* read diskctl into d7
 
 rdiskctl:				* read diskctl into d0
 * setporta - set floppy	select bits in PORT A on the sound chip
-	move.w	diskctl,d0		;	read it
+* Passed:	d0.b (low three	bits)
 * Uses:		d1
-	move	sr,-(sp)		; save flags
 setporta:
 .ifne TT
 	move	sr,-(sp)		; save our IPL
@@ -1203,8 +1299,7 @@ setporta:
 	move.w	#$20,d0			; 0x20 seems about right...
 rwdly1:	dbra	d0,rwdly1		; busy-loop: give 1770 time to settle
 .endc
-	move.w	(sp)+,d0		; restore register, flags, and return
-	move	(sp)+,sr
+	move.w	(sp)+,d0		; restore register
 *
 * The 1770 can't keep up with full-tilt	CPU accesses, so
 * we have to surround reads and	writes with delay loops.
@@ -1364,14 +1459,19 @@ getspinup:
 *	bsr	change		; get right disk in drive
 *				; this can change the devno on the stack!
 *	add.w	#$8,sp		; clean up stack
+*	move.w	$4(sp),d0	; get (possibly new) dev number
+*	and.w	#$1,d0		; keep only bit 0
 *	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
 *	move.w	_wpstatus.w,d0
 *	or.w	d0,_wplatch.w	; (catch WP transitions)
 *	move.b	(a0),d0		; reload the WP status as return value.
-	clr.w	fastcnt			; make sure it's zero for next time
+*	ext.l	d0
+*	rts
+
+*
 * code to handle fast vs slow ram:
 	move.l	def_frb,a1
-unmove:	asl.w	#5,d1			; d1 is now number of 16's of longs
+*	In each case, if the buffer address is in slow RAM, return.
 *	Else...
 *
 *	rdfast: change the buffer pointer on the stack to point to 

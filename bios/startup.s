@@ -3,18 +3,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/05/10 14:00:24 $
+* $Date: 89/06/15 15:43:11 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.10  89/06/15  15:43:11  apratt
+* Changed STPLUSVIDEO to STPLUS, because it covers everything STPLUS
+* unique (DMASND covers other things).  Changed version number to 1.6,
+* and date to 6/16/89.  Added STPLUS memory sizing.  The BIOS revs
+* with this date or earlier are correct for STPLUS (now called STE).
+* I think.
+*
 * Revision 2.9  89/05/10  14:00:24  apratt
 * Added MOVEVBL switch to make vblqueue happen early in vblank.
 * Moved memory clearing around so the screen clears early on as before.
 * (Previous rev had a substantial delay between power-on and clear screen.)
-*
+* 
 * Revision 2.8  89/04/17  14:43:48  apratt
 * Added mwdata and mwmask equates... Oops.
 * 
@@ -225,7 +232,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.9 $
+* $Revision: 2.10 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -289,7 +296,7 @@ denmark		=      13 ***DON'T  CHANGE***
 * code is stopgap, such as programming the memory controller for 2Meg
 * and short-circuiting the RTC.  Caveat programmer.
 * The switches TT, STPLUS, systype, and country
-TT		=	1	; @check@
+TT		=	0	; @check@
 * of one of the canned switch settings files.
 
 * set MOVEVBL to 1 to make vblqueue processing first in the vblank
@@ -298,7 +305,7 @@ TT		=	1	; @check@
 * beam starts drawing.  May not turn out to be necessary, and
 * may turn out to be dangerous (I'm not sure how...).
 
-MOVEVBL		=	1	; @check@
+MOVEVBL		=	0	; @check@
 
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
 * the chip actually exists (so clearing the control register will
@@ -311,12 +318,12 @@ DMASND		=	1	; @check@
 * monomon when DMA sound chip is idle.  Older STPLUS and TT machine
 * do this, newer ones have the idle state noninverting.
 
-DMAINV		=	1	; @check@
+DMAINV		=	0	; @check@
 
-* set STPLUSVIDEO to 1 if you have ST PLUS video, with four bits per
-* gun instead of three in the palette.
+* set STPLUS to 1 for ST PLUS specific things like memory layout
+* and video (four bits per gun, any-word alignment).
 
-STPLUSVIDEO	=	0	; @check@
+STPLUS		=	1	; @check@
 
 * Set LONGFRAME to 1 for code which runs on 68000 *or* 680[1-3]0.
 * Even if this is zero, the new system variable _longframe at $59e
@@ -324,23 +331,23 @@ STPLUSVIDEO	=	0	; @check@
 
 LONGFRAME	=	1	; @check@
 
-systype		=	rom	; 'rom' or 'ram' @check@
+systype		=	ram	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
 
 .ifeq TT
-version		equ	$0104		; version number *MUST BE EVEN*
-date		equ	$03301989	; date, $MMDDYYYY
+version		equ	$0106		; version number *MUST BE EVEN*
+date		equ	$06161989	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001001111110 ; Mar 30, 1989
+dosdate		equ	%0001001011010000 ; Jun 16, 1989
 .endc
 
 .ifne TT
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$02061989	; date, $MMDDYYYY
+date		equ	$05231989	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001001000110 ; Feb 6, 1989
+dosdate		equ	%0001001010110111 ; May 23, 1989
 .endc
 
 ****
@@ -772,7 +779,7 @@ ttcolor0	equ	$ffff8400	; color palette #0 for TT
 shiftmd		equ	$ffff8262	; TT shift mode (overrides above equ)
 .endc
 dbaseh		equ	$ffff8201	; display base high
-.ifne STPLUSVIDEO+TT
+.ifne STPLUS+TT
 *--- ST PLUS shifter
 shiftmd		=	$ffff8260	; video	shift mode (resolution)
 * that the low bit of this register will always read as zero.
@@ -1218,7 +1225,7 @@ notpal:	lea	color0(a5),a1		; a1 ->	hardware reg
 * from the STylus touch-screen hardware.  This is as good a place to
 	move.b	#$01,dbaseh(a5)		; set high ptr
 	clr.b	dbasel(a5)		; set low ptr
-.ifne STPLUSVIDEO+TT
+.ifne STPLUS+TT
 	clr.b	dbasell(a5)		; set lo byte ptr
 .endc
 	move.b	#$80,$ffff827f		; write LCD and power control
@@ -1260,22 +1267,36 @@ sp_cold:
 	move.l	d0,$00300010		; write a magic number to 3rd MB
 * from test-pattern signatures:
 	cmp.l	$00300010,d0		; still there?
+	bne	pad_small		; nope, you're small
+	cmp.l	$00300014,d1		; also still there?
+	beq	pad_big			; yes - you're big (so d5 is fine)
+pad_small:
+	move.l	#$100000,d5		; we have 1MB
+pad_big:
+* If neither shadow appears, but the pattern took in the first place,
+.ifeq STPLUS
+shadow	equ	$200			; look for first shadow at 512 bytes
+.endc
+.ifne STPLUS
+shadow	equ	$40000			; look for first shadow at 128K
+.endc
+*
 * to be an assembly-time constant, now it's in d7.
 *
-	move.w	#$208,a0		; pattern matches at $208?
+	move.l	#shadow+8,a0		; pattern matches at first shadow loc?
 	lea	memr1(pc),a5		; a5 ->	return addr
 
-memr1:	beq	mem4			; yes -- 128K
-	move.w	#$408,a0		; pattern matches at $408?
+	move.b	#$5a,dbasell		; see if dbasell is RAM
+	move.l	#shadow*2+8,a0		; pattern matches at second shadow loc?
 	lea	memr2(pc),a5		; a5 ->	return addr
 	cmp.b	#$5a,d0			; NOW cmp.b
-memr2:	beq	mem3			; yes -- 512K
-	move.w	#8,a0			; pattern matches at $8?
+	bne	memST
+
 	lea	memr3(pc),a5		; a5 ->	return addr
 	tst.w	color0			; color0 is $FFF
 	tst.b	dbasell			; read back - should be zero.
-	addq.w	#4,d6			; adjust config	byte for 2M
-mem3:	addq.w	#4,d6			; adjust config	byte for 512K
+	bne	memST
+
 ; OK, dbasell holds its value: you're an STe.
 
 cold3:	clr.l	a5
@@ -1312,8 +1333,7 @@ mem4:	sub.l	#bank1,d1		; decrement bank number
 * TT memory sizing
 *
 * Routine notes: at the .endc, d5 must hold phystop, and d6 must hold
-* the value to put in memconf and memcntlr.  Furthermore, the ssp
-* should be set to #$8000.
+*	(256Kx4 (=2M) onboard)
 *	(256Kx4 onboard) plus (256Kx4 add-on)
 *	(256Kx4 onboard strapped at 8M) plus (1Mx4 (=8M) add-on at 0)
 	move.b	memcntlr(a5),d6
@@ -1556,7 +1576,7 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 	move.l	a0,_v_bas_ad(a5)
 	move.b	_v_bas_ad+1(a5),dbaseh(a5) ; load high addr
 	move.b	_v_bas_ad+2(a5),dbasel(a5) ; load low (really, medium) addr
- .ifne STPLUSVIDEO+TT
+ .ifne STPLUS+TT
 	move.b	_v_bas_ad+3(a5),dbasell(a5)	; load lo byte addr
  .endc
 *  Setup display base,
@@ -2312,7 +2332,7 @@ ca_r:	rts
 
 
 
-.ifeq STPLUSVIDEO
+.ifeq STPLUS
 
 .ifeq TT
 colors:	dc.w	$777			; 0 white
@@ -2342,7 +2362,7 @@ colors:	dc.w	$000			; 0 black (TT shifter's busted)
 .endc
 .endc
 
-.ifne STPLUSVIDEO
+.ifne STPLUS
 
 * full-magnitude colors for STPLUS palette means 'f' not 7
 
@@ -2551,7 +2571,7 @@ vbl2:	move.w	(a0)+,(a1)+		; load a palette
 vbl1:	tst.l	screenpt(a5)		; if(screenpt == NULL) don't;
 
 	move.l	screenpt(a5),_v_bas_ad(a5)	; set OS variable
-.ifne STPLUSVIDEO+TT
+.ifne STPLUS+TT
 	move.b	_v_bas_ad+3(a5),dbasell(a5)	; for STPLUS use these 8 bits
 .endc
 	move.b	_v_bas_ad+2(a5),dbasel(a5)	; load "low" pointer
@@ -3045,7 +3065,7 @@ _get_mpb:
 	bls	nottram
 	move.b	dbasel(a5),d0		; load and shift bits 8..15
 	lea.l	ttmd.w,a2
-.ifne	STPLUSVIDEO+TT
+.ifne	STPLUS+TT
  	move.b	dbasell(a5),d0		; load low byte for STPLUS
 .endc
 
@@ -3096,7 +3116,7 @@ f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
 	move.b	dbasel,d0		; load and shift bits 8..15
 	move.b	9(sp),dbaseh(a5)	; set bits 16..23 of hardware pointer
 	move.b	$a(sp),dbasel(a5)	; set bits 8..15 of hardware pointer
-.ifne STPLUSVIDEO+TT
+.ifne STPLUS+TT
  	move.b	$b(sp),dbasell(a5)	; STPLUS set low 8 bits, too
 .endc
 phydone:
@@ -3147,10 +3167,10 @@ _setscreen:
 	lea	ttcolor0(a5),a0		; a0 -> base of palette memory
 .endc
 	bmi	f5a
-.ifeq STPLUSVIDEO+TT
+.ifeq STPLUS+TT
 *--- set physical location:
 .endc
-.ifne STPLUSVIDEO+TT
+.ifne STPLUS+TT
 	and.w	#$0fff,d0		; STPLUS has different dirty bits 
 .endc
 	tst.w	6(sp)			; if new color is <0, don't set it
@@ -3322,7 +3342,7 @@ _term:
 savp_2:	move.l	(sp)+,proc_pc.w		; save bogus PC + exception number
 	move.b	dbasel(a5),d0
 .else
-.ifne STPLUSVIDEO+TT
+.ifne STPLUS+TT
 	move.b	dbasell(a5),d0
 .endc
 	movem.l	d0-d7/a0-a7,proc_regs

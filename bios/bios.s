@@ -4,13 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/12 19:41:34 $
+* $Date: 1991/09/16 23:44:52 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.38  1991/09/16  23:44:52  apratt
+* Fixed jdisabint twice: first, you can't clear ipra using bclr: it's an
+* asynchronous register.  Second, my "fix" back in 89 for clearing isr was
+* wrong -- I used asl, not rol, so we were clearing the isr for the interrupt
+* in question and all the lower bits in the same isr.  Sigh.
+*
 * Revision 2.37  1991/09/12  19:41:34  apratt
 * Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
 * So we use (TT == 0) instead.  Sigh.
@@ -91,7 +97,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.37 $
+* $Revision: 2.38 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\bios.s,v $
@@ -2006,16 +2012,15 @@ disint:
 	movem.l d0-d1/a0-a1,-(sp)	;save affected registers
 	lea	mfp,a0		;set mfp chip address pointer
 	lea	imra(a0),a1	;set a1 for the mskoff routine
-	lea	ipra(a0),a1	;yet again...
-	bsr.b	bselect
-	bclr	d1,(a1)		;and clear the bit...
+	bsr.b	bselect		;generate the appropriate bit to clear
 	bclr	d1,(a1)		;and clear the bit...
 	lea	iera(a0),a1	;set a1 for another mskoff call
 	bsr.b	bselect
 	bclr	d1,(a1)		;and clear the bit...
-
+* 9/91: don't bclr in ipra - that insn doesn't work on this register.
+	lea	isra(a0),a1	;now set up to check for interrupts in progress
 	bsr.b	bselect		;get proper a/b version...
-	asl.b	d1,d0
+* This was "bclr d1,(a1)" but that's illegal when talking to the ISR's.
 * Changed 9/89 to write all 1's except d1's bit.
 * Fixed 9/91: we were clearing the bit we wanted and all the lower ones
 * in the same ISR, using asl not rol.  Oops.

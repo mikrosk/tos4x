@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.23 $	$Source: e:/tos/gd2\RCS\fs.h,v $
+* $Revision: 2.24 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 17:13:30 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/25 13:16:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.24  1991/06/25  13:16:06  apratt
+* Changed FN_NORM etc to SCAN_NORM _DIR and _EARLY
+*
 * Revision 2.23  1991/06/20  17:13:30  apratt
 * changed version number because production GEMDOS is now $2000
 *
@@ -405,11 +408,10 @@ DIR
 	FCB	*dir_fcb;	/* points into buffer, only if fresh */
 };
 
-/* flags to fn2dir; ok to mix dotsok and trailok */
-#define FN_NORM 0
-#define FN_DOTSOK 1
-#define FN_EARLY 2
-#define FN_TRAILOK 4
+/* flags to fn2dir */
+#define SCAN_NORM 0
+#define SCAN_DIR 1
+#define SCAN_EARLY 2
 
 /*
  * File Control Block

@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 17:14:06 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/25 13:16:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.20  1991/06/25  13:16:06  apratt
+* Changed FN_NORM etc to SCAN_NORM _DIR and _EARLY
+*
 * Revision 2.19  1991/06/20  17:14:06  apratt
 * changes for new newcl/Getfat code
 *
@@ -87,10 +90,11 @@
  * Part of the reason is that the current directory for each drive is now
  * represented by the cluster number only, not a reference to a struct.
  *
- * Note: this is the only function which calls name2fcb with dotsok, and
- * the only function which can get EROOT back from name2fcb (or anywhere
- * else).  EROOT means the path ended with "." or ".." in the root
- * directory, and we handle that appropriately.
+ * Note: this is the only function which calls name2fcb with SCAN_DIR, and
+ * thus the only function which can get EROOT back from name2fcb (or
+ * anywhere else).  EROOT means the path ended in the root directory, and
+ * we handle that appropriately.
+ *
  */
 
 long
@@ -114,13 +118,7 @@ char *p;
     }
     else drv = run->p_curdrv;
 
-    if (*ptemp == SLASH && !*(ptemp+1)) {
-	/* set a drive to its root directory; can't fail */
-	run->p_curdir[drv] = 0;
-	return E_OK;
-    }
-
-    if (err = fn2dir(&p,&dir,FN_DOTSOK | FN_TRAILOK)) {
+    if (err = fn2dir(&p,&dir,SCAN_DIR)) {
     	if (err == EROOT) {
     	    run->p_curdir[drv] = 0;
     	    return E_OK;
@@ -308,7 +306,7 @@ char *s;
     /* first, call fn2dir so we know where this *will* go. */
     /* Fail on anything but EFILNF. */
 
-    if ((err = fn2dir(&s,&dir,FN_NORM)) != EFILNF) {
+    if ((err = fn2dir(&s,&dir,SCAN_NORM)) != EFILNF) {
 	if (!err) return EACCDN;
 	else return err;
     }
@@ -448,7 +446,7 @@ char *p;
 
     DBCMD(1,"print xrmdir -s (lpeek (`a6 + 8));_c");
 
-    if (err = fn2dir(&p,&dir,FN_NORM)) {
+    if (err = fn2dir(&p,&dir,SCAN_NORM)) {
 	if (err == EFILNF) return EPTHNF;
 	else return err;
     }
@@ -537,7 +535,7 @@ DTA *dta;
     long err;
     uint m = 0;
 
-    if (err = fn2dir(&name,&dir,FN_EARLY)) return err;
+    if (err = fn2dir(&name,&dir,SCAN_EARLY)) return err;
 
     /* stuff the last part of the name and the attribs into an FCB */
     if (err = name2fcb(name,NULL,&fcb)) return err;

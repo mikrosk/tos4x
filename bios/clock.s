@@ -4,18 +4,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/05 15:13:11 $
+* $Date: 91/08/15 15:31:13 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.11  91/08/15  15:31:13  apratt
+* Added code to write GEMDOS' idea of _date and _time every time _getclock is
+* called (for either clock chip).  This lets you update those variables
+* without doing Settime(Gettime()), which would cause the RTC to lose between
+* zero and two seconds each time.
+*
+* Fixed the STPAD case where the reset register and test register weren't
+* being initialized properly.
+*
 * Revision 2.10  91/08/05  15:13:11  apratt
 * Added support for STPAD: took out the test (the Ricoh chip is ALWAYS
 * there), disabled the 1Hz and 16Hz wave outputs, and changed other code to
 * avoid clobbering alarm registers.
-*
+* 
 * Revision 2.9  90/08/03  13:21:39  apratt
 * TTOS FINAL RELEASE
 * 
@@ -65,7 +74,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.10 $
+* $Revision: 2.11 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -107,6 +116,7 @@
 * better handling than was here: 1Hz and 16Hz must be disabled, the alarm
 * reset bit must never be set, and the alarm enable bit must be preserved.
 * Sigh.
+*
 
 RTCBASE	equ	$fffffc20	; base address of RTC chip
 
@@ -175,18 +185,9 @@ _iclock:
 *
 	bsr	_getclock		; get chip's idea of the time
 	cmp.l	#-1,d0			; bad time?
-	beq	iclfai			; yes --- punt
-
-	move.w	d0,_time		; set GEMDOS time
-	swap	d0
-	move.w	d0,_date		; set GEMDOS date
-
-	moveq	#0,d0			; return "Ok fine"
-	rts
-
-iclfai:	moveq	#-1,d0			; return -1L (error)
-	rts
-
+	beq	iclfai			; yes --- return -1
+	moveq	#0,d0			; return 0 for "Ok fine"
+iclfai:	rts
 
 *----------------
 *
@@ -208,6 +209,8 @@ iclfai:	moveq	#-1,d0			; return -1L (error)
 clktest:
 .ifne STPAD
 	move.w	#RTCBASE,a0		; fulfill return requirement
+	move.b	#0,RTTEST(a0)		; clobber test register
+	move.b	#%1100,RTRES(a0)	; and turn off periodic outputs
 	moveq.l	#0,d0			; clear the carry bit - clock exists.
 	rts
 .else
@@ -251,6 +254,10 @@ clkfai:	or	#1,ccr			; set carry
 *  The clock must read the same twice in a row to be sure
 *  that it didn't roll over during the read.  The date must
 *  be checked to see if it's valid.  And so on...
+*
+* When this succeeds, it also writes GEMDOS' idea of date & time
+* so they're in synch.  Thus, calling Gettime() has the effect of
+* synchronizing the RTC and GEMDOS. (new as of 8/91)
 *
 _getclock:
 	bsr	clktest			; test for clock-there
@@ -318,7 +325,12 @@ cmplup:	move.b	(a1,d0.w),d1		; get first byte
 	asl.w	#1,d0
 	add.w	d0,d1			; date += d0 << 9
 
+	move.w	sr,d2
+	or.w	#$0700,sr		; no ints while writing date & time
+	move.w	d1,_date		; set GEMDOS' idea of date & time
 	swap	d1			; date into high word, time in lower
+	move.w	d1,_time
+	move.w	d2,sr			; restore ints
 	move.l	d1,d0			; move to output register
 	rts				; ... and return it
 
@@ -520,16 +532,9 @@ _iclock:
 timeok:
 	bsr	_getclock
 	cmp.l	#-1,d0
-	beq	iclkfail
-	move.w	d0,_time
-	swap	d0
-	move.w	d0,_date
-
-	moveq.l	#0,d0
-	rts
-
+	beq	iclkfail	; failed: return -1
+	moveq.l	#0,d0		; success: return 0
 iclkfail:
-	moveq.l	#-1,d0
 	rts
 
 *
@@ -540,6 +545,10 @@ iclkfail:
 * 
 * Does not validate what it gets from the clock chip, except that if
 * the chip test fails or the VRT bit is clear, returns -1L.
+*
+* When this succeeds, it also writes GEMDOS' idea of date & time
+* so they're in synch.  Thus, calling Gettime() has the effect of
+* synchronizing the RTC and GEMDOS. (new as of 8/91)
 *
 
 _getclock:
@@ -586,6 +595,14 @@ gwait:*	move.w	d2,sr		; allow interrupts
 	sub.b	#10,d1		; subtract 10 for yr since 1980, not 1970
 	bfins	d1,d0{0:7}
 	move.w	d2,sr		; restore original IPL
+
+	move.w	sr,d2		; no ints while writing date & time
+	or.w	#$0700,sr
+	move.w	d0,_time	; set GEMDOS' idea of date & time
+	swap	d0
+	move.w	d0,_date
+	swap	d0
+	move.w	d2,sr		; restore ints
 	rts
 
 gclfail:

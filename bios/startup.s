@@ -4,23 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/02 10:39:08 $
+* $Date: 90/03/02 17:45:44 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.44  90/03/02  17:45:44  apratt
+* This rev is the source for the 3/1/90 ROM.
+*
 * Revision 2.43  90/03/02  10:39:08  apratt
 * Added a comment to the effect that anybody who programs Timer B
 * to a value of 1 (that is, interrupt every time) will defeat
 * noblank/noblank1 processing.  I don't want to actually WRITE
 * to Timer B's data register in noblank, since it would kill
 * somebody's real programming, but there is this danger.
-*
+* 
 * initmfp in bios.s now writes 0 (meaning 256) to Timer B's data
 * register, so if NOBODY uses it, it will have a legal value (not 1).
-*
+* 
 * Revision 2.42  90/03/01  17:10:51  apratt
 * Added equates for TTMFP: ttgpip, ttiera, etc.
 * Fixed ttwait, stwait for new equates.
@@ -422,7 +425,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.43 $
+* $Revision: 2.44 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2688,16 +2691,40 @@ dskb1:	rts				; return status
 
 .if systype == rom
 
+* Before doing anything, dmaboot waits until 90 seconds after 200Hz 
+* started ticking. If you hit a key, it falls into the dmaboot code.
+*
 *		checksum is $1234), then it is executed.  The search stops
+* 		set next_bar_time to bar_interval;	(d6)
+NINETY_SECONDS	equ	200*90
+* 		place the cursor on the last char of this line;
 * 		fall through to continuation of bar shrinking;
+	move.l	#NINETY_SECONDS,d7	; do this for 90 sec
+*             (else fall through to dmab_todone to erase the bar)
+dmab_to:
+* A simple backspace after the Nth one doesn't work because you may or may
+* not be on an N-column display, where the cursor is ALREADY on the
+* Nth one.  Sigh.
+	move.l	#$00010002,-(sp)
+	trap	#$d			; Bconstat(2)
+	addq.l	#4,sp
+
+* we jump here when we're counting time and the memory test is done.
+	move.l	#$00020002,-(sp)	; Bconin(2)
+nomt:
+
+* if (mt_done && _hz_200 >= d6)
+	trap	#$d
+* this is the end of the memory-test/shrinking bar sequence.  We check
 .ifne TT
 * Check the keyboard for a user aborting the timeout
 	moveq.l	#8,d4			; start with SCSI device 0
 .else
 	moveq.l	#0,d4			; start with ACSI device 0
 .endc
+.if STPAD
 dmab_todone:
-	move.w	#1,d1			; retry count (try twice total)
+	move.l	d7,_hz_200		; you broke out: write 80 sec
 	move.w	#13,-(sp)
 	move.l	#$00030002,-(sp)
 	move.w	d4,-(sp)		; device number
@@ -2706,12 +2733,13 @@ dmab_todone:
 	clr.l	-(sp)			; sector zero
 	jsr	_dmaread
 	addq.l	#6,sp
-	move.w	(sp)+,d1		; get retry count back
+
 dmab_skip:
 
 * Begin scanning DMA devices for a bootable one.  The sequence of devices
 * you scan varies, and is described in dmarfail where the device number is
-*					; retry count not expired
+* updated.  This code uses the first word of the buffer "the_env"
+* as scratch space.
 
 .if TT
 	jsr	_resetscsi		; reset the SCSI bus
@@ -2774,7 +2802,9 @@ boot_dev_tab:	dc.b	$10,$11,8,9,$a,$b,$c,$d,$e,$f,$ff
 boot_dev_tab:	dc.b	$10,$11,0,1,2,3,4,5,6,7,$ff
 .endif
 .endif
-	move.l	ca_init(a0),a0		; a0 -> initialization address
+
+		.even
+
 * We get here if the _dmaread call worked and gave an executable sector. We
 * load up the registers and jsr to that sector.  If it returns, we check
 * hdv_rw for a change; if it changed, we rts to go on booting TOS.  If it
@@ -3272,13 +3302,13 @@ trp13tab:
 
 
 *------ jump table for Atari BIOS extensions:
+trp14tab:
 .ifne TT
-	dc.l	_bconmap		; 43: Bconmap call
+.if (TT == 0)
 .else
 	dc.l	unimpl
 .endc
-	dc.l	unimpl			; 44: unused (0x2c)
-	dc.l	unimpl			; 45: unused
+	dc.l	unimpl			; 45: unused (0x2d)
 	dc.l	unimpl			; 46: unused
 	dc.l	unimpl			; 47: unused
 	dc.l	_setcolor		; 7: set single color

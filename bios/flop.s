@@ -4,17 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/06/13 16:27:09 $
+* $Date: 91/08/05 15:13:36 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.29  91/08/05  15:13:36  apratt
+* Removed nospindelay global; now spin delay is the first byte of the field
+* of the DSB. It has to be first because startup.s sets it for drive 0 when
+* the high-density switch is thrown.  It gets ORed into the appropriate
+* commands, so its value is the bit to set.  Floprate(drv,-2) sets, -3
+* clears, and -4 probes the current setting of that bit.
+*
 * Revision 2.28  91/06/13  16:27:09  apratt
 * removed tmpdma -- left over from something, took up 4 bytes in BSS and four
 * in ROM for a clr.b instruction.
-*
+* 
+* 
 * Revision 2.27  91/05/22  14:56:07  apratt
 * Expanded comments about QD switch and TURNED IT OFF because
 * it's just for debugging.
@@ -199,7 +207,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.28 $
+* $Revision: 2.29 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -342,7 +350,7 @@ tcdr		equ	$fffffa00+$23
 	.globl _flopfmt			; format drive/track		func
 	.globl _flopver			; verify sectors		func
 	.globl _floprate		; change seek rate for a drive	func
-	.globl	nospindelay		; somebody has to set this; see above
+
 	.globl	_wpstatus		; write-protect state (2 drives)
 	.globl	_wplatch		; write-protect latch (2 drives)
 	.globl	_motoron		; motor-on status (1 byte, both drives)
@@ -383,11 +391,14 @@ e_write		equ	-10		; generic write error
 e_read		equ	-11		; generic read error
 e_wp		equ	-13		; write on write-protected media
 e_undev		equ	-15		; unknown device
+e_badsects	equ	-16		; bad sectors on format-track
+e_insert	equ	-17		; insert_a_disk 
 .ifne HI_DEN
-dcurtrack	equ	0		; current track#
-ddenflags	equ	dcurtrack+2	; density flags (usu 0 or 3)
-dseekrt		equ	ddenflags+2	; floppy's seek-rate
-dsbsiz		equ	dseekrt+2	; (size of a DSB)
+
+*------ Floppy state variables in DSB:
+recal		equ	$ff00		; recalibrate flag (in dcurtrack)
+
+*------ Startup.s assumes that dspinflag is the first thing in this struct!
 
 .if HI_DEN
 dspinflag	equ	0		; spinup-delay flag (in hi byte)
@@ -1531,16 +1542,9 @@ go2trr:	rts				; return EQ/NE on succes/failure
 
 .endc
 * restore - home head
-	or.b	d0,d6			; OR into command
+* Passed:	nothing
+* Calls:	flopcmds
 * high-density note: the 1772 restore command returns when TRK00
-* See the discussion of motor-spin-up delay at the top of the file
-
-	tst.w	nospindelay		; spin delay?
-	beq	nomap1
-	or.b	#$08,d6			; set 'h' = 1 (no spin-up delay)
-
-nomap1:
-
 * bit is 1.  It doesn't actually read anything.
 *-
 restore:
@@ -1803,13 +1807,21 @@ change:
 	clr.l	(a0)+			; so the grace period in mediach
 	clr.l	(a0)			; is always expired.
 
-* FOR TT WITH HIGH-DENSITY DRIVES:  The seek rate parm is taken to
-* be a LOW-DEN seek rate; when there is a HIGH-DEN disk in the drive,
-* we map the input value to the appropriate 1772 value, with errors
-* on the slow side: 3->0, 2->0, 1->1 (what can you do?), and 0->1.
-* This is done in rtmap in flopcmds.
+	move.w	$10(sp),_curflop	; set current disk#
+ch_ok1:	clr.w	$10(sp)			; use drive 0
+ch_r:	rts
+
+
 *+
 * setdmode - set drive-change mode
+* Passed:	d0.b = mode to put current drive in (0, 1, 2)
+* Uses:		a0
+*
+* This had a bug: it set the state of the drive in cdev,
+* but on a single-floppy system that is always 0.  It should
+* set the state of the LOGICAL drive, which in single-drive
+* systems can be found in _curflop.
+*-
 setdmode:
 	lea	_diskmode.w,a0		; a0 -> disk mode table
 	move.b	d0,-(sp)		; (save mode)
@@ -1821,11 +1833,34 @@ dmode1:	move.b	(sp)+,(a0,d0.w)		; set drive's mode
 	rts
 
 
+*+
+* Floprate - read / change the seek rate of a drive
+*
+* Usage: oldrate = Floprate(devno,newrate);
+* Returns old rate.  Sets new rate if newrate is not -1, else leaves it alone.
+*
 * This call is new with TOS 1.4.  You have to do this by hand for older TOSes:
 *	DRIVE	RAM TOS		11/20/85	4/22/87
 *	  A	 6cb		  a09		  a4f
 *	  B	 6cf		  a0d		  a53
 *
+* The values that make sense to the 1772 are:
+*     VALUE    LOW-DEN	HIGH-DEN    QUAD-DEN
+*	01	12 ms	  6   ms     3    ms
+*	02	 2 ms	  1   ms     0.5  ms
+*	03	 3 ms	  1.5 ms     0.75 ms
+*
+* drive zero -> zero, nonzero -> one.
+* FOR HIGH-DENSITY DRIVES:  The seek rate parm is taken to be a LOW-DEN
+* seek rate; when there is a HIGH-DEN disk in the drive, we map the input
+* value to the appropriate 1772 value, with errors on the slow side: 3->0,
+* 2->0, 1->1 (what can you do?), and 0->1. This is done in rtmap in
+*
+* For quad density, all values are mapped to 1 (3ms).  What can you do?
+*
+* New feature: if the rate is -2, that drive's no-spinup-delay flag is set.
+* physical drive 0.  If drive 1 also should not have the spinup-delay flag
+* set, make this call.
 *
 *-
 
@@ -2021,7 +2056,6 @@ fmfast:	cmp.l	#MAXACSI,8(sp)
 .ifne HI_DEN
 	tst.l	_frb			; already done this?
 .endc
-nospindelay:	ds.w	1		; flag saying "do set 'h' bit"
 	move.l	_p_cookie,a0		; no; get base of cookie jar
 	cmp.w	#0,a0			; no cookie jar?
 	beq	getf2			; yow! no cookie jar! bail out.

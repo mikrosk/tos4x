@@ -61,13 +61,14 @@ WORD   obj;
 }
 
 
+#if 0		/* see kballoc.c for implementation */
 	BYTE
 *malloc( size )
 	LONG	size;
 {
 	return( Mxalloc( size, 3 ) );
 }
-
+#endif
 
 	VOID
 m_objdraw( obj, which, start, x, y, w, h )

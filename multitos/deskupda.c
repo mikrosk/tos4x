@@ -16,6 +16,7 @@
 #include <extern.h>
 
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 EXTERN	BYTE	*scasb();
 EXTERN	BYTE	*r_slash();
 EXTERN	BYTE	*escan_str();
@@ -170,7 +171,7 @@ qq_1:
 	if ( alloc )		/* swap the buffer	*/
 	{
 	  strcpy( copy1, copy2 );
-	  Mfree( q_addr );
+	  free( q_addr );
 	  q_addr = newbuff;
 	}
 }

@@ -47,6 +47,7 @@
 #include <extern.h>
 
 EXTERN	BYTE	*malloc();
+EXTERN	VOID	free();
 EXTERN	LONG	trap14();
 EXTERN	LONG	trap13();
 EXTERN	OBJECT	*get_tree();
@@ -352,7 +353,7 @@ memerr:	  do1_alert( FCNOMEM );
 						/* my bad sector table	    */
 	if ( !(badtable= malloc( FSIZE )) )	/* no memory		    */
 	{
-	  Mfree( bufaddr );
+	  free( bufaddr );
 	  goto memerr;
 	}
 
@@ -513,8 +514,8 @@ eout1:
 	    ret = TRUE;		/* To Continue	*/
 	}
 
-	Mfree( bufaddr );
-	Mfree( badtable );
+	free( bufaddr );
+	free( badtable );
 	return( ret );
 }
 
@@ -548,7 +549,7 @@ chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
 	{
 	  if( do1_alert( FCFAIL ) == 1 ) /* retry */
 	    goto chksrc;
-	  Mfree( bootbuf );
+	  free( bootbuf );
 	  return;
 	}
 
@@ -558,27 +559,21 @@ chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
 	bpc = spc * bps;			/* bytes per cylinder	   */
 
 						/* buffer at least a track */
-	bufsize = malloc( 0xFFFFFFFFL );
-	if( bufsize < (LONG)bpc )
-	{
-	  Mfree( bootbuf );
-	  goto errmem;
-	}
+						/* but try to do the whole disk */
 
 	disksect = spc * (dsbs->dntracks);	/* total sectors on disk    */
-#if 1	/* ++ERS 12/21/92 */
-	if (bufsize > ((LONG)disksect) * bps) {	/* don't take more memory than we need */
-		bufsize = ((LONG)disksect) * bps;
+	bufsize = ((LONG)disksect) * bps;
+	buf = malloc( bufsize );
+	while (bufsize >= (LONG)bpc && !buf)
+	{
+		bufsize /= 2;
+		buf = malloc(bufsize);
 	}
-#endif
-	buf = malloc( bufsize );		/* get the buffer	    */
-#if 1	/* ++ ERS 12/21/92 */
 	if ( !buf )				/* we have to check, when multitasking */
 	{
-	  Mfree( bootbuf );
+	  free( bootbuf );
 	  goto errmem;
 	}
-#endif
 	sectbufs = (bufsize / bps);		/* how many sector buffers  */
 	leftover = disksect % sectbufs;		/* sectors left for last loop */
 
@@ -671,8 +666,8 @@ fc_c1:
 	fc_rwsec(WSECTS, bootbuf, 0x00010000L, devnod);
 
 bailout:
-	Mfree( buf );
-	Mfree( bootbuf );
+	free( buf );
+	free( bootbuf );
 	return;
 }
 

@@ -2,14 +2,11 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.0 $	$Source: /u2/MRS/osrevisions/aes/gemrslib.c,v $
+*  $Revision: 2.3 $	$Source: /u2/MRS/osrevisions/aes/gemrslib.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/02/03 21:26:46 $	$Locker:  $
+*  $Author: mui $	$Date: 89/04/26 18:26:37 $	$Locker: kbad $
 * =======================================================================
-*  $Log: gemrslib.c,v $
-*  Revision 1.0  93/02/03  21:26:46  ersmith
-*  MultiTOS version 1.0
-*
+*  $Log:	gemrslib.c,v $
 * Revision 2.3  89/04/26  18:26:37  mui
 * TT
 * 

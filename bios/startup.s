@@ -4,16 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/01/31 13:57:42 $
+* $Date: 91/03/27 12:37:43 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.63  91/01/31  13:57:42  apratt
-* Changed noblank1 to save & restore iera bit 0. Now vers x.06
+* Revision 2.64  91/03/27  12:37:43  apratt
+* Added STPAD: mostly, this is STPLUS (which should also be set), but sets
+* DMASND to zero, adds some magic vars at $840 which Slavik's touch pad
+* driver knows about, and short-circuits memory sizing. Also has its own
+* cookie: $00010000+STPAD (which should be 1). Also tries the IDE bus, then
+* the ACSI bus for booting.  Removes monitor-change code.
 *
+* Fixed a bug: the AND to get only the significant bits of the mode register
+* was wrong; it was always three bits when it should be just two if not TT.
+*
+* Fixed a bug: the AND to get only the significant bits of the mode register
+* was wrong; it was always three bits when it should be just two if not TT.
+* 
 * Revision 2.63  91/01/31  13:57:42  apratt
 * Changed noblank1 to save & restore iera bit 0. Now vers x.06
 * 
@@ -54,7 +64,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.63 $
+* $Revision: 2.64 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -112,27 +122,31 @@ USEDB		equ	0
 * IRQ line.
 
 .ifne TT+STPLUS
+.ifeq STPAD
 DMASND		equ	1
+.else
+DMASND		equ	0
+.endc
 .else
 DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
 .ifne STPLUS
 version		equ	$0206		; version number
-date		equ	$01311991	; STPLUS date, $MMDDYYYY @check@
+date		equ	$03011991	; STPLUS date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011000111111 ; Jan 31, 1991
+dosdate		equ	%0001011001100001 ; Mar 1, 1991
 .else
 .ifne TT
 version		equ	$0306		; version number (need not be even)
-date		equ	$01311991	; TT date, $MMDDYYYY @check@
+date		equ	$03011991	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011000111111 ; Jan 31, 1991
+dosdate		equ	%0001011001100001 ; Mar 1, 1991
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
 version		equ	$0146
-date		equ	$01311991
+date		equ	$03011991
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011000111111 ; Jan 31, 1991
+dosdate		equ	%0001011001100001 ; Mar 1, 1991
 .endc
 .endc
 
@@ -640,6 +654,11 @@ fix_it_up:	ds.b	$800-$5b4
 user_vars:	ds.b	64		; 64 bytes for carts and things
 *	BSS beyond this point		:
 *	will change in future		:
+.ifne STPAD
+*					:
+*					:
+.endc
+* used by the touch driver in STPAD.	:
 * They are not clobbered across reset.	:
 *----------------------------------------
 
@@ -943,6 +962,20 @@ sysic1:	move.w	(a0)+,(a1)+		; copy palette assignment
 * Take mmb as a number; phystop is 512KB << mmb clamped to 14MB maximum.
 sp_cold:
 	move.w	SPAR_CONF,d0	; read again just for fun
+.ifne STPAD
+* This is the ifne in "ifeq TT ... (ifne STPAD ... else ... endc) else ... endc"
+	lsr.b	#1,d0		; d0=0vvmmrrb
+* STPAD is always 1MB, memory controller config value $a.
+* (This means "two 2MB banks, of which only the first actually exists,
+* and of that only 1MB exists.)
+	and.b	#6,d0		; d0=00000mm0
+	move.b	#$0a,memconf
+	or.b	d0,d1		; d1=00000mmb
+	move.l	#$100000,d5
+	move.b	memcntlr.w,d6		; d6 = memory controller configuration
+* first else of "ifeq TT ... (ifne STPAD ... else ... endc) else ... endc"
+
+	move.l	phystop.w,d5		; d5 ->	(possible) top of physical mem
 	lea	ret_2(pc),a6		; load return address
 	bra	val_memval		; get memory controller validation
 ret_2:	beq	reset4			; already sized -- don't size or test
@@ -994,6 +1027,9 @@ shadow	equ	$40000			; look for first shadow at 128K
 
 cold3:	move.b	d6,memconf		; setup	memory controller
 	bra	gotshadow
+* first endc of "ifeq TT ... (ifne STPAD ... else ... endc) else ... endc"
+.endc
+* second else of "ifeq TT ... (ifne STPAD ... else ... endc) else ... endc"
 
 	move.l	#bank1,d1		; d1 = bank offset (start with bank 1)
 mem1:	lsr.w	#2,d6			; (shift bank1's size into position)
@@ -1058,22 +1094,23 @@ mem4:	sub.l	#bank1,d1		; decrement bank number
 * the value to put in memconf and memcntlr.
 *
 
-* end of TT / not TT split
+* last endc of "ifeq TT ... (ifne STPAD ... else ... endc) else ... endc"
 .endc
 	beq	mt_cold			; definitely a cold boot
 
-*  Determine memory size (once we've setup the memory
-*  controller) by probing successive locations until
-*  something breaks.  Either we get a bus error (for
-*  an non-existant controller) or the pattern we write
-*  won't read back correctly (non-existant bank on a
-*  controller that works).
+	move.b	memcntlr.w,d6		; might be warm boot...
+	move.l	phystop.w,d5
+*  bus error (for an non-existant controller) or the pattern we write won't
+*  read back correctly (non-existant bank on a controller that works).
 ret_2:	beq	reset4			; already sized; don't size or test.
-*  This will handle both the 2119 and 4002 memory
-*  controllers.  ("Parts iz parts, ey?")
+
+mt_cold:
 	move.w	#$5,d6			; init d6 for small parts
+	move.b	#$a,memconf		; but mem cntlr for big
+	moveq	#0,d0
 	move.l	d0,$1008		; clear space first so pattern
 	move.l	d0,$100c		; doesn't "happen" to be there
+.ifeq STPAD
 	move.l	d0,$8			; write pattern
 	cmp.l	$1008,d0		; shadowed here?
 	bne	mt_big			; no, definitely big parts
@@ -1103,13 +1140,15 @@ mt_done:
 *  SPARROW also doesn't need this.
 *-
 	lea	$8000,sp		; initialize SP just this once
+* end of ifeq STPAD
+.endc
+	lea	mt_q(pc),a0		; steal BUS ERROR vector
 	move.l	a0,8			; to catch non-existant controllers
 	move.w	#$fb55,d3		; d3 = a nice random number
-*  Clear memory from $400 to 'd5' (phystop).
-*  Used to put screen at phystop - screen size and clear from top down.
-*  Now leaves screen where it is (at 64K) and clears from bottom up,
-*  so screen still clears early on.
-*  Must preserve d5 = phystop and d6 = mem controller program byte.
+	move.l	#$20000,d7		; d7 = 128K
+	move.l	d7,a0			; a0 -> first location to probe
+
+mt_1:	move.l	a0,a1			; a1 -> end of RAM (as we know it)
 	move.w	d0,d2			; d2 = copy of random #
 	moveq	#42,d1			; d1 = # words to stuff
 	add.w	d3,d2			; generate new random #
@@ -1123,10 +1162,10 @@ mt_3:	cmp.w	-(a1),d0		; compare word in RAM with ours
 	add.w	d3,d0			; generate next random #
 	dbra	d1,mt_3			; (check more words)
 
-*  Set the system variables memcntlr and phystop.
-*  Also set the magic values in the validation variables.
-*  On TT, of course, this isn't enough: we aren't done until
-*  fast RAM is sized, then we set bit 0 of SCU general register 1.
+	add.l	d7,a0			; bump up 128K
+	bra	mt_1			; check some more
+
+mt_q:	sub.l	d7,a0			; drop down to last successful probe
 	move.l	a0,d5			; d5 -> end of RAM (as we know it)
 
 .endif
@@ -1141,10 +1180,10 @@ mt_3:	cmp.w	-(a1),d0		; compare word in RAM with ours
 mem_sized:
 	move.w	#$400,a0
 	move.l	d5,d4
-* contrary: that's dual-purpose, slow, compatibility-mode RAM.  Primary
-* RAM starts at $01000000 and is contiguous from there.  The first N bytes
-* of it (N>=0) is fast, nybble-mode RAM.  The rest of it is on the VME
-* bus.  The VME bus and the RAM you put there is jumpered to start at
+	moveq	#0,d0
+clm_1:	move.l	d0,(a0)+
+	move.l	d0,(a0)+
+	move.l	d0,(a0)+
 	move.l	d0,(a0)+
 	cmp.l	d4,a0
 	bne	clm_1
@@ -1411,12 +1450,12 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 
 .ifne STPLUS
 	movec	d0,cacr		; (un-freeze data cache)
-	move.l	#$00010000,(a0)+	; STE video
+	move.l	#$00010000+STPAD,(a0)+	; STE video w/stpad as minor rev
 	move.l	#$00020000,(a0)+
 	move.l	#"_MCH",(a0)+
 	move.l	#$00020000,(a0)+
 .else
-	move.l	#$00010000,d0		; load d0 for normal STe
+	move.l	#$00010000+STPAD,d0	; load d0 for normal STe (plus STPAD)
 * STPAD is one kind of STPLUS -- if we're that kind, use those values,
 
 	move.l	#mste,$8
@@ -2202,30 +2241,35 @@ st_3:	move.b	(a0)+,(a1)+		; copy a byte
 * The path setting here perpetuates a bug in the original release
 * of the software.  Fixing the bug made the system behave strangely,
 * so we left it in.  The string should be "PATH=#:\\\0\0", not
+* "PATH=\0#:\\\0\0".
 *
-*		to the SCSI DMA bus, and eight devices connected to
-*		the ACSI bus.  If a sector is read, and it is executable
-*		(word checksum is $1234), then it is executed.  The search
-*		stops with the first one which is executable.
+*-
+orig_env: dc.b	"PATH=",0		; default pathname
+	  dc.b	"#:\",0			; is the boot device
+	  dc.b	0			; terminate env string
 	  dc.b	$ff			; end of env string (for our copy)
 
 
-*		It waits until at least 40 sec after power-up for the
-*		data once the device accepts the command.
+cmdname: dc.b	"COMMAND.PRG",0		; shell name
+gemname: dc.b	"GEM.PRG"		; desktop name
 nullenv: dc.b	0,0			; null string (and enviroment)
-*		The old code is included here as comments; 
-*		_dmaread is from Minna Lai (thanks!).
-*		_dmaread is also available as an XBIOS call ($2a).
+	even
+
+ikbreset:	dc.b	$80,$01		;reset keyboard,disable
 sizeikbd	equ	*-ikbreset-1
-*		The register set-up when jmp'ing to the root sector
-*		is deliberate and should not change.
+	even
 
 *+
-* new DMA BOOT code: use _dmaread (in another file) to scan
-* devices 8-15, then 0-7 (that is, SCSI, then ACSI).
-* First device which has an executable root sector stops the
-* process; if it returns, we return (i.e. just jmp to it).
 * _dskboot - boot (or return diagnostics)
+* Passed:	nothing
+* Returns:	D0.W = error number (if nonzero)
+*-
+_dskboot:
+	moveq	#3,d0			; %%3 ap cart
+	bsr	cartscan
+.if STPAD
+	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
+.endif
 	move.l	hdv_boot.w,a0		; go through boot vector
 	jsr	(a0)
 .if systype == rom
@@ -2262,7 +2306,11 @@ dskb1:	rts				; return status
 NINETY_SECONDS	equ	200*90
 * 		place the cursor on the last char of this line;
 * 		fall through to continuation of bar shrinking;
+.ifeq STPAD				; don't wait on the pad
 	move.l	#NINETY_SECONDS,d7	; do this for 90 sec
+.else
+	moveq.l	#0,d7
+.endc
 *             (else fall through to dmab_todone to erase the bar)
 dmab_to:
 * A simple backspace after the Nth one doesn't work because you may or may
@@ -2287,7 +2335,11 @@ nomt:
 * Check the keyboard for a user aborting the timeout
 	moveq.l	#8,d4			; start with SCSI device 0
 .else
+.ifne STPAD
+	moveq.l	#16,d4			; start with IDE device 0
+.else
 	moveq.l	#0,d4			; start with ACSI device 0
+.endc
 .endc
 .if STPAD
 .ifne TT
@@ -2528,7 +2580,7 @@ colors:
 	dc.w	$33f			; 12 light blue
 	dc.w	$f3f			; 13 light magenta
 	dc.w	$3ff			; 14 light cyan
-*** ST PLUS:
+	dc.w	$000			; 15 black
 
 *+
 * hbl - force caller to IPL 3
@@ -2545,7 +2597,11 @@ colors:
 *
 *-
 hbl:	move.w	d0,-(sp)		; save d0
+	move.w	2(sp),d0		; get pushed SR
+	and.w	#$0700,d0		; strip crufty bits
 hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
+.ifeq STPAD
+
 .ifne DMASND
 *-
 vbl:
@@ -2569,11 +2625,8 @@ vbl10:	move.l	(a0)+,a1		; a1 ->	deferred vector
 	beq	v_read2
 vbl11:	dbra	d7,vbl10		; loop for more	vectors
 v_read2:
-.endc
-
+.else
 *** non-DMASND equivalent: just get the input from gpip
-
-.ifeq DMASND
 	move.b	gpip,d1			; get "High Rez" input
 .endc
 
@@ -2633,6 +2686,9 @@ v_readdone:
 .if (TT == 0)
 	and.b	#3,d0			; strip bucky bits
 	cmp.b	#2,d0			; low or high rez?
+	bge	swmon1			; (high)
+.endc
+	and.b	#7,d0			; strip bucky bits
 	cmp.b	#6,d0			; high rez?
 	beq	swmon1			; (high)
 .endif
@@ -3226,7 +3282,12 @@ nottram:
 *		convienience -- they could really be located anywhere.
 *
 * Returns:	D0.L = original vector value
+.ifne STPAD
+	move.b	sshiftmd.w,d0
+	lsl.w	#2,d0			; turn into longword index
 	clr.l	a0
+.endc
+	move.l	(a0),d0			; d0 = current vector address
 .ifeq TT
 	bmi	setex1			; punt if (d1 < 0)
 	move.l	d1,(a0)			; set vector address
@@ -3399,8 +3460,12 @@ paes1:	rts
 
 _term:
 
-	move.b	shiftmd,d7
-	and.w	#$0007,d7
+.if (M68030 == 0)
+.ifeq TT
+* the PC with its exception number.  We use dc's so the assembler
+.else
+	and.w	#$0007,d7		; TT: three significant bits
+.endc
 *
 	dc.w	$4eb9		; jsr (not bsr!)
 	dc.l	savp_2		; target address

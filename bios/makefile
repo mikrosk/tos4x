@@ -1,14 +1,17 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.2 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.3 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: kbad $	$Date: 89/06/19 15:46:12 $     $Locker:  $
+#  $Author: apratt $	$Date: 89/08/25 16:45:58 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.2  89/06/19  15:46:12  kbad
-#  Fixed pushd/popd lines.
+#  Revision 2.3  89/08/25  16:45:58  apratt
+#  Added dmaread.o and dmaread.s (needs mac, not as68).
 #
+# Revision 2.2  89/06/19  15:46:12  kbad
+# Fixed pushd/popd lines.
+# 
 # Revision 2.1  89/02/22  20:45:37  kbad
 # *** TOS 1.4  FINAL RELEASE VERSION ***
 # 
@@ -48,7 +51,7 @@ TMPDIR	=	m:
 
 STARTUP	=	startup.o
 
-SFILES	=	flop.o xinout.o clear.o clock.o bios.o 
+SFILES	=	dmaread.o flop.o xinout.o clear.o clock.o bios.o 
 
 CFILES	=	prtblk.o rwabs.o
 
@@ -56,6 +59,9 @@ allbios.o:	$(STARTUP) $(SFILES) $(CFILES) allbios.aln
 		aln -c allbios.aln
 		cp $@ ..\build
 		@echo $@ linked.
+
+dmaread.o:	dmaread.s
+		mac dmaread.s
 
 prtblk.o:	prtblkc.h
 

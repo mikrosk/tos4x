@@ -418,7 +418,7 @@ ONLY_LONGFRAME	equ	TT
 
 .if SPARROW
 vershi		equ	$04
-verslo		equ	$00
+verslo		equ	$01
 .else
 
 .if TT
@@ -1077,6 +1077,8 @@ reseth:
 
 .if SPARROW
 	move.w	sp_config,d0		; read to auto-config mem cntrlr
+	move.w	#7,$ffff8940		; @TOWNS@: Added to fix problem in Sparrow
+								; hardware. GPIO has no pullup/down resist.
 .endif
 * [ROM only]
 .endif
@@ -2634,7 +2636,11 @@ nv_ok:	move.w	(a5),_upref.w		; nv_upref
 	move.w	(a5)+,(a0)+
 
 	move.l	(a5)+,dspin.w		; nv disk stuff
-
+	moveq	#80,d0			; 80 second cap
+	cmp.b	dspin.w,d0		; on spinup delay
+	bcc.b	nv_md			; (unsigned byte)
+	move.b	d0,dspin.w
+nv_md:
 	move.w	(a5),d0			; nv_modecode
 	bne.b	okmode
 	move.w	#$82,d0
@@ -2895,7 +2901,15 @@ DB_STUB = 0
 	jsr	_Dsp_Init(pc)
 
 * Initialize the sound system
-	clr.l	(sp)			; setmode(0) (8 bit stereo)
+	moveq	#8,d0			; src=dmaplay, dst=DAC
+	move.l	d0,-(sp)
+
+	clr.l	-(sp)
+	move.w	#1,-(sp)		; use protocol
+	jsr	devconnect(pc)
+	addq	#6,sp			; leave 2 words on stack
+	
+	clr.w	(sp)			; setmode(0) (8 bit stereo)
 	jsr	setmode(pc)
 	move.l	#0x00020080,(sp)	; soundcmd(LTGAIN, 0x80)
 	jsr	soundcmd(pc)
@@ -3909,12 +3923,19 @@ DMAB_RETRIES	equ	2		; try each device twice total
 EIGHTY_SECONDS	equ	200*80		; eighty seconds at 200Hz
 
 dmaboot:
-	move.l	#EIGHTY_SECONDS,d7
+	move.l	#200,d5			; ticks per second
+.if (TT|SPARROW)
+	moveq	#0,d4
+	move.b	dspin.w,d4		; # of seconds
+.else
+	moveq	#80,d4
+.endif
+	move.l	d4,d7
+	muls.w	d5,d7			; # of ticks
 	cmp.l	_hz_200,d7		; Have we already been up >= 80 sec?
 	blo	dmab_skip		; yes -- boot this popsicle stand!
 
 	move.w	#0,a5
-
 
 dmab_to:
 	cmpa.w	#0,a5		; a5 is a flag: TRUE when the memory test
@@ -3940,15 +3961,19 @@ dmab_to:
 	move.l	#$00030002,(sp)
 	trap	#$d			; Set discard at end of line flag
 
-	move.l	#200,d5			; d5 is increment for reporting
-	move.w	#79,d4			; d4 is count of intervals -1
+.if SPARROW
+	btst.b	#3,_modecode+1.w	; test 80 column bit of mode code
+.else
 	tst.b	sshiftmd		; test (shadow) resolution register
+.endif
 	bne	dmab_80			; OK, you're in an 80-column rez
 
-	move.l	#400,d5			; lo rez: report every 2 seconds
-	move.l	#39,d4			; only 40 intervals total
+	lsl.l	#1,d5			; lo rez: report every 2 seconds
+	lsr.l	#1,d4			; and half the total intervals
 
 dmab_80:
+	subq	#1,d4			; dbra count
+
 	move.l	d5,d6			; d6 is next time to report at
 	move.l	d4,d3			; remember this: we use it twice
 
@@ -6973,7 +6998,9 @@ trp14tab:
 	dc.l	unimpl			; 142 [reserved]
 	dc.l	unimpl			; 143 [reserved]
 * 144
-	dc.l	unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl
+; This line has been commented out because it is taken care of below..
+; See towns for details..
+*	dc.l	unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl
 
 * 152-159: Sparrow VDI video calls
 

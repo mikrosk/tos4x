@@ -907,5 +907,11 @@ _SetMasks:
 	move.l	_lineAVar,a0		; a0 -> linea var struct
 	move.l	4(sp),col_or_mask(a0)	; set the or mask for vs_color
 	move.l	8(sp),col_and_mask(a0)	; set the and mask for vs_color
+; Sparrow only stuff follows
+; 920910 towns changed to or.w from move.w to preserve rest of shift
+;              register
+	or.w	#$0200,$FFFF8266	; Set the overlay bit
+
+; Sparrow only stuff earlier
 	rts
 	.end

@@ -43,7 +43,7 @@ spx0:	moveq.l	#$0F,d5			; d5 <- mod16 mask
 
 	tst.w	_LSTLIN(a4)		; and not last line ...
 	bne	spx1
-	subq.w	#1,d7			; don't plot last point  (DRI kludge)
+;	subq.w	#1,d7			; don't plot last point  (DRI kludge)
 
 spx1:	move.w	_LN_MASK(a4),d2		; d2 <- line style mask for this line
 	move.w	d2,d3			; d3 <- line style mask for next line

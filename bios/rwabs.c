@@ -310,7 +310,7 @@ int curflop;			/* current floppy# inserted */
 
 /*
  * New media-change code.  Set CKSECTS to zero to disable this code. Eight
- * is a good number to avoid the risk that a wierd format doesn't have nine
+ * is a good number to avoid the risk that a weird format doesn't have nine
  * sectors per track.
  */
 
@@ -345,16 +345,6 @@ dskinit()
 
 
 /*
- * getdsb - return pointer to DSB
- */
-LONG getdsb(dev)
-WORD dev;
-{
-    return 0L;
-}
-
-
-/*
  * getbpb - return pointer to BPB
  * Reset disk mode to "SAFE"
  */
@@ -382,21 +372,25 @@ WORD dev;
      * Compute the DOS BPB from the MSDOS one.
      */
     do {
+
 #if USE_DISK_CHANGE
 	/*
-	 * Call check_disk_change here; if it returns 1, then we have to
-	 * step the drive, to make that signal go away. So read Trk1/Sect1.
+	 * Clear possible disk changed signal.
+	 * The return from clear_disk_change() could be ignored,
+	 * since any drive error will show up on the next floprd()...
 	 */
-	if (check_disk_change()) {
-	    ret = floprd(dskbufp, 0L, dev, 1, 1, 0, 1);
-	    if (ret < 0) goto critical;
-	}
+	ret = clear_disk_change(dev);
+#if 0
+	if (ret < 0) goto critical;
 #endif
+#endif
+
 #if CKSECTS
 	ret = floprd(dskbufp, 0L, dev, 1, 0, 0, CKSECTS);
 #else
 	ret = floprd(dskbufp, 0L, dev, 1, 0, 0, 1);
 #endif
+
 	if (ret < 0) {
 critical:    ret = critic((WORD)ret, dev);
 	}
@@ -461,6 +455,16 @@ critical:    ret = critic((WORD)ret, dev);
 }
 
 
+/*
+ * getdsb - return pointer to DSB
+ */
+LONG getdsb(dev)
+WORD dev;
+{
+    return 0L;
+}
+
+
 #if USE_DISK_CHANGE
 /*
  * In a disk_change system, there is only one physical drive, so select it
@@ -481,6 +485,22 @@ check_disk_change() {
     setporta(oporta);				/* restore values */
     return (ret == 0);
 }
+
+/*
+ * Check for disk change, and if it's changed,
+ * read Trk1/Sect1 to clear the signal.
+ * Return any floprd() error.
+ * Used by getbpb(), and chkmedia() if CKSECTS.
+ */
+WORD clear_disk_change(dev)
+WORD dev;
+{
+    WORD ret = 0;
+    if (check_disk_change())
+	ret = floprd(dskbufp, 0L, dev, 1, 1, 0, 1);
+    return ret;
+}
+
 #endif
 
 /*
@@ -554,17 +574,19 @@ WORD dev;
     else if (i == UNSURE) {
 	/* read the first CKSECTS sectors and check serial # & cksum */
 	do {
+
 #if USE_DISK_CHANGE
 	    /*
-	     * Call check_disk_change here; if it returns 1, then we have to
-	     * step the drive, to make that signal go away. So read Trk1/Sect1.
+	     * Clear possible disk changed signal.
+	     * The return from clear_disk_change() could be ignored,
+	     * since any drive error will show up on the next floprd()...
 	     */
-	    if (check_disk_change()) {
-		ret = floprd(dskbufp, 0L, dev, 1, 1, 0, 1);
-		check_disk_change();    /* for debugging - see ftrap13 */
-		if (ret < 0) goto critical;
-	    }
+	    ret = clear_disk_change(dev);
+#if 0
+	    if (ret < 0) goto critical;
 #endif
+#endif
+
 	    ret = floprd(dskbufp,0L,dev,1,0,0,CKSECTS);
 	    if (ret < 0) {
 critical:	ret = critic((WORD)ret,dev);
@@ -604,9 +626,11 @@ critical:	ret = critic((WORD)ret,dev);
 	if (!(wplatch[dev] = wpstatus[dev]))
 	    diskmode[dev] = SAFE;
 #endif
+
     }
     return SAFE;
 }
+
 #else
 /*
  * This is the old media-change detection code, included #if !CKSECTS.  It

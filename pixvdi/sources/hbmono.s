@@ -222,6 +222,13 @@ char1st:
 
 	dbra	d2,mchar_loop	;10/14 do next character
 
+.ifeq	P68030
+
+	movec.l	cacr,d0			; d2 <- cache control register
+	bset.l	#11,d0			; set "Clr DATA Cache" bit
+	movec.l	d0,cacr			; clear the data cache
+.endc
+
 	moveq.l	#1,d0		;4	exit blit with success code in d0
 	rts			;16
 

@@ -53,8 +53,8 @@ typedef UWORD	EVSPEC;
 #define EVB_PROC 5			/* for atari, number of EVB per process */
 
 #define KBD_SIZE 8
-#define QUEUE_SIZE 128
-#define NFORKS 32
+#define QUEUE_SIZE 256
+#define NFORKS 96
 
 CQUEUE
 {

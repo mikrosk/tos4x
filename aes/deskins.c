@@ -66,6 +66,9 @@ cp_iblk( number, dest_ciblk )
 	CICONBLK	*ciblk;
 	ICONBLK		*iblk;
 
+	if ( number >= numicon )
+	  number = numicon - 1;
+
 	obj = get_icon( number );
 
 	if ( obj->ob_type == G_ICON )

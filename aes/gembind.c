@@ -298,14 +298,14 @@ crysbind(opcode, pglobal, int_in, int_out, addr_in)
 		ret = wm_find(WM_MX, WM_MY);
 		break;
 	  case WIND_UPDATE:
-		wm_update(WM_BEGUP);
+		ret = wm_update(WM_BEGUP);
 		break;
 	  case WIND_CALC:
 		wm_calc(WM_WCTYPE, WM_WCKIND, WM_WCIX, WM_WCIY, WM_WCIW, 
 			WM_WCIH, &WM_WCOX, &WM_WCOY, &WM_WCOW, &WM_WCOH);
 		break;
 	  case WIND_NEW:
-	  	wm_new( );
+	  	ret = wm_new( );
 		break;
 				
 	  case RSRC_LOAD:	/* Resource Manager	*/

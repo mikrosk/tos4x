@@ -63,7 +63,7 @@ on_bounds:	move.w	_DESTY(a1),d1		; d1 <- dst Y
 
 		move.w	d1,d4			;4	d4 <- dst Y
 		add.w	d3,d4			;4	d4 <- bottom Y +1
-		cmp.w	_XMX_CLIP(a1),d4	; str can't descend below Ymax
+		cmp.w	_YMX_CLIP(a1),d4	; str can't descend below Ymax
 		bge	fail_ret		;8/10
 
 		cmp.w	d5,d0			; str can't extend left of Xmin

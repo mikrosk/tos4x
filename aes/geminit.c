@@ -961,10 +961,10 @@ gr_slidebox(tree, parent, obj, isvert)
 {
 	REG GRECT	*pt, *pc;	/* new pointer for Reg Opt	*/
 	GRECT		t, c;
-	REG WORD	divnd, divis;
+	REG LONG	divnd, divis;
 	OBJECT		*objc;
 	WORD		ptype,ctype;
-	WORD		ret;
+	WORD		ret,setxy,setwh;
 
 	pt = &t;
 	pc = &c;
@@ -987,12 +987,15 @@ gr_slidebox(tree, parent, obj, isvert)
 	else
 	  ctype = 0;
 	  
+	setxy = 0;
+
 	if ( ctype ) 	/* if the child is 3D, then check 	    */
 	{	
 	  if ( !ptype ) /* if parent is not 3D, then the child is   */
 	  {		/* ADJ3DPIX off, we need to adjust it	    */
   	    pt->g_x -= ADJ3DPIX;
 	    pt->g_y -= ADJ3DPIX;
+	    setxy = 1;	
 	  }	
 	  pt->g_w += (ADJ3DPIX << 1);
 	  pt->g_h += (ADJ3DPIX << 1);
@@ -1012,13 +1015,63 @@ gr_slidebox(tree, parent, obj, isvert)
 	  divis = pc->g_w - pt->g_w;
 	}
 
+	if ( setxy )
+	{
+	  if ( divnd )
+  	    divnd += ADJ3DPIX;
+	}
+
 	if (divis)
-	  return( mul_div( divnd, 1000, divis ) );
+	{
+	  ret = ( divnd * 1000 ) / divis;
+	  if ( ret > 1000 )
+	    ret = 1000;
+	  return( ret );
+	}	
 	else
 	  return(0);
 }
 
 
+/*
+*	Routine to watch the mouse while the button is down and
+*	it stays inside/outside of the specified rectangle.
+*	Return TRUE as long as the mouse is down.  Block until the
+*	mouse moves into or out of the specified rectangle.
+*/
+
+	WORD
+gr_stilldn(out, x, y, w, h)
+	WORD		out, x, y, w, h;
+{
+/*	WORD		rets[6];*/
+	WORD		status;
+/*	WORD		state;	*/
+					/* compiler had better	*/
+					/*   put the values out,*/
+					/*   x, y, w, h in the	*/
+					/*   right order on the	*/
+					/*   stack to form a	*/
+					/*   MOBLK		*/
+	while( TRUE )
+	{
+	  forker();
+	  if ( !( button & 0x01 ) )
+	  {
+	    status = FALSE;		
+	    break;
+	  }
+	  else
+	  {
+	    if ( out != inside( xrat, yrat, &x ) )
+	    {
+	      status = TRUE;
+	      break;
+	    }
+ 	  }  	
+	}
+	return( status );
+} /* gr_stilldn */
 
 
 #if 0

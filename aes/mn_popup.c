@@ -140,6 +140,8 @@ MENU	*MData;			/* the output menu structure	 */
     obj = -1L;			/* Set it to no object selected  */
     if( !MenuBar_Mode )		/* PopUp Menu Routines!          */
     {
+      wm_update( BEG_MCTRL );	/* Lock the menus and mouse      */
+
       /* Wait for the up button */
 /*
       do
@@ -152,7 +154,6 @@ MENU	*MData;			/* the output menu structure	 */
       {
       }while( gl_button );
 			        /* moved 03/23/92 cjg 		 */
-      wm_update( BEG_MCTRL );	/* Lock the menus and mouse      */
 
       /* Get the new Menu ID! */
       if( ( MenuID = Menu_Insert( tree, Menu->mn_menu )) > 0 )

@@ -411,14 +411,14 @@ inf_scan( buffer )
 						/* window's x position	*/
 		pcurr = scan_2( pcurr, &pws->w_sizes.x );
 		if ( pws->w_sizes.x >= gl_ncols )
-		  pws->w_sizes.x /= 2;
+		  pws->w_sizes.x = gl_ncols - 4;
 
 		pws->w_sizes.x *= gl_wchar;
 
 						/* window's y position	*/
 		pcurr = scan_2( pcurr, &pws->w_sizes.y );
 		if ( pws->w_sizes.y >= gl_nrows )
-		  pws->w_sizes.y /= 2;
+		  pws->w_sizes.y = gl_nrows - 1;
 		
 		pws->w_sizes.y *= gl_hchar;
 

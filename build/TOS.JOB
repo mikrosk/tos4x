@@ -1,9 +1,8 @@
-# TOS 4.00 build, run by C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c).
+# TOS 4.01 build, run by C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c).
 # S: is the repository, D: the work copy, M: the RAM disk the makefiles expect.
 # cptree gives every copied file the same time stamp, so make rebuilds only what is missing.
 # Everything is built from the sources, the Lattice C parts with Lattice 5.52 -> D:\ROM\TOS.IMG,
-# which EXPECT.LST checks against the TOS 4.00 ROM (tos400.rom plus its last byte, the CRC low byte $13,
-# which the 524287-byte dump lacks: md5 f1b79aaee8e35ec0fa22b2c3f2228394).
+# which EXPECT.LST checks against the TOS 4.01 ROM (TOS401.BIN, md5 b338bacb2fc453bab61bcc1e2cf5076b).
 # The same sources also give the stand-alone programs: the VDI as SCREEN.PRG and SMSCREEN.PRG, the AES
 # and desktop as USA.PRG (EXPECT.LST).
 
@@ -15,19 +14,13 @@ cptree S:\BIOS D:\BIOS
 cptree S:\GEMDOS D:\GEMDOS
 cptree S:\PIXVDI D:\PIXVDI
 echo AES resource glue: SIZEGLUE.PRG (newglue.c with its size block on) makes glue.XXX from gemXXX.rsc,
-echo deskXXX.rsc (their rsh_rssize bytes) and deskXXX.inf, session usa, grm, ita, spa, fre
+echo deskXXX.rsc (their rsh_rssize bytes) and deskXXX.inf, session fre, grm, ita, spa, usa
 cd D:\AES
-type usa\rgrm\rita\rspa\rfre\rexit\r
+type fre\rgrm\rita\rspa\rusa\rexit\r
 x C:\GLUE\SIZEGLUE.PRG
 echo glue.swe, which makeprg links: a session of swe alone
 type swe\rexit\r
 x C:\GLUE\SIZEGLUE.PRG
-# SIZEGLUE never writes the padding after each deskXXX.inf; the 4.00 ROM has these values there
-poke D:\AES\GLUE.USA 32719 ff011b0040
-poke D:\AES\GLUE.GRM 32953 050011ffff
-poke D:\AES\GLUE.FRE 33561 ff001c
-poke D:\AES\GLUE.ITA 33035 01020b0018
-poke D:\AES\GLUE.SPA 33451 14
 echo makevdi moves the objects into ..\objs
 mkdir D:\PIXVDI\OBJS
 cptree C:\ROM D:\ROM
@@ -36,11 +29,10 @@ echo the surviving MAS versions reject clr.l An; the shipped objects hold suba.l
 subst D:\BIOS\STARTUP.S clr.l\ta5 suba.l\ta5,a5
 subst D:\BIOS\STARTUP.S clr.l\ta0 suba.l\ta0,a0
 subst D:\BIOS\XINOUT.S clr.l\ta5 suba.l\ta5,a5
-echo startup.s has three cpp-style lines (#if SPARROW, #else, #endif) that the surviving MAS rejects; the
-echo 4.00 ROM holds the code of both branches, so the MAS of 1992 took them as comments: they become comments
-subst D:\BIOS\STARTUP.S \n#if\sSPARROW\r \n*#if\sSPARROW\r
-subst D:\BIOS\STARTUP.S \n#else\r \n*#else\r
-subst D:\BIOS\STARTUP.S \n#endif\r \n*#endif\r
+echo startup.s has three cpp-style lines (#if SPARROW, #else, #endif) that MAS does not take; 2.100 has .if
+subst D:\BIOS\STARTUP.S \n#if\sSPARROW\r \n.if\sSPARROW\r
+subst D:\BIOS\STARTUP.S \n#else\r \n.else\r
+subst D:\BIOS\STARTUP.S \n#endif\r \n.endif\r
 echo TOS cuts functions.o in the AES link list to function.o; the Hatari drive does not for make
 subst D:\AES\MAKEIMG functions.o function.o
 subst D:\AES\MAKEPRG functions.o function.o
@@ -74,7 +66,7 @@ setenv PATH=C:\LC\BIN;C:\PUREC;C:\SLAV;C:\BIN;C:\UTIL
 cd D:\GEMDOS
 echo the ROM's sup module was compiled before RCS 2.19 added its 3 $Log lines (ASSERT line 331)
 subst D:\GEMDOS\SUP.C \s$Log:\ssup.c,v\s$\r\n*\sRevision\s2.19\s\s1992/08/11\s\s00:37:02\s\skbad\r\n*\sTOS\s4.00\sFalcon030\sfirst\sproduction\sversion\r\n*\r\n \s$Log:\ssup.c,v\s$\r\n
-echo TOS 4.00 has mem.ot with the debug commands and every other module with NODB
+echo TOS 4.01 has mem.ot with the debug commands and every other module with NODB
 x make mem.ot
 x make NODB=1 gemdos.030
 
@@ -86,8 +78,8 @@ copy D:\VDIVTG\VDIVTG.O D:\PIXVDI\SOURCES\VDIVTG.O
 x make -f makevdi screen.prg
 x make -f makevdi smscreen.prg
 
-echo AES (Lattice make; makeimg with the 1989 MadMac, gemoblib with Pure C PASM)
-setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\PUREC;C:\UTIL
+echo AES (Lattice make; makeimg with the 1989 MadMac)
+setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
 cd D:\AES
 x make -f makeimg
 echo USA.PRG gives Swedish its own resources: gemrom.c, then gemrom.oo again for makeprg

@@ -66,10 +66,11 @@ GLOBAL LONG	gl_pglue;
 GLOBAL WORD	nodesk;
 GLOBAL WORD	nogem;
 
-GLOBAL	UWORD	st_lang;	/* Language code	*/
+GLOBAL	WORD	st_lang;	/* Language code	*/
 GLOBAL	UWORD	st_time;	/* time code		*/
 GLOBAL	UWORD	st_date;
 GLOBAL	UWORD	st_dchar;
+GLOBAL	WORD	st_keybd;
 MLOCAL	UWORD	*tosrsc;	
 
 EXTERN	BYTE	USARSC[];	/* USA, UK	*/
@@ -176,10 +177,14 @@ rsc_read()
 
 	if ( getcookie( 0x5F414B50L, &value ) )	/* get _AKP cookie */
 	{
+	  st_keybd = value & 0x00FFL;
 	  st_lang = ( value >> 8 ) & 0x00FFL;	/* get the keyboard preferences */
 	}
 	else
-	  st_lang = 0;
+	  st_keybd = st_lang = 0;
+
+	if ( ( st_keybd > 8 ) || ( st_keybd < 0 ) )
+	  st_keybd = 0;
 
 	if ( ( st_lang > 6 ) || ( st_lang < 0 ) || ( st_lang == 3 ) )
 	  st_lang = 0;

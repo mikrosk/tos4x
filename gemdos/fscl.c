@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.15 $	$Source: e:/tos/gd2\rcs\fscl.c,v $
+* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.16  1991/04/05  18:38:22  apratt
+* Misc fixes making it work
+*
 * Revision 2.15  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -76,7 +79,7 @@ voidfn
 dirdirty(dir)
 DIR *dir;
 {
-    DBCMD(2,"print -n dirdirty ; dirx (lpeek (+ `a6 8)) ; _c");
+    DBCMD(2,"print -n dirdirty ; dirf (lpeek (+ `a6 8)) ; _c");
     dir->dir_bcb->b_dirty = 1;
     flush(dir->dir_bcb);
 }
@@ -132,7 +135,13 @@ BCB *b;
     if (b->b_bufdrv == d && b->b_dirty) {
     	n = b->b_buftyp;	/* n gets THIS BUFFER's type */
 	b->b_bufdrv = B_INVALID; /* invalidate now in case of error */
+
+	/* this DBCMD contains &b so b isn't placed in a register */
+	DBCMD(0x200,(&b,"print -n Write:;bcb (lpeek (+ `a6 8));"
+		    "dw (lpeek (+ (lpeek (+ `a6 8)) 10))[200];_c"));
+
 	rwabs(1,b->b_bufr,1,b->b_bufrec,d);
+
 	/* if FAT operation, flush to both FATs */
 	if (!n) 
 	    rwabs(1,b->b_bufr,1,b->b_bufrec - dmd->m_fsiz,d);
@@ -322,16 +331,25 @@ doio:
 	/* INVALIDATE this buffer because the rwabs might fail! */
 	b->b_bufdrv = B_INVALID;
 
-	/* do the read if doread, or mediach was/is nonzero */
+	/* set this up now for DB purposes. Doesn't matter as drv=INVALID. */
 
-	if (doread || mcflag == 1 || mediach(dmd->m_drvnum)) {
-	    rwabs(0,b->b_bufr,1,recn,dmd->m_drvnum);
-	}
 	b->b_bufrec = recn;
 	b->b_dirty = 0;
 	b->b_buftyp = n;
-	b->b_bufdrv = dmd->m_drvnum;
 	b->b_dmd = dmd;
+
+	/* do the read if doread, or mediach was/is nonzero */
+
+	if (doread || mcflag == 1 || mediach(dmd->m_drvnum)) {
+	    /* &b appears in this DBCMD so it doesn't go in a register. */
+	    /* I only hope it goes in (- `a6 4) since it's the first auto. */
+	    DBCMD(0x400,(&b,"print Read:;bcb (lpeek (- `a6 4));_c"));
+	    rwabs(0,b->b_bufr,1,recn,dmd->m_drvnum);
+	    DBCMD(0x400,"dw (lpeek (+ (lpeek (- `a6 4)) 10))[200];_c");
+	}
+
+	/* read succeeded (or wasn't necessary) so validate the buffer */
+	b->b_bufdrv = dmd->m_drvnum;
     }
     else {
 	/* cache hit */
@@ -693,56 +711,75 @@ int freeflag;
     uint free;
     uint clcount;
     uint cl;
-    uint i;
+    uint recno;
     uint clpersec;	    /* clusters represented by each sector of FAT */
     uint lastcl;
 
     clpersec = dmd->m_recsiz >> 1;
-    lastcl = dmd->m_numcl + 2;
 
+    /*
+     * Lastcl is the last valid cluster number, plus one. for each sector,
+     * the loop runs until the end of the sector OR until it reaches
+     * lastcl, because the last FAT sector isn't all valid.
+     */
+
+    lastcl = dmd->m_numcl + 2;	/* +2 here fixes "missing 2 clusters" bug */
+
+    /* this is the counter for the freeflag case */
     free = 0;
 
     /* set up the first pass here; remainder get set up before "goto again" */
 
-    i = 0;
-    /* clcount: first cluster to look at in this sector */
+    /* start at FAT record zero */
+    recno = 0;
+
+    /* clcount counts the cluster number we're looking at; starts at 2 */
     clcount = 2;
-    /* cl: clusters left to look at in this sector */
+
+    /* cl: number of clusters left to look at in this sector */
     cl = min(clpersec,lastcl) - 2;
+
     /* buf: pointer following along in this sector */
-    buf = ((uint *)getfat(i,dmd,FALSE)) + 2;
+    buf = ((uint *)getfat(recno,dmd,FALSE)) + 2;
 
 again:
-    /* stop at the sooner of the end of sector or the end of FAT */
+    DBCMD(0x4,"print top of fastcl loop;_c");
     if (!freeflag) {
-	while (cl-- && *buf++) {
+	/* this loop could be faster -- do math once instead of ++ many times */
+	while (cl--) {
+	    if (!*buf++) {
+		DBCMD(0x4,"print fastcl found an unused cluster;_c");
+		return clcount;
+	    }
 	    clcount++;
-	}
-	if (cl >= 0) {
-	    /* quit because *buf was 0! return number of zero entry */
-	    return clcount;
 	}
     }
     else {
+	clcount += cl;	/* advance clcount by stride of this loop */
 	while (cl--) {
 	    if (!*buf++) free++;
-	    clcount++;
 	}
-	if (clcount == lastcl) return (int)free;
     }
 
     /* this is the end condition for the loop, followed by setup for next */
 
     if (clcount < lastcl) {
-	i++;
-	cl = min(clpersec,lastcl-clcount);
-	buf = (uint *)getfat(i,dmd,FALSE);
-	goto again;
+	/* not the end of the FAT yet */
+	recno++;			    /* advance to next record */
+	cl = min(clpersec,lastcl-clcount);  /* set cl to size of valid part */
+	buf = (uint *)getfat(recno,dmd,FALSE);  /* get the record into RAM */
+	goto again;			    /* and loop */
     }
-
-    /* drop out of the loop here. */
-
-    return 0;
+    else if (freeflag) {
+	/* end condition for freeflag case */
+	DBCMD(0x4,"print fastcl returns number of free clusters;_c");
+	return free;
+    }
+    else {
+	/* end condition for normal case */
+	DBCMD(0x4,"print fastcl found no free clusters;_c");
+	return 0;
+    }
 }
 
 /*
@@ -991,6 +1028,14 @@ eof:
  * Call this before doing anything with any drive in an OS call. fn2dir is
  * a good choice, but some calls (Fsnext, Dgetpath) don't take file names,
  * yet need to use this call.
+ *
+ * We could also call Mediach() here to see if we should process a
+ * media-change on the drive before proceeding.  It is still possible to
+ * get media change in the middle of an operation (think floppy, with
+ * "insert other disk"), but if that is done wrong you'll just get EMEDIA
+ * from the read or write. This takes Mediach() out of getrec, which is
+ * GOOD!  This is theoretical; for better reliability, I'll leave mediach
+ * where it is.
  */
 
 long
@@ -1062,7 +1107,7 @@ long *buf;
     dmd = &drvtbl[drv];
     free = 0;
     newcl = TRUE;
-    end = dmd->m_numcl + 2;
+    end = dmd->m_numcl + 2;	/* +2 here fixes missing 2 clusters */
 
     if (dmd->m_16) free = fastcl(dmd,TRUE);
     else {

@@ -1,12 +1,15 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.18 $	$Source: e:/tos/gd2\rcs\fs.h,v $
+* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.19  1991/04/05  18:38:22  apratt
+* Misc fixes making it work
+*
 * Revision 2.18  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -65,9 +68,10 @@
  *	  04	    xrw and clusters
  *	  08	    handles
  *	  10	    pool
- *	  20	    _dirnext calls
+ *	  20	    _dirnext calls, etc.
  *	  40	    process stuff
  *	  80	    memory stuff
+ *	 100	    xgetdir
  *	FFFFFFFF    really important, "non-maskable" stuff, like panic.
  */
 
@@ -147,8 +151,6 @@ extern void sprintf();
 #define uint unsigned int
 #define ulong unsigned long
 #define	REG		register
-#define swp68(x)	s68(&(x))
-#define swp68l(x)	s68l(&(x))
 #define MGET(x)		((x*)getbig())
 #define GETMD()		((MD *)getsmall())
 #define MFREE(p)	freebig(p)
@@ -158,10 +160,44 @@ extern void sprintf();
 #define bconout(a,b)	trap13(3,(short)a,(short)b)
 #define bconostat(a)	trap13(8,(short)a)
 #define getbpb(a)	(BPB *)trap13(7,(short)a)
-#define getmpb(a)	(void)trap13(0,(long)a)
 #define mediach(a)	(int)trap13(9,(short)a)
-#define setexc(e,h)	(void (*)())trap13(5,e,((long)(h)))
 #define gettime()	(ulong)trap14(0x17)
+
+#if !__GNUC__
+
+#define swp68(x)	s68(&(x))
+#define swp68l(x)	s68l(&(x))
+voidfn s68 _P(( void *word_to_swap ));
+voidfn s68l _P(( void *long_to_swap ));
+
+#else
+
+#define swp68(x) ((x) = ({				\
+    register short retvalue = (short)(x);		\
+    __asm__ volatile (					\
+	"rorw #8,%0"					\
+	: "=d" (retvalue)   /* outputs */		\
+	: "0" (retvalue)    /* inputs */		\
+	);						\
+    retvalue; }))
+
+#define swp68l(x) ((x) = ({				\
+    register long retvalue = (long)(x);			\
+    __asm__ volatile (					\
+	"rorw #8,%1;					\
+	 swap  %1;					\
+	 ror.w #8,%1"					\
+	: "=d" (retvalue)   /* outputs */		\
+	: "0" (retvalue)    /* inputs */		\
+	);						\
+    retvalue; }))
+
+#endif /* __GNUC__ */
+
+#if !UNREAL
+#define getmpb(a)	(void)trap13(0,(long)a)
+#define setexc(e,h)	(void (*)())trap13(5,e,((long)(h)))
+#endif
 
 #define min(a,b)	(((a)<(b))?(a):(b))
 
@@ -362,7 +398,6 @@ DIR
 #define FN_NORM 0
 #define FN_DOTSOK 1
 #define FN_EARLY 2
-#define FN_EMPTYOK 3
 
 /*
  * File Control Block
@@ -497,12 +532,10 @@ long trap1 _P(( int,... ));
 long trap13 _P(( int,... ));
 long trap14 _P(( int,... ));
 
-voidfn s68 _P(( void *word_to_swap ));
-voidfn s68l _P(( void *long_to_swap ));
 int uc _P(( int ));
 voidfn clear _P(( void *start, void *last_plus_1 ));
-voidfn usr2xfr _P(( int n, void *d, void *s ));
-voidfn xfr2usr _P(( int n, void *s, void *d ));
+voidfn usr2xfr _P(( uint n, void *d, void *s ));
+voidfn xfr2usr _P(( uint n, void *s, void *d ));
 voidfn upd_tod _P(( void ));
 
 long setjmp _P(( jmp_buf buf ));

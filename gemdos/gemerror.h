@@ -1,12 +1,15 @@
 /*
 ***************************   GEMERROR.H   ******************************
 *
-* $Revision: 2.7 $	$Source: e:/tos/gd2\RCS\gemerror.h,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\gemerror.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:47:08 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/05 18:38:22 $    $Locker:  $
 * =======================================================================
 *
 * $Log: gemerror.h,v $
+* Revision 2.8  1991/04/05  18:38:22  apratt
+* Misc fixes making it work
+*
 * Revision 2.7  1991/03/28  17:47:08  apratt
 * THIS VERSION WORKS! DESKTOP OPS WORK!
 *
@@ -37,7 +40,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.7 $
+* $Revision: 2.8 $
 * =======================================================================
 *
 * $Source: e:/tos/gd2\RCS\gemerror.h,v $
@@ -91,3 +94,4 @@
 #define	EINTRN	-65L	/* internal error				*/
 #define EPLFMT  -66L	/* invalid program load format			*/
 #define EGSBF	-67L	/* setblock failure due to growth restrictions  */
+#define EROOT	-68L	/* Directory name translation resulted in "\."	*/

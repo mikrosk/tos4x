@@ -3,18 +3,21 @@
 * $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/02/06 23:07:08 $
+* $Date: 89/02/21 17:21:05 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.1  89/02/21  17:21:05  kbad
+* *** TOS 1.4  FINAL RELEASE VERSION ***
+*
 * Revision 1.11  89/02/06  23:07:08  kbad
 * Changed _acctim (last floppy access time) to use video frame counter
 * instead of 200Hz clock.  Safer that way, since floppy WP is checked
 * at vblank time -- this way mediach() will work even if 200Hz is disabled.
-*
+* 
 * Revision 1.10  88/12/22  12:56:27  apratt
 * Added (a5)'s to save some words & some time (as if it mattered in 
 * floppy code...)
@@ -61,7 +64,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.11 $
+* $Revision: 2.1 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $

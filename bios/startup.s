@@ -4,20 +4,32 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/05/02 17:40:55 $
+* $Date: 91/05/21 16:57:58 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.69  91/05/21  16:57:58  apratt
+* Reset the ACSI chip and leave it in the read state VERY EARLY in the boot,
+* between the CPU reset and the reset instruction at the top of the code. 
+* Changed the _FDC cookie to match the new def'n.  Set nospindelay (from
+* flop.s) if the switch is thrown.
+*
+* Made TT's boot up in TT MED so they don't look like game machines.  Fixed
+* icon-drawing code appropriately.  Hold down ALT to go back to ST LOW so
+* autoboot games get what they expect.
+*
+* Fixed CRC message so it identifies the chip just like on the board.
+*
+* 
+* Fixed CRC message so it identifies the chip just like on the board.
+* 
 * Revision 2.68  91/05/02  17:40:55  apratt
 * Added code to save tbcr in addition to the enable bit from iera
 * in noblank1.  Can't hurt, and probably will help: if somebody
 * has the interrupt enabled and the counter stopped, and we
-* end up leaving the counter running (and restore the enable bit),
-* you'll start getting timer B ints!
-*
 * end up leaving the counter running (and restore the enable bit),
 * you'll start getting timer B ints!
 * 
@@ -98,7 +110,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.68 $
+* $Revision: 2.69 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -756,11 +768,20 @@ os_dosdate:	dc.w	dosdate		;($1e) DOS-format date the system was built
 	dc.l	0			;($2c) reserved for future use
 sizeof_hdr = *-ostext			; = size of OS header
 
+
+*+
+* mode.  Shouldn't hurt in non-TT settings, but I make it .ifne TT for
+*
+* ".ifeq systype-rom."
 *  or when the RESET button is pressed,
 *  or after a really messy system crash.
 *
 * There is code here to reset the ACSI chip and leave it in the read state.
 .ifeq systype-rom
+.ifne TT
+* safety.  It's only necessary for ROM systems in any case, so it's inside
+* ".if systype == rom."
+.endc
 
 .endc
 	move.w	#$2700,sr		; super mode, no interrupts
@@ -1581,30 +1602,41 @@ gotem:	move.l	a1,$8
 cdone1:
 .endif
 .endif
-* switches, when zero, means you have high-density capability.  This is
-* defined as "Flopfmt of 18 sectors gives you high-density at 18 sectors"
-* and "Protobt(4) gives you 80 tracks / double sided / 18 spt" and
-* Floprd/Flopwr/Flopver work on high-density disks (and auto-detect them)."
+* switches, when zero, means you have high-density capability.  This
+* is defined as "Flopfmt of 18 sectors gives you high-density at 18
+* sectors" and "Protobt type 4 gives you 80 tracks / double sided /
+* 18 spt" and Floprd/Flopwr/Flopver work on high-density disks (and
+* auto-detect them)."  One day we'll have a switch which tells us to
+* install the quad-density version of this cookie, meaning all of the
+* above at 36 spt, plus "Protobt type 5 gives 36 spt."
 *
-* The high word of the value of the _FDC cookie holds a value indicating
-* the kinds of drives available: 0000 means 720K only, 0001 means 1.44MB,
-* and other values are undefined, but will eventually mean stuff like
-* 2.88MB.  The low word of the cookie is to be used by vendors who want to
-* identify their products; they should register their desires with somebody
-* (as of 4/25/91 it's Bill Rhebock).  Zero means Atari's 1772-clone that
-* runs reliably at 16MHz.
+* The high byte of the value of the _FDC cookie holds a value
+* indicating the kinds of drives available: 00 means 720K only, 01
+* means 1.44MB, and other values are undefined, but will eventually
+* mean stuff like 2.88MB.  The low three bytes of the cookie is to be
+* used by vendors who want to identify their products; they should
+* register their desires with somebody (as of 4/25/91 it's Bill
+* Rehbock).  "ATC" means Atari's 1772-clone that runs reliably at
+* the higher denisty.
 *
 * We're being cagey about this because we don't want to preannounce
 * the high-density floppy capability, and besides, we don't want people
 * looking at the switches directly if we can help it.  So, like DMASND,
 * you get a cookie based on a switch.
 *
+* In addition, if the switch is thrown, we set nospindelay so the
+* floppy BIOS knows you're using an Epson SMD-340 or something like
+* it.  See comments in flop.s for the rationale.
+	bclr	#1,d1			; nope, no DMA sound
 gotsnd:	move.l	d1,(a0)+		; write sound cookie value
 	btst.l	#$6,d0			; second switch thrown (read as 0)?
 * d0.b still holds the configuration switches as computed above.
 
+.globl nospindelay
+	move.w	#1,nospindelay		; set this, see flop.s
+* switches, when zero, means you have high-density capability.  This is
 * defined as "Flopfmt of 18 sectors gives you high-density at 18 sectors"
-	move.l	#$00010000,(a0)+	; 1 means 1.44MB, 0 means Atari
+	move.l	#$01000000+"ATC",(a0)+	; $01 means 1.44MB
 * Floprd/Flopwr/Flopver work on high-density disks (and auto-detect them)."
 * One day we'll have a switch which tells us to install the quad-density
 * version of this cookie, meaning all of the above at 36 spt, plus "Protobt
@@ -1905,6 +1937,9 @@ scuberr:
 	move.w	#$0400,d0	; divide by 50, count 256 = 5ms
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
 	move.l	#ikbreset,-(sp)	; ikbd reset string
+	move.w	#sizeikbd,-(sp)	; string length
+	jsr	ikbdws		; reset keyboard
+	addq.l	#6,sp
 	bsr	dowait		; (this is ttwait or stwait as appropriate)
 	dbra	d1,ikbdlp1
 .ifne STPAD
@@ -1912,7 +1947,12 @@ scuberr:
 	move.b	#2,d1
 	move.b	#$80,$ffff827e		; write LCD and power control
 .else
+.ifeq TT
 	bsr	cartscan		; execute cartridge aps
+.if STPAD
+	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
+.endc
+
 *+
 *  Initialize screen resolution -- algorithm from Jim Tittsler (thank you!)
 .ifeq TT
@@ -2164,20 +2204,33 @@ priv2:
 *
 *-
 
-* Draw an icon on the screen.  It is never cleared from the screen,
-* but the text cursor is placed below it so if something loads
-* and prints a message before the next screen clear it won't overlap
-* the icon.  The "icon" is a bloody huge thing on the screen.
+	swap	d0			; from ikbd time & continue.
+	move.w	d0,_time
+
+noikbdclk:
+* At this point, everything is up.  It's no longer OK to use Timer A
+* to time short events, and for compatiblity we actually shut it
+* down and disable its interrupt.
 *
 
+.ifne TT
+	bclr.b	#5,iera
+
+**********************************************************************
+*
+* Enable the cache on a M68030.  It gets turned off again if you hold
+.endc
 * auto-boot games that can't hack having the cache on can run.  The
 * idea is that if you are holding down the ALT key, it's because you
 * want maximal ST compatibility of the boot phase.
-	tst.b	sshiftmd.w		; low rez?
-	bne	monoicon		; no, monochrome
+*
+
+.if M68030
+	move.l	#$3111,d0
+	movec	d0,cacr
 .endif
 
-	add.w	#160*4,a1		; bump down four lines
+**********************************************************************
 *
 * Draw an icon on the screen.  It is never cleared from the screen (by us),
 * but the text cursor is placed below it so if something loads and prints a
@@ -2188,25 +2241,17 @@ priv2:
 *
 
 .if TT
-	add.w	#160-48,a1		; add stride
+colstride	equ	320	; TT MED stride from line to line, 80*4
 mstride		equ	160	; TT HIGH stride, 160
 .else
 colstride	equ	160	; ST LOW stride, 40*4
 mstride		equ	80	; ST HIGH stride, 80
-	cmp.b	#2,sshiftmd.w		; mode 2? ST HIGH
-	beq	isthigh
-	add.w	#160*4,a1		; bump down 4 lines for TT HIGH
-	move.l	#160-12,d2		; TTHIGH stride from line to line
-	bra	doicon
-isthigh:
-	add.w	#80*4,a1		; bump down 4 lines for ST HIGH
-	move.l	#80-12,d2		; STHIGH stride from line to line
-doicon:
+.endif
 
 	move.l	#icon_start,a0
 	move.l	_v_bas_ad.w,a1
 	move.b	sshiftmd.w,d0
-	add.l	d2,a1			; add stride
+	cmp.b	#2,d0
 	beq	monoicon
 	cmp.b	#6,d0
 	beq	monoicon
@@ -2376,24 +2421,39 @@ crcstride	equ	4
 	move.l	#(256*1024)-2,d7	; PAD roms, 256Kb
 
 .else
-crcmsg:	dc.b	"WARNING: BAD ROM CRC, OFFSET ",0
+	move.l	#(128*1024)-2,d7	; else checksum 128KB per chip
+.endif
 	move.w	#crcstride-1,d6		; counter - loop crcstride times
 	move.l	#ostext,a5		; start address
-badcrc:	move.w	a5,d5
-	and.w	#crcstride-1,d5		; leave significant bits in d5
+
 ckloop:
 	move.w	#crcstride,-(sp)	; push stride -- four bytes
 	move.l	d7,-(sp)		; push count -- (chip size)-2 bytes.
-	add.w	#'0',d5
-	move.w	d5,2(sp)
+	move.l	a5,-(sp)		; push start address
+	bsr	_toscrc			; compute the CRC
+	add.w	#10,sp			; clean off stack
+	move.l	a5,a0
+
+* advance a0 to first byte of the checksum: for single-chip TOS
 * this is a0+d7; for others it's stride*128K - stride*2.
-	trap	#1			; Cconout(d5+'0')
-	move.w	#$0d,2(sp)
+
+.if crcstride == 1
+.ifne TT
+.else
+	add.l	#((crcstride*(128*1024)) - (crcstride*2)),a0
+.endif
+	move.b	(a0),d1			; get hi byte of CRC from rom
+	lsl.w	#8,d1			; ... to high byte of d1.w
+	move.b	crcstride(a0),d1	; get lo byte of CRC to d1.b
+	cmp.w	d1,d0			; check the CRC
 	bne	badcrc
-	trap	#1			; Cconout(CR)
-	move.w	#$0a,2(sp)
-	move.w	#2,(sp)
-	trap	#1			; Cconout(LF)
+	addq.l	#1,a5			; incr start addr for next time
+.endc
+	bra	crcdone
+
+crcmsg:		dc.b	"WARNING: BAD ROM CRC IN CHIP ",0
+crcmsg1:	dc.b	".",13,10,0
+.even
 
 badcrc:	move.l	a5,d5			; put addr in d5 for chip identification
 	pea	crcmsg
@@ -2414,7 +2474,31 @@ eok1:
 	btst	#1,d5
 	beq	eok2
 	move.b	#'O',d0			; 2nd bit odd, say 'O'
+eok2:
+	move.w	d0,2(sp)
+	move.w	#2,(sp)
+	trap	#1			; Cconout((d5 & 2) ? 'O' : 'E');
+.endif
 	trap	#1			; Cconws(".\r\n");
+
+.ifne TT
+	cmp.w	#$6,sshiftmd.w		; TT HIGH monitor?
+	dbra	d6,ckloop		; go back and check others
+
+crcdone:
+.endif
+
+*
+* End of CRC computation code
+*
+************************************************************************
+
+*+
+*  Attempt to load a boot sector
+*    o  from floppy disk 0 (A:),
+*  Then find packages and execute 'em.
+.endc
+* But first... If you're on TT and the ALT key is down, go into ST LOW rez.
 .endif
 .ifeq systype-rom
 

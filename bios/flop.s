@@ -4,16 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/03 13:22:58 $
+* $Date: 90/08/21 17:26:50 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.18  90/08/21  17:26:50  apratt
+* Mega STe version: made SLOWACSI true for STPLUS, too.
+*
 * Revision 2.17  90/08/03  13:22:58  apratt
 * TTOS FINAL RELEASE
-*
+* 
 * Revision 2.16  90/07/19  18:51:14  apratt
 * Removed some leftover debugging code.
 * 
@@ -140,7 +143,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.17 $
+* $Revision: 2.18 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -213,7 +216,7 @@
 * least.
 *
 
-SLOWACSI	equ	TT	; set to 1 for TT(?) @check@
+SLOWACSI	equ	TT+STPLUS	; set to 1 for TT(?) @check@
 
 READFIFO	equ	0	; fixes a bug in TT MCU 4/90, but
 				; is deadly to older MCU's!

@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
+* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.11  1991/02/21  03:07:32  apratt
+* This version performs this testbed perfectly.
+*
 * Revision 2.10  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -53,8 +56,8 @@ DIR *dir;
 }
 
 /*
- *  Create a file.  Called by xcreat and xmkdir.  Returns error codes,
- *  fills in dir with a fresh DIR for the file.
+ * Create a file.  Called by xcreat and xmkdir.  Returns error codes, fills
+ * in dir with a fresh DIR for the file.
  *
  * ERROR CONSIDERATIONS:
  * All disk errors longjmp.  Other errors return their error codes.
@@ -82,8 +85,8 @@ DIR *dir;
     if (err && err != EFILNF) return err;
 
     /*
-     *  Special case for volume label here: only works in RD, and
-     *  deletes any existing label, not a file with the same name.
+     * Special case for volume label here: only works in RD, and deletes
+     * any existing label, not a file with the same name.
      */
 
     if (attr & FA_LABEL) {
@@ -92,10 +95,9 @@ DIR *dir;
     }
 
     /*
-     *  If the file exists, remove it, unless it's open.
-     *
-     *  Don't remove if existing file is RO or subdir, and don't
-     *  create a subdir over an existing file.
+     * If the file exists, remove it, unless it's open. Don't remove if
+     * existing file is RO or subdir, and don't create a subdir over an
+     * existing file.
      */
 
     if (err == 0) {
@@ -120,9 +122,7 @@ DIR *dir;
 
     if (err = dirslot(dir)) return err;
 
-    /*
-     * write the new file info there, flush back to disk.
-     */
+    /* write the new file info there, flush back to disk. */
 
     fcb = dir->dir_fcb;
 
@@ -137,6 +137,7 @@ DIR *dir;
     fcb->f_clust = 0;
     fcb->f_fileln = 0;
     dirdirty(dir);
+    fatdirty(dir->dir_dev);	/* dirslot may have dirtied some FAT */
     return 0;
 }
 
@@ -163,11 +164,11 @@ int mod;
 /*
  * ixopen: given a DIR entry, open the file.
  *
- *  ERROR CONSIDERATIONS:
- *  Since this function doesn't do any writes, it can't mangle the disk.
- *  We allocate an OFD early because we know we'll need one,
- *  and free it if we then need a DFD and can't get one, but that's
- *  all that can go wrong.
+ * ERROR CONSIDERATIONS:
+ * 
+ * Since this function doesn't do any writes, it can't mangle the disk. We
+ * allocate an OFD early because we know we'll need one, and free it if we
+ * then need a DFD and can't get one, but that's all that can go wrong.
  */
 
 long
@@ -237,10 +238,10 @@ uint mod;
 }
 
 /*
- *  Fattrib: Get/Set file attributes.  There are some restrictions on 
- *  "set:" mainly, you can't change the "folder" bit, and you can't change
- *  the "label" bit of a subdir.  You can get YOURSELF into trouble
- *  with this, but you can't get GEMDOS into trouble!
+ * Fattrib: Get/Set file attributes.  There are some restrictions on 
+ * "set:" mainly, you can't change the "folder" bit, and you can't change
+ * the "label" bit of a subdir.  You can get YOURSELF into trouble with
+ * this, but you can't get GEMDOS into trouble!
  *
  * ERROR CONSIDERATIONS: when writing, we just call dirdirty().
  */
@@ -277,15 +278,15 @@ char attr;			/* attribute byte */
 
 
 /*
- *  Fdatime, Get/Set File Date and Time
+ * Fdatime, Get/Set File Date and Time
  *
- * Megamax C relies on this function leaving the input buffer alone on
- * a read when the handle isatty, and on changing it (with the file's
- * info) when the handle !isatty.  We can preserve that and still
- * return EIHNDL with the handle refers to a tty.
+ * Megamax C relies on this function leaving the input buffer alone on a
+ * read when the handle isatty, and on changing it (with the file's info)
+ * when the handle !isatty.  We can preserve that and still return EIHNDL
+ * with the handle refers to a tty.
  *
- * We change the DFD for the open file, not what's on disk.
- * Fsfirst/next has to look for a DFD or it will be out of date.
+ * We change the DFD for the open file, not what's on disk. Fsfirst/next
+ * has to look for a DFD or it will be out of date.
  *
  * NO DISK ACTIVITY, NO ERROR CONSIDERATIONS.
  */
@@ -326,8 +327,8 @@ int wrt;			/* 0:get, 1:set */
 }
 
 /*
- *  Delete a file.  This is the external version: calls ixdel to
- *  do the dirty deed.  Simple returns from errors suffice.
+ * Delete a file.  This is the external version: calls ixdel to do the
+ * dirty deed.  Simple returns from errors suffice.
  */
 long
 xdelete(name)
@@ -352,10 +353,10 @@ char *name;
 	return(EACCDN);
 
     /*
-     * Refuse if the file is open by anybody else.  This involves
-     * looking first for a matching DFD, then exhaustively scanning
-     * p_uft for EACH PROCESS looking for entries which refer to OFD's
-     * which refer to this DFD.
+     * Refuse if the file is open by anybody else.  This involves looking
+     * first for a matching DFD, then exhaustively scanning p_uft for EACH
+     * PROCESS looking for entries which refer to OFD's which refer to this
+     * DFD.
      */
 
     if (dfd = getdfd(&dir)) {
@@ -380,11 +381,11 @@ char *name;
     }
 
     /*
-       OK, nobody else has it open.  If you do, youflag is 1, in which
-       case we have to call xclose for each time you have it open.  If
-       any of these fails, we return the error code.  Hopefully, either
-       the first one will fail or none of them will; otherwise, some of
-       your handles to the file are closed and some are not.
+     * OK, nobody else has it open.  If you do, youflag is 1, in which case
+     * we have to call xclose for each time you have it open.  If any of
+     * these fails, we return the error code.  Hopefully, either the first
+     * one will fail or none of them will; otherwise, some of your handles
+     * to the file are closed and some are not.
      */
 	    
 
@@ -407,15 +408,14 @@ char *name;
 
 
 /*
- *  Internal version of delete-file.  Takes a dir structure with fresh
- *  bcb and fcb fields.  Assumes the file is not open by anyone:
- *  caller must check this.  All this function does is e5 out the
- *  dir entry and zap the FAT.
- *  (called by ixcreat(), xdelete() and xrmdir()).
+ * Internal version of delete-file.  Takes a dir structure with fresh bcb
+ * and fcb fields.  Assumes the file is not open by anyone: caller must
+ * check this.  All this function does is e5 out the dir entry and zap the
+ * FAT. (called by ixcreat(), xdelete() and xrmdir()).
  *
- *  ERROR CONSIDERATIONS: e5 out the directory slot first, so if
- *  dirwrite() fails you could at worst end up with lost clusters,
- *  not an entry that points to zeros.
+ * ERROR CONSIDERATIONS: e5 out the directory slot first, so if dirwrite()
+ * fails you could at worst end up with lost clusters, not an entry that
+ * points to zeros.
  */
 long
 ixdel(dir)
@@ -435,8 +435,9 @@ DIR *dir;
 
     /*
      * Traverse this file's chain of allocated clusters, freeing them.
-     * Note: stop at (and don't touch) entries in the range [0xfff0..0xfffe],
-     * and also stop if the entry is 0 (possible for inconsistent filesystems).
+     * Note: stop at (and don't touch) entries in the range
+     * [0xfff0..0xfffe], and also stop if the entry is 0 (possible for
+     * inconsistent filesystems).
      */
 
     dm = &drvtbl[dir->dir_dev];
@@ -464,13 +465,14 @@ DIR *dir;
  *  Rename a file.
  *
  * ERROR CONSIDERATIONS:
- * First we create the new file, then remove the old.  Creating the new file
- * includes calling dirslot, which might fail; this is harmless.  It also
- * involves writing the new slot.  If this fails, then the buffer we wrote 
- * into will be invalidated, so that's OK. If the write to dir2 succeeds but
- * the write to dir1 fails, you end up with the same file in two places;
- * tough.  This is worse for Freanme of a directory through the structure.
- * Still tough.
+ * 
+ * First we create the new file, then remove the old.  Creating the new
+ * file includes calling dirslot, which might fail; this is harmless.  It
+ * also involves writing the new slot.  If this fails, then the buffer we
+ * wrote  into will be invalidated, so that's OK. If the write to dir2
+ * succeeds but the write to dir1 fails, you end up with the same file in
+ * two places; tough.  This is worse for Freanme of a directory through the
+ * structure. Still tough.
  */
 long
 xrename(n, p1, p2)
@@ -542,8 +544,8 @@ char *p2;			/* new name */
 }
 
 /*
- * xlseek: update the read-write pointer of a file.
- * Calls ixlseek on the OFD and new pointer location.
+ * xlseek: update the read-write pointer of a file. Calls ixlseek on the
+ * OFD and new pointer location.
  *
  * For tty's, returns zero.  Some programs use this to determine isatty.
  */

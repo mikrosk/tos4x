@@ -3,18 +3,16 @@ set eightbit 0
 bind "echo \e8s\r" 1d ; # ^] bury window, Mint/MGR style
 load c:\apratt\db.rc
 
-# b_link ........ b_bufdrv . b_buftyp . b_bufrec .... b_dirty . 
-# b_dmd ........ b_bufr ........
+# link ........ bufdrv . buftyp . bufrec .... dirty . dmd ........ bufr ........
 
 procedure bcb a
-  print -n b_link (lpeek `a);xa (+ `a 4)
-  print -n b_bufdrv (wpeek `a);xa (+ `a 2)
-  print -n b_buftyp (wpeek `a);xa (+ `a 2)
-  print -n b_bufrec (wpeek `a);xa (+ `a 2)
-  print b_dirty (wpeek `a);xa (+ `a 2)
-
-  print -n b_dmd (lpeek `a);xa (+ `a 4)
-  print b_bufr (lpeek `a);xa (+ `a 4)
+  print -n link (lpeek `a);xa (+ `a 4)
+  print -n bufdrv (wpeek `a);xa (+ `a 2)
+  print -n buftyp (wpeek `a);xa (+ `a 2)
+  print -n bufrec (wpeek `a);xa (+ `a 2)
+  print -n dirty (wpeek `a);xa (+ `a 2)
+  print -n dmd (lpeek `a);xa (+ `a 4)
+  print bufr (lpeek `a);xa (+ `a 4)
 .
 
 alias allbcbs "echo LIST 0:;xt0 (lpeek .bufl);_allbcbs;echo LIST 1:;xt0 (lpeek (+ .bufl 4));_allbcbs"
@@ -36,64 +34,58 @@ procedure bpb a
   print b_flags (wpeek `a);xa (+ `a 2)
 .
 
-# dfd_next xxxxxxxx dfd_use xxxx dfd_time xxxx dfd_date xxxx dfd_strtcl xxxx
-# dfd_fileln xxxxxxxx dfd_attrib xx dfd_dirty xx dfd_dev xxxx 
-# dfd_dircl xxxx dfd_dirrec xxxx dfd_diroffs xxxx
+# next xxxxxxxx use x time xxxx date xxxx strtcl xxxx fileln xxxxxx 
+# attrib xx dirty x dev x dircl xxxx dirrec xxxx diroffs xxxx
 
 procedure dfd a
-  print -n dfd_next (lpeek `a);xa (+ `a 4)
-  print -n dfd_use (wpeek `a);xa (+ `a 2)
-  print -n dfd_time (wpeek `a);xa (+ `a 2)
-  print -n dfd_date (wpeek `a);xa (+ `a 2)
-  print dfd_strtcl (wpeek `a);xa (+ `a 2)
+  print -n next (lpeek `a);xa (+ `a 4)
+  print -n use (wpeek `a);xa (+ `a 2)
+  print -n time (wpeek `a);xa (+ `a 2)
+  print -n date (wpeek `a);xa (+ `a 2)
+  print -n strtcl (wpeek `a);xa (+ `a 2)
+  print fileln (lpeek `a);xa (+ `a 4)
 
-  print -n dfd_fileln (lpeek `a);xa (+ `a 4)
-  print -n dfd_attrib (peek `a);xa (+ `a 1)
-  print -n dfd_dirty (peek `a);xa (+ `a 1)
-  print dfd_dev (wpeek `a);xa (+ `a 2)
-
-  print -n dfd_dircl (wpeek `a);xa (+ `a 2)
-  print -n dfd_dirrec (wpeek `a);xa (+ `a 2)
-  print dfd_diroffs (wpeek `a);xa (+ `a 2)
+  print -n attrib (peek `a);xa (+ `a 1)
+  print -n dirty (peek `a);xa (+ `a 1)
+  print -n dev (wpeek `a);xa (+ `a 2)
+  print -n dircl (wpeek `a);xa (+ `a 2)
+  print -n dirrec (wpeek `a);xa (+ `a 2)
+  print diroffs (wpeek `a);xa (+ `a 2)
 .
 
-# dir_dev xx dir_clust xxxx dir_curcl xxxx dir_recno xxxx dir_recoffs xxxx
-# dir_bcb xxxxxxxx dir_fcb xxxxxxxx
+# dev x clust xxxx curcl xxxx recno xxxx recoffs xxxx bcb xxxxxxxx fcb xxxxxxxx
 
 procedure dirx a
-  print -n dir_dev (wpeek `a);xa (+ `a 2)
-  print -n dir_clust (wpeek `a);xa (+ `a 2)
-  print -n dir_curcl (wpeek `a);xa (+ `a 2)
-  print -n dir_recno (wpeek `a);xa (+ `a 2)
-  print dir_recoffs (wpeek `a);xa (+ `a 2)
-
-  print -n dir_bcb (lpeek `a);xa (+ `a 4)
-  print dir_fcb (lpeek `a);xa (+ `a 4)
+  print -n dev (wpeek `a);xa (+ `a 2)
+  print -n clust (wpeek `a);xa (+ `a 2)
+  print -n curcl (wpeek `a);xa (+ `a 2)
+  print -n recno (wpeek `a);xa (+ `a 2)
+  print -n recoffs (wpeek `a);xa (+ `a 2)
+  print -n bcb (lpeek `a);xa (+ `a 4)
+  print fcb (lpeek `a);xa (+ `a 4)
 .
 
 
-# m_recfat xxxx  m_recrd xxxx m_recdata xxxx m_drvnum xxxx m_fsiz xxxx 
-# m_clsiz xxxx m_clsizb xxxx m_recsiz xxxx m_numcl xxxx m_clrlog xxxx  
-# m_clrm xxxx m_rblog xxxx m_rbm xxxx m_clblog xxxx m_16 xxxx
+# recfat xx  recrd xx recdata xx drvnum x fsiz xx clsiz x clsizb xxxx 
+# recsiz xxxx numcl xxxx clrlog x clrm xxxx rblog x rbm xxxx clblog x 16 x
 
 procedure dmd a
-  print -n m_recfat (wpeek `a);xa (+ `a 2)
-  print -n m_recrd (wpeek `a);xa (+ `a 2)
-  print -n m_recdata (wpeek `a);xa (+ `a 2)
-  print -n m_drvnum (wpeek `a);xa (+ `a 2)
-  print m_fsiz (wpeek `a);xa (+ `a 2)
+  print -n recfat (wpeek `a);xa (+ `a 2)
+  print -n recrd (wpeek `a);xa (+ `a 2)
+  print -n recdata (wpeek `a);xa (+ `a 2)
+  print -n drvnum (wpeek `a);xa (+ `a 2)
+  print -n fsiz (wpeek `a);xa (+ `a 2)
+  print -n clsiz (wpeek `a);xa (+ `a 2)
+  print clsizb (wpeek `a);xa (+ `a 2)
 
-  print -n m_clsiz (wpeek `a);xa (+ `a 2)
-  print -n m_clsizb (wpeek `a);xa (+ `a 2)
-  print -n m_recsiz (wpeek `a);xa (+ `a 2)
-  print -n m_numcl (wpeek `a);xa (+ `a 2)
-  print m_clrlog (wpeek `a);xa (+ `a 2)
-
-  print -n m_clrm (wpeek `a);xa (+ `a 2)
-  print -n m_rblog (wpeek `a);xa (+ `a 2)
-  print -n m_rbm (wpeek `a);xa (+ `a 2)
-  print -n m_clblog (wpeek `a);xa (+ `a 2)
-  print m_16 (wpeek `a);xa (+ `a 2)
+  print -n recsiz (wpeek `a);xa (+ `a 2)
+  print -n numcl (wpeek `a);xa (+ `a 2)
+  print -n clrlog (wpeek `a);xa (+ `a 2)
+  print -n clrm (wpeek `a);xa (+ `a 2)
+  print -n rblog (wpeek `a);xa (+ `a 2)
+  print -n rbm (wpeek `a);xa (+ `a 2)
+  print -n clblog (wpeek `a);xa (+ `a 2)
+  print 16 (wpeek `a);xa (+ `a 2)
 .
 
 # dta_sname xxxxxxxxxxx dta_attr xx dta_clust xxxx dta_curcl xxxx 
@@ -116,23 +108,23 @@ procedure dta a
 .
 
 
-procedure fcb a
-  print -n f_name -s11 `a;xa (+ `a b)
-  print -n f_attrib (peek `a);xa (+ `a 1)
-  print f_fill {a};xa (+ `a a)
+# name xxxxxxxxxxx attrib xx time xxxx date xxxx clust xxxx filelen xxxxxxxx
 
-  print -n f_time (wpeek `a);xa (+ `a 2)
-  print -n f_date (wpeek `a);xa (+ `a 2)
-  print -n f_clust (wpeek `a);xa (+ `a 2)
-  print f_fileln (lpeek `a);xa (+ `a 4)
+procedure fcb a
+  print -n name -s11 `a;xa (+ `a b)
+  print -n attrib (peek `a);xa (+ `a 1)
+  print -n time (wpeek `a);xa (+ `a 2)
+  print -n date (wpeek `a);xa (+ `a 2)
+  print -n clust (wpeek `a);xa (+ `a 2)
+  print fileln (lpeek `a);xa (+ `a 4)
 .
 
 
 procedure md a
-  print -n m_link (lpeek `a);xa (+ `a 4)
-  print -n m_start (lpeek `a);xa (+ `a 4)
-  print -n m_length (lpeek `a);xa (+ `a 4)
-  print m_own (lpeek `a);xa (+ `a 4)
+  print -n link (lpeek `a);xa (+ `a 4)
+  print -n start (lpeek `a);xa (+ `a 4)
+  print -n length (lpeek `a);xa (+ `a 4)
+  print own (lpeek `a);xa (+ `a 4)
 .
 
 procedure mpb a
@@ -141,18 +133,16 @@ procedure mpb a
   print mp_rover (lpeek `a);xa (+ `a 4)
 .
 
-# o_next xxxxxxxx o_use xxxx o_mode xxxx o_dfd xxxxxxxx
-# o_bytnum xxxxxxxx o_curcl xxxx o_currec xxxx
+# next xxxxxxxx use x mode x o_dfd xxxxxxxx bytnum xxxxxx curcl xxxx currec xxxx
 
 procedure ofd a
-  print -n o_next (lpeek `a);xa (+ `a 4)
-  print -n o_use (wpeek `a);xa (+ `a 2)
-  print -n o_mode (wpeek `a);xa (+ `a 2)
-  print o_dfd (lpeek `a);xa (+ `a 4)
-
-  print -n o_bytnum (lpeek `a);xa (+ `a 4)
-  print -n o_curcl (wpeek `a);xa (+ `a 2)
-  print o_currec (wpeek `a);xa (+ `a 2)
+  print -n next (lpeek `a);xa (+ `a 4)
+  print -n use (wpeek `a);xa (+ `a 2)
+  print -n mode (wpeek `a);xa (+ `a 2)
+  print -n dfd (lpeek `a);xa (+ `a 4)
+  print -n bytnum (lpeek `a);xa (+ `a 4)
+  print -n curcl (wpeek `a);xa (+ `a 2)
+  print currec (wpeek `a);xa (+ `a 2)
 .
 
 # p_lowtpa xxxxxxxx p_hitpa xxxxxxxx p_tbase xxxxxxxx p_tlen xxxxxxxx
@@ -266,14 +256,10 @@ procedure allofds
 .
 
 procedure do_ofd ofd
-	local dfd
-
 	print > OFD `ofd
 	ofd `ofd
-	echo >> DFD `dfd
+	print >> DFD (lpeek (+ `ofd 8))
 	dfd (lpeek (+ `ofd 8))
-	echo <<
-	echo <
 .
 
 procedure block a
@@ -292,3 +278,11 @@ alias allblocks "xt0 (lpeek .blockhead);_blocks"
 alias _blocks "if `t0 'block `t0;xt0 (lpeek `t0);_blocks'"
 
 alias a "dw`sp[f]"
+
+load bios.db
+b#8 .trap13 ; alias br8 "_db13 (+ `sp 4);_13enter"
+b#9 (- .trap14 2); alias br9 "if `bios_ret print BIOS returns `d0;_13leave"
+
+# this alias is used in DBCMDs in the source
+
+alias _c defer g

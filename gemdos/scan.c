@@ -1,12 +1,15 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.3 $	$Source: e:/tos/gd2\rcs\scan.c,v $
+* $Revision: 1.4 $	$Source: e:/tos/gd2\rcs\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/02/15 18:45:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/21 03:07:32 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.4  1991/02/21  03:07:32  apratt
+* This version performs this testbed perfectly.
+*
 * Revision 1.3  1991/02/15  18:45:40  apratt
 * CI at the end of the week...
 *
@@ -155,10 +158,10 @@ int flags;
     DMD *dmd;
     uint dev;
     uint cl;
+    char c;
 
     int dotflag = (flags == FN_DOTSOK);
     int earlyflag = (flags == FN_EARLY);
-    int m = 0;			/* this shuts up GCC, not really necessary */
     long err;
     FCB fcb, *pfcb;
 
@@ -182,25 +185,28 @@ int flags;
     }
     else cl = run->p_curdir[dev];
 
-    dir->dir_dev = dev;
-    dir->dir_clust = cl;
-
     do {
-	/* Find the end of name (SLASH or null byte) and */
-	/* scan the directory dev/cl for that name. */
-	/* While you're at it, reject wildcards. */
+    	dir->dir_dev = dev;
+    	dir->dir_clust = cl;
+
+	/*
+	 * Find the end of name (SLASH or null byte) and scan the directory
+	 * dev/cl for that name. While you're at it, reject wildcards.
+	 */
 	for (end = name; *end && *end != SLASH; ++end) {
-		if (*end == '?' || *end == '*') return EBADRQ;
+	    if (*end == '?' || *end == '*')
+		return EBADRQ;
 	}
 
 	/* empty component? */
 	if (end == name) return EBADRQ;
 
-	/* if name is last component, bail out here if earlyflag is set */
-	/* or if name is "." or ".." and they are not allowed. */
+	/*
+	 * if name is last component, bail out here if earlyflag is set or
+	 * if name is "." or ".." and they are not allowed.
+	 */
 
 	if (!*end) {
-	    /* this is last component: check for earlyflag and dots */
 	    if (earlyflag) {
 		*pname = name;
 		return E_OK;
@@ -213,8 +219,7 @@ int flags;
 	if (err = name2fcb(name,end,&fcb)) return err;
 	fcb.f_attrib = FA_ALL;
 
-	/* do the scan */
-	/* (believe me, this loop is better than the first one!) */
+	/* do the scan (believe me, this loop is better than the old one!) */
 
 	if (err = dirfirst(dir,dmd)) return err;
 	while (1) {
@@ -244,6 +249,10 @@ didmatch:
 	    if (!(pfcb->f_attrib & FA_SUBDIR)) return EPTHNF;
 	    name++;
         }
+
+	/* set up cl of start of next search, down one level */
+        cl = pfcb->f_clust;
+        swp68(cl);
     } while (*name);
 
     /* end still points to end of last component; check for trailing SLASH */
@@ -266,8 +275,8 @@ DIR *dir;
 }
 
 /*
- * dirfirst: given just dev and cl, initialize the rest of the dir structure
- * and freshen it so it refers to the first slot of the dir.
+ * dirfirst: given just dev and cl, initialize the rest of the dir
+ * structure and freshen it so it refers to the first slot of the dir.
  *
  * This is a macro, as follows:
  * #define dirfirst(dir,dmd) \
@@ -278,15 +287,15 @@ DIR *dir;
  */
 
 /*
- * dirnext: advance dir to point to the next slot.  This will advance to the
- * end of the last record of the last cluster in the dir, and won't stop at
- * null-byte entries.  Returns E_OK and fresh dir on success, ENMFIL on
- * failure (in which case dir_curcl is the last cluster), and other errors.
- * In any error case, dir isn't fresh any more.
+ * dirnext: advance dir to point to the next slot.  This will advance to
+ * the end of the last record of the last cluster in the dir, and won't
+ * stop at null-byte entries.  Returns E_OK and fresh dir on success,
+ * ENMFIL on failure (in which case dir_curcl is the last cluster), and
+ * other errors. In any error case, dir isn't fresh any more.
  *
- * This is partly a macro: the fcb and recoffs fields are bumped to the next
- * FCB in the record, and if that's still in the current record then that's
- * it.  Otherwise a procedure call is made to _dirnext.
+ * This is partly a macro: the fcb and recoffs fields are bumped to the
+ * next FCB in the record, and if that's still in the current record then
+ * that's it.  Otherwise a procedure call is made to _dirnext.
  *
  * The macro part looks like this:
  * 
@@ -400,12 +409,12 @@ DIR *dir;
     dir->dir_bcb = bcb;
     return 0;
 }
- * Attribute matching: since this is only called for non-wildcard
- * matches, the pattern attribute doesn't matter.  fcb's
- * attribute is used only to inhibit matching of FA_LABEL.
+
+/*
+ * match: given two FCB's, see if their names & attrs match.
  *
- * There's a trick here: we assume the names are on word boundaries
- * and compare 5 int's and a byte.  (GCC actually uses "cmpm.l (a2)+,(a3)+"!)
+ * FCB *pat is the pattern, FCB *fcb is the potential match.
+ *
  * Attribute matching: since this is only called for non-wildcard matches,
  * the pattern attribute doesn't matter.  fcb's attribute is used only to
  * inhibit matching of FA_LABEL.
@@ -443,15 +452,15 @@ FCB *fcb;
 {
     char *p = pat->f_name;
     char *f = fcb->f_name;
-     * Old attr matching logic: "match if file att is 0 and input not 8,
-     * or there is at least a one-bit match."
+    int i;
+
     /* no match on erased files */
-     * The caller is assumed to have ORed in FA_ARCHIVE and FA_RO.
-     * This results in archive and r/o files being unhideable.
+    if (*f == ERASED) return 0;
+
     /*
-     * A saner approach is to use the SUBDIR, HIDDEN, and SYSTEM
-     * bits only in the zero-or-any-bit-match test, but this might
-     * just be too much incompatibility.
+     * Old attr matching logic: "match if file att is 0 and input not 8, or
+     * there is at least a one-bit match."
+     *
      * The caller is assumed to have ORed in FA_ARCHIVE and FA_RO. This
      * results in archive and r/o files being unhideable.
      *
@@ -467,12 +476,11 @@ FCB *fcb;
 	if (!(*p == '?' || *p == *f)) return 0;
     }
 
- * This returns EBADRQ on some illegal file names, not all.
- * The only kind it catches now is "..abc" but it would be
- * nice to catch names with spaces, too.  But it is imperative
- * that the FCB not be changed if the file name is illegal:
- * that way there is less to undo.  (Sometimes this is called
- * to stuff a name directly in a disk buffer.  To lift the
+    return 1;
+}
+
+/*
+ * name2fcb: see above.
  *
  * This returns EBADRQ on some illegal file names, not all. The only kind
  * it catches now is "..abc" but it would be nice to catch names with

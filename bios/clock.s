@@ -1,22 +1,26 @@
 ******************* Revision Control System *****************************
 *
-* $Author: lozben $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 87/11/20 14:23:42 $
+* $Date: 89/02/06 13:45:40 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 1.2  89/02/06  13:45:40  apratt
+* Added handling for bus error when accessing RTC (because TT has none).
+* The handling is harmless for non-TT, so it's not conditional.
+*
 * Revision 1.1  87/11/20  14:23:42  lozben
 * Initial revision
-*
+* 
 *
 * =======================================================================
 *
-* $Revision: 1.1 $
+* $Revision: 1.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -136,9 +140,17 @@ iclfai:	moveq	#-1,d0			; return -1L (error)
 *
 *    Uses:	d0-d2/a0-a2
 *
+* Originally, this code didn't have the bus error handling; that
+* was added 2/6/89 by AKP.  Don't know why the above comment
+* refers to bus errors but doesn't implement them.
+*
 clktest:
 	move.w	#RTCBASE,a0		; a0 -> base of clock chip
+	move.l	8,a1			; save bus error vector
+	move.l	sp,a2			; save stack pointer for cleaning up
+	move.l	clkerr,8		; write bus error vector
 	move.b	#%1001,RTMODE(a0)	; set "alarm" bank
+	move.l	a1,8			; no bus error - restore vector
 	move.w	#$0a05,d0		; d0 = test pattern
 	movep.w	d0,RT01MIN(a0)		; write two registers
 	movep.w	RT01MIN(a0),d1		;   and read them back
@@ -150,8 +162,11 @@ clktest:
 	move.b	#0,RTTEST(a0)		; clobber test register
 	rts				; return OK
 
+clkerr:	move.l	a2,sp			; clean off the stack
+	move.l	a1,8			; restore the bus error vector
 clkfai:	or	#1,ccr			; set carry
 	rts				; return "failure"
+
 
 
 

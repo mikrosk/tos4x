@@ -4,13 +4,18 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/03 17:53:24 $
+* $Date: 1991/10/15 14:12:08 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.34  1991/10/15  14:12:08  apratt
+* Changed to probe for FDC every time you call, not just at boot time.
+* This is STPAD only, of course.  This way you can boot without a
+* floppy attached and still attach one later.
+*
 * Revision 2.33  1991/10/03  17:53:24  apratt
 * Added code for high-density selection on STPAD, which is different from
 * other high-density select code.
@@ -106,7 +111,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.33 $
+* $Revision: 2.34 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $

@@ -3,22 +3,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/05 17:47:50 $
+* $Date: 88/04/08 17:45:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.7  88/04/08  17:45:24  apratt
+* Backed out reset bail-out vector fix -- leave it broken.  The workaround
+* is to return to the reset code via "jmp $24(a6)" rather than
+* with "jmp (a6)" as advertised.  THE RESET CODE CAN'T CHANGE thanks to this.
+*
 * Revision 1.6  88/04/05  17:47:50  apratt
 * Changed Flopwp call to Xbios $29 because of internal versions of AKP's
 * debugger, which uses $28.  Must keep Xbios $11 unused.
 * (Newer versions of the debugger use Xbios calls $11 and $F000)
-*
+* 
 * Revision 1.5  88/03/31  15:58:23  apratt
-* Fixed reset bailout vector so it leaves the right number in a6.
-* If (a6) == $9bcd you have buggy ROMs -- return via jmp'ing to $24(a6).
-* Else you have new ROMs -- return via jmp'ing to (a6)
+* <BACKED OUT -- SEE VERSION 1.7 NOTES>
 * 
 * Also fixed some bsr's to jsr's so gemdos can be far away from here.
 * 
@@ -39,7 +42,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.6 $
+* $Revision: 1.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -848,6 +851,9 @@ ret_1:	bne	reset2			; (invalid -- don't set anything up)
 *  bailout vector.  The high byte must be zero,
 *  Mega STe.
 *-
+*  NOTE THAT THE "RETURN ADDRESS" IN A6 IS WRONG.  It points to reset2,
+
+*  sake.  The workaround is to return via "jmp $24(a6)"
 *+
 reset2:	clr.l	a5			; quick zeropage
 	cmp.l	#resmagic,resvalid(a5)	; is resvalid the magic	number?
@@ -858,7 +864,7 @@ reset2:	clr.l	a5			; quick zeropage
 *
 * Also read the STylus button register & don't jump through resvector
 * if both buttons are down.  Well, there's no STylus so this is moot.
-	lea	reset3(pc),a6		; a6 ->	return address FIXED by AKP
+	lea	reset2(pc),a6		; a6 -> WRONG RETURN ADDRESS! See note
 * There is new code elsewhere that makes this less important: bus error etc.
  endc
 
@@ -869,9 +875,6 @@ reset2:	clr.l	a5			; quick zeropage
 	move.w	$d00004,d0
 	and.b	#%00000110,d0		; test for both STylus buttons
 	bne	resv1			; if either is up, don't clobber
-* The first instruction here MUST NOT BE CLR.L A5.  Use NOP if you have to.
-* This is because of the old bug in the reset vector code above.
-*
 	cmp.l	#resmagic,resvalid.w	; is resvalid the magic	number?
 reset3:	lea	giselect,a0		; a0 -> giselect, giwrite-2
 	move.l	resvector.w,d0		; d0 = reset bailout vector
@@ -2121,6 +2124,8 @@ supexec:
 bconstat:
 	lea	xconstat.w,a0		; a0 -> stat table
 	moveq.l	#0,d1			; d0 = offset in device map 
+	bra	chsw
+
 bcostat:
 	lea	xcostat.w,a0		; a0 -> ostat table
 	moveq.l	#8,d1

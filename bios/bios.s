@@ -4,18 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/26 17:31:51 $
+* $Date: 90/03/01 15:33:46 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
-* Revision 2.12  90/02/26  17:31:51  apratt
-* Changed instruction-loop delays to use dowait (see startup) during boot
-* and another trick in the other place which needs it: ikbdwc. The trick
-* expects that Timer C is running as we programmed it, but does not rely
-* on the interrupt being enabled or our handler still handling it.
+* Revision 2.13  90/03/01  15:33:46  apratt
+* Made dowait global; changed delay in ikput to use STMFP Timer C rather
+* than instructions.  Made bus error during SCC init just return.
+* Changed some ttwait calls to dowait.
 *
 * Revision 2.11  90/02/16  16:43:07  apratt
 * Added SCC serial-port code to the bconmap section.  All works.
@@ -170,7 +169,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.12 $
+* $Revision: 2.13 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -250,7 +249,7 @@ osconf		equ	%11001
 .ifne TT
 	.globl	_dumpflg		;flag to signal a screen dump(alt-HELP)
 .endc
-	.globl	dowait			;wait you can use in booting only
+	.globl	kcl_hook		;hook for keyclick handling
 .ifne TT
 	.globl	ttmfpvectr		;interrupt handlers (from ttmfp.s)
 .endc
@@ -1429,31 +1428,27 @@ ikbdox:
 ikbdwc:
 	move.w	6(sp),d1
 ikbdput:
-*
-* delay 5ms: on TT, use ttwait; on not TT, use a trick:
-* assume that Timer C is still counting 5ms in 192 ticks.
-* I don't want to assume that 200hz interrupts are happening,
-* but I do want to be sure this doesn't use instruction loops.
-* The trick is to read the timer, then wait for a new reading
-* which is HIGHER than the first; then you know (at least)
-* 5ms have gone by.  If you read anything >190 initially, wait for
-* something less than that, so we don't (a) wait forever for
-* something >192 or (b) wait a long time to catch 192 or 191.
-*
 	lea	keyboard,a1	;point to ikbd register base
-.ifne TT
+.ifeq TT
+* wait 5ms using a trick: assume that Timer C is still programmed as
+* we set it up.  Read the Timer C countdown register, then wait for
+* a new read which is GREATER than that one.  That means (at least)
+* 5ms have gone by.  (If we initially get >190, keep trying, to avoid
+* fringe cases.)
+
+	lea	mfp,a0
+ikput2:	cmp.b	#190,tcdr(a0)	; while (tcdr >= 190)
+	bhs	ikput2		; ...loop
+	move.b	tcdr(a0),d0	; get that value
+ikput3:	cmp.b	tcdr(a0),d0	; while (tcdr <= d0)
+	bhs	ikput3		; ...loop
+	move.w	#191,d0		; do this loop 192 times
 ikput2:	move.b	(a0),d2		; get a value
 ikput3:	cmp.b	(a0),d2		; changed?
-.else
-ikwait:	move.b	mfp+tadr,d0	; get current timer value
-	cmp.b	#190,d0
-	bhs	ikwait		; be sure it's not too high
-
-ikloop:	cmp.b	mfp+tadr,d0	; do { (nothing) 
-	bhs	ikloop		; } while (tadr <= d0)
 .endc
 	dbra	d0,ikput2	; yes - load a new value and loop
-	rts
+ikbdret:
+.else
 	move.w	#$0400,d0	; 256 * 20us = 5ms
 	bsr	ttwait
 .endif
@@ -3359,12 +3354,22 @@ nolan:
 	move.b	d0,giselect+2
 	move.w	d1,sr
 	rts
+
+**********************************************************************
+*
+*
 * On TT's with no SCC DMA chip, even talking to the SCC chip will
 * cause a bus error.  This code catches that error and returns,
 * but you'd better not try to use the SCC ports for anything!
 * This also short-circuits if you're on an STPLUS, not Mega STe.
+*
+
+	move.l	sccberr,$8
+
 	clr.w	sccctl		; disable DMA
 	move.l	#sccberr,$8
+* capability (e.g. no SCC DMA chip), and on STe's, but works fine
+
 * on real TT's and Mega STe's.
 
 	tst.b	sccad		; read from data byte
@@ -3392,7 +3397,7 @@ nolan:
 	move.l	#chbibuffer,chbibufptr.w	; fix up the differences
 	move.l	#chbobuffer,chbobufptr.w
 
-	bsr	dowait
+	lea.l	sccac,a2
 	SCCw	#9,#%11000000	; software reset both channels
 
 * wait four PCLK's after resetting SCC - something over 4us should do.
@@ -3405,6 +3410,16 @@ nolan:
 
 	lea.l	sccbc,a0
 	lea.l	inittab(PC),a1
+	bsr	sccinit		; initialize channel B
+
+	bset.b	#5,ttvmeintmsk	; enable level 5 interrupts (SCC)
+	rts
+
+*
+* Talking to SCC caused a bus error; catch it here, restore bus error
+* vector, restore ssp, and return.
+*
+
 sccberr:
 	move.l	a0,$8
 	move.l	a1,sp
@@ -6346,7 +6361,7 @@ bellsnd:
 	.dc.b	6,0
 	.dc.b	7,$FE
 *
-.end
+	.end
 	.dc.b	9,0
 	.dc.b	10,0
 	.dc.b	11,0

@@ -587,6 +587,44 @@ REG	WORD	*pwork_out;
 	i_ptsout( ( LONG )&ptsout );
 }
 
+	VOID
+v_opnvwk( pwork_in, phandle, pwork_out, ppt_out )
+	WORD	*pwork_in;
+	WORD	*phandle;
+REG	WORD	*pwork_out;
+	WORD	*ppt_out;
+{
+	i_ptsout( ( LONG )ppt_out );	/* set ptsout to work_out array */
+	i_intin( ( LONG )pwork_in );	/* set intin to point to callers data  */
+	i_intout( ( LONG )pwork_out );	/* set intout to point to callers data */
+	
+	contrl[0] = 100;
+	contrl[1] = 0;
+	contrl[3] = 11;
+	gsx2();
+
+
+	*phandle = contrl[6];		
+	i_intin( ( LONG )&intin );	/* reset all the arrays	*/
+	i_intout( ( LONG )&intout );
+ 	i_ptsin( ( LONG )&ptsin );
+	i_ptsout( ( LONG )&ptsout );
+}
+
+	VOID
+v_clsvwk(handle)
+WORD	handle;
+{
+	contrl[0] = 101;
+	contrl[1] = 0;
+	contrl[3] = 0;
+
+	contrl[6] = handle;
+
+	gsx2();
+
+}
+
 
 	VOID
 v_pline( count, pxyarray )
@@ -612,6 +650,14 @@ vst_clip( clip_flag, pxyarray )
 	intin[0] = clip_flag;
 	gsx_ncode(TEXT_CLIP, value, 1);
 	i_ptsin( ( LONG )&ptsin);
+}
+
+	VOID
+vst_charmap(mode)
+WORD	mode;
+{
+	intin[0] = mode;
+	gsx_ncode(236, 0, 1);
 }
 
 
@@ -750,7 +796,7 @@ v_set_alignment( hor_in, ver_in )
 }
 
 
-	VOID
+	WORD
 v_setpoint( point, wchar, hchar, wbox, hbox )
 	WORD	point;
 	WORD	*wchar,*hchar,*wbox,*hbox;
@@ -761,6 +807,7 @@ v_setpoint( point, wchar, hchar, wbox, hbox )
 	*hchar = ptsout[1];
 	*wbox = ptsout[2];
 	*hbox = ptsout[3];
+	return intout[0];
 }	
 
 
@@ -810,4 +857,4 @@ vqt_width( inchar, space, dummx, dummy )
 	*dummx = ptsout[2];
 	*dummy = ptsout[4];
 }
-	
+

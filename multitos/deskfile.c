@@ -5,7 +5,7 @@
 /*	Fix at read_file to allow lower case 7/18/90	D.Mui		*/
 /*	Fix at read_file for calculating volume value	4/29/91	D.Mui	*/
 /*	Fix at read_file for calculating volume again	8/13/91	D.Mui	*/
-
+/*	read_file: current directory for iconify added	6/01/93 H.Krober*/
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
 /*	Atari Corp							*/
@@ -13,6 +13,7 @@
 /************************************************************************/
 
 #include "portab.h"
+#include "machine.h"
 #include "obdefs.h"
 #include "deskdefi.h"
 #include "osbind.h"
@@ -309,6 +310,11 @@ set_newview( index, win )
 		BYTE	*text;
 		WORD	temp;
 
+	if (win->w_iconified) {		/* get the right object 		*/
+		obj = win->w_icnobj;	/* simple for iconified windows, just	*/
+		obj[1].ob_state = win->w_icndir.d_state; /* one object		*/
+		return;
+	}
 	obj = win->w_obj;	/* get all the icons source	*/
 	obj->ob_next = 0xFFFF;
 				/* No objects			*/
@@ -326,8 +332,7 @@ set_newview( index, win )
 
 	obj++;		/* points to the rigth object	*/
 
-	dir = (DIR *)win->w_memory;
-
+	dir = (DIR *) win->w_memory;
 	vicons = win->w_vicons + 1;
 
 	obj1 = get_tree( TEXTLINE );
@@ -337,7 +342,7 @@ set_newview( index, win )
 	for( k = 1, i = index; ( ( i < items ) && ( k < vicons ) ); 
 	     i++, k++, obj++ )
 	{
-	  if ( s_view == S_ICON )
+	  if ( (s_view == S_ICON) )
 	  {
 	    app_icon( &dir[i].d_name[0], ( dir[i].d_att & 0x10 ) ? FOLDER : -1, &type );
 	    cp_iblk( type, (CICONBLK*)(obj->ob_spec) );
@@ -450,16 +455,25 @@ read_files( win, attr )
 
 	do
 	{				/* volume label		*/
-	  if ( dtabuf.dirfile.d_att & VOLUME )
+	  if ( dtabuf.dirfile.d_att & VOLUME ) {
 	    goto r_3;
+	  }
 					/* directory file	*/
 	  if ( dtabuf.dirfile.d_att & 0x10 )
 	  {
 	    if ( dtabuf.dirfile.d_name[0] == '.' )
 	    {
-	      if ( ( dtabuf.dirfile.d_name[1] == '.' ) || 
-		   ( !dtabuf.dirfile.d_name[1] ) ) 		
-	        goto r_3;
+	      if ( dtabuf.dirfile.d_name[1] == '.' )
+			goto r_3;
+	      else if ( !dtabuf.dirfile.d_name[1] ) {	/* current direcotry 		*/
+	      	dtabuf.dirfile.d_order = 1;		/* +++ HMK 2/6/93		*/
+	    	dtabuf.dirfile.d_state = NORMAL;	/* for iconified window stuff	*/
+ 		getlastpath(dtabuf.dirfile.d_name, win->w_path);
+		if (dtabuf.dirfile.d_name[0] == '\0')	/* root direcotry		*/
+			strcpy("\\", dtabuf.dirfile.d_name); 
+	       	win->w_icndir = dtabuf.dirfile;		/* store for iconifying purpose */
+		goto r_3; 
+	      }
 	    }
 	  }
 	  else
@@ -503,5 +517,11 @@ r_2:
 r_1:
 	win->w_items = (UWORD)items;	/* total number of files	*/
 	sort_file( win, s_sort );
+
+	if ((win->w_path[2] == '\\') && (win->w_path[3] == '*')) {	/* +++ HMK 6/2/93 */
+								/* for window iconifying  */
+		strcpy("\\", win->w_icndir.d_name); 			/* root directory */ 
+		win->w_icndir.d_att = 0x10;				/* directoty      */
+	}
 	return( TRUE );
 }

@@ -214,30 +214,54 @@ ldaccs( VOID )
 	BYTE		rspath[128];
 	BYTE		blank[2];
 
+	LSTCPY( rspath, STACCFULL );
 	blank[0] = ' ';
 	blank[1] = 0;
 
 	dos_dta( ( LONG )name );	/* set the DMA address		*/
 				/* get the boot device		*/
+	defdrv = *((WORD*)0x446L );
+#if 0	
+	defdrv = dos_gdrv();	/* save the default drive	*/
 
-/* First, try ACCPATH */
-	LSTCPY( rspath, STACC );
-	ret = sh_find( (LONG)rspath, (WORD (*)())NULLPTR, ACCPATH, TRUE );
+	if ( isdrive() )
+	{
+	  if ( isdrive() & 0x04 )
+	     dos_sdrv( 0x04 );	/* set the hard disk	*/
+				/* search the file	*/
+	  dos_chdir( "\\" );
 
-	if (!ret) {
-/* OK, let's try the root directory */
-		LSTCPY( rspath, STACCFULL );
-		defdrv = *((WORD*)0x446L );
-		rspath[0] = defdrv + 'A';
-		dos_setdir( rspath, 0 );
-		strcpy( rspath, ad_shcmd );  
-		ret = dos_sfirst( ( LONG )rspath, 0 );
+	  if ( !( ret = dos_sfirst( rspath, 0 ) ) )
+	  {
+	    dos_sdrv( defdrv );	/* restore default drive*/
+	    dos_chdir("\\");	/* always at root	*/
+	    ret = dos_sfirst( rspath, 0 );
+	  }
 	}
 	else
+	  ret = FALSE;
+#endif
+
+	rspath[0] = defdrv + 'A';
+	dos_setdir( rspath, 0 );
+	strcpy( rspath, ad_shcmd );  
+	ret = dos_sfirst( ( LONG )rspath, 0 );
+	Debug1( "ACC first try to load from " );
+	Debug1( rspath );
+	Debug1( "\r\n" );
+
+
+	if ( !ret )		/* try the ACCPATH	*/
 	{
+	  LSTCPY( rspath, STACC );
+
+	  if ( (ret = sh_find( ( LONG )rspath, ( WORD(*)())NULLPTR, ACCPATH, TRUE ) ) )
+	  {
+/*	    dos_setdir( rspath, 0 );	*/
 	    Debug1( "ACC is loading from -> " ); 
 	    Debug1( rspath );
 	    Debug1( "\r\n" );
+	  }
 	}
 
 	if ( ret )

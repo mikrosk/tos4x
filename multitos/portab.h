@@ -21,7 +21,7 @@
 #define	BYTE	char			/* Signed byte				*/
 #define BOOLEAN	int				/* 2 valued (true/false)	*/
 #define	WORD	int  			/* Signed word (16 bits)	*/
-#define	UWORD	unsigned int	/* unsigned word			*/
+#define	UWORD	unsigned int		/* unsigned word			*/
 
 #define	LONG	long			/* signed long (32 bits)	*/
 #define	ULONG	long			/* Unsigned long			*/
@@ -33,7 +33,7 @@
 #define	GLOBAL	/**/			/* Global variable			*/
 #define	VOID	void			/* Void function return		*/
 #define VOIDP	void *			/* void pointer return		*/
-#define UBYTE	char			/* Unsigned byte 			*/
+#define UBYTE	unsigned char		/* Unsigned byte 			*/
 
 
 /* Misc definitions */

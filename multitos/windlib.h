@@ -127,6 +127,10 @@
 #define WF_ICONIFY	26
 #define WF_UNICONIFY	27
 #define WF_UNICONIFYXYWH	28
+#define WF_TOOLBAR	30
+#define WF_FTOOLBAR	31
+#define	WF_NTOOLBAR	32
+
 
 #ifdef MNBAR
 #define	WF_MENUBAR	99

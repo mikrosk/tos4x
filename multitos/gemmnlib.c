@@ -44,6 +44,7 @@ EXTERN 	WORD	gl_hbox;
 EXTERN 	GRECT	gl_rzero;
 EXTERN 	GRECT	gl_rmenu;
 EXTERN 	WORD	gl_hchar;
+EXTERN 	WORD	gl_wchar;
 EXTERN 	PD	*scr_pd;
 EXTERN 	PD	*plr;
 EXTERN	PD	*shellpd;
@@ -77,6 +78,7 @@ mn_iadd( string, state )
 {
 	REG OBJECT	*obj;
 	REG WORD	item;
+	WORD		sw, sh;
 
 	obj = mn_addr;		/* get the menu address	*/
 	item = obj->ob_tail;
@@ -90,7 +92,13 @@ mn_iadd( string, state )
 	  return( -1 );
 
 	LBCOPY( ( BYTE *)&obj[item], ( BYTE *)w_b2, sizeof( OBJECT ) );
+	sw = gl_wchar;
+	sh = gl_hchar;
+	gl_wchar = gl_wchar;
+	gl_hchar = gl_hchar;
 	rs_obfix( ( LONG )obj, item );
+	gl_wchar = sw;
+	gl_hchar = sh;
 	ob_add( ( LONG )mn_addr, 0, item );		/* link the object	*/
 	obj[item].ob_y = gl_hchar * ( item - 1 );
 	obj[item].ob_width = obj[0].ob_width;	/* set the correct width*/
@@ -299,7 +307,9 @@ mn_bar( tree, showit )
 	 
 
 	  gsx_sclip( &gl_rmenu );
+	
 	  ob_draw( tree, THEBAR, MAX_DEPTH );
+
 	  gsx_attr( FALSE, MD_REPLACE, BLACK );	/* not xor mode!	*/
 	  gsx_cline( 0, gl_hbox - 1, gl_width - 1, gl_hbox - 1 );
 	  

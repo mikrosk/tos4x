@@ -139,7 +139,7 @@ nosync( VOID )
 	  if ( !currpd->p_wmtas ) {	/* count down		*/
 	    unsync();			/* wake someone up	*/
 	  } else {
-		Debug1("unsync not called, p_wmtas="); Ndebug1((LONG)currpd->p_wmtas);
+		Debug7("unsync not called, p_wmtas="); Ndebug7((LONG)currpd->p_wmtas);
 	  }
 	  return( TRUE ); 
 	}

@@ -17,7 +17,7 @@
 /*      Load rsc file from disk			2/10/92 H.Krober        */
 /*	Start the separation of desktop and aes 3/18/93 C.Gee		*/
 /*	Implement flags for PRG vs SYS version  4/14/93 C.Gee		*/
-
+/*	Speedo GDOS font support in windows	5/25/83 H.Krober	*/ 
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -109,10 +109,20 @@ GLOBAL	WORD	d_maxcolor;
 GLOBAL	USERBLK	chxcache;
 GLOBAL	WORD	pglobal[15];
 CICONBLK	*ciconaddr;
+GLOBAL	WORD	d_spd;
+GLOBAL	WORD	d_numfonts;
+GLOBAL	FNTLST	*d_fontlst;
 GLOBAL	UWORD	st_time;	/* time code		*/
 GLOBAL	UWORD	st_date;
 GLOBAL	UWORD	st_dchar;
 GLOBAL	WORD	st_keybd;
+
+GLOBAL	OBJECT	*fontmn;	/* font popup menu in	*/ 
+				/* "Set Color & Style"	*/
+				/* dialog box		*/
+EXTERN	WORD	win_font;	/* window font 		*/
+EXTERN	WORD	win_fsize;	/* window font szie 	*/
+
 
 MLOCAL	BYTE	TIMETABLE[] =	/* was: BYTE *TIMETABLE[], changed for LC */
 {/* Eurotime, Eurodate and seperator */
@@ -256,6 +266,86 @@ i_1:					/* restore the pglobal	*/
 	return( ret );
 }
 
+	WORD
+d_load_fonts()			/* load GDOS fonts */
+{
+	REG WORD	i;
+	REG FNTLST	*fontsp;
+
+	if (d_spd)		/* Is Speedo GDOS there? */
+		d_numfonts = d_v_load_fonts();
+	else
+		d_numfonts = 1; /* only system font available */
+	Debug1("NEWDESK: Fonts loaded\r\n");
+	if ((d_fontlst = malloc(d_numfonts * sizeof(FNTLST))) == NULL) {
+		do1_alert( FCNOMEM );
+		return( FALSE );
+	}
+	/*
+	 *	Get font names
+	 */
+	for (i = 1, fontsp = d_fontlst; i <= d_numfonts; i++, fontsp++) {
+		fontsp->fnt_id = d_v_font_name(i, &fontsp->fnt_name[2], &fontsp->fnt_type);
+		fontsp->fnt_name[0] = ' ';	/* build strings so we can also */
+		fontsp->fnt_name[1] = ' ';	/* use them in the popup menu 	*/
+		fontsp->fnt_name[34] = ' ';
+		fontsp->fnt_name[35] = '\0';
+		Debug1( fontsp->fnt_name);
+	}
+	win_font = 0;	/* system font */	
+	win_fsize = 10; /* 10 points */
+
+	return( TRUE );
+}
+
+/*
+ *	Objects for the font popup menu
+ */
+OBJECT  fntmn_b1 = { -1, -1, -1, G_BOX, NONE, SHADOWED, 0xFF1100L, 2, 0, 35, 0 };
+OBJECT	fntmn_b2 = { -1, -1, -1, G_STRING, NONE, NORMAL, 0L, 0,  1, 35, 1 };
+
+	WORD	
+build_fontmenu()	/* build font popup menu for "Set Color & Style" dialog" */
+{
+	REG WORD	i;
+	REG FNTLST	*fontsp;	
+	OBJECT		*tree;
+	TEDINFO		*ted;
+
+	/*	First, soemthing else...
+	 *	Hack Speedo font into the "Desktop Info"
+	 *	dialog box.
+	 */
+	if (d_numfonts > 1) {
+		rsrc_gaddr(R_TREE, ADDINFO, &tree); /* Desktop Info... */
+		ted = (TEDINFO *) tree[GEMMSG].ob_spec;
+		ted->te_font = GDOS_PROP;
+		ted->te_fontid = 3;	/* Swiss */
+		ted->te_fontsize = -1;	/* Take size of system font */
+	}
+
+	/*
+	 *	Now the popup menu stuff...
+	 */
+	if ((fontmn = ( OBJECT *)malloc( (LONG)( ( d_numfonts + 1 ) * sizeof(OBJECT) ))) == NULL) {
+		do1_alert( FCNOMEM );
+		return FALSE;
+	}
+	LBCOPY((BYTE*) fontmn, (BYTE*) &fntmn_b1, sizeof(OBJECT));	/* outside box	*/
+	rsrc_obfix(fontmn, 0);
+
+	fontsp = d_fontlst;
+	for (i = 1; i <= d_numfonts; i++, fontsp++) {
+		LBCOPY((BYTE *)&fontmn[i], (BYTE *) &fntmn_b2, sizeof(OBJECT));
+		rsrc_obfix(fontmn, i);
+		objc_add(fontmn, 0, i); 
+		fontmn[i].ob_spec = (LONG) fontsp->fnt_name;
+		fontmn[i].ob_y = (i - 1) * gl_hchar;
+		fontmn[i].ob_width = fontmn[0].ob_width;
+		fontmn[0].ob_height += gl_hchar;
+	}
+	return TRUE;
+}
 
 /*	Initalize the icon and allocate backid memory	*/
 
@@ -570,6 +660,7 @@ deskmain()
 	WORD		*ptr;	
 	BYTE		temp[30];
 	LONG		value;
+	LONG		*pvalue;
 	WORD		temp1, temp2;
 
 #if !DESKPRG
@@ -685,6 +776,15 @@ top:
 #endif
 	ret = TRUE;		/* assume everything is OK	*/
 
+	if ( getcookie( 0x46534d43L, (LONG *)&pvalue ) ) /* FSMC */
+	{
+	  if ( *pvalue == 0x5F535044L ) /* _SPD */
+	  	d_spd = 1;
+	} 
+
+	if (!d_load_fonts()) 	/* Load Speedo GDOS fonts	*/
+		goto m_2;			
+
 	appnode = (APP*)0;	/* No app buffer yet		*/
 	applist = (APP*)0;	/* No app list yet		*/
 	apsize = 0;		/* Initalize app size		*/
@@ -785,6 +885,10 @@ m_2:
 					/* check desktop file	*/	
 	put_keys();			/* set up the key menu	*/
 
+	if (!build_fontmenu()) 		/* Build the font popup menu */
+		goto m_1;		/* for "Set Color & Style"   */
+					/* dialog box 		     */
+
 	Debug1( "Put menu bar\r\n" );
 
 	if ( d_exit != L_WAKEUP )
@@ -862,7 +966,8 @@ m_1:
 	}
 
 	inf_path[0] = 0;
-	v_clsvwk( );
+	d_v_unload_fonts();
+	d_v_clsvwk( );
 m_6:
 	appl_exit();
 	Pterm( 1 );
@@ -1084,3 +1189,4 @@ Debug( level, str )
 	}
 }
 #endif
+

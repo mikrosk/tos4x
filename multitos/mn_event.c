@@ -52,6 +52,15 @@
  *
  * 02/11/93  cjg   - Converted to Lattice C 5.51
  * 02/19/93  cjg   - Force the use of Prototype Files
+ * 05/14/93  cjg   - modified EvntSubMenu() to add in Drop Down List handling.
+ *		   - modified pop_blit() to add in drop down list handling.
+ *		   - modified item_handler() to add in drop down list handling.
+ * 06/10/93  cjg   - Modified ArrowScroll() to scroll even when the parent
+ *		     of the menu is not at the root.
+ * 		   - Installed MU_KEYBD event for the event_multi().
+ *		     Handles UP, DOWN, SHIFT-UP and SHIFT-DOWN for the
+ *		     scrolling menus and drop-down menus. Scrolling menus
+ *		     only do UP and DOWN tho...
  */
 
 
@@ -67,7 +76,8 @@
 #include "objaddr.h"
 #include "osbind.h"
 
-
+#define	 K_UP	  0x4800
+#define  K_DOWN   0x5000
 
 /* EXTERNS
  * ================================================================
@@ -88,8 +98,10 @@ EXTERN GRECT	gl_rfull;
 EXTERN GRECT	gl_rscreen;
 EXTERN GRECT	gl_rzero;
 EXTERN WORD	gl_nplanes;
+EXTERN WORD	gl_wchar;	/* cjg 05/14/93	 */
+EXTERN WORD	gl_button;
 
-
+EXTERN WORD	DListFlag;	/* cjg 05/14/93  */
 
 
 /* GLOBALS
@@ -120,6 +132,9 @@ BOOLEAN      SamePlaceFlag;  	   /* Used for above - TRUE - mouse has
 BOOLEAN	     UpDownFlag;	   /* Used to determine if the mouse moved
 				    * straight up or down during a drag.
 			            */
+WORD	     slide_obj;		   /* Slider object that we clicked on for
+				    * the Drop Down Lists  - cjg 05/14/93
+				    */
 
 
 /*	Customized of do_chg 	*/
@@ -201,11 +216,11 @@ EvntSubMenu( id, MenuPtr )
 WORD		id;		   /* Process id	     */
 REG MENU_PTR	MenuPtr;	   /* ptr to the menu node   */
 {
-      REG OBJECT   *tree;
+      OBJECT   	   *tree;
       WORD         cur_obj;	   /* object mouse is over   */
       WORD     	   old_obj;	   /* old object             */
 
-      REG MENU_PTR SubMenuPtr;	   /* Pointer to SubMenu     */
+      MENU_PTR     SubMenuPtr;	   /* Pointer to SubMenu     */
       GRECT        SubRect;	   /* GRECT of active Submenu*/
 
       MENU_PTR     OldMenuPtr;	   /* Ptr to previous submenu*/
@@ -235,7 +250,15 @@ REG MENU_PTR	MenuPtr;	   /* ptr to the menu node   */
       WORD         title_state;
       WORD	   buff[6]; 	
       LONG	   tmparm,lbuparm;
-		
+
+
+      WORD	   ScrollFlag;	   /* Flag to see if the menu can scroll
+				    * Used by the Keyboard event
+				    */
+      MENU_PTR	   ScrollMenuPtr;  /* MenuPtr to the Menu scrolling for
+				    * Keyboard Scrolling...	
+				    */
+
 
       /* INITIALIZE LOCAL VARIABLES */
       result        = -1L;		   /* Init return obj     */
@@ -251,6 +274,7 @@ REG MENU_PTR	MenuPtr;	   /* ptr to the menu node   */
       CurRect  = MOBRECT( MenuPtr );		/* Get GRECT of Menu   */
       DragRect = CurRect;
       ClearDelays( &MenuDelayFlag, &MenuDragFlag, &mn_mask );
+
 
       /* Get the current object the mouse is over */
       gr_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
@@ -273,8 +297,9 @@ REG MENU_PTR	MenuPtr;	   /* ptr to the menu node   */
 	     CurKeyState = 0;
 
 	     tmparm = HW(hicount) + LW(locount);	
-	     lbuparm = HW(1)|LW((1 << 8) | buparm),	
-             event = ev_multi(	mn_mask, &m1, &m2,
+	     lbuparm = HW(1)|LW((1 << 8) | buparm);
+	
+             event = ev_multi(	mn_mask | MU_KEYBD, &m1, &m2,
                                	tmparm,lbuparm,
 				0x0L,&buff[0] );
 
@@ -293,6 +318,199 @@ REG MENU_PTR	MenuPtr;	   /* ptr to the menu node   */
 	       */
 	      old_obj = cur_obj;
               cur_obj = GetMouseState( &mk, MenuPtr );
+
+
+
+	       /* Keyboard Event
+	        * =====================================================
+		*/
+	       if( !done && ( event & MU_KEYBD ) ) {
+
+		    /* ----------------------------------------------------------------
+		     * Check if we're a drop down list menu. If so, check the sliders
+		     * and process them if necessary.  Skip if we're already at the
+		     * very top or the very bottom. 
+		     * In case we are, kill the events and loop back to the evnt multi.
+		     * Otherwise, continue processing for more events below..ie: button
+		     * ----------------------------------------------------------------
+		     */
+		    if( DListFlag && ( ( ( scancode & 0xFF00 ) == K_UP ) ||
+			( ( scancode & 0xFF00 ) == K_DOWN ) ) ) {
+
+			  if( ( ( ( scancode & 0xFF00 ) == K_UP ) &&
+				( MFIRST_CHILD( MenuPtr ) != MTOP_OBJ( MenuPtr ) ) ) ||
+			    ( ( ( scancode & 0xFF00 ) == K_DOWN ) && ( MB_OBJ( MenuPtr ) !=
+				  MLAST_CHILD( MenuPtr ) ) ) ) {
+
+			    /* ----------------------------------------------
+			     * Process the UP or DOWN Keys...SHIFT ALSO...
+			     * If the mouse is over a menu item, clear it...
+			     * ----------------------------------------------
+			     */
+			    if( old_obj != NIL )
+       			       mu_set( MTREE( MenuPtr ), old_obj, -1, FALSE, FALSE );
+			    old_obj = cur_obj = NIL;
+
+			    SliderButtons( scancode );
+
+
+			    /* ----------------------------------------------
+			     * Upon return from the slider code, we should 
+			     * check where them mouse is. If it is over a
+			     * menu item, we should select it and set the
+			     * MU rect event. Continue processing events.
+			     * ----------------------------------------------
+			     */
+			    gr_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
+      			    cur_obj = GetMouseState( &mk, MenuPtr );
+
+		            ItemHandler( id, MenuPtr, cur_obj, old_obj, SubMenuPtr,
+	           		         &MenuDelayFlag, &MenuDragFlag, &mn_mask,
+		   		         &MenuObject, &m1, &m2, &mk );
+		        }
+
+		    } /* end of 'if' DListFlag */
+		    else {
+
+			/* --------------------------------------------------------------
+		         * Check if the current menu can be scrolled. This is NOT a drop
+			 * down list menu. If the menu can be scrolled, Let's scroll it.
+			 * If the menu cannot be scrolled, check if the submenu can be 
+			 * scrolled. If so, scroll the submenu if its displayed.
+			 * --------------------------------------------------------------
+			 */
+			ScrollMenuPtr = NULL;
+
+			if( MSCROLL( MenuPtr ) > 0 )	/* Can we scroll the menu that we are in? */
+                           ScrollMenuPtr = MenuPtr;	/* If so, set the pointer to scroll it... */
+
+
+			/* -------------------------------------------------------------
+			 * If we can't scroll the menu that we're in, is there a submenu
+			 * attached that is visible that we can scroll? AND the mouse is
+			 * still over the original cur_obj with the submenu attachment.
+			 * -------------------------------------------------------------
+			 */
+			if( !ScrollMenuPtr && SubMenuPtr && ( MSCROLL( SubMenuPtr ) > 0 ) 
+			    && ( MenuObject == cur_obj )) 
+			    ScrollMenuPtr = SubMenuPtr;
+
+
+			/* If we can scroll a menu, check for an UP, Down, SHIFT-Up or SHIFT-Down Keypress */
+			if( ScrollMenuPtr && ( ( ( scancode & 0xFF00 ) == K_UP )
+			    || ( ( scancode & 0xFF00 ) == K_DOWN ) ) )  {
+
+				ScrollFlag = FALSE;
+
+
+				/* Check if we're an UP Button and if its OK to scroll upwards. */
+				if( (( scancode & 0xFF00 ) == K_UP ) &&
+				    ArrowCheck( ScrollMenuPtr, MTREE( ScrollMenuPtr ),
+				    MTOP_OBJ( ScrollMenuPtr ) ) )  {
+
+				   ScrollFlag = MTOP_OBJ( ScrollMenuPtr );
+				}
+
+
+				/* Check if we're a Down Button and if its OK to scroll Downwards. */
+				if( (( scancode & 0xFF00 ) == K_DOWN ) &&
+				    ArrowCheck( ScrollMenuPtr, MTREE( ScrollMenuPtr ),
+				    MB_OBJ( ScrollMenuPtr ) ) )  {
+
+				   ScrollFlag = MB_OBJ( ScrollMenuPtr );
+				}
+
+				if( ScrollFlag ) {
+
+
+				    /* ---------------------------------------------------------
+				     * If we are scrolling a menu, and a submenu is displayed,
+				     * shut down the submenu.  In addition, clear the menu item
+				     * that the mouse is on top of before the scroll.
+				     * ---------------------------------------------------------
+				     */
+			            if( ( MenuPtr == ScrollMenuPtr ) && ( old_obj != NIL )) {
+
+					/* If there is a submenu displayed, close it up */
+				        ClearDelays( &MenuDelayFlag, &MenuDragFlag, &mn_mask );
+
+					/* Need to reset the menu items and m1 variables.*/
+				   	if( SubMenuPtr ) {
+	                   		   HideSubMenu( SubMenuPtr );
+					   old_obj        = MenuObject;   /* So that we can clear */
+					   MenuObject     = NIL;	  /* them menu item with  */
+              		   		   SubMenuPtr     = NULL;	  /* the submenu attached */
+			      		   MenuDelayFlag  = FALSE;
+			      		   MenuDragFlag   = FALSE;
+		           		}
+
+					/* Clear the old object, in the menu that will be scrolled*/
+       			                mu_set( MTREE( MenuPtr ), old_obj, -1, FALSE, FALSE );
+			                old_obj = cur_obj = NIL;
+				    }
+
+
+      	                	    ArrowScroll( ScrollMenuPtr, ScrollFlag );
+
+
+				    /* -------------------------------------------------------
+				     * Always check to see, after the scroll, what menu item,
+				     * if any, that we are on top of...
+				     * -------------------------------------------------------
+				     */
+				    gr_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
+      				    cur_obj = GetMouseState( &mk, MenuPtr );
+
+
+				    /* ------------------------------------------------------
+				     * If the menu that the mouse is over cannot be scrolled,
+				     * BUT, a submenu is displayed, shut down the submenu.
+				     * In addition, clear the delays.
+				     * ------------------------------------------------------
+				     */
+				    if( SubMenuPtr && ( MenuObject != cur_obj ) ) {
+
+				        ClearDelays( &MenuDelayFlag, &MenuDragFlag, &mn_mask );
+
+					/* Need to reset the menu items and m1 variables.*/
+				   	if( SubMenuPtr ) {
+	                   		   HideSubMenu( SubMenuPtr );
+					   MenuObject     = NIL;
+              		   		   SubMenuPtr     = NULL;
+			      		   MenuDelayFlag  = FALSE;
+			      		   MenuDragFlag   = FALSE;
+		           		}
+				    }
+
+				    /* ------------------------------------------------------
+				     * If the object that we were once over is not the same,
+				     * clear the old object. Set the new object if possible.
+				     * ------------------------------------------------------
+				     */
+			            mu_set( MTREE( MenuPtr ), old_obj, cur_obj, FALSE, FALSE );
+		        	    ItemHandler( id, MenuPtr, cur_obj, old_obj, SubMenuPtr,
+	           		      		 &MenuDelayFlag, &MenuDragFlag, &mn_mask,
+		   		     		 &MenuObject, &m1, &m2, &mk );
+
+
+				    /* -----------------------------------------------------
+				     * If the mouse is no longer over the menu itself, jump
+				     * to do more in the hopes that we might be on top of
+				     * the menubar.
+				     * -----------------------------------------------------
+				     */
+				    if( cur_obj == NIL )
+				    {
+			   		/* Clear the event flag - no other events */
+			   		event = 0;
+			   		goto do_more;
+				    }
+
+				}
+		        }
+		    }
+	       }		    /* End of event & MU_KEYBD */
+
 
 
 	       /* Mouse M1 Rectangle Event
@@ -658,10 +876,9 @@ do_button:
 		    }
 
 
-		     /* Check if clicking on an ARROW */
-                     if( ArrowCheck( MenuPtr, MTREE( MenuPtr ), cur_obj ) )
+		     /* Check if clicking on an ARROW and NOT a Drop Down List Menu */
+                     if( !DListFlag && ArrowCheck( MenuPtr, MTREE( MenuPtr ), cur_obj ) )
                      {
-
 			/* We are clicking on an ARROW - SCROLL IT! */
       	                ArrowScroll( MenuPtr, cur_obj );
 
@@ -686,6 +903,29 @@ do_button:
              	     }
 	             else
 	             {
+			 /* Check if we're a drop down list, if so, check
+			  * the sliders and process them if necessary.
+			  * cjg 05/14/93
+			  */
+			 if( DListFlag )
+			 {
+			    if( ( slide_obj = SliderCheck( mk.x, mk.y ) ) != -1 )
+			    {
+				SliderButtons( slide_obj );
+
+			        gr_mkstate( &mk.x, &mk.y, &mk.buttons, &mk.kstate );
+      				cur_obj = GetMouseState( &mk, MenuPtr );
+
+	                        old_obj = NIL;
+		                ItemHandler( id, MenuPtr, cur_obj, old_obj, SubMenuPtr,
+	           		             &MenuDelayFlag, &MenuDragFlag, &mn_mask,
+		   		             &MenuObject, &m1, &m2, &mk );
+			        event = 0;
+			        continue;
+			    } /* end of 'if' */
+			 }
+
+
 			 /* Just a Mouse CLick! */
 
 			 /* Need to clear the submenu, if its displayed. */
@@ -705,7 +945,7 @@ do_button:
 
 	                 /* If clicked outside, its NIL, and should return as such. */
 	                 result    = (( cur_obj == NIL ) ? ( -1L ) : ( NULL ) );
-                     }  
+                     }
 	  	}	/* End of MU_BUTTON */
 
 
@@ -829,7 +1069,6 @@ da_bar:
             result = -1L;
         
       }
-
       return( result );   
 }
 
@@ -922,9 +1161,12 @@ MRETS		*mk;
 
 	      /* Check for a Submenu on the Current object.
                * Set the SubMenuDisplayDelay flag if the check is valid.
+	       *
+	       * Check if we're a Drop Down List, if NOT, check for
+	       * Submenus. Otherwise, Skip it... cjg 05/14/93
                */
 
-	      if( !(*MenuDelayFlag) && CheckForSubMenu( id, MTREE( MenuPtr), cur_obj, SubMenuPtr ) )
+	      if( !DListFlag && !(*MenuDelayFlag) && CheckForSubMenu( id, MTREE( MenuPtr), cur_obj, SubMenuPtr ) )
 	      {
 	         *mn_mask = MU_BUTTON | MU_M1 | MU_TIMER;
 	         locount = (WORD)(SUBMENU_DELAY & 0x0000ffffL );
@@ -1029,6 +1271,12 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
 
    ob_gclip( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ), &dummy,&dummy,
 	     &clip.g_x,&clip.g_y,&clip.g_w,&clip.g_h );
+
+   /* cjg 05/14/93 - Adjust width of clip to take into account
+    * the sliders if we're a drop down list.
+    */
+   if( DListFlag )
+      clip.g_w += ( gl_wchar * 3 );
 
    rc_intersect( &gl_rfull, &clip );	/* clip to the work area*/
    gsx_sclip( &clip );			/* set the clip		*/
@@ -1228,9 +1476,10 @@ REG WORD        cur_obj;	/* the obj being clicked on */
 
 	  /* The height is the number of visible objects in the scrolling
 	   * area - set by ( BOTTOM - TOP ) + 1 == # of objects
+ 	   *
+	   * Changed to "HEIGHT - ( SCROLL - FIRST )" cjg 06/10/93
 	   */
-	   clip.g_h *= ( ( MAX_MENU_HEIGHT - MSCROLL( MenuPtr )) + 1);
-
+	   clip.g_h *= ( MAX_MENU_HEIGHT - ( MSCROLL( MenuPtr ) - MFIRST_CHILD( MenuPtr ))  );
 
 	  /* 
 	   * Adjust for the presence of both an Up and down arrow.

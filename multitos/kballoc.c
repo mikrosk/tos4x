@@ -1,28 +1,5 @@
 /* kballoc.c - fast allocator for LC5 based on AKP's nalloc2.c
  * ===========================================================================
- * $Log: kballoc.c,v $
- * Revision 1.8  1993/06/09  23:47:00  ersmith
- * Another check in to save work.
- *
- * Revision 1.7  1993/05/12  15:50:18  ersmith
- * Check in to save work
- *
- * Revision 1.6  1993/04/27  23:00:14  ersmith
- * Merged Cary's and Hans-Martin's changes
- *
- * Revision 1.4  1993/03/12  19:51:12  ersmith
- * Merged HMK's loadable resource stuff
- *
- * Revision 1.3  1993/03/10  20:12:42  ersmith
- * Lattice port
- *
- *
- * Revision 1.1  1993/02/24  23:52:46  ersmith
- * 1 meg floppy MultiTOS
- *
- * Revision 1.0  1993/02/03  21:26:46  ersmith
- * MultiTOS version 1.0
- *
  * 911025 kbad added mavail(), mheap()
  * 910508 kbad
  */

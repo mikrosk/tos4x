@@ -9,8 +9,9 @@
 /*	Added 3D and color icon			7/7/92	D.Mui		*/
 /*	Convert to Lattice C 5.51	        02/16/93	C.Gee   */
 /*	Force to use prototypes			02/23/93	C.Gee	*/
-/*	Fix ob_format to not right justify	2/25/93 H.Krober	*/
+/*	Fix ob_format to not right justify	2/25/93 H.M.Krober	*/
 /*	Fix trans_cicon() and free_cicon()	4/30/93 C.Gee and E.Smith */
+/*	Add GDOS font support to TEDINFO	5/21/93 H.M.Krober	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -34,7 +35,7 @@
 #include "dispvars.h"
 #include "objaddr.h"
 
-
+#define USE_OB_GCLIP	1
 
 #define ADJOUTLPIX 	3
 #define ADJSHADPIX 	SHADOW
@@ -54,6 +55,11 @@ WORD gl_colmask[128];		/* global mask used by color icons */
 EXTERN WORD 	gl_nplanes;	/* number of planes in current res */
 EXTERN FDB	gl_src, gl_dst;
 EXTERN WORD	ptsin[];
+
+EXTERN LONG	gl_mntree;
+EXTERN WORD	mn_fontid;
+EXTERN WORD	mn_fsize;
+
 
 /* This is the color table of RGB values that VDI expects in pixel-
  * packed mode (This whole table can be moved to a separate file).
@@ -119,6 +125,7 @@ EXTERN UWORD	ind3dtxt, ind3dface, act3dtxt, act3dface;
 
 /* June 24 1992 - ml. Button and alert background colors */
 EXTERN UWORD	gl_indbutcol, gl_actbutcol, gl_alrtcol;
+
 
 
 
@@ -491,7 +498,7 @@ just_draw(tree, obj, sx, sy)
 	LONG		spec;
 	BYTE		ch;
 	GRECT		t, c;
-	REG GRECT	*pt;
+	GRECT		*pt;
 	BITBLK		bi;
 	ICONBLK		ib;
 	TEDINFO		edblk;
@@ -725,27 +732,24 @@ just_draw(tree, obj, sx, sy)
 	    case G_TEXT:
 	    case G_BOXTEXT:
 		gr_inside(pt, tmpth);
-
 /* July 30 1992 - ml.  Draw text of 3D objects */	/* 8/1/92 */
-
+		set_cufont(edblk.te_font, edblk.te_fontid, edblk.te_fontsize); /* +++ HMK 5/18/93 */
 		if (three_d) {
-		    pt->g_x += ADJ3DPIX;  /* don't draw text on 3D effects */
-		    pt->g_w -= (ADJ3DPIX << 1);
+ 		    pt->g_x += ADJ3DPIX;  /* don't draw text on 3D effects */
+ 		    pt->g_w -= (ADJ3DPIX << 1);
 		    if (!(state & SELECTED) && mvtxt) {
 			pt->g_x -= 1;
-			pt->g_y -= 1;
-			gr_gtext(edblk.te_just, edblk.te_font, 
-			    edblk.te_ptext, pt, tmode);
+			pt->g_y -= 1; 
+			gr_gtext(edblk.te_just, edblk.te_ptext, pt, tmode);
 			pt->g_x += 1;
 			pt->g_y += 1;
 		    } else {
-			gr_gtext(edblk.te_just, edblk.te_font, 
-			    edblk.te_ptext, pt, tmode);
+			gr_gtext(edblk.te_just, edblk.te_ptext, pt, tmode);
 		    }
-		    pt->g_x -= ADJ3DPIX;
-		    pt->g_w += (ADJ3DPIX << 1);
+ 		    pt->g_x -= ADJ3DPIX;
+ 		    pt->g_w += (ADJ3DPIX << 1);
 		} else {
-		    gr_gtext(edblk.te_just, edblk.te_font, edblk.te_ptext, 
+		    gr_gtext(edblk.te_just, edblk.te_ptext, 
 				pt, tmode);
 		}
 
@@ -798,7 +802,7 @@ just_draw(tree, obj, sx, sy)
 	     (obtype == G_TITLE) ||
              (obtype == G_BUTTON) )
 	{
-	  len = LBWMOV( ( BYTE *)ad_intin, ( BYTE *)spec);
+	  len = str2intin(( BYTE *)spec);
 	  if (len)
 	  { 				/* 8/3/92 */
 	    if ((state & SELECTED) && obtype == G_BUTTON && chcol)
@@ -821,8 +825,8 @@ just_draw(tree, obj, sx, sy)
 	    } else {
 	      tmpx = pt->g_x;
 	    }
-
-	    gsx_tblt(IBM, tmpx, tmpy, len);
+	    set_cufont(IBM, 0, 0);
+	    gsx_tblt(tmpx, tmpy, len);
 	  }
 	}
 
@@ -882,8 +886,9 @@ just_draw(tree, obj, sx, sy)
 	  if ( state & CHECKED )
 	  {
 	    gsx_attr(TRUE, MD_TRANS, BLACK);
-	    intin[0] = '\010';			/* a check mark	*/
-	    gsx_tblt(IBM, pt->g_x+2, pt->g_y, 1);
+	    str2intin("\010");			/* a check mark	*/
+	    set_cufont(IBM, 0, 0);
+	    gsx_tblt(pt->g_x+2, pt->g_y, 1);
 	  }
 
 	  if ( state & CROSSED )
@@ -920,7 +925,7 @@ just_draw(tree, obj, sx, sy)
 	    draw_hi(&c, NORMAL, FALSE, thick, icol);
 /**/
 	}
-
+	set_cufont(IBM, 0, 0);		/* just to make sure ... */
 } /* just_draw */
 
 
@@ -1645,10 +1650,12 @@ gr_cicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt, cicon)
     if ( ch )
     {
 	intin[0] = ch;
-	gsx_tblt(SMALL, pi->g_x+chx, pi->g_y+chy, 1);
+    	set_cufont(SMALL, 0, 0);
+	gsx_tblt(pi->g_x+chx, pi->g_y+chy, 1);
     }
 						/* draw the label	*/
-    gr_gtext(TE_CNTR, SMALL, ( LONG )ptext, pt, MD_TRANS);
+    set_cufont(SMALL, 0, 0);
+    gr_gtext(TE_CNTR, ( LONG )ptext, pt, MD_TRANS);
 
 }
 

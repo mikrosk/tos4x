@@ -50,6 +50,7 @@
 #include "gemusa.h"
 #include "windlib.h"
 #include "osbind.h"
+#include "mintbind.h"
 
 #define LEN_FSNAME 16
 #define NM_NAMES 9
@@ -485,11 +486,6 @@ rdir5:		strcpy( pathcopy, ad_fpath );
 		  break;
 	        }
 
-#if 0
-                if (!gl_multi)
-                        dsptch();
-#endif
-
 		if( !gl_button )
 		{
 		    FXWait();
@@ -614,7 +610,6 @@ fdone:
 }
 
 
-
 /*	read in a directory	*/
 
 	WORD	
@@ -670,7 +665,6 @@ r_exit:
 	return ( status );
 }
 	
-
 /*	Read files into the buffer		           */
 /*	The buffer size will always be NM_NAMES or more    */
 /*	for easy coding and redraw the count will return   */
@@ -782,32 +776,40 @@ rfile2:
 	return( TRUE );
 }
 		   
-
 static VOID
 r_sort( buffer, count )
 REG	FSTRUCT	*buffer;
 	WORD	count;
 { 
-REG	WORD	gap,i,j;
+REG	WORD	i,j;
+REG	WORD	gap;
 	BYTE	tmp[LEN_FSNAME];
+	BYTE	*first, *second;
 
-	for( gap = count/2; gap > 0; gap /= 2 )
+	for( gap = count/2; gap > 0; gap = gap >> 1 )
 	{
 	  for( i = gap; i < count; i++ )
 	  {
 	    for ( j = i - gap; j >= 0; j -= gap )
 	    {
-	      if ( strchk( buffer[j].snames, buffer[j+gap].snames ) <= 0 )
+#ifdef OUR_OPTIMIZER_WORKS
+/* this is the way the code should be */
+	      first = buffer[j].snames;
+	      second = buffer[j+gap].snames;
+#else
+/* this is the way the Lattice optimizer needs it to be */
+	      first = ((BYTE *)buffer) + j * LEN_FSNAME;
+	      second = first + gap * LEN_FSNAME;
+#endif
+	      if ( strchk( first, second ) <= 0 )
 	        break; 
-
-	      LSTCPY( tmp, buffer[j].snames );
-	      LSTCPY( buffer[j].snames, buffer[j+gap].snames );
-	      LSTCPY( buffer[j+gap].snames, tmp );
+	      LSTCPY( &tmp[0], first );
+	      LSTCPY( first, second );
+	      LSTCPY( second, &tmp[0] );
 	    }
 	  }
 	}
 }
-
 
 
 /*	show files and update the scroll bar	*/
@@ -865,7 +867,6 @@ fs_draw( index, path, addr1, addr2 )
 	ob_draw( ad_fstree, index, MAX_DEPTH );
 }
 
-
 /*	Adjust all the drive boxes	*/
 
 	VOID
@@ -874,20 +875,21 @@ ini_fsel( VOID )
 	WORD		x,y,i,j,w;
 	REG OBJECT	*obj;
 	OBJECT		*tree;
-	TEDINFO		*edspec;
 
 	rs_gaddr(ad_sysglo, R_TREE, SELECTOR, ( LONG *)&tree );
 	obj = tree;
 
 	y = x = 0;
 
-	for ( i = 0, j = DRIVEA; i < 8; i++, j++ )
+	j = DRIVEA;
+	for ( i = 0; i < 8; i++)
 	{  
 	   obj[j].ob_x = x;
 	   obj[j++].ob_y = y;
 	   obj[j].ob_x = obj[j].ob_width + (ADJ3DPIX << 1) + x + 1;
 	   obj[j].ob_y = y;
 	   y += obj[j].ob_height + (ADJ3DPIX << 1) + 1;
+	   j++;
 	} 	
 
 	/* fix up the remaining of the file selector */
@@ -923,16 +925,8 @@ ini_fsel( VOID )
 	obj[FILEBOX].ob_width = w;
 	obj[SCRLBAR].ob_x = obj[FILEBOX].ob_x + w;
 	obj[SCRLBAR].ob_spec = 0;
-#if 0
-	obj[FSVSLID].ob_flags &= ~(IS3DOBJ|IS3DACT);
-	obj[FSVSLID].ob_width += ADJ3DPIX;
-	obj[FSVELEV].ob_x += ADJ3DPIX;
-	obj[FUPAROW].ob_x += ADJ3DPIX;
-	obj[FDNAROW].ob_x += ADJ3DPIX;
-#else
 	obj[FSVSLID].ob_flags |= (IS3DOBJ|IS3DACT);
 	obj[FSVSLID].ob_state |= SELECTED;
-#endif
 
 	ob_offset( ( LONG )tree, FILEBOX, &x, &y );
 	y = obj[FILEBOX].ob_height + y + 6 + ADJ3DPIX;
@@ -949,13 +943,10 @@ FXWait( VOID )
 {
     do
     {
-#if 0
-        if (!gl_multi)
-                dsptch();
-#endif
+        if (gl_multi)
+                Syield();
     }while( gl_button );
 }
-
 
 	VOID
 FXSelect( tree, obj )

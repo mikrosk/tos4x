@@ -118,8 +118,10 @@ hd_button( WORD clicks, WORD kstate, WORD mx, WORD my )
 
 	wind_get( 0, WF_OWNER, &type, &xitem, &xitem, &xitem );
 
-	if ( type != desk_id )
+	if ( type != desk_id ) {
+		Debug1("hd_button: no desktop window \r\n"); 
 	  return;
+	 }
 				/* click on any objects	*/
 
 	if ( ( kstate != K_RSHIFT ) && ( kstate != K_LSHIFT ) )
@@ -127,21 +129,27 @@ hd_button( WORD clicks, WORD kstate, WORD mx, WORD my )
 	else
 	  keypress = TRUE;
 
+	Debug1("hd_button: before i_find\r\n"); 
 	if ( i_find( mx, my, &win1, &xitem, &type ) )
 	{
+	   Debug1("hd_button: item="); Ndebug1((LONG)xitem);
 	   item = xitem;
 	   win = win1;
 
 	   if ( type == WINICON )	/* window objects	*/
 	   {
+#if 0	     /* NOW WE ALLOW USER TO DO STUFF WITH ICONIFIED WINDOWS 	*/
+	     /* SO DO NOT RETURN 					*/
 	     if (win->w_iconified)
 	        return;
-
+#endif
+	     wind_update(1);
 	     clr_dicons( );		/* clean up desktop icons */
-
+	     
 	     if ( ( x_win ) && ( x_win != win ) )
 	       clr_xwin( x_win, TRUE );
 
+	     wind_update(0);
 	     if ( !item )		/* hit nothing		*/
 	     {
 	       if ( !keypress )		/* shift key down?	*/
@@ -153,7 +161,10 @@ hd_button( WORD clicks, WORD kstate, WORD mx, WORD my )
 	     }
 	     else			/* hit something	*/
 	     {
-	       obj = win->w_obj;	
+	       if (win->w_iconified)	/* get the right object */
+	       	  obj = win->w_icnobj;
+	       else
+	          obj = win->w_obj;	
 	       state = obj[item].ob_state;  /* JTT - changed from ob_states */
 
 	       if ( ( state & SELECTED ) && ( !keypress ) )
@@ -168,14 +179,17 @@ hd_button( WORD clicks, WORD kstate, WORD mx, WORD my )
 	         state ^= SELECTED;
 
 	       obj[item].ob_state = state;
-	       get_dir( win, item )->d_state = state;
+/*	       if (!win->w_iconified)*/
+		       get_dir( win, item)->d_state = state;
 	       do_redraw( win->w_id, &full, item );
 	       winfo( win );
 	     }
 	  }
 	  else				/* desktop icon selected 	*/
 	  {
+	    wind_update(1);
 	    clr_allwin( );
+	    wind_update(0);
 
 	    if ( !item )		/* hit background		*/
 	    {
@@ -211,8 +225,9 @@ a_1:
 
 	  if ( clicks == 2 ) {		/* double clicks	*/
 	    open_item( item, type, win );
-	    /*if (!d_multi)*/	/* maybe not only in single tasking mode??? */
-	    	clr_allwin();	/* deselect icon */
+	    wind_update(1);
+	    clr_allwin();	/* deselect icon */
+	    wind_update(0);
 	  } else				/* button still down	*/
  	    hd_down( item, type, win );
 

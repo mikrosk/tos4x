@@ -22,6 +22,8 @@
 #define WM_BOTTOMED	33
 #define WM_ICONIFIED	34
 #define WM_UNICONIFIED	35
+#define WM_ICONIFYALL	36
+#define WM_TOOLBAR	37
 
 #define AC_OPEN 	40
 #define AC_CLOSE 	41

@@ -45,6 +45,12 @@
  *
  * 02/11/93  cjg   - Convert to Lattice C 5.51
  * 02/19/93  cjg   - Force the use of Prototypes
+ * 05/14/93  cjg   - Added flag to EvntSubMenu() for Drop Down Lists.
+ * 06/04/93  cjg   - Added in mn_hdo() - wait for up key before exiting
+ * 06/08/93  cjg   - Set scrolling for the desk menu to begin with
+ *		     the first Desk Accessory.
+ * 06/11/93  cjg   - Added MU_KEYBD to mn_hdo() to suck up the 
+ *		     keyboard events.
  */
 
 
@@ -74,8 +80,8 @@ EXTERN	LONG	gl_mntree;
 EXTERN	GRECT	gl_rfull;
 EXTERN  GRECT   gl_rzero;
 
-
-
+EXTERN  WORD	DListFlag;
+EXTERN  WORD	gl_button;	/* cjg 06/04/93 */
 
 
 /* GLOBALS
@@ -276,7 +282,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
    flag = done = FALSE;			/* 6/11/92 D.Mui	*/
    button     = 1;
    MenuBar_Mode = FALSE;	/* TRUE - Use code for the menubar  */
-
+   DListFlag = FALSE;	/* For Menus - NO Drop Down Lists   */
 
    tree       = ( OBJECT *)gl_mntree;		/* global menu tree */
    newtree    = tree;
@@ -358,7 +364,11 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 	       /* This is the DA Menu - See if we need to scroll it! */
 	       MXPOS( MenuPtr )   = newtree[ ROOT ].ob_x;
 	       MYPOS( MenuPtr )   = newtree[ ROOT ].ob_y;
-	       MSCROLL( MenuPtr ) = (( gl_accid ) ? ( gl_accid + 4 ) : ( 3 ));
+
+/*	       MSCROLL( MenuPtr ) = (( gl_accid ) ? ( gl_accid + 4 ) : ( 3 ));*/
+
+	       /* CJG 06/08/93 Always scroll starting from the first DA */
+	       MSCROLL( MenuPtr ) = 3;
 
 	       /* Save the original values - and restore them after.
 		* Ensure that we have a minimum height for the menu.
@@ -412,7 +422,7 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 			 break;
         }
         rect_change( ( LONG )tree, &m1, wall, flag );			
-        ev_which = evnt_multi( mflags, 1, 1, buparm,
+        ev_which = evnt_multi( mflags | MU_KEYBD, 1, 1, buparm,
                                m1.m_out, m1.m_x, m1.m_y, m1.m_w, m1.m_h,
 			       m2.m_out, m2.m_x, m2.m_y, m2.m_w, m2.m_h,
 			       0L,
@@ -420,6 +430,13 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 			       &mk.x, &mk.y,
 		       	       &mk.buttons, &mk.kstate,
 		               &keycode, &nclicks );
+
+
+
+	if( ev_which & MU_KEYBD ) {	/* CJG 06/11/93 */
+	   /* HERE ONLY TO SUCK UP THE KEYBOARD STROKES */
+	}
+
 
         if( ev_which & MU_BUTTON )
         {
@@ -582,7 +599,10 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
 		     /* The tree has changed, - it is the DA menu */
 		     MXPOS( MenuPtr ) = newtree[ ROOT ].ob_x;
 		     MYPOS( MenuPtr ) = newtree[ ROOT ].ob_y;
-	             MSCROLL( MenuPtr ) = (( gl_accid ) ? ( gl_accid + 4 ) : ( 3 ));
+
+		     /* cjg 06/08/93 Scroll from the first DA */
+/*	             MSCROLL( MenuPtr ) = (( gl_accid ) ? ( gl_accid + 4 ) : ( 3 ));*/
+	             MSCROLL( MenuPtr ) = 3;
 
 	             /* Save the original values - and restore them after.
 		      * Ensure that we have a minimum height for the menu.
@@ -648,6 +668,11 @@ WORD	*keyret;		/* returns the keystate - shift,ctrl*/
    }
 
 m_hexit:
+
+   /* Wait for the up button */
+   do
+   {
+   }while( gl_button );
 	
    graf_mouse( M_RESTORE, 0L );
    wind_update( 2 );

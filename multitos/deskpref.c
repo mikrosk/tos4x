@@ -1,6 +1,7 @@
 /*	DESKPREF.C		3/17/89	- 6/15/89	Derek Mui	*/
 /*	Change at set color and pattern	6/29/90		D.Mui		*/ 
 /*	Use m_st to determine the resolution	9/19/90	D.Mui		*/
+/*	Add "SET FONT" stuff			5/24/93 H.M.Krober	*/
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -9,6 +10,7 @@
 /************************************************************************/
 
 #include "portab.h"
+#include "machine.h"
 #include "obdefs.h"
 #include "deskdefi.h"
 #include "deskwin.h"
@@ -20,6 +22,12 @@
 #include "pboth.h"
 
 EXTERN	WORD	d_maxcolor;
+EXTERN	OBJECT	*fontmn;
+EXTERN	FNTLST	*d_fontlst;
+EXTERN	WORD	win_font;
+EXTERN	WORD	win_fsize;
+EXTERN  WORD	win_wchar;
+EXTERN  WORD	win_hchar;
 
 
 	WORD
@@ -54,7 +62,11 @@ col_pa_pref( )
 	LONG		newdesk;
 	LONG		*outpat;
 	WORD		last,i,j;
-	
+	WORD		editobj;
+	WORD		s_font;
+	LONG		s_fsize;
+	WORD		redraw = FALSE;
+		
 	obj = get_tree( SSCREEN );
 
 	newdesk = background[0].ob_spec;
@@ -62,6 +74,34 @@ col_pa_pref( )
 					/* set the background pattern */
 	last = ret = obj[DESKPREF].ob_state & SELECTED ? DESKPREF : WINPREF;
 
+	s_font  = win_font;		
+	s_fsize = (LONG) win_fsize;
+
+	if (last == WINPREF) {
+	    obj[WFTITLE].ob_state  &= (~DISABLED);
+	    obj[WINFONT].ob_state  &= (~DISABLED);
+	    obj[WINFMBTN].ob_state &= (~DISABLED);
+	    obj[WINFSIZE].ob_state &= (~DISABLED);
+	    obj[WFSZDN].ob_state  &= (~DISABLED);
+	    obj[WFSZUP].ob_state   &= (~DISABLED);
+	    obj[WINFSIZE].ob_flags |= EDITABLE;
+	    editobj = WINFSIZE;	
+	} else {
+	    obj[WFTITLE].ob_state  |= DISABLED;
+	    obj[WINFONT].ob_state  |= DISABLED;
+	    obj[WINFMBTN].ob_state |= DISABLED;
+	    obj[WINFSIZE].ob_state |= DISABLED;
+	    obj[WFSZDN].ob_state  |= DISABLED;
+	    obj[WFSZUP].ob_state   |= DISABLED;
+	    obj[WINFSIZE].ob_flags &= (~EDITABLE);
+	    editobj = 0;	
+	}
+	((TEDINFO *)(obj[WINFONT].ob_spec))->te_ptext = 
+		(LONG) d_fontlst[win_font].fnt_name;
+
+	lbintoasc((LONG) s_fsize, 
+		(BYTE*)((TEDINFO *)(obj[WINFSIZE].ob_spec))->te_ptext );
+	
 	for ( j = COLOR0,i = d_maxcolor; i < 16; i++ )
 	  obj[j+i].ob_flags |= HIDETREE;	
 
@@ -71,13 +111,15 @@ col_pa_pref( )
 	
 	while( TRUE )
 	{
-	  ret = xform_do( obj, 0 );
+	  ret = xform_do( obj, editobj );
 c_1:
 	  if ( ret == SOK )
 	    break;
 
 	  if ( ret == SCANCEL )
 	  {
+	    if (s_font != win_font)
+		    menu_icheck(fontmn, s_font + 1, FALSE);
 	    do_finish( SSCREEN );
 	    return;
 	  }
@@ -87,18 +129,111 @@ c_1:
 	    outpat = &newdesk;
 	    obj[DESKPREF].ob_state = SELECTED;
 	    obj[WINPREF].ob_state = NORMAL;
+
+	    obj[WFTITLE].ob_state  |= DISABLED;
+	    obj[WINFONT].ob_state  |= DISABLED;
+	    obj[WINFMBTN].ob_state |= DISABLED;
+	    obj[WINFSIZE].ob_state |= DISABLED;
+	    obj[WFSZDN].ob_state   |= DISABLED;
+	    obj[WFSZUP].ob_state   |= DISABLED;
+	    obj[WINFSIZE].ob_flags &= (~EDITABLE);
+	    editobj = 0;
 	    goto c_2;
 	  }
 		    
-	  if ( ret == WINPREF )
+	  if (ret == WINPREF)
 	  {
 	    outpat = &newwin;
-	    obj[WINPREF].ob_state = SELECTED;
 	    obj[DESKPREF].ob_state = NORMAL;
+	    obj[WINPREF].ob_state = SELECTED;
+
+	    obj[WFTITLE].ob_state  &= (~DISABLED);
+	    obj[WINFONT].ob_state  &= (~DISABLED);
+	    obj[WINFMBTN].ob_state &= (~DISABLED);
+	    obj[WINFSIZE].ob_state &= (~DISABLED);
+	    obj[WFSZDN].ob_state   &= (~DISABLED);
+	    obj[WFSZUP].ob_state   &= (~DISABLED);
+	    obj[WINFSIZE].ob_flags |= EDITABLE;
+	    editobj = WINFSIZE;	
 c_2:
 	    draw_fld( obj, DESKPREF );
 	    draw_fld( obj, WINPREF );
+	    draw_fld( obj, WFTITLE );
+	    draw_fld( obj, WINFONT );
+	    draw_fld( obj, WINFMBTN );
+	    draw_fld( obj, WINFSIZE );
+	    draw_fld( obj, WFSZDN );
+	    draw_fld( obj, WFSZUP );
 	    obj[PATTERN].ob_spec = *outpat;
+	  }
+
+	  if ( (ret == WINFONT) || (ret == WINFMBTN) ) {
+		WORD	start = 1;
+		GRECT	brect;
+		MENU	Menu, MData;
+		WORD	flag;
+
+		if (obj[WINFONT].ob_state & DISABLED) {
+			continue;
+		}
+		obj[WINFONT].ob_state  |= SELECTED;
+		draw_fld( obj, WINFONT );
+		draw_fld( obj, WINFMBTN );
+		objc_offset(obj, WINFONT, &brect.g_x, &brect.g_y );
+		brect.g_y += (obj[WINFONT].ob_height + 1);
+
+		Menu.mn_tree   = fontmn;
+		Menu.mn_menu   = 0;
+		Menu.mn_item   = s_font + 1;
+		Menu.mn_scroll = -1;	/* scroll list popup */
+		fontmn->ob_x = brect.g_x;
+		fontmn->ob_y = brect.g_y;
+
+		menu_icheck(fontmn, s_font + 1, TRUE );
+
+		flag = menu_popup( &Menu, brect.g_x, brect.g_y, &MData );
+
+		if (flag) {
+			if( fontmn == MData.mn_tree ) {
+				menu_icheck(fontmn, s_font + 1, FALSE);
+				menu_icheck(fontmn, MData.mn_item, TRUE);
+				s_font = MData.mn_item - 1;
+				((TEDINFO *)(obj[WINFONT].ob_spec))->te_ptext = 
+					(LONG) d_fontlst[s_font].fnt_name;				
+        		}
+		} else 
+			menu_icheck(fontmn, s_font + 1, FALSE);
+
+		obj[WINFONT].ob_state  &= (~SELECTED);
+		draw_fld( obj, WINFONT );
+		draw_fld( obj, WINFMBTN );
+	  }
+
+	  if (ret == WFSZDN) {
+		if (obj[WFSZDN].ob_state & DISABLED) {
+			continue;
+		}
+		asctobin((BYTE*)((TEDINFO *)(obj[WINFSIZE].ob_spec))->te_ptext, 
+		&s_fsize);
+		if (s_fsize > 1L) {
+			s_fsize -= 1L;
+			lbintoasc((LONG) s_fsize, 
+			  (BYTE*)((TEDINFO *)(obj[WINFSIZE].ob_spec))->te_ptext );
+			draw_fld( obj, WINFSIZE );
+		}
+	  }
+	  if (ret == WFSZUP) {
+		if (obj[WFSZUP].ob_state & DISABLED) {
+			continue;
+		}
+		asctobin((BYTE*)((TEDINFO *)(obj[WINFSIZE].ob_spec))->te_ptext, 
+		&s_fsize);
+		if (s_fsize < 999L) {
+			s_fsize += 1L;
+			lbintoasc((LONG) s_fsize, 
+			  (BYTE*)((TEDINFO *)(obj[WINFSIZE].ob_spec))->te_ptext );
+			draw_fld( obj, WINFSIZE );
+		}
 	  }
 
 	  if ( ( ret >= PAT0 ) && ( ret <= PAT7 ) )
@@ -140,12 +275,39 @@ c_2:
 
 	    win = (WINDOW *) win->w_next;
 	  }
+		/* "All Iconified" window */
+	  winpd[MAXWIN].w_icnobj[0].ob_spec = windspec; /* +++ HMK 5/27/93 */
+	  redraw = TRUE;
+	}
 
-	  win = w_gfirst();
-	  while( win )
-	  {
-	    do_redraw( win->w_id, &full, 0 );
-	    win = w_gnext();
-	  }
+	/* window font stuff */
+
+	asctobin((BYTE*)((TEDINFO *)(obj[WINFSIZE].ob_spec))->te_ptext, 
+		&s_fsize);
+	if ((win_font != s_font) || (win_fsize != (WORD) s_fsize)) {
+		win_font  = s_font;
+		win_fsize = (WORD) s_fsize;
+		win = w_gfirst();
+		while ( win ) {
+			set_winfont(win->w_ted, win->w_maxicons);			
+			view_fixmode(win);
+			view_adjust(win);
+			win = w_gnext();
+		}
+		redraw = TRUE;
+
+		f_xywh[2] = win_wchar * 14;
+		f_xywh[4] = win_wchar * 14;
+		f_xywh[5] = win_hchar;
+		f_xywh[7] = win_hchar;
+ 	}
+	
+	if (redraw) {		
+		win = w_gfirst();
+		while( win )
+	  	{
+	    		do_redraw( win->w_id, &full, 0 );
+	    		win = w_gnext();
+	  	}
 	}
 }

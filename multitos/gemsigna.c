@@ -19,6 +19,8 @@
 *	02/12/93	cjg	Convert to Lattice C 5.51
 *	02/22/93	cjg	Force the use of prototypes
 *	05/04/93	hmk	ch_mowner now recognizes iconified windows
+*	06/01/93	hmk	ch_owner only now reacts on double clicks 
+*				when window is iconified
 */
 #include "pgem.h"
 #include "pmisc.h"
@@ -99,8 +101,10 @@ GLOBAL	WORD	gl_button;	/* current button state as reported by 	*/
 /*	ownership and check the menu bar		*/
 
 	PD
-*ch_mowner( button )
+*ch_mowner( button, clicks )
 	WORD		button;
+	WORD		clicks;	/* +++ 5/27/93 HMK */
+
 {
 	WORD		wh;
 	PD		*m;
@@ -129,9 +133,9 @@ GLOBAL	WORD	gl_button;	/* current button state as reported by 	*/
 		if ( ( ((wp = srchwp( wh ))->type & 0x01 ) || 
 	               ( !wh ) || ( wh == gl_topw ) || ( button != 0x01 )
 		     ) 
-		     && ( !wp->iconflag )  /* +++ 05/04/93 HMK */
-		   ) /* if window is iconified, don't send event to appl. */
-					   
+		     && ( !wp->iconflag || (clicks != 2))  /* +++ 05/04/93 HMK 	*/
+		   ) /* if window is iconified, single clicks goes to appl. 	*/
+		     /* - a double click goes to the window manager (uniconify) */ 				   
 	        	m = srchwp( wh )->owner;
 	      }
 	    }
@@ -307,7 +311,7 @@ bchange( button, clicks )
 	PD	*m;
 
 	Debug7( "Bchange\r\n" );
-	m = ch_mowner( button );	
+	m = ch_mowner( button, clicks );/* +++ HMK 5/93, clicks added	*/	
 					/* the mouse see if this button	*/
 					/* event causes an ownership 	*/
 					/* change			*/

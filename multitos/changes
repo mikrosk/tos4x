@@ -1,3 +1,32 @@
+Changes made 6/14/93:
+
+desk*.rsc:
+	Updated resources as need for Hans-Martin's and Cary's changes.
+*.*:
+	Merged Hans-Martin's and Cary's changes (selectable fonts in
+	desktop windows, tool-bars, scrollable drop-down menus, better
+	iconification stuff, etc.)
+
+Changes made 6/11/93:
+
+deskbutt.c:
+	Added wind_update() protection around some of the redrawing stuff.	
+gemfslib.c:
+	Found a work-around for the Lattice optimizer bug.
+*.o:
+	Started recompiling with optimization on.
+
+Changes made 6/10/93:
+
+gemwmlib.c:
+	Made the iconify/uniconify code and the window colors changing
+	code compatible (so that when window colors are changed, iconified
+	windows are redrawn properly).
+gemcli.c:
+	Backed out the earlier ACCPATH change, since that seemed to be
+	producing strange attempts to access drive A: in single tasking
+	mode.
+
 Changes made 6/9/93:
 
 geminit.c:

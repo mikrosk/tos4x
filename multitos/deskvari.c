@@ -76,7 +76,7 @@ BYTE	inf_path[PATHLEN];	/* store the inf path	*/
 BYTE	g_buffer[160];	/* merge string buffer	*/
 BYTE	comtail[PATHLEN];/* comtail tail buffer	*/
 
-WINDOW	winpd[MAXWIN];	/* window process structure	*/
+WINDOW	winpd[MAXWIN + 1];/* window process structure	*/
 WINDOW	*winhead;	/* head of window list 		*/
 GRECT	full;		/* full window size value	*/
 

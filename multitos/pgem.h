@@ -394,7 +394,7 @@ WORD	v_setfont( WORD id );
 
 VOID	v_set_alignment( WORD hor_in, WORD ver_in );
 
-VOID	v_setpoint( WORD point, WORD *wchar, WORD *hchar, WORD *wbox, WORD *hbox );
+WORD	v_setpoint( WORD point, WORD *wchar, WORD *hchar, WORD *wbox, WORD *hbox );
 
 VOID	v_unload_font( VOID );
 
@@ -404,7 +404,11 @@ WORD	vst_arbpt( WORD point, WORD *chwd, WORD *chht, WORD *cellwd, WORD *cellht )
 
 VOID	vqt_width( WORD inchar, WORD *space, WORD *dummx, WORD *dummy );
 
+VOID	v_opnvwk(WORD *, WORD *, WORD *, WORD *);
 
+VOID	v_clsvwk(WORD);
+
+VOID	vst_charmap(WORD);
 
 
 
@@ -805,7 +809,7 @@ WORD	sh_xfind( BYTE *file, BYTE *pathname );
 /* FILE: GEMSIGNA.C
  * --------------------------------------------------------------------
  */
-PD	*ch_mowner( WORD button );
+PD	*ch_mowner( WORD button, WORD clicks ); /* +++ HMK 6/2/93 */
 
 VOID	mchange( REG WORD mx, REG WORD my );
 
@@ -897,7 +901,7 @@ WORD	wm_find( WORD mx, WORD my);
 WORD	wm_calc( WORD type, WORD kind, WORD ix, WORD iy, WORD iw, WORD ih,
 		 WORD *ox, WORD *oy, WORD *ow, WORD *oh);
 
-VOID	wm_min( REG WORD kind, WORD *ow, WORD *oh );
+VOID	wm_min( WINDOW *wp, WORD *ow, WORD *oh );
 
 WORD	wm_new( VOID );
 
@@ -917,7 +921,7 @@ VOID	activate(REG WINDOW *wp, WORD topped);
 
 VOID	setcol( REG WINDOW *wp, WORD ndx, WORD topped);
 
-VOID	w_adjust( REG WINDOW *wp, REG GRECT *rect);
+VOID	w_adjust( REG WINDOW *wp, REG GRECT *rect, WORD wflag);
 
 VOID	w_clipdraw( WINDOW *wp, WORD obj, GRECT *pc );
 
@@ -947,6 +951,7 @@ VOID	dk_redraw( OBJECT *obj, WORD root, GRECT *px );
 VOID	w_showparts(WINDOW *wp);
 VOID	w_hideparts(WINDOW *wp);
 
+VOID	w_tooldraw(WINDOW *wp, WORD obj, GRECT *pc);
 
 
 /* FILE: MN_EVENT.C
@@ -1038,7 +1043,7 @@ WORD	GetObjMenu( OBJECT *tree, WORD ititle, OBJECT **itree );
 
 
 
-/* FILE: MN_EVENT.C
+/* FILE: MN_MENU.C
  * --------------------------------------------------------------------
  */
 WORD	Menu_Insert( OBJECT *tree, WORD Parent );
@@ -1076,6 +1081,11 @@ VOID	PopArrowText( REG MENU_PTR MenuPtr );
 WORD	SetMaxHeight( WORD height );
 
 
+VOID	CheckListHeight( REG MENU_PTR MenuPtr );
+
+VOID	SetListHeight( REG MENU_PTR MenuPtr, WORD start_obj );
+
+VOID	DListAdjust( REG MENU_PTR MenuPtr, WORD start_obj );
 
 
 /* FILE: MN_POPUP.C
@@ -1139,6 +1149,31 @@ VOID	ObjcDraw( OBJECT *tree, WORD obj, GRECT *rect );
 VOID	rc_2xy( GRECT *r, WORD *pxy );
 
 
+/* FILE: MN_SLIDE.C
+ * --------------------------------------------------------------------
+ */
+void	InitListSliders( REG MENU_PTR MenuPtr );
+void	ml_size( OBJECT *tree, WORD base, WORD slider, WORD num_items,
+         	 WORD visible, WORD min_size );
+
+void   ml_y( OBJECT *tree, WORD base, WORD slider, WORD value,
+             WORD num_min, WORD num_max, void (*foo)( void ) );
+
+void   ml_arrow( OBJECT *tree, WORD base, WORD slider, WORD obj,
+                 WORD inc, WORD num_min, WORD num_max, WORD *numvar,
+          	 void (*foo)() );
+
+void   ml_dragy( OBJECT *tree, WORD base, WORD slider, WORD min,
+          	 WORD max, WORD *numvar, void (*foo)() );
+
+WORD	SliderCheck( WORD mx, WORD my );
+VOID	SliderScroll( VOID );
+VOID	SliderButtons( WORD button );
+void   ScrollBlit( MENU_PTR MenuPtr, WORD old_offset, WORD new_offset );
+WORD	ML_CalcValue( WORD slidxy, WORD basexy, WORD basewh,
+		      WORD obwh, WORD num_min, WORD num_max );
+
+
 
 /* FILE: GEMAPLIB.C
  * --------------------------------------------------------------------
@@ -1194,10 +1229,10 @@ WORD 	chkbind(REG CBLK *pcrys_blk, LONG what);
 
 VOID 	gr_inside(REG GRECT *pt, REG WORD th);
 VOID 	gr_rect(UWORD icolor, REG UWORD ipattern, REG GRECT *pt);
-WORD	gr_just(WORD just, WORD font, LONG ptext, REG WORD w,
-		REG WORD h, REG GRECT *pt);
-VOID 	gr_gtext(WORD just, WORD font, LONG ptext, GRECT *pt, 
-		WORD tmode);
+WORD	gr_just(WORD just, 
+		LONG ptext, REG WORD w, REG WORD h, REG GRECT *pt);
+VOID 	gr_gtext(WORD just, 
+		LONG ptext, GRECT *pt, WORD tmode);
 VOID 	gr_crack(REG UWORD color, WORD *pbc, WORD *ptc, WORD *pic,
 		REG WORD *pip, REG WORD *pmd);
 VOID	gr_gicon(REG WORD state, LONG pmask, LONG pdata, LONG ptext,
@@ -1234,7 +1269,9 @@ VOID	bb_fill(WORD mode, WORD fis, REG WORD patt, REG WORD hx,
 		REG WORD hy, REG WORD hw, REG WORD hh);
 UWORD	ch_width(WORD fn);
 UWORD	ch_height(WORD fn);
-VOID	gsx_tcalc(REG WORD font, LONG ptext, REG WORD *ptextw,
-		REG WORD *ptexth, REG WORD *pnumchs);
-VOID	gsx_tblt(REG WORD tb_f, REG WORD x, REG WORD y, WORD tb_nc);
+VOID	gsx_tcalc(LONG ptext, 
+		REG WORD *ptextw, REG WORD *ptexth, REG WORD *pnumchs);
+VOID	gsx_tblt(REG WORD x, REG WORD y, WORD tb_nc);
 VOID	gsx_xline(WORD ptscount, REG WORD *ppoints);
+UWORD	set_cufont(WORD font, WORD font_id, WORD size);
+WORD	str2intin(BYTE *);

@@ -45,41 +45,6 @@ typedef struct	grect
 } GRECT;
 #endif
 
-typedef	struct	window
-{
-	BYTE	*w_next;		/* link pointer		*/
-	UWORD	w_id;			/* window handle	*/
-	UWORD	w_free;			/* window free to use	*/
-	BYTE	*w_path;		/* window path name	*/
-	BYTE	*w_buf;			/* scratch buffer	*/
-	WORD	w_level;		/* max level allowed in this path */
-	BYTE	w_info[INFOLEN];	/* info line		*/
-	GRECT	w_sizes;	/* window current size and pos	*/
-	GRECT	w_work;		/* the current working xywh	*/
-	GRECT	w_normsizes;	/* window's size & pos when not iconified */
-	OBJECT	*w_obj;		/* pointer to objects			*/
-	WORD	w_iconified;	/* true == window is iconified		*/
-	OBJECT	*w_icnobj;	/* pointer to objects in iconified state*/
-	WORD	w_srtitem;	/* file item # to start with		*/
-	WORD	w_icon;		/* disk icon that owns this window	*/
-	WORD	w_vicons;	/* maximum visible icons		*/
-	BYTE	*w_memory;	/* file memory owns by this window	*/
-	WORD	w_items;	/* max number of file items		*/
-	WORD	w_maxicons;	/* max # of icons allocated in window	*/
-	WORD	w_icol;		/* max number of col at any time	*/
-	WORD	w_irow;		/* max number of row at any time	*/
-	TEDINFO	*w_ted;
-	CICONBLK *w_ciblk;	/* starting address of iconblk		*/
-	BYTE	*w_text;	/* starting address of text		*/
-	WORD	w_coli;		/* the horizontal column index 		*/
-	WORD	w_hvicons;	/* number of invisible icon per row	*/
-	WORD	w_rowi;		/* the vertical row index		*/
-	WORD	w_vvicons;	/* number of invisible icon per col	*/
-	WORD	w_xcol;		/* number of visible column of icon	*/
-	WORD	w_xrow;		/* number of visible row of icon	*/
-} WINDOW;	
-
-
 typedef	struct	dir
 {
 	WORD	d_att;		/* attribute	*/
@@ -102,6 +67,44 @@ typedef struct myblk
 	GRECT	*mygrect;
 	BYTE	*myptr;
 } MYBLK;
+
+
+typedef	struct	window
+{
+	BYTE	*w_next;		/* link pointer		*/
+	UWORD	w_id;			/* window handle	*/
+	UWORD	w_free;			/* window free to use	*/
+	BYTE	*w_path;		/* window path name	*/
+	BYTE	*w_buf;			/* scratch buffer	*/
+	WORD	w_level;		/* max level allowed in this path */
+	BYTE	w_info[INFOLEN];	/* info line		*/
+	GRECT	w_sizes;	/* window current size and pos	*/
+	GRECT	w_work;		/* the current working xywh	*/
+	GRECT	w_normsizes;	/* window's size & pos when not iconified */
+	OBJECT	*w_obj;		/* pointer to objects			*/
+	WORD	w_iconified;	/* true == window is iconified		*/
+	OBJECT	*w_icnobj;	/* pointer to objects in iconified state*/
+	DIR	w_icndir;	/* file memory when iconified (just 1 dir) */
+	WORD	w_srtitem;	/* file item # to start with		*/
+	WORD	w_icon;		/* disk icon that owns this window	*/
+	WORD	w_vicons;	/* maximum visible icons		*/
+	BYTE	*w_memory;	/* file memory owns by this window	*/
+	WORD	w_items;	/* max number of file items		*/
+	WORD	w_maxicons;	/* max # of icons allocated in window	*/
+	WORD	w_icol;		/* max number of col at any time	*/
+	WORD	w_irow;		/* max number of row at any time	*/
+	TEDINFO	*w_ted;
+	CICONBLK *w_ciblk;	/* starting address of iconblk		*/
+	BYTE	*w_text;	/* starting address of text		*/
+	WORD	w_coli;		/* the horizontal column index 		*/
+	WORD	w_hvicons;	/* number of invisible icon per row	*/
+	WORD	w_rowi;		/* the vertical row index		*/
+	WORD	w_vvicons;	/* number of invisible icon per col	*/
+	WORD	w_xcol;		/* number of visible column of icon	*/
+	WORD	w_xrow;		/* number of visible row of icon	*/
+	WORD	w_saveid;
+} WINDOW;	
+
 
 /* stuff added from gemlib.h since gemlib.h has a different window struct */\
 /* DLF 2/23/93 */
@@ -159,6 +162,10 @@ typedef struct myblk
 #define WF_ICONIFY	26
 #define WF_UNICONIFY	27
 #define WF_UNICONIFYXYWH	28
+#define WF_TOOLBAR	30
+#define WF_FTOOLBAR	31
+#define	WF_NTOOLBAR	32
+
 						/* update flags		*/
 #define	END_UPDATE 0
 #define	BEG_UPDATE 1

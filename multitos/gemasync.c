@@ -368,7 +368,7 @@ i_3:
 
 		if ( aparm & 0x1L )	/* Left button?			*/
 		{			/* Yes then check for ownership	*/
-		  if ( ch_mowner( cu_button ) != currpd )
+		  if ( ch_mowner( cu_button, 1 ) != currpd )
 		    goto mui;
 		}
 

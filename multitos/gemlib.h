@@ -103,6 +103,10 @@
 #define WF_ICONIFY	26
 #define WF_UNICONIFY	27
 #define WF_UNICONIFYXYWH 28
+#define WF_TOOLBAR	30
+#define WF_FTOOLBAR	31
+#define	WF_NTOOLBAR	32
+
 						/* update flags		*/
 #define	END_UPDATE 0
 #define	BEG_UPDATE 1
@@ -293,6 +297,7 @@ typedef	struct	window {
     struct  window *wnext;	/* ptr to next WINDOW in database */
     BYTE    *drawaddr;
     WORD    w_msg[MSG_SIZE];
+    OBJECT  *ad_tools;		/* ptr to ToolBar Tree */
 } WINDOW;
 
 

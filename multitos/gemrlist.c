@@ -4,6 +4,7 @@
  * Jun 19 1991	ml.	Created this.
  * Feb 16, 1993 cgee	Converted to Lattice C 5.51
  * Feb 23, 1993 cgee	Force the use of prototypes
+ * Jun 01, 1993 cgee	Modified genrlist() to work with WF_TOOLBAR requests
  *
  */
 #include "pgem.h"
@@ -246,6 +247,7 @@ delrect(rp, rlist)
 	UWORD	handle;	    /* window handle */
 	WORD	area;	    /* WF_WORKXYWH: generate rectangle list of work area */
 		    /* WF_CURRXYWH: generate rectangle list of whole window */
+		    /* WF_TOOLBAR: generate rectangle list for TOOLBAR area */
 {
     WINDOW	*wp;	    /* ptr to current window structure */
     GRECT	wrect;	    /* rectangle of current window */
@@ -263,12 +265,18 @@ delrect(rp, rlist)
 	return(  ( RLIST *)NULLPTR );
 
     /* initialize rectangle list */
-    if (area == WF_WORKXYWH)
-	rlist->rect = *(GRECT *)&(wp->obj[W_WORK].ob_x);
-    else { /* if (area == WF_CURRXYWH) */
-	rlist->rect = wp->curr;
-	rlist->rect.g_w += SHADOW;    /* add thickness for drop shadow */
-	rlist->rect.g_h += SHADOW;    /* add thickness for drop shadow */
+    if( area == WF_TOOLBAR )	/* cjg 06/01/93 */
+/*        rlist->rect = *( GRECT *)&( wp->ad_tools[ ROOT ].ob_x );*/
+	  ob_actxywh( ( LONG )wp->ad_tools, ROOT, &rlist->rect );
+    else {
+    
+      if (area == WF_WORKXYWH)
+	  rlist->rect = *(GRECT *)&(wp->obj[W_WORK].ob_x);
+      else { /* if (area == WF_CURRXYWH) */
+	  rlist->rect = wp->curr;
+	  rlist->rect.g_w += SHADOW;    /* add thickness for drop shadow */
+	  rlist->rect.g_h += SHADOW;    /* add thickness for drop shadow */
+      }
     }
 
     /* process all windows that are on top of the given window */

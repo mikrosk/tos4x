@@ -1,12 +1,17 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
+* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/04/30 12:12:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/03 00:17:02 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.18  1991/05/03  00:17:02  apratt
+* Took out xmfree calls on the env and basepage of a process: if the
+* terminating process doesn't own its env or basepage then they should
+* not be freed.
+*
 * Revision 2.17  1991/04/30  12:12:38  apratt
 * Converted DBCMDs to new infix DB style
 *
@@ -126,8 +131,6 @@ PD *r;			/* -> basepage */
      *  which is fine.)
      */
     xmfreeall(r);
-    (void)xmfree(r->p_env);
-    (void)xmfree(r);
 
     /*
      * remove this entry from pdtab.

@@ -46,6 +46,17 @@
  *
  * 02/11/93   cjg	- Convert to Lattice C 5.51
  * 02/19/93   cjg	- Force the use of Prototypes
+ * 04/29/93   cjg	- SetMaxHeight() - Fixed max height to be
+ *		   	  height - ( 2 * gl_hchar ).
+ * 05/14/93   cjg	- Modifiy InitMenus() to init list height.
+ *			- Modify RestoreMenu() to handle DropDownLists
+ *			- Added new routines to handle dropdown lists
+ * 06/10/93   cjg 	- Modified MenuScrollAdjust() to handle 
+ *			  scrolling menus whose parents are not
+ *			  at the ROOT.
+ * 			- Modified SetListHeight() to handle 
+ *			  drop-down list menus whose parents are not
+ *			  at the ROOT.
  */
 
 
@@ -75,17 +86,22 @@ EXTERN GRECT 	  gl_rfull;	/* GRECT of the full window area */
 EXTERN WORD	  gl_hchar;
 EXTERN WORD	  gl_wchar;
 
-
+EXTERN WORD	  Old_Offset;
 
 
 /* GLOBALS
  * ================================================================
  */
-MENU_PTR MenuList;		  /* Pointer to the head of the linked list */
-				  /* that contains the structures of the    */
-				  /* menus that are to be displayed, such as*/
-				  /* the ObRect, blit buffer etc...         */
-WORD MAX_MENU_HEIGHT;		  /* The menu height we start scrolling     */
+MENU_PTR MenuList;		/* Pointer to the head of the linked list   */
+				/* that contains the structures of the      */
+				/* menus that are to be displayed, such as  */
+				/* the ObRect, blit buffer etc...           */
+WORD MAX_MENU_HEIGHT;		/* The menu height we start scrolling       */
+
+WORD MAX_LIST_HEIGHT;		/* Inititialize to 8 in mn_init() - cjg     */
+WORD  DListFlag;		/* If TRUE -> This is a Drop Down List Menu */
+MENU_PTR DListPtr;		/* Global Pointer to MenuPtr for	    */
+				/* Drop Down Lists - Sliders Control        */
 
 
 /* FUNCTIONS
@@ -204,6 +220,7 @@ mn_init( VOID )
     MenuList  = ( MENU_PTR )NULLPTR;  /* Clear out the Master Menu Node Pointer */
     IndexList = ( PNODE_PTR )NULLPTR;  /* Clear the SubMenu Index Master Pointer */
     MenuBar_Mode = 0;	  /* 8/3/92 */	
+    MAX_LIST_HEIGHT = INIT_LIST_HEIGHT;  /* cjg 05/14/93 Set Drop Down List Height */
 }
 
 
@@ -414,7 +431,11 @@ REG MENU_PTR	MenuPtr;		/* ptr to the Menu Node   */
 /* CountMenuItems()
  * ================================================================
  * Get the Number of Menu Items in this menu based off of the parent.
- *         Last Child - First Child + 1 == Num of Menu Items.
+ * We count by going through the actual objects rather than
+ * doing a subtraction from the last child to the first child.
+ * This is because when a menu has been shortend for scrolling,
+ * the last child and the first child might only be that for
+ * the original menu, not the shortend scrolled version.
  *
  * IN:  MENU_PTR MenuPtr - Ptr to the menu node in question
  * OUT: returns the number of menu items in this menu.
@@ -550,11 +571,8 @@ BOOLEAN		adjust_flag;		/* see above...            */
 
 
     MTOP_OBJ( MenuPtr ) = max( MSCROLL( MenuPtr ), offset_obj);
-/*
-    if(( offset_obj > MSCROLL( MenuPtr ) ) && (MSCROLL( MenuPtr ) != MFIRST_CHILD( MenuPtr )))
- */
-   if(( start_obj > MSCROLL( MenuPtr ) ) && (MSCROLL( MenuPtr ) != MFIRST_CHILD( MenuPtr )))
-   {
+    if(( start_obj > MSCROLL( MenuPtr ) ) && (MSCROLL( MenuPtr ) != MFIRST_CHILD( MenuPtr )))
+    {
         MB_OBJ( MenuPtr ) = min(((( MAX_MENU_HEIGHT - ( MSCROLL( MenuPtr ) - MFIRST_CHILD( MenuPtr )))
 				  + offset_obj ) - 1 ), MLAST_CHILD( MenuPtr ) );
     }
@@ -626,8 +644,11 @@ REG MENU_PTR	MenuPtr;	/* ptr to the menu node... */
    /* Fix up menus that have a height > MAX_MENU_HEIGHT 
     * Restore the text that occupied the original menu items, if required
     * If we got this far, it is required....
+    *
+    * HOWEVER, Ignore this for Drop Down Lists.	05/14/93 cjg
     */
-    PopArrowText( MenuPtr );
+    if( !DListFlag )    
+        PopArrowText( MenuPtr );
 
     obj = ObHead( parent );
     while( obj != parent )
@@ -785,9 +806,9 @@ WORD		start_obj;	/* the menu item that we want on top*/
 	   ob_add( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ), obj );
 	MTOP_OBJ( MenuPtr ) = offset_obj;
 
-        /* Delete the bottom object or objects.*/
-        new_bottom = min( (MAX_MENU_HEIGHT - MSCROLL(MenuPtr))+start_obj,
-			   MLAST_CHILD( MenuPtr ) );
+        /* Delete the bottom object or objects. - Modified cjg 06/10/93 */
+        new_bottom = min( (MAX_MENU_HEIGHT - ( MSCROLL(MenuPtr) - MFIRST_CHILD( MenuPtr ) ))
+			   +start_obj - 1, MLAST_CHILD( MenuPtr ) );
 
 	for( obj = ( new_bottom + 1 ); obj <= MB_OBJ( MenuPtr ); obj++ )
              ob_delete( ( LONG )MTREE( MenuPtr ), obj );
@@ -802,9 +823,10 @@ WORD		start_obj;	/* the menu item that we want on top*/
            ob_delete( ( LONG )MTREE( MenuPtr ), obj );
         MTOP_OBJ( MenuPtr ) = offset_obj;
       
-        /* Add in the bottom objects */
-        new_bottom = min( (MAX_MENU_HEIGHT - MSCROLL(MenuPtr))+start_obj,
-			   MLAST_CHILD( MenuPtr ) );
+        /* Add in the bottom objects - Modified cjg 06/10/93  */
+        new_bottom = min( (MAX_MENU_HEIGHT - ( MSCROLL(MenuPtr) - MFIRST_CHILD( MenuPtr )) )
+			  +start_obj - 1, MLAST_CHILD( MenuPtr ) );
+
         for( obj = MB_OBJ( MenuPtr ) + 1; obj <= new_bottom; obj++ )
            ob_add( ( LONG )MTREE( MenuPtr ), MPARENT( MenuPtr ), obj );
         MB_OBJ( MenuPtr ) = new_bottom;
@@ -940,10 +962,211 @@ WORD	height;
      MAX_MENU_HEIGHT = MIN_HEIGHT;
 
    /* See if we exceed the height of the screen */
-   /* max_height = (( gl_rfull.g_h - ( gl_hchar / 2 ) - 1 )/ gl_hchar); */
-   max_height = (( gl_rfull.g_h - ( gl_hchar * 2) )/ gl_hchar);
+/*   max_height = (( gl_rfull.g_h - ( gl_hchar / 2 ) - 1 )/ gl_hchar);*/
+   max_height = (( gl_rfull.g_h - ( gl_hchar * 2 ) )/ gl_hchar);/* cjg 04/29/93*/
    if( height >= max_height )
      MAX_MENU_HEIGHT = max_height;
 
    return( MAX_MENU_HEIGHT );
 }
+
+
+
+
+
+/* CheckListHeight()
+ * ================================================================
+ * The menu will be shortened to MAX_LIST_HEIGHT
+ * In addition, the starting object will be the first menu item if
+ * possible and it will be selected.
+ * If there are fewer than MAX_LIST_HEIGHT menu items, the menu
+ * will appear as a popup with no sliders.
+ *
+ * IN:  MENU_PTR MenuPtr - The ptr to the Menu Node that we need to check.
+ * OUT: VOID
+ */
+VOID
+CheckListHeight( MenuPtr )
+REG MENU_PTR	MenuPtr;		/* ptr to the Menu Node   */
+{
+    REG OBJECT *tree;
+
+    ActiveTree( MTREE( MenuPtr ) );
+
+    MWIDTH( MenuPtr  ) = ObW( MPARENT( MenuPtr ) );     /* Set width and the*/
+    MHEIGHT( MenuPtr ) = ObH( MPARENT( MenuPtr ) );     /* height ( init )  */
+
+    if( MNUM_ITEMS( MenuPtr ) > MAX_LIST_HEIGHT )
+       SetListHeight( MenuPtr, MSTART_OBJ( MenuPtr ) );	
+
+    Old_Offset = MOFFSET( MenuPtr );
+}
+
+
+
+
+
+/* SetListHeight()
+ * ================================================================
+ * Sets the menu height to MAX_LIST_HEIGHT and cut it down to size.
+ * THIS IS FOR A DROP DOWN LIST.
+ *
+ * IN: MENU_PTR MenuPtr   - the menu ptr in question
+ *     WORD     start_obj - the menu item that we should have at the top.
+ *
+ * OUT: VOID
+ */
+VOID
+SetListHeight( MenuPtr, start_obj )
+REG MENU_PTR	MenuPtr;		/* ptr to the menu node    */
+WORD		start_obj;		/* menu item at the top    */
+{
+    REG	OBJECT *tree;			/* object tree in question */
+    REG WORD   obj;			/* temp object             */
+    WORD       parent;			/* menu object             */
+    WORD       offset_obj, temp;	/* Offset menu item        */
+
+    ActiveTree( MTREE( MenuPtr ) );
+    parent  = MPARENT( MenuPtr );
+
+    /* Find the offset object necessary */
+    offset_obj = start_obj;
+
+    /* We've added startobj - MPARENT so that we can adjust
+     * for those menus who don't start with root == 0.
+     *
+     * If the start_obj is less than the scrolling starting object,
+     * just position the offset to the first child.
+     */
+
+     if( start_obj <= MFIRST_CHILD( MenuPtr ) )
+     {
+	 offset_obj = MFIRST_CHILD( MenuPtr );
+     }
+     else
+     {
+	     /* Start the object as the first Displayed item! */
+             offset_obj = start_obj;
+             temp = MNUM_ITEMS( MenuPtr ) - MAX_LIST_HEIGHT + MFIRST_CHILD( MenuPtr );
+             if( offset_obj >= temp )
+                offset_obj = temp;
+     }
+
+
+
+    /* Delete the menu items from MFIRST_CHILD to offset object. */
+    for( obj = MFIRST_CHILD( MenuPtr ); obj < offset_obj; obj++ )
+    {
+	ObH( parent ) -= ObH( obj );  /* fixup height of root menu */
+        ob_delete( ( LONG )tree, obj );     /* delete object in question */
+    }
+
+    /* update the yoffset starting from the offset object
+     * by fixing up based upon the height based on height of text
+     */
+    for( obj = offset_obj; obj <= MLAST_CHILD( MenuPtr ); obj++ )
+	  ObY( obj ) = ( obj - offset_obj ) * ObH( obj );
+
+    /* Now, shorten the menu to the new height reducing the size of the
+     * root menu and deleting the excess menu items.
+     */
+    for( obj = MLAST_CHILD( MenuPtr ); obj > ( offset_obj + MAX_LIST_HEIGHT - 1 ); obj-- )
+    {
+       ObH( parent ) -= ObH( obj );
+       ob_delete( ( LONG )tree, obj );
+    }
+
+    MTOP_OBJ( MenuPtr ) = offset_obj;
+    MB_OBJ( MenuPtr ) = min( offset_obj + MAX_LIST_HEIGHT - 1, MLAST_CHILD( MenuPtr ) );
+
+    if( MLASTFLAG( MenuPtr ) )		/* CJG 01/13/92 */
+      ObFlags( MB_OBJ( MenuPtr )) = LASTOB;
+
+    MOFFSET( MenuPtr ) = offset_obj;
+
+    /* Adjust the height of the GRECT to be set to new adjusted height */
+    MHEIGHT( MenuPtr ) = ObH( parent );
+}
+
+
+
+
+/* DListAdjust()
+ * ================================================================
+ * Adjust the resource menu tree while scrolling up and down
+ * IN A DROP DOWN LIST. This is MUCH quicker than just doing a RestoreMenu().
+ * This routine scrolls by adding and deleting objects on the fly.
+ *
+ * IN: MENU_PTR MenuPtr - Ptr to the menu node in question.
+ *     WORD     start_obj - the menu item that we want on top
+ *
+ * OUT: VOID
+ */
+VOID
+DListAdjust( MenuPtr, start_obj )
+REG MENU_PTR	MenuPtr;	/* ptr to the menu node in question */
+WORD		start_obj;	/* the menu item that we want on top*/
+{
+    REG OBJECT *tree;		/* temp tree variable      */
+    REG WORD   obj;		/* temp obj variable       */
+    WORD       offset_obj;	/* the offset/start object */
+    WORD       new_bottom;	/* the new bottom object   */
+
+    ActiveTree( MTREE( MenuPtr ) );
+
+    /* Find the Direction of the Scroll */
+    offset_obj = start_obj;
+
+    if( offset_obj < MTOP_OBJ( MenuPtr ) )
+    {
+	/*  UP ARROW SCROLL */
+
+	/* Add in the objects preceding up to offset_obj */
+	for( obj = offset_obj; obj < MTOP_OBJ( MenuPtr ); obj++ )
+	   ob_add( ( LONG )tree, MPARENT( MenuPtr ), obj );
+	MTOP_OBJ( MenuPtr ) = offset_obj;
+
+        /* Delete the bottom object or objects.*/
+        new_bottom = start_obj + MAX_LIST_HEIGHT - 1;
+
+	for( obj = ( new_bottom + 1 ); obj <= MB_OBJ( MenuPtr ); obj++ )
+             ob_delete( ( LONG )tree, obj );
+	MB_OBJ( MenuPtr ) = new_bottom;
+    }
+    else
+    {
+ 	/* DOWN ARROW SCROLL */
+
+        /* Delete the starting objects. */
+	for( obj = MTOP_OBJ( MenuPtr ); obj < min( MB_OBJ( MenuPtr ) + 1, offset_obj ); obj++ )
+         ob_delete( ( LONG )tree, obj );
+        MTOP_OBJ( MenuPtr ) = offset_obj;
+      
+        /* Add in the bottom objects */
+        new_bottom = start_obj + MAX_LIST_HEIGHT - 1;
+
+        for( obj = max( MB_OBJ( MenuPtr ) + 1, offset_obj ); obj <= new_bottom; obj++ )
+           ob_add( ( LONG )tree, MPARENT( MenuPtr ), obj );
+        MB_OBJ( MenuPtr ) = new_bottom;
+    }
+
+    /* Adjust the ypos offsets */
+    for( obj = MTOP_OBJ( MenuPtr ); obj <= MB_OBJ( MenuPtr ); obj++ )
+    {
+       MTREE( MenuPtr )[obj].ob_state &= ~SELECTED;
+
+       MTREE( MenuPtr )[obj].ob_y = ( obj - MTOP_OBJ( MenuPtr )) *
+			            MTREE( MenuPtr )[ MTOP_OBJ( MenuPtr ) ].ob_height;
+
+       MTREE( MenuPtr )[obj].ob_flags &= ~LASTOB;
+    }
+
+    /* Set the LASTOB only if the menu started out that way. */
+    if( MLASTFLAG( MenuPtr ) )
+        MTREE( MenuPtr )[ MB_OBJ( MenuPtr ) ].ob_flags |= LASTOB;
+
+    MOFFSET( MenuPtr ) = offset_obj;		/* set the new offset  */
+}
+
+
+

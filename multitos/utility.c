@@ -207,7 +207,7 @@ rc_copy(psxywh, pdxywh)
 	*pdxywh++ = *psxywh++;
 	*pdxywh++ = *psxywh++;
 	*pdxywh++ = *psxywh++;
-	*pdxywh++ = *psxywh++;
+	*pdxywh = *psxywh;
 }
 
 

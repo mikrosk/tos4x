@@ -438,7 +438,7 @@ gr_slidebox(tree, parent, obj, isvert)
 	REG LONG	divnd, divis;
 	OBJECT		*objc;
 	WORD		pstate,cstate;
-	WORD		ret,setxy;
+	WORD		ret;
 
 	pt = &t;
 	pc = &c;
@@ -462,8 +462,6 @@ gr_slidebox(tree, parent, obj, isvert)
 	else
 	  cstate = 0;
 	  
-	setxy = 0;
-
 	if ( cstate )	/* if the child is 3D, then adjust its size 	    */
 	{	
  	  pt->g_x -= ADJ3DPIX;

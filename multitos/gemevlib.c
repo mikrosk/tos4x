@@ -171,14 +171,6 @@ ev_mesag( pbuff )
 	BYTE	*pbuff;
 {
 	return( ap_rdwr(AQRD, currpd->p_pid, EV_BUFSIZE, pbuff) );
-#if 0
-	if ( !rd_mymsg( pbuff ) )	/* check internal message 	*/
-	{				
-	  if ( !rd_wmmsg( currpd, pbuff ) ) 	/* check window message	*/
-	    return( ap_rdwr(AQRD, currpd->p_pid, EV_BUFSIZE, pbuff) );
-	}
-	return( TRUE );
-#endif
 }
 
 
@@ -263,7 +255,7 @@ check_event( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	      what |= MU_BUTTON;
 	   }
 
-	   if ( currpd != ch_mowner( cu_button ) )
+	   if ( currpd != ch_mowner( cu_button, 1 ) )
 	      what &= ~MU_BUTTON;
 	}
 
@@ -344,17 +336,19 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	REG WORD	prets[];
 {
 	QPB		m;
-	EVSPEC		wmask, kbmsk, bumsk, xbumsk,
+	EVSPEC		wmask, kbmsk, bumsk,
+#if 1
+ xbumsk,
+#endif
 			m1msk, m2msk, qrmsk, tmmsk;
 	REG EVSPEC	which;
 	REG WORD	what;
-/*	REG CQUEUE	*pc;*/
-/*	WORD		type;*/
 	EVB		*e;
-/*	LONG		i;*/
 
-	what = wmask = kbmsk = xbumsk = bumsk = m1msk = m2msk = qrmsk = tmmsk = 0x0;
-
+	what = wmask = kbmsk = bumsk = m1msk = m2msk = qrmsk = tmmsk = 0x0;
+#if 1
+	xbumsk = 0;
+#endif
 	if ( ( currpd->p_state == PS_ALLRUN ) && ( currpd != errpd ) 
 		&& ( currpd != scr_pd ) )
 	{
@@ -388,9 +382,10 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	  if (flags & MU_BUTTON)		/* wait for a button	*/	
 	    wmask |= bumsk = iasync( ABUTTON, buparm );
 
+#if 1		/* MU_XBUTTON isn't used anywhere else! */
 	  if (flags & MU_XBUTTON)
 	    wmask |= xbumsk = iasync( AXBUTTON, buparm ); 
-					
+#endif
 	  if (flags & MU_M1)			/* wait for mouse rect.	*/
 	    wmask |= m1msk = iasync( AMOUSE, ( LONG )pmo1 ); 
 					
@@ -451,6 +446,13 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	    }
 	  }
 
+#if 1
+/* MU_XBUTTON isn't used anywhere. What's it supposed to do?  Note
+ * that gemasync.c doesn't even look at AXBUTTON, so this code is
+ * bogus until gemasync.c is updated!
+ * or is it... commenting it out causes all sorts of bizarreness.
+ * what's going on???
+ */
 	  if ( which & xbumsk )			/* or button event	*/
 	  {
 	    if ( e = eret( xbumsk ) )
@@ -462,7 +464,7 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	      what |= MU_XBUTTON;
 	    }
 	  }
-
+#endif
 	  if ( which & m1msk )
 	  {
 	    Debug7("ev_multi: m1msk event\r\n");

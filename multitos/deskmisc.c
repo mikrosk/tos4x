@@ -2,7 +2,7 @@
 /*	Change chk_par		9/25/89			D.Mui		*/
 /*	Fix at fill_string to take out control character	7/9/91	*/
 /*	Convert to Lattice C 5.51	2/18/93		C.Gee		*/
-	
+/*	Change rep_path			6/02/93		H.M.Krober	*/	
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -255,16 +255,20 @@ hit_disk( drive )
 
 
 	DIR
-*get_dir( win, item )
+*get_dir ( win, item )
 	WINDOW	*win;
 	WORD	item;
 {
 	WORD	j;
 	DIR	*dir;
 
-	j = win->w_srtitem + item - 1;
-	dir = ( DIR *)win->w_memory;
-	return( &dir[j] );
+	if (win->w_iconified)
+		return &win->w_icndir;
+	else {
+		j = win->w_srtitem + item - 1;
+		dir = ( DIR *)win->w_memory;
+		return( &dir[j] );
+	}
 }
 
 
@@ -272,7 +276,13 @@ hit_disk( drive )
 up_1( win )
 	WINDOW	*win;
 {
-	set_newview( win->w_srtitem, win );
+	WORD	srtitem;
+	
+	if (win->w_iconified)
+		srtitem = 0;
+	else
+		srtitem = win->w_srtitem;
+	set_newview( srtitem, win );
 	do_redraw( win->w_id, &full, 0 );
 }
 
@@ -297,6 +307,8 @@ up_2( win )
 	WINDOW	*win;
 	BYTE	*name;
 {
+	WORD	len;
+
 	strcpy( win->w_path, win->w_buf );
 	rep_path( name, win->w_buf );
 	return( win->w_buf );
@@ -506,7 +518,7 @@ xform_do( obj, which )
 	WORD	ret;
 
 	ret = form_do( obj, which ) & 0x7FFF;
-	obj[ret].ob_state = NORMAL;
+	obj[ret].ob_state &= (~SELECTED);	/* was: ob_state = NORMAL; changed 5/20/93 HMK */
 	return( ret );
 }
 
@@ -611,8 +623,13 @@ rep_path( name, path )
 	BYTE	*path;
 {
 	path = r_slash( path );	
-	path++;
-	strcpy( name, path ); 
+	if (name == NULL) {	/* +++ HMK 6/2/93 */
+		*path = '\0';
+		return;
+	} else {
+		path++;
+		strcpy( name, path ); 
+	}
 }
 
 

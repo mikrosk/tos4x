@@ -61,7 +61,6 @@ EXTERN GRECT      gl_rfull;
 
 
 
-
 /* GLOBALS
  * ================================================================
  */
@@ -633,7 +632,6 @@ GRECT		*rect;		/* rect of the button        */
        Menu_Delete( NewMenuID );
        return( ( MENU_PTR )NULL );
      }
-
      ObjcDraw( tree, MPARENT( MenuPtr ), &gl_rfull );
    }
    return( MenuPtr );

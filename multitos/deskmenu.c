@@ -21,7 +21,8 @@
 /*	Changed v_hardcopy() to d_v_hardcopy()  03/31/93 C.Gee		*/
 /*	Replaced the hardcoded keyboard tables with BIOS calls 5/3/93 ERS */
 /*	Add window iconifying.			05/04/93 H.Krober	*/
-
+/*	Add "Iconify All" windows support	05/27/93 H.Krober	*/
+/*	Add life to iconified windows		06/01/93 H.Krober	*/  
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
 /*	Atari Corp							*/
@@ -67,6 +68,9 @@ EXTERN	WORD	ftab[];
 EXTERN	WORD	st_keybd;
 EXTERN	WORD	d_multi;
 
+EXTERN	WORD	win_alliconified;
+
+WORD	all_icontop;	/* "All Iconify" Window is top */
 WORD	icn_whandle;
 WORD	d_exit;		/* desktop exit flag	*/
 BYTE	mentable[MAXMENU];
@@ -232,6 +236,8 @@ menu_verify( VOID )
 		wp = get_top();
 		if (wp && wp->w_iconified == TRUE)
 			enable = FALSE;
+		if (all_icontop)
+			enable = FALSE;
 	}
 
 	i = 0;	
@@ -259,7 +265,7 @@ menu_verify( VOID )
 
 	enable = FALSE;
 
-	if ( w_gfirst() )
+	if (!all_icontop && w_gfirst() )
 	{
 	  if ( w_gnext() )
 	    enable = TRUE;
@@ -267,6 +273,7 @@ menu_verify( VOID )
 	  men_ienable( menu_addr, CLSWITEM, TRUE ); /* +++ 5/5/93 HMK */
  	  men_ienable( menu_addr, SEAMENU, TRUE );
  	  men_ienable( menu_addr, SHOWITEM, TRUE );
+	  men_ienable( menu_addr, SELALL, TRUE ); /* +++ 6/2/93 HMK */
 	}
 
  	men_ienable( menu_addr, BOTTOP, enable );
@@ -282,15 +289,21 @@ sel_all( VOID )
 {
 	REG WINDOW	*win;
 	REG DIR		*dir;
-	REG WORD	i;
+	REG WORD	i, items;
 	BYTE		buffer[14];
 
-	if ( (win = w_gfirst()) != 0 && !(win->w_iconified) )
+	if ( (win = w_gfirst()) != 0 /* && !win->w_iconified*/)
 	{
 	  clr_dicons( );
-          dir = ( DIR *)win->w_memory;
+	  if (win->w_iconified) {
+		dir = &win->w_icndir;
+		items = 1;
+	  } else {
+	          dir = ( DIR *)win->w_memory;
+		  items = win->w_items;
+	  }
 	  strcpy( g_name( win->w_path ), buffer );
-	  for ( i = 0; i < win->w_items; i++ )
+	  for ( i = 0; i < items; i++ )
 	  {
 	    if ( wildcmp( buffer, dir[i].d_name ) )
 	      dir[i].d_state = SELECTED; 	    
@@ -826,11 +839,12 @@ do_file( msgbuff )
 	    break;
 
 	  case SHOWITEM:
-	    show_item( );
+	    if (!all_icontop)
+		    show_item( );
 	    break;
 
 	  case SEAMENU:		/* search file menu	*/
-	    if ( ( x_status ) || ( w_gfirst() ) )
+	    if (!all_icontop && ( ( x_status ) || ( w_gfirst() ) ))
 	    {
 	      obj = get_tree( SEAFILE );
 	      inf_sset( (LONG)obj, SFILE, Nostr );
@@ -869,29 +883,32 @@ do_file( msgbuff )
 	    break;
 
 	  case NEWFITEM:
-	    if ( win && !topwicon )
+	    if ( win && !topwicon && !all_icontop)
 	      newfolder( win );	  	
 	    break;
 		
 	  case CLSFITEM:
-	    if ( win && !topwicon )
+	    if ( win && !topwicon && !all_icontop)
 	      close_path( win );	/* close one path	*/
 	    break;
 		
 	  case CLSWITEM:		/* close the top window	*/
-	    close_top();
+	    if (!all_icontop)
+	    	close_top();
 	    break;
 
 	  case BOTTOP:			/* bring bot win to top	*/
-	    bottop();
+	    if (!all_icontop)
+		    bottop();
 	    break;
 
 	  case SELALL:
-	    sel_all();
+	    if (!all_icontop)
+		    sel_all();
 	    break;
 
 	  case EXTMENU:
-	    if ( win && !topwicon )
+	    if ( win && !topwicon && !all_icontop)
 	      foption( win );
 
 	    break;
@@ -1004,9 +1021,8 @@ hd_window( msgbuff )
 	REG WORD	msgbuff[];
 {
 	REG WORD	handle;
-	REG WINDOW	*win;	
+	REG WINDOW	*win, *win2;	
 	REG OBJECT	*obj;
-	WINDOW		*win2;
 	WORD		shrink,x,dodraw;
 	GRECT		pt,px;
 	GRECT		*pc;
@@ -1043,13 +1059,12 @@ hd_window( msgbuff )
 	      if ( winhead != win )	/* if not already on top in my list */
 	        clr_allwin();
 	      wind_set( handle, WF_TOP, 0, 0, 0, 0 );
-	      /* next line commented out: since we already did top the window,
-		 (with the wind_set), we should keep track of that fact,
-		 shouldn't we??
-	       */
-	      /* if (!win->w_iconified)	/* only top the window if it isn't iconified */
-	      	make_top( win );
-
+	      if (handle == winpd[MAXWIN].w_id)
+			all_icontop = TRUE;
+	      else {
+			all_icontop = FALSE;
+		      	make_top( win );
+	      }
 	      /* fall through */
 	    case WM_ONTOP:
 	      desk_mice( M_ON );
@@ -1065,7 +1080,9 @@ hd_window( msgbuff )
 	      {
 		win = w_gnext();
 		if (win)
-		  make_top( win );
+			make_top(win);
+		else if (win_alliconified)
+			all_icontop = TRUE;
 	      }
 	      break;
 	      
@@ -1124,7 +1141,14 @@ hd_window( msgbuff )
 	      break;
 		
 	    case WM_UNICONIFIED: /* bring window back to its original state */
-	      uniconify_window(handle, pc);
+	      if (handle == winpd[MAXWIN].w_id)
+		      alluniconify_windows(handle, pc);
+	      else
+		      uniconify_window(handle, pc);
+	      break;
+
+	    case WM_ICONIFYALL:		/* iconify all windows */
+	      alliconify_windows(handle, pc);
 	      break;
 
 	    case WM_FULLED:
@@ -1318,8 +1342,10 @@ actions( VOID )
 	      msgbuff[3] = icn_whandle;	 	
 	      hd_wicon( msgbuff );	
 	    }
-	    else
+	    else {
+	      Debug1("NEWDESK: actions: button event\r\n");
 	      hd_button( clicks, kstate, mx, my );
+	    }
 	  }
 
 	  if ( event & MU_KEYBD )

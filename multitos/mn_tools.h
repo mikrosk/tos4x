@@ -78,21 +78,11 @@ typedef struct _moblk
  */
 typedef struct sColorword
 {
-/*
-#if HIBIT_1ST
 	unsigned cborder : 4;
 	unsigned ctext	 : 4;
 	unsigned replace : 1;
 	unsigned pattern : 3;
 	unsigned cfill	 : 4;
-#else
-*/
-	unsigned cfill	 : 4;
-	unsigned pattern : 3;
-	unsigned replace : 1;
-	unsigned ctext	 : 4;
-	unsigned cborder : 4;
-/*#endif*/
 } Colorword;
 
 
@@ -406,7 +396,7 @@ typedef struct _menu_node
 #define DOWN_ARROW	1
 #define TIME_SAMPLE		150L
 
-#define INIT_MAX_HEIGHT 16
+#define INIT_MAX_HEIGHT 999
 #define MIN_HEIGHT	5
 
 #define INIT_ARROW_DELAY	250L
@@ -426,5 +416,6 @@ typedef struct _menu_node
 #define BEG_MCTRL	3
 #define END_MCTRL	2
 
+#define INIT_LIST_HEIGHT	8	/* Drop Down List Height */
 #endif
 

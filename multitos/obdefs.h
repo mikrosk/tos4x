@@ -1,6 +1,6 @@
 /*	OBDEFS.H	03/15/84 - 02/08/85	Gregg Morris		*/
 /*	Add 3D definitons		7/7/92	D.Mui			*/
-
+/*	Add Speedo Font Support		5/18/93 H.M.Krober		*/
 #ifndef _OBDEFS_H_
 #define _OBDEFS_H_
 
@@ -56,8 +56,11 @@
 #define NOTS_OR_D 13
 #define ALL_BLACK 15
 						/* font types		*/
-#define IBM 3
-#define SMALL 5
+#define GDOS_PROP	0
+#define	GDOS_MONO	1
+#define GDOS_BITM	2
+#define IBM 		3
+#define SMALL 		5
 
 /* Object Drawing Types */
 						/* Graphic types of obs	*/
@@ -228,10 +231,10 @@ TEDINFO
 	LONG		te_ptmplt;	/* ptr to template		*/
 	LONG		te_pvalid;	/* ptr to validation chrs.	*/
 	WORD		te_font;	/* font				*/
-	WORD		te_junk1;	/* junk word			*/
+	WORD		te_fontid;	/* GDOS font id, was junk1 5/93 */
 	WORD		te_just;	/* justification- left, right...*/
 	WORD		te_color;	/* color information word	*/
-	WORD		te_junk2;	/* junk word			*/
+	WORD		te_fontsize;	/* GDOS font size,was junk2 5/93*/
 	WORD		te_thickness;	/* border thickness		*/
 	WORD		te_txtlen;	/* length of text string	*/
 	WORD		te_tmplen;	/* length of template string	*/

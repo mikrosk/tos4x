@@ -259,7 +259,8 @@ WORD	ch_obj( WORD mx, WORD my, WINDOW **win, WORD *item, WORD *type );
 WORD	ch_undo( VOID );
 VOID	file_op( BYTE *dest, WORD mode );
 WORD	build_rect( REG OBJECT *obj, REG GRECT *rect, WORD w, WORD h );
-VOID	chk_rect( REG WINDOW *win, GRECT *rect, WORD id );
+VOID	chk_rect( REG WINDOW *win, GRECT *rect, WORD id);
+VOID	chk_r2(WINDOW *win, WORD id, WORD mode, WORD x, WORD y);
 VOID	frame( WORD x1, WORD y1, WORD x2, WORD y2 );
 VOID	r_box( WORD id, WINDOW *win );
 WORD	abs( WORD x, WORD y );
@@ -352,6 +353,8 @@ VOID	draw_loop(WORD, OBJECT *, WORD, WORD, WORD, WORD, WORD, WORD);
 VOID	winfo(WINDOW *);
 WINDOW	*w_gnext(VOID);
 WINDOW	*w_gfirst(VOID);
+WINDOW	*w_agnext(VOID);
+WINDOW	*w_agfirst(VOID);
 VOID	up_2allwin(BYTE *);
 VOID	up_1allwin(BYTE	*, WORD, WORD);
 VOID	up_allwin(BYTE *, WORD);
@@ -388,6 +391,7 @@ VOID	setclip(GRECT *);
 VOID	iconify_window(WORD, GRECT *);
 VOID	uniconify_window(WORD, GRECT *);
 VOID	set_wiconname(WINDOW *);
+VOID	set_winfont(TEDINFO *, WORD);
 
 /*	----------------------------------------------------------
  *	deskvdi.c
@@ -405,10 +409,19 @@ VOID	v_hide_c(VOID);
 VOID	v_exit_cur(VOID);
 VOID	v_enter_cur(VOID);
 VOID	vs_clip(WORD, WORD *);
-VOID	v_clsvwk(VOID);
+VOID	d_v_clsvwk(VOID);
 VOID	d_vro_cpyfm(WORD, WORD *, LONG *, LONG *);
 VOID	vq_chcells(WORD *, WORD *);
 VOID	d_v_hardcopy( VOID );
+WORD	d_v_load_fonts(VOID);
+VOID	d_v_unload_fonts(VOID);
+WORD	d_v_font_name(WORD, BYTE *, WORD *);
+WORD	d_vqt_width(WORD, WORD *, WORD *, WORD *);
+WORD	d_vqt_attributes(WORD *);
+WORD	d_v_setfont(WORD);
+WORD	d_vst_point(WORD, WORD *, WORD *, WORD *, WORD *);
+WORD	d_vst_arbpt(WORD, WORD *, WORD *, WORD *, WORD *);
+WORD	d_vst_height(WORD, WORD *, WORD *, WORD *, WORD *);
 
 /*	----------------------------------------------------------
  *	deskupda.c
@@ -426,6 +439,8 @@ VOID	desk_term(VOID);
 WORD	ch_xcache(VOID);
 WORD	re_icon(VOID);
 WORD	ini_icon(VOID);
+WORD	d_load_fonts(VOID);
+WORD	build_fontmenu(VOID);
 VOID	adj_menu(WORD);
 WORD	ini_rsc(VOID);
 WORD	chkrscver(BYTE *, BYTE); 

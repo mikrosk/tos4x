@@ -15,6 +15,12 @@
 /*	Convert to Lattice C 5.51		2/17/93		C.Gee	*/
 /*	Force the use of prototypes		2/24/93		C.Gee	*/
 /*	Iconify feature added to screen manager 5/04/93		H.Krober*/
+/*	Add "Iconify All Windows" feature	5/27/93		H.Krober*/
+/*	Added toolbar handling at hctl_window   05/28/93	C.Gee	*/
+/*	Double-Clicking on the title bar will send a FULL message. This */
+/*      only occurs if the window has a full button AND the window      */
+/*      is not iconified.			06/11/93        C.Gee   */
+
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
 *	Copyright (C) 1992 
@@ -226,6 +232,7 @@ hctl_window( mx, my, kshift, clicks )
 	PD		*p;
 	REG OBJECT	*obj;
 
+Debug1("hctl_window()\r\n");
 	if ( ( w_handle = wind_find( mx, my ) ) == NIL )
 	  return;
 	graf_mouse( M_ARROW|0xC000, 0L );
@@ -250,7 +257,10 @@ hctl_window( mx, my, kshift, clicks )
 	switch( cpt )
 	{
 	    case W_SMALLER:		/* +++ 04/93 Iconify Feature */
-		message = WM_ICONIFIED;	
+	      	if (kshift & 0x0004)	/* CONTROL & Iconify = Iconify All Windows */
+			message = WM_ICONIFYALL;	
+	      	else
+	        	message = WM_ICONIFIED;
 		w = WINICON_W; h = WINICON_H;
 		y = gl_rfull.g_y + gl_rfull.g_h - h - 1;
 		goto do_cpt;
@@ -297,6 +307,14 @@ do_cpt:
 		break;
 
 	    case W_NAME:
+
+		/* Double click? treat like a FULLER! cjg 06/11/93 */
+		if( ( clicks == 2 ) && ( kind & FULLER ) &&
+		    ( !pwin->iconflag )  ) {
+		    message = WM_FULLED;
+		    goto do_cpt;
+		}
+		
 		if ( !( gl_button & 1 ) )
 		  goto h_2;
 
@@ -318,7 +336,7 @@ do_cpt:
 	       {
 		 obj[cpt].ob_state |= SELECTED;		  
 		 c_clipdraw( pwin, cpt, NULLPTR );
-		 wm_min( kind, &wm, &hm );
+		 wm_min( pwin, &wm, &hm );
 		 w += pwin->curr.g_w + 1;
 		 h += pwin->curr.g_h + 1;
 		 graf_rubbox( x, y, wm, hm, &w, &h );		/* it uses to be gr_rubwind */
@@ -368,6 +386,37 @@ do_cpt:
 		break;
 
 	    default:
+
+	       /* CJG 05/28/93
+	        * Button Handling for the ToolBar, if any...
+		* 1) ad_tools must be non-zero, its the tree!
+		* 2) The window must not be iconified...
+		* 3) Window must be on TOP	06/01/93 cjg
+		*
+		* 1a) Check if we have clicked on the ToolBar....
+		* 1b) Check if the clicked item is a TouchExit...
+	        */
+	      if( pwin->ad_tools && !pwin->iconflag && 
+		( w_handle == gl_topw ) ) {
+
+		cpt = objc_xfind( pwin->ad_tools, ROOT, MAX_DEPTH, mx, my );
+
+		if( cpt != -1 ) {
+		   if( pwin->ad_tools[ cpt ].ob_flags & TOUCHEXIT ) {
+
+		     x = cpt;	  /* Object Clicked on in the ToolBar */ 
+		     y = clicks;  /* Number of Clicks... */
+		     w = kshift;  /* keystate at time of clicks	*/
+		     h = 0; 
+		     message = WM_TOOLBAR;
+		     cpt = W_BOX;	  /* Clear cpt object */
+		     break;
+		   }
+		}
+		cpt = W_BOX;
+	      }
+
+
 		/* +++ 04/05/93 HMK
 		 * If window is iconoified and a double click is
 		 * hapening on the window's work area, uniconify the
@@ -395,6 +444,7 @@ h_2:	      if ( w_handle != gl_topw )
 		rets[1] = p->p_pid;
 		hctl_mesag( rets );
 	      }
+	      Debug1("hctl_window: button - default\r\n");
 
 	  }/* switch */
 
@@ -461,8 +511,41 @@ h_2:	      if ( w_handle != gl_topw )
 	      {
 	        ct_wmsgup( message, p->p_pid, w_handle, x, y, w, h );
 	      }
-	      else
-	        ct_msgup( message, p->p_pid, w_handle, x, y, w, h );
+	      else {
+	        if( message == WM_TOOLBAR ) {  /* TOOLBAR HANDLING */
+
+		    /* The TOOLBAR needs to force an immediate dispatch
+		     * and then sit around waiting for the button to
+		     * come back up.  We can't exit this function
+		     * because we don't want other toolbar messages.
+		     */
+		    kind = TRUE;
+
+		    do {
+	               wind_update( 0 );    /* give up the screen  */
+
+	               if( kind ) {	    /* Send the message only once */
+	                 ct_msgup( message, p->p_pid, w_handle, x, y, w, h );
+		       }
+					/* Delay for half current double*/
+					/* click time: allow button to	*/
+					/* come back up on single click.*/
+	               if( kind ) {	/* Only delay 1st time through */ 
+		         kind = FALSE;
+		         evnt_timer( gl_dclick * 8, 0  );
+	               }
+
+	               wind_update( 1 );	/* take back the screen	*/
+			
+		    }while( gl_button & 1 );
+		    graf_mouse( M_RESTORE, 0L );
+		    return;  
+
+		}   /* end of if( message == WM_TOOLBAR */
+		else                           /* ALL OTHER MESSAGE HANDLING*/
+	 	    ct_msgup( message, p->p_pid, w_handle, x, y, w, h );
+
+	      }
 	    }
 	  }
 

@@ -114,18 +114,18 @@ crysbind( pcrys_blk )
 	UWORD		*control;
 	LONG		temp;
 
-	if ( currpd->p_state == PS_ZOMBIE )
-	{
-	  ret = FALSE;
-	  goto c_1;
-	}
-
 	control = (UWORD *)(pcrys_blk->cb_pcontrol);
 	global_in = (LONG *)(pcrys_blk->cb_pglobal);
 	int_in = (WORD *)(pcrys_blk->cb_pintin);
 	addr_in = (LONG *)(pcrys_blk->cb_padrin);
 	int_out = (WORD *)(pcrys_blk->cb_pintout);
 	addr_out = (LONG *)(pcrys_blk->cb_padrout);
+
+	if ( currpd->p_state == PS_ZOMBIE )
+	{
+	  ret = FALSE;
+	  goto c_1;
+	}
 
 	ret = TRUE;
 
@@ -565,6 +565,13 @@ chkbind( pcrys_blk, what )
 	ret = TRUE;		/* set up correct return code	*/
 	wait = FALSE;		/* assume no need to wait	*/
 
+ 	control = (UWORD *)(pcrys_blk->cb_pcontrol);
+	global_in = (LONG *)(pcrys_blk->cb_pglobal);
+	int_in = (WORD *)(pcrys_blk->cb_pintin);
+	addr_in = (LONG *)(pcrys_blk->cb_padrin);
+	int_out = (WORD *)(pcrys_blk->cb_pintout);
+	addr_out = (LONG *)(pcrys_blk->cb_padrout);
+
 	if ( currpd->p_state == PS_ZOMBIE )
 	  goto c_out;
 
@@ -573,13 +580,6 @@ chkbind( pcrys_blk, what )
 	  if (!gl_multi) wait = TRUE;
 	  goto c_out; 
 	}
-
- 	control = (UWORD *)(pcrys_blk->cb_pcontrol);
-	global_in = (LONG *)(pcrys_blk->cb_pglobal);
-	int_in = (WORD *)(pcrys_blk->cb_pintin);
-	addr_in = (LONG *)(pcrys_blk->cb_padrin);
-	int_out = (WORD *)(pcrys_blk->cb_pintout);
-	addr_out = (LONG *)(pcrys_blk->cb_padrout);
 
 	Debug7( currpd->p_name );
 	Debug7( " calls chkbind " );

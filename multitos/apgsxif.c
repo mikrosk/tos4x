@@ -5,7 +5,8 @@
 /*	Change at gsx_start for new pixel ratio	7/26/89	D.Mui		*/
 /*	Restore into C lanuage from 3.01	8/30/90	D.Mui		*/
 /*	Inquire the number of planes by making extend call 2/13/92	*/
-
+/*	Add GDOS support for gsx_tblt & gsx_tcalc 5/21/93 H.M.Krober	*/
+/*	Add set_cufont call to set current font	  5/21/93 H.M.Krober	*/
 /*
 *	-------------------------------------------------------------
 *	GEM Application Environment Services		  Version 1.0
@@ -35,6 +36,9 @@ GLOBAL	WORD	gl_fsm;		/* 0 system font 	*/
 				/* 1 .... load font 	*/
 GLOBAL	WORD	gl_spd;		/* Speedo engine	*/
 
+GLOBAL	WORD	gl_numfonts;
+
+GLOBAL	WORD	gl_size;
 GLOBAL	WORD	gl_width;
 GLOBAL	WORD	gl_height;
 
@@ -89,6 +93,65 @@ GLOBAL GRECT	gl_rfull;	/* work area below the menu	*/
 GLOBAL GRECT	gl_rzero;	/* zero GRECT			*/
 GLOBAL GRECT	gl_rcenter;	/* center of the screen		*/	
 GLOBAL GRECT	gl_rmenu;	/* menu area			*/
+
+
+GLOBAL WORD	cu_font;	/* current font type used	*/
+				/* font types:			*/
+				/*  0 = Speedo Proportional	*/
+				/*  1 = Speedo Monospaced	*/
+				/*  2 = GDOS Bitmap		*/
+				/*  3 = System Font		*/
+				/*  5 = Small Font		*/
+				
+GLOBAL WORD	cu_font_id;	/* current font id (GDOS)	*/	
+GLOBAL WORD	cu_wchar;	/* current char width		*/
+GLOBAL WORD	cu_hchar;	/* current char height		*/
+GLOBAL WORD	cu_space;	/* current char space		*/
+GLOBAL WORD	cu_hptschar;	/* current char width pts	*/
+GLOBAL WORD	cu_wptschar;	/* current char height pst	*/
+GLOBAL WORD	cu_spd;		/* current font is speedo font	*/
+GLOBAL WORD	cu_prop;	/* current font uses 		*/
+				/*   proportional output	*/
+
+
+WORD	bitstmap;		/* TRUE = use Bitstream char map*/
+				/* FALSE = use ATARI char map   */
+
+/*
+ *	Bitstream character mapping table
+ */
+short ATable[] = {
+      0,    295,    292,    294,    293,     336,    559,    353,    302,    505,     
+     31,
+    330,     31,     31,    522,    523,     16,     17,     18,     19,     20,
+     21,     22,     23,     24,     25,     31,     31,     31,     31,     31,
+     31,    
+     0,      1,      2,      3,      4,      5,      6,      7,      8,      9,
+     10,     11,     12,     13,     14,     15,     16,     17,     18,     19,
+     20,     21,     22,     23,     24,     25,     26,     27,     28,     29,
+     30,     31,     32,     33,     34,     35,     36,     37,     38,     39,
+     40,     41,     42,     43,     44,     45,     46,     47,     48,     49,
+     50,     51,     52,     53,     54,     55,     56,     57,     58,     59,
+     60,     61,     62,     63,     64,     65,     66,     67,     68,     69,
+     70,     71,     72,     73,     74,     75,     76,     77,     78,     79,
+     80,     81,     82,     83,     84,     85,     86,     87,     88,     89,
+     90,     91,     92,     93,     94,    314,    148,    215,    252,    258,
+    256,    260,    117,    149,    248,    246,    250,    236,    238,    240,
+    255,    113,    251,    118,    114,    203,    205,    201,    213,    211,
+    221,    206,    216,     98,     97,    274,    121,     99,    262,    242,
+    199,    209,    195,    196,     31,     31,    127,    310,    309,    153,
+    151,    128,    125,    126,    254,    207,    115,    119,    120,    116,
+    259,    253,    208,    136,    130,    108,    279,    503,    504,    334,
+    275,    276,     31,     31,     31,     31,     31,     31,     31,     31,
+     31,     31,     31,     31,     31,     31,     31,     31,     31,     31,
+     31,     31,     31,     31,     31,     31,     31,     31,     31,    110,
+     31,    303,    319,    320,    313,    326,    316,    327,    325,    328,
+    317,    324,    318,    321,    428,    329,    298,    299,    287,    286,
+    290,    291,    300,    301,    285,    289,    499,    500,    341,    302,
+    543,    160,    161,    230
+};
+
+
 
 
 	BOOLEAN
@@ -413,13 +476,15 @@ s_pntsize( buffer )
 	{
 	  if ( size = (WORD)l )
 	  {
-	    if ( gl_fsm )
-	      vst_arbpt( size, &gl_wptschar, &gl_hptschar, &gl_wchar, &gl_hchar );
-	    else
-	      v_setpoint( size,	&gl_wptschar, &gl_hptschar, &gl_wchar, &gl_hchar );
-
-	    gl_ws.ws_chmaxh = size;		/* max height of character	*/
-
+	    if ( gl_fsm ) {
+		vst_arbpt( size, &gl_wptschar, &gl_hptschar, &gl_wchar, &gl_hchar );
+		gl_hchar += 1;		/* necessary for Speedo fonts; otherwise in replacement */
+		gl_hptschar += 1;	/* mode (BOXTEXT) the top line gets overdrawn.		*/
+	    } else
+	      size = v_setpoint( size,	&gl_wptschar, &gl_hptschar, &gl_wchar, &gl_hchar );
+		
+	    gl_ws.ws_chmaxh = gl_hptschar;		/* max height of character	*/
+	    gl_size = size;
 	  }
 	}
 }
@@ -437,9 +502,10 @@ gsx_lfont( buffer )
 
 	if ( asctobin( buffer, &l ) )
 	{
+#if 0	  /* already done, see gsx_start +++ 5/18/93 HMK */
 	  num = v_load_fonts();
-
-	  for ( i = 0; i < num; i++ )
+#endif
+	  for ( i = 0; i < gl_numfonts; i++ )
 	  {
 	    id = v_font_name( i, name, &type );
 
@@ -447,13 +513,16 @@ gsx_lfont( buffer )
 	    {
 	      gl_fid = id;
 	      gl_fsm = type;
-	      v_setfont( gl_fid );	
+	      v_setfont( gl_fid );
+	      s_pntsize("10");	/* set default point size */	
 	      break;
 	    }
 	  }
 	}
 }
 
+WORD	work_in[11];
+WORD	work_out[57];
 
 	VOID
 gsx_start()
@@ -461,15 +530,24 @@ gsx_start()
 /*	REG WORD	nc;*/
 	WORD		dummy;
 	LONG		*l;
+	WORD		i, handle;          
 						/* force update		*/
 	gl_mode = gl_mask = gl_tcolor = gl_lcolor = -1;
-	gl_fid = gl_fis = gl_patt = gl_font = -1;
+	gl_fis = gl_patt = gl_font = -1;
 	gl_xclip = 0;
 	gl_yclip = 0;
 	gl_width = gl_wclip = gl_ws.ws_xres + 1;
 	gl_height = gl_hclip = gl_ws.ws_yres + 1;
 	gl_fsm = 0;
-	
+	gl_fid = 1;
+	gl_numfonts = 1;
+	  
+	for (i = 0; i < 10; i++)
+		work_in[i] = 1;
+	work_in[10] = 2;	/* RC */
+	v_opnvwk(work_in, &handle, work_out, &work_out[45]);
+	v_clsvwk(handle);
+
 	intin[0] = 1;
 	gsx_ncode( 102, 0, 1 );
 	gl_nplanes = intout[4];
@@ -497,16 +575,22 @@ gsx_start()
 	gl_hptschar = ptsout[1];	/* character height		*/
 	gl_wchar = ptsout[2];		/* Cell width			*/
 	gl_hchar = ptsout[3];		/* Cell height			*/
-
+	
+	gl_size = 0;
 	gl_ws.ws_chmaxh = gl_hptschar;	/* max height of character	*/
 					/* Set the default char height size	*/
 	vst_height( gl_ws.ws_chmaxh, &gl_wptschar, &gl_hptschar, &gl_wchar, &gl_hchar );
 
+					/* Set the small char height size	*/
+	vst_height( gl_ws.ws_chminh, &gl_wsptschar, &gl_hsptschar, &gl_wschar, &gl_hschar );
+
 					/* Load AES font type	*/
+	if (gl_spd) 
+		gl_numfonts = v_load_fonts();	/* +++ HMK 5/18/93*/
+
 	Debug1( "Set font\r\n" );
 
 	(VOID) s_aescnf( AE_FONTID,  (WORD (*)()) &gsx_lfont );
-
 	(VOID) s_aescnf( AE_PNTSIZE, (WORD (*)()) &s_pntsize );
 
 /* if font is not initialized, assume system font */
@@ -519,9 +603,13 @@ gsx_start()
 	{				/* get the widthest font value	*/
 	  vqt_width( 'M', &gl_space, &dummy, &dummy ); 
 	  gl_wchar = gl_space;
-	  gl_ws.ws_chminh += 2;		/* this is a kludge */
+
+	 /* gl_ws.ws_chminh += 2;*/	/* this is a kludge */
 					/* which still doesn't work: ERS */
 	}
+#if 0				
+	/* MOVED UP, 05/93 HMK */
+	/* SMALL will always default to ROM system font !!! */
 					/* get the small size character	*/
 	vst_height( gl_ws.ws_chminh, &gl_wsptschar, &gl_hsptschar, &gl_wschar, &gl_hschar );
 
@@ -532,13 +620,15 @@ gsx_start()
 	}
 	Debug1( "System min char height is " );
 	Ndebug1( (LONG)gl_ws.ws_chminh );
-
+#endif
 /*	v_set_alignment( 0, 1 );	*/
 
-	if ( gl_hchar < ( gl_hptschar + 2 ) )
+	if ( gl_hchar < ( gl_hptschar + 2 ) ) {
+	  Debug1("gsx_start: gl_hchar = gl_hptschar + 2;\r\n");
 	  gl_hchar = gl_hptschar + 2;
+	}
 
-	gl_ncols = gl_width / gl_wchar;
+	gl_ncols = gl_width / gl_wchar ;
 	gl_nrows = gl_height / gl_hchar;
 	gl_hbox = gl_hchar + 3;
 
@@ -548,6 +638,21 @@ gsx_start()
 
 	if ( gl_wbox < ( gl_wchar + 2 ) )
 	  gl_wbox = gl_wchar + 2;
+
+	/* Set up current font information, +++ HMK 05/18/93  */
+	cu_font		= IBM;
+	cu_font_id	= gl_fid;
+	cu_wchar	= gl_wchar;
+	cu_hchar	= gl_hchar;
+	cu_space	= gl_space;
+	cu_wptschar	= gl_wptschar;
+	cu_hptschar	= gl_hptschar;
+	cu_prop		= 0;
+	cu_spd		= gl_spd;
+
+Debug1("gsx_start: GL_HCHAR    ="); Ndebug1((LONG)gl_hchar);
+Debug1("gsx_start: GL_HPTSCHAR ="); Ndebug1((LONG)gl_hptschar);
+
 
 	vsl_type( 7 );		/* User defined line pattern */
 	vsl_width( 1 );		/* line width	*/
@@ -591,10 +696,10 @@ bb_fill(mode, fis, patt, hx, hy, hw, hh)
 }
 
 
-	UWORD
+	UWORD		
 ch_width(fn)
 	WORD		fn;
-{
+{				/* just for system font */
 	if (fn == IBM)
 	  return(gl_wchar);
 	if (fn == SMALL)
@@ -608,7 +713,7 @@ ch_width(fn)
 	UWORD
 ch_height(fn)
 	WORD		fn;
-{
+{				/* just for system font */
 	if (fn == IBM)
 	  return(gl_hchar);
 	if (fn == SMALL)
@@ -617,75 +722,210 @@ ch_height(fn)
 	return(0);
 }
 
+/*
+ *	set_cufont  +++ HMK 5/93
+ *	This function is called in gemoblib before every
+ *	gsx_tblt to set the proper font.
+ */
+
+
+	UWORD
+set_cufont(font, font_id, size)
+WORD	font;
+WORD	font_id;
+WORD	size;
+
+{
+	WORD		dummy;
+	WORD		buf;
+	
+	buf = intin[0];
+	
+	Debug7("set_cufont: font = ");  Ndebug7((LONG) font);
+	Debug7("set_cufont: fontid = ");  Ndebug7((LONG) font_id);
+	Debug7("set_cufont: fontsize = ");  Ndebug7((LONG) size);
+	Debug7("set_cufont: gl_spd = ");  Ndebug7((LONG) gl_spd);
+
+	if (!gl_spd && (font_id > 1)) {		/* if no GDOS, default to system font */
+		if (font < 3)
+			font = IBM;
+	}
+	Debug7("set_cufont: font = ");  Ndebug7((LONG) font);
+
+	switch (font) {
+	case GDOS_MONO:			/* MONO SPACED FONT (ALWAYS SPEEDO!!!) */
+		if (v_setfont(font_id) != font_id)
+			goto GO_IBM;
+		cu_font = font;
+		cu_font_id = font_id;
+		cu_prop = FALSE;
+		cu_spd = TRUE;
+		if (size == -1)
+			size = (gl_size) ? gl_size : 10;
+		vst_arbpt( size, &cu_wptschar, &cu_hptschar, &cu_wchar, &cu_hchar );
+		cu_hchar += 1;		/* necessary for Speedo fonts; otherwise in replacement */
+		cu_hptschar += 1;	/* mode (BOXTEXT) the top line gets overdrawn.		*/
+		vqt_width( 'M', &cu_space, &dummy, &dummy ); 
+		cu_wchar = cu_space;
+		break;
+
+	case GDOS_BITM:		/* old GDOS bitmap font       */
+	case GDOS_PROP:		/* PROPORTIONAL FONT (SPEEDO) */
+
+		if (v_setfont(font_id) != font_id)
+			goto GO_IBM;
+		cu_font = font;
+		cu_prop = TRUE;
+		cu_font_id = font_id;
+		if (size == -1)
+			size = (gl_size) ? gl_size : 10;
+		if (gl_spd && (font == GDOS_PROP)) {
+			cu_spd = TRUE;
+			vst_arbpt( size, &cu_wptschar, &cu_hptschar, &cu_wchar, &cu_hchar );
+			cu_hchar += 1;		/* necessary for Speedo fonts; otherwise in replacement */
+			cu_hptschar += 1;	/* mode (BOXTEXT) the top line gets overdrawn.		*/	
+		} else {
+			cu_spd = FALSE;		    
+			v_setpoint( size, &cu_wptschar, &cu_hptschar, &cu_wchar, &cu_hchar );
+		}
+		break;
+GO_IBM:
+	default:
+	case IBM:		/* default system font */
+		cu_font = IBM;	
+		gl_fid = v_setfont(gl_fid);
+
+		if (!gl_size) {
+				vst_height( gl_ws.ws_chmaxh, &dummy, &dummy, &dummy, &dummy );
+				cu_prop = TRUE;  /* use v_gtext */	
+		} else {
+			if ( gl_fsm ) {
+	  			vst_arbpt( gl_size, &dummy, &dummy, &dummy, &dummy );
+				cu_prop = FALSE;
+	    		} else {
+				v_setpoint( gl_size, &dummy, &dummy, &dummy, &dummy );
+				cu_prop = TRUE;
+			}
+		}
+		cu_font_id = gl_fid;
+		cu_wchar = gl_wchar;
+		cu_hchar = gl_hchar;
+		cu_space = gl_space;
+	  	cu_hptschar = gl_hptschar;
+	  	cu_wptschar = gl_wptschar;
+		break;
+
+	case SMALL:		/* small system font */
+		cu_font = font;
+		cu_font_id = 1;
+		cu_wchar = gl_wschar;
+		cu_hchar = gl_hschar;
+		cu_space = gl_wschar;
+	  	cu_hptschar = gl_hsptschar;
+	  	cu_wptschar = gl_wsptschar;	
+	  	cu_space = gl_sspace;
+		cu_prop = TRUE;			/* use v_gtext */
+		v_setfont(1);			/* always ROM system font !!! */
+		vst_height( gl_ws.ws_chminh, &dummy, &dummy, &dummy, &dummy ); 
+		break;
+	}
+	intin[0] = buf;
+
+	return	cu_font;
+}
+
 
 /*	Calculate where to put the text		*/
 
 	VOID
-gsx_tcalc(font, ptext, ptextw, ptexth, pnumchs)
-	REG WORD		font;
-	LONG		ptext;
+gsx_tcalc(ptext, ptextw, ptexth, pnumchs)
+	LONG			ptext;
 	REG WORD		*ptextw;
-	REG WORD		*ptexth;
+	WORD			*ptexth;
 	REG WORD		*pnumchs;
 {
-	REG WORD		wc;
-	REG WORD		hc;
+	WORD			buf;
+	WORD			dummy;	
+	WORD			wc;
+	WORD			hc;
+	WORD			snum;
 
-	wc = ch_width(font);		/* get the width and height of the text */ 
-	hc = ch_height(font);
-	*pnumchs = LBWMOV((BYTE *)ad_intin, (BYTE *)ptext);
+	wc = cu_wchar;
+	hc = cu_hchar;
+  
+	*pnumchs = str2intin((BYTE*)ptext); 
 					/* figure out the min width of  text	*/
-	*ptextw = min(*ptextw, *pnumchs * wc );
+	if ((cu_font == GDOS_PROP) || (cu_font == GDOS_BITM)) {
+		WORD	pptw = 0;
+		REG	BYTE *s;
+		
+		buf = intin[0];
+		snum = *pnumchs;
+		for (s = (BYTE *) ptext; *s ; s++) {
+			vqt_width(*s, &wc, &dummy, &dummy);
+			pptw += wc;
+			if (pptw > *ptextw) {
+				snum = (WORD) (s - ptext);
+				break;
+			}
+		}
+		
+		intin[0] = buf;
+		*ptextw = min(*ptextw, pptw);
+	} else {
+		*ptextw = min(*ptextw, *pnumchs * wc );
+	}
 					/* figure out the min height of text	*/
 	*ptexth = min(*ptexth, hc );
 
 			/* if the height and width are big enough to put	*/
-	if (*ptexth / hc)		/* the text then do it			*/	
-	  *pnumchs = min(*pnumchs, *ptextw / wc );
-	else
+	if (*ptexth / hc) {		/* the text then do it			*/	
+	  if (cu_font == 0)
+		*pnumchs = min(*pnumchs, snum);
+	  else
+		*pnumchs = min(*pnumchs, *ptextw / wc );
+	} else
 	  *pnumchs = 0;
 
 }  /* gsx_tcalc */
 
 
 	VOID
-gsx_tblt(tb_f, x, y, tb_nc)
-	REG WORD		tb_f;
-	REG WORD		x, y;
+gsx_tblt(x, y, tb_nc)
+	REG WORD	x, y;
 	WORD		tb_nc;
 {
-	WORD		dummy,space;
+	WORD		space;
 	WORD		buf;
 
-	buf = intin[0];	/* save the first character	*/
+	Debug7("gsx_tblt: cu_font = "); Ndebug7((LONG) cu_font);
 
-	if (tb_f == IBM)
+Debug7("gsx_tblt: GL_HCHAR    ="); Ndebug7((LONG)gl_hchar);
+Debug7("gsx_tblt: GL_HPTSCHAR ="); Ndebug7((LONG)gl_hptschar);
+
+	if (cu_font == IBM)
 	{
-	  if (tb_f != gl_font)
-	  {
-	    vst_height( gl_ws.ws_chmaxh, &dummy, &dummy, &dummy, &dummy );
-	    gl_font = tb_f;
-	  }
-
-	  y += gl_hptschar;
+	  y += gl_hptschar;	
 	  space = gl_space;
-	}
-
-	if (tb_f == SMALL)
+	} 
+	else if (cu_font == SMALL)
 	{
-	  if (tb_f != gl_font)
-	  {
-	    vst_height( gl_ws.ws_chminh, &dummy, &dummy, &dummy, &dummy ); 
-	    gl_font = tb_f;
-	  }
-
 	  y += gl_hsptschar;	
 	  space = gl_sspace;
+	} 
+	else
+	{
+	  y += cu_hptschar;
+	  space = cu_space; 
+	}
+	if (bitstmap && (cu_font != SMALL)) {
+		buf = intin[0];		/* If a Speedo font is the system font */	
+		vst_charmap(0);		/* we have to use the Bitstream char   */
+		intin[0] = buf;		/* map to get special characters < 32. */
+					/* (we do our own mapping)	       */
 	}
 
-	intin[0] = buf;		/* restore character */
-
-	if ( !gl_spd )
+	if ( (cu_prop) || !gl_spd )
 	{
 	  contrl[0] = 8;		/* TEXT */
 	  contrl[1] = 1;
@@ -697,6 +937,11 @@ gsx_tblt(tb_f, x, y, tb_nc)
 	}
 	else
 	  v_monotext( x, y, tb_nc, space );
+
+	if (bitstmap && (cu_font != SMALL)) {
+		vst_charmap(1);		/* Use ATARI char map */
+		bitstmap = FALSE;
+	}
 }
 
 
@@ -730,3 +975,25 @@ gsx_xline( ptscount, ppoints )
 }	
 
 
+WORD	str2intin(s)
+REG	UBYTE *s;
+{	
+	REG WORD	i;
+	REG WORD	*ip, *t;
+
+
+	ip = (WORD *) ad_intin;
+
+	if ((cu_font_id > 1)) {
+		bitstmap = TRUE ;
+		t = ATable;
+		for (i = 0; *s; i++) {
+			*ip++ = t[*s++];
+		} 
+
+	} else {
+		bitstmap = FALSE;
+		i = LBWMOV((BYTE *)ip, (BYTE *)s); 
+	}
+	return i;
+}

@@ -10,7 +10,8 @@
 /*	Change at ob_center for 3D buttons	7/7/92	D.Mui		*/
 /*  	02/16/93	cjg	Convert to Lattice C 5.51		*/
 /*	02/23/93	cjg	Force the use of prototypes		*/
-/*	Fix at pxl_rect to use ob_offset again  2/25/93 H.Krober	*/
+/*	Fix at pxl_rect to use ob_offset again  2/25/93 H.M.Krober	*/
+/*	Add GDOS font support to TEDINFO	5/21/93 H.M.Krober	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -54,9 +55,14 @@ EXTERN WORD	gl_hchar;
 EXTERN WORD	gl_hbox;
 EXTERN WORD	gl_width;
 EXTERN WORD	gl_height;
+EXTERN WORD	cu_wchar;
+EXTERN WORD	cu_hchar;
 
 EXTERN THEGLO	D;
 
+MLOCAL WORD	old_w;
+MLOCAL WORD	new_w;
+MLOCAL WORD	old_x;
 
 	VOID
 ob_center(tree, pt)
@@ -196,6 +202,9 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 
 	WORD		thickness;
 	WORD		type;
+	REG THEGLO	*DGLO;
+
+	DGLO = &D;
 
 #if 0	/* ++HMK 02/25/93 
 	/* Since of 08/06/92 ob_actxywh is no longer using  */
@@ -214,12 +223,12 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 	o.g_h = LWGET(OB_HEIGHT(obj));
 #endif
 
-	numchs = gr_just(edblk->te_just, edblk->te_font, edblk->te_ptmplt, 
-				o.g_w, o.g_h, &o);
+	numchs = gr_just(edblk->te_just, &DGLO->g_fmtstr[0], 
+			o.g_w, o.g_h, &o);
 
 #if 0
 	pt->g_x = o.g_x + (ch_pos * gl_wchar);
-#else
+#endif
 			/* ++HMK: "edblk->thickness stuff added "  added 02/25/93 */
 
 	type = LWGET(OB_TYPE(obj));
@@ -234,11 +243,38 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 	} else
 		thickness = 0;
 
-	pt->g_x = o.g_x + (ch_pos * gl_wchar) - thickness;
-#endif
-	pt->g_y = o.g_y;
-	pt->g_w = gl_wchar;
-	pt->g_h = gl_hchar;
+	if (edblk->te_font == GDOS_MONO) {
+		WORD	wc, hc;
+		WORD	dummy;
+		
+		pt->g_x = o.g_x + (ch_pos * cu_wchar) - thickness;
+		pt->g_y = o.g_y;
+		pt->g_w = cu_wchar;
+		pt->g_h = cu_hchar;
+	} else if ((edblk->te_font == GDOS_PROP) || (edblk->te_font == GDOS_BITM)) {
+		WORD		wc;
+		WORD		dummy;
+		WORD		pptw = 0;
+		REG WORD	i;
+		REG BYTE 	*s;
+
+		s = &DGLO->g_fmtstr[0];
+		for (i = 0 ; i < ch_pos ; i++, s++) {
+			vqt_width(*s, &wc, &dummy, &dummy);
+			pptw += wc;
+		}
+		vqt_width(*s, &wc, &dummy, &dummy);
+
+		pt->g_x = o.g_x + pptw - thickness; 
+		pt->g_y = o.g_y;
+		pt->g_w = wc;
+		pt->g_h = cu_hchar;
+	} else {
+		pt->g_x = o.g_x + (ch_pos * gl_wchar) - thickness;
+		pt->g_y = o.g_y;
+		pt->g_w = gl_wchar;
+		pt->g_h = gl_hchar;
+	}
 }
 
 
@@ -253,11 +289,38 @@ curfld(tree, obj, new_pos, dist, edblk)
 	TEDINFO		*edblk;
 {
 	GRECT		oc, t;
+	WORD		wc, dummy;
+	WORD		prop;
+	REG THEGLO	*DGLO;
 
+	DGLO = &D;
+	prop = FALSE;
+	if (edblk->te_font == 1) {
+		wc = cu_wchar;
+	} else if (edblk->te_font == 0) {
+		vqt_width(((BYTE*)edblk->te_ptext)[new_pos], &wc, &dummy, &dummy);
+	} else
+		wc = gl_wchar;
         pxl_rect(tree, obj, new_pos, &t, edblk);
-	if (dist)
-	  t.g_w += (dist - 1) * gl_wchar + 1;	/* ++ERS: "+1" added 1/19/93 */
-	else
+	if (dist) {
+	  if (edblk->te_font == 0) {
+		WORD		pptw = 0;
+		WORD		dummy;
+		REG WORD	i, l;
+		REG BYTE 	*s;
+
+		s = &DGLO->g_fmtstr[new_pos];
+		l = strlen(s);
+		for (i = 0 ; i < l; i++, s++) {
+			vqt_width(*s, &wc, &dummy, &dummy);
+			pptw += wc;
+		}
+		t.g_w += pptw + 1;
+		prop = TRUE;
+	  } else 
+		  t.g_w += (dist - 1) * wc + 1;	/* ++ERS: "+1" added 1/19/93 */
+
+	} else
 	{
 	  gsx_attr(FALSE, MD_XOR, BLACK);
 	  t.g_y -= 3;
@@ -267,9 +330,50 @@ curfld(tree, obj, new_pos, dist, edblk)
 	gsx_gclip(&oc);
 	gsx_sclip(&t);
 						/* redraw the field	*/
-	if (dist)
+	if (dist) {
+	  if ( prop ) {
+		GRECT	s, sc;
+		OBJECT	*o;
+		WORD	ox, oy, d;
+
+		o = &((OBJECT *)tree)[obj];
+		ob_offset(tree, obj, &ox, &oy);
+
+		d = 0;
+		if ((edblk->te_just == 0) && (old_w > new_w)) {
+			s.g_x = ox + new_w;
+			s.g_w = old_w - new_w;
+			s.g_y = oy;
+			s.g_h = o->ob_height;
+			d = 1;
+		} else if (edblk->te_just != 0) {
+			s.g_x = ox;
+			s.g_y = oy;
+			s.g_w = o->ob_width;
+			s.g_h = o->ob_height;
+			gr_just(edblk->te_just, &DGLO->g_fmtstr[0], s.g_w, s.g_h, &s);
+			if (old_w > new_w) {
+				s.g_w = old_w;
+				s.g_x = old_x;
+			}
+			old_x = s.g_x;
+			d = 2;
+		}
+		if (d > 0) {
+			gsx_gclip(&sc);
+			gsx_sclip(&s);
+
+			bb_fill(MD_REPLACE, FIS_SOLID, IP_SOLID, 
+		  		s.g_x, s.g_y, s.g_w, s.g_h);
+		}
+		if (d == 1)
+			gsx_sclip(&sc);
+	  }
 	  ob_draw(tree, obj, 0);
-	else
+				/* since ob_draw reset the font back to */
+				/* IBM, we have to set it again!!!	*/
+	  set_cufont(edblk->te_font, edblk->te_fontid, edblk->te_fontsize);
+	} else
 	  gsx_cline(t.g_x, t.g_y, t.g_x, t.g_y+t.g_h-1);
 						/* turn on cursor in	*/
 						/*   new position	*/
@@ -449,15 +553,20 @@ ob_edit(tree, obj, in_char, idx, kind)
 		(len < edblk.te_tmplen) )
 	  DGLO->g_valstr[len++] = DGLO->g_valstr[ii-1];
 	DGLO->g_valstr[len] = NULL;
+
+	set_cufont(edblk.te_font, edblk.te_fontid, edblk.te_fontsize);
 						/* init formatted	*/
 						/*   string		*/
 	ob_format(edblk.te_just, &DGLO->g_rawstr[0], &DGLO->g_tmpstr[0], 
 			&DGLO->g_fmtstr[0]);
+
 	switch(kind)
 	{
 	  case EDINIT:
 		*idx = strlen(&DGLO->g_rawstr[0]);
+		new_w = propStrWidth(&DGLO->g_fmtstr[0]);
 		break;
+
 	  case EDCHAR:
 		/* at this point, DGLO->g_fmtstr has already been formatted--*/
 		/*   it has both template & data. now update DGLO->g_fmtstr	*/
@@ -552,8 +661,12 @@ ob_edit(tree, obj, in_char, idx, kind)
 		  ob_stfn(*idx, &nstart, &nfinish);
 		  start = min(start, nstart);
 		  dist = max(finish, nfinish) - start;
-		  if (dist)
+
+		  if (dist) {
+		    old_w = new_w;
+		    new_w = propStrWidth(&DGLO->g_fmtstr[0]);
 		    curfld(tree, obj, start, dist, &edblk);
+		  }
 		} /* switch */
 	        break;
 	  case EDEND:
@@ -562,5 +675,21 @@ ob_edit(tree, obj, in_char, idx, kind)
 						/* draw/erase the cursor*/
 	cur_pos = find_pos(&DGLO->g_tmpstr[0], *idx);
 	curfld(tree, obj, cur_pos, 0, &edblk);
+
+	set_cufont(IBM, 0, 0);			/* just to make sure ... */
 	return(TRUE);
+}
+
+	WORD
+propStrWidth(s)
+	REG BYTE	*s;
+{
+	REG WORD pptw;
+	WORD	 wc, dummy;
+
+	for (pptw = 0 ; *s; s++) {
+		vqt_width(*s, &wc, &dummy, &dummy);
+		pptw += wc;
+	}
+	return pptw;
 }

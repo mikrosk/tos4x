@@ -4,7 +4,7 @@
 /*	Fixed at do_box when it is from desktop	5/2/91	D.Mui		*/
 /*	Chnaged at close_path			9/30/91	D.Mui		*/
 /*	Change all the iconblk to ciconblk	7/11/92	D.Mui		*/
-
+/*	Add support for icnoified windows	6/02/93 H.M.Krober	*/
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
 /*	Atari Corp							*/
@@ -12,6 +12,7 @@
 /************************************************************************/
 
 #include "portab.h"
+#include "machine.h"
 #include "obdefs.h"
 #include "deskdefi.h"
 #include "deskwin.h"
@@ -90,9 +91,6 @@ open_subdir( win, icon, opendisk, init, redraw )
 	WORD	handle; 
 	WORD	status;
 	BYTE	*path;
-#if 0	/* NOT USED: */
-	WORD	num,len,i;
-#endif
 
 	desk_mice( HOURGLASS );
 	status = FALSE;
@@ -144,9 +142,15 @@ show_item()
 	REG WINDOW	*win;
 
 	wind_update(1);
-	if ( x_status )		/* something is selected	*/
-	  sh_sitems();
-	else
+	if ( x_status ) {		/* something is selected	*/
+	  if ( x_win && x_win->w_iconified && (x_win->w_icndir.d_name[0] == '\\') 
+	  && (x_win->w_icndir.d_name[1] == '\0') ) {
+	    	strcpy( wildext, x_win->w_buf );	/* we are at root */
+	   	x_win->w_buf[0] = x_win->w_path[0];	/* so		  */
+		sh_disk( x_win->w_buf );		/* show disk info */
+	  } else		
+		  sh_sitems();
+	} else
 	{
 	  if ( win = w_gfirst() )
 	  {
@@ -195,8 +199,13 @@ sh_sitems( )
 	}
 	else
 	{
-	  dir2 = (DIR *) x_win->w_memory;
-	  limit = x_win->w_items;
+	  if (x_win->w_iconified) {	/* get the right dir */
+	  	dir2 = &x_win->w_icndir;
+		limit = 1;
+	  } else {
+		dir2 = (DIR *) x_win->w_memory;
+		limit = x_win->w_items;
+	  }
 	  curri = 0;
 	}
 
@@ -258,14 +267,17 @@ ss_2:
 	  {
 	    for( ; curri < limit; curri++ )
 	    {
-	      if ( dir2[curri].d_state & SELECTED )
+	      if ( dir2[curri].d_state & SELECTED ) {
 		goto ss_3;
+	      }
 	    }
-
 	    goto ss_5;
 ss_3:	    
 	    dir1 = dir2[curri];
-	    file = put_name( x_win, dir2[curri].d_name );
+	    if (!x_win->w_iconified)
+		    file = put_name( x_win, dir2[curri].d_name );
+	    else
+		    file = put_name( x_win, NULL); /* just get rid of '*.*' */
 	    curri++;
 
 	    if ( *file == 'c' )
@@ -319,9 +331,10 @@ ss_3:
 	      f_str( obj, FINFILES, nfile );
 	      f_str( obj, FISIZE, nsize );
 	    }
-	    else
+	    else {
 	      goto ss_5;
-		
+	    }
+	
 	    *r_slash( newstr ) = 0; 	
 	    ((TEDINFO*)(obj[INFTITLE].ob_spec))->te_ptext = (LONG)
 			get_fstring( FOLDINFO );
@@ -705,6 +718,13 @@ open_wfile( win, item, tail, swin, sitem )
 	REG DIR		*dir;
 	BYTE		*bptr,*addr;
 	
+	if (win->w_iconified) {		/* +++ HMK 6/2/93   */
+		/* if icon in iconified window is selected, */
+		/* then uniconify window...		    */
+		uniconify_window(win->w_id, &win->w_normsizes);
+		return;
+	}
+
 	dir = get_dir( win, item );
 
 	if ( dir->d_att & SUBDIR )	/* open folder	*/
@@ -727,7 +747,10 @@ open_wfile( win, item, tail, swin, sitem )
 	}
 	else				/* open exec file	*/
 	{				/* deselect the item	*/
-	  bptr = put_name( win, dir->d_name );	
+	  if (win->w_iconified)
+		  bptr = put_name( win, NULL );	/* just get rid of '*.*' */
+	  else	
+		  bptr = put_name( win, dir->d_name );	
 	  if ( win == swin )
 	  {
  	    i = strlen( bptr ) + 1;	/* +1 for trailing 0 */
@@ -826,7 +849,6 @@ do_box( win, item, desk, open, openfull )
 	  pc.g_w = gl_wbox;
 	  pc.g_h = gl_hbox;
 	}
-
 	form_dial( ( open ) ? FMD_GROW : FMD_SHRINK, pc.g_x, pc.g_y, pc.g_w,
 		pc.g_h, dc.g_x, dc.g_y, dc.g_w, dc.g_h );
 }

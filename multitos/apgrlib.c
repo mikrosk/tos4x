@@ -2,7 +2,7 @@
 /*	for 68k		03/06/85 - 03/09/85	Lowell Webster		*/
 /*	Reg Opt		03/09/85		Derek Mui		*/
 /*	Restore into C language	from 3.01	8/30/90	D.Mui		*/
-
+/*	Changes to gr_gtext, gr_just for GDOS	5/25/93 H.M.Krober	*/
 /*
 *	-------------------------------------------------------------
 *	GEM Application Environment Services		  Version 1.0
@@ -21,7 +21,10 @@
 
 EXTERN WORD	gl_width;
 EXTERN WORD	gl_height;
+EXTERN WORD	gl_hchar;
+EXTERN WS	gl_ws;
 EXTERN WORD	intin[];
+EXTERN WORD	cu_hptschar;
 
 VOID
 gr_inside(pt, th)
@@ -64,9 +67,8 @@ gr_rect(icolor, ipattern, pt)
 *	in the string is also returned.
 */
 	WORD
-gr_just(just, font, ptext, w, h, pt)
+gr_just(just, ptext, w, h, pt)
 	WORD		just;
-	WORD		font;
 	LONG		ptext;
 	REG WORD	w, h;
 	REG GRECT	*pt;
@@ -75,11 +77,11 @@ gr_just(just, font, ptext, w, h, pt)
 						/* figure out the	*/
 						/*   width of the text	*/
 						/*   string in pixels	*/
-	gsx_tcalc(font, ptext, &pt->g_w, &pt->g_h, &numchs);
+	gsx_tcalc(ptext, &pt->g_w, &pt->g_h, &numchs);
 
 	h -= pt->g_h;
 	if ( h > 0 )				/* check height		*/
-	  pt->g_y += (h + 1) / 2;
+	  pt->g_y += ((h + 1) / 2);
 
 	w -= pt->g_w;
 	if ( w > 0 )
@@ -104,22 +106,22 @@ gr_just(just, font, ptext, w, h, pt)
 *	Routine to draw a string of graphic text.
 */
 	VOID
-gr_gtext(just, font, ptext, pt, tmode)
+gr_gtext(just, ptext, pt, tmode)
 	WORD		just;
-	WORD		font;
 	LONG		ptext;
 	GRECT		*pt;
 	WORD		tmode;
 {
+	WORD		dummy;
 	WORD		numchs;
 	GRECT		t;
 						/* figure out where &	*/
 						/*   how to put out	*/
-						/*   the text		*/
 	rc_copy((WORD *)pt, (WORD *)&t);
-	numchs = gr_just(just, font, ptext, t.g_w, t.g_h, &t);
+	numchs = gr_just(just, ptext, t.g_w, t.g_h, &t);
 	if (numchs > 0)
-	  gsx_tblt(font, t.g_x, t.g_y, numchs);
+	  gsx_tblt(t.g_x, t.g_y, numchs);
+
 }
 
 
@@ -203,10 +205,12 @@ gr_gicon(state, pmask, pdata, ptext, ch, chx, chy, pi, pt)
 	if ( ch )
 	{
 	  intin[0] = ch;
-	  gsx_tblt(SMALL, pi->g_x+chx, pi->g_y+chy, 1);
+    	  set_cufont(SMALL, 0, 0);
+	  gsx_tblt(pi->g_x+chx, pi->g_y+chy, 1);
 	}
 						/* draw the label	*/
-	gr_gtext(TE_CNTR, SMALL, ptext, pt, MD_TRANS);
+	set_cufont(SMALL, 0, 0);
+	gr_gtext(TE_CNTR, ptext, pt, MD_TRANS);
 }
 
 

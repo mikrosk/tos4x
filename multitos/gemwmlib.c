@@ -25,6 +25,16 @@
 /*								*/
 /*	Add iconfy features to wmset/wmget H.M.Krober  05/04/93 */ 
 /*								*/
+/*	Added ToolBar features to window. C.Gee     05/26/93    */
+/*								*/
+/*	Changed wm_min() to:		  C.Gee	    06/01/93	*/
+/*          1) initialize W1...W3/H1...H3 to 0.    		*/
+/*          2) input a WINDOW ptr instead of KIND  		*/
+/*	    3) Increment for INFO is a gl_hbox instead of yinc  */
+/*								*/
+/*	Added WF_FTOOLBAR and WF_NTOOLBAR to get the rect list  */
+/*	for the TOOLBAR area.		  C.Gee     06/01/93    */
+
 /*	MultiTOS window library is written by Minna Lai		
 *	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -469,6 +479,7 @@ wm_create( kind, rect )
 #endif
     wp->fxywh = wp->nxywh = (RLIST *)NULLPTR;	/* no rectangle list yet */
     wp->kind = kind;			/* save kind of window */
+    wp->ad_tools = ( OBJECT *)NULLPTR;	/* Clear ToolBar Tree cjg 05/26/93*/
 
     /* initialize window object colors */
     /* also, set all objects to not display, initially */
@@ -598,7 +609,7 @@ wm_create( kind, rect )
     wp->savekind = 0;
 
     storewp(wp);	/* store window structure into database */
-    w_adjust( wp, rect);
+    w_adjust( wp, rect, FALSE);
     Debug5( wp->owner->p_name );
     Debug5( " creates " );
     Ndebug5( (LONG)wp->handle );  		
@@ -641,7 +652,7 @@ wmopen(handle, rect)
 
     wp = srchwp( handle );
 				/* check the minimun size */
-    wm_min( wp->kind, &w, &h );
+    wm_min( wp, &w, &h );
 
     if ( w > rect->g_w )
       rect->g_w = w;
@@ -649,7 +660,7 @@ wmopen(handle, rect)
     if ( h > rect->g_h )
       rect->g_h = h;
 		
-    w_adjust( wp, rect);		/* init window components */
+    w_adjust( wp, rect, TRUE);		/* init window components */
     wp->prev = wp->curr;
     wp->status.opened = TRUE;	    	/* Grand opening!	*/
 
@@ -984,10 +995,11 @@ wm_get(handle, field, ow, iw)
 	REG WORD    ow[];	/* return values */
 	WORD	    iw[];
 {
-    int		ret;
+    WORD	ret;
     REG WINDOW	*wp;
     REG	GRECT	*r;
-
+    WORD		area;
+	
     if ( ( field == WF_DCOLOR ) || ( field == WF_TOP ) || ( field == WF_SCREEN ) ||
 	 ( field == WF_BOTTOM )	)
       goto wg_1;
@@ -1047,7 +1059,11 @@ wg_1:
 	    ow[2] = wp->under;
 	    break;
 
+	case WF_FTOOLBAR:
 	case WF_FIRSTXYWH:
+
+	    area = (( field == WF_FIRSTXYWH )?( WF_WORKXYWH ):( WF_TOOLBAR ));
+
 	    r = (GRECT *)ow;
 
 	    if ( !wp->status.opened )
@@ -1056,6 +1072,18 @@ wg_1:
 	      r->g_h = 0;
 	      break;
 	    }
+
+	    /* If checking for the TOOLBAR area, there must be a valid
+	     * tree AND the window cannot be iconified.
+	     */
+	    if( area == WF_TOOLBAR ) {
+	       if( !wp->ad_tools || wp->iconflag ) {
+		 r->g_w = 0;
+		 r->g_h = 0;
+		 break;
+	       }
+            }
+
 
 	    /* delete old list if there is one */
 	    if (wp->fxywh) {
@@ -1074,6 +1102,7 @@ wg_1:
 
 	    break;
 
+	case WF_NTOOLBAR:
 	case WF_NEXTXYWH:
 	    r = (GRECT *)ow;
 	    if ( wp->nxywh ) 
@@ -1146,6 +1175,9 @@ wg_1:
 	    r = (GRECT *)ow;	/* window's size when not iconified */
 	    *r = wp->icon;
 	    break;
+	case WF_TOOLBAR:	/* Get Tree for the ToolBar cjg 05/26/93 */
+	     *(LONG *)ow = ( LONG )wp->ad_tools;
+	     break;
 	case WF_RESVD:
 	default:
 	    ret = FALSE;
@@ -1172,6 +1204,10 @@ wmset(handle, field, iw)
 	WORD		oldbcolor, oldtcolor;
 	WORD		i;
 	PD		*p;
+	WORD		uniflag = FALSE;
+	WORD		w, h;
+	WORD		tflag;
+	GRECT		trect;
 
 	if ((wp = srchwp(handle)) == ( WINDOW *)NULLPTR)
 	  return FALSE;	
@@ -1211,7 +1247,7 @@ wmset(handle, field, iw)
 	    break;
 	  case WF_UNICONIFYXYWH: /* set size which will be send when */
 	    rect = *(GRECT *)iw; /* a WM_UNICONIFY message occurs    */
-	    w_adjust(wp, &rect);
+	    w_adjust(wp, &rect, FALSE);
 	    rc_copy(&rect, &wp->icon);
 	    break;
 
@@ -1222,6 +1258,7 @@ wmset(handle, field, iw)
 	    wp->iconflag = FALSE;	/* not an icon window anymore */
 	    w_showparts(wp);		/* show window parts again */
 
+	    uniflag = TRUE;		/* make sure that the prev == curr */
 	    goto currxywh;		/* set to previous window size */
 
 	  case WF_ICONIFY:
@@ -1244,7 +1281,20 @@ currxywh:
 	      iw[1] = gl_hbox;
 
 	    rect = *(GRECT *)iw;
-	    w_adjust(wp, &rect);
+
+	    /* Check for a minimum size...*/
+	    wm_min( wp, &w, &h );
+
+            if ( w > rect.g_w )
+                 rect.g_w = w;
+
+	    tflag = FALSE;
+            if ( h > rect.g_h ) {
+		 tflag = TRUE;		/* cjg 06/2/93 */
+                 rect.g_h = h;
+	    }
+	
+	    w_adjust(wp, &rect, FALSE);
 
 	    if (wp->status.opened) {
 		/* send redraw message to opened windows which */
@@ -1265,10 +1315,42 @@ currxywh:
 		{
 		    w_clipdraw( wp, W_BOX, ( GRECT *)NULLPTR );
 		    if (rect1.g_x != rect.g_x || rect1.g_y != rect.g_y
-			|| rect1.g_w > rect.g_w || rect1.g_h > rect.g_h)
+			|| rect1.g_w > rect.g_w || rect1.g_h > rect.g_h) {
 		    	ap_sendmsg( WM_REDRAW, wp->owner->p_pid, handle,
 				wp->curr.g_x, wp->curr.g_y, wp->curr.g_w, 
 				wp->curr.g_h);
+		    }
+		    /* Check if we should redraw the TOOLBAR area
+		     * cjg 06/02/93
+		     */
+		    if( wp->ad_tools && !wp->iconflag ) {
+
+		      if( ( rect.g_x != rect1.g_x ) ||
+			  ( rect.g_y != rect1.g_y)  ||
+			  tflag ) {		/* forced new height only */
+
+		          w_tooldraw( wp, W_BOX, &wp->curr );
+		      }
+		      else {
+
+			  /* This is if x1 == x2, y1 == y2, height == d/c
+			   * and w2 > w1 - Do a redraw of the dirty area
+			   * of the toolbar.
+			   */
+			   if( rect1.g_w > rect.g_w ) {
+			      ob_actxywh( ( LONG )wp->ad_tools, ROOT, &trect );
+
+			      trect.g_w = ( rect1.g_w - rect.g_w + SHADOW +
+					  (( trect.g_x - rect.g_x ) << 2 ));
+
+	      		      trect.g_x = rect.g_x + rect.g_w - SHADOW - 
+			  		  ( trect.g_x - rect.g_x ) - 1;
+
+		              w_tooldraw( wp, W_BOX, &trect );
+			   }
+		      }
+
+		    }
 		} 
 		else 
 		{
@@ -1281,6 +1363,8 @@ currxywh:
 
 		w_drawchange( &rect, handle, handle );
 	    }
+	    if (uniflag)
+		rc_copy(&wp->curr, &wp->prev);
 	    break;
 
  	case WF_HSLSIZE:
@@ -1413,8 +1497,9 @@ wfagain:
 		setcol(wp, which, FALSE);
 
 	    /* if window is already opened, redraw it */
+	    /* BUG: iconified windows can't be redrawn, w_clipdraw loses */
 
-	    if (wp->status.opened)
+	    if (wp->status.opened && !wp->iconflag)
 		w_clipdraw( wp, which, ( GRECT *)NULLPTR);
 
 /* kludge: take the colors for the fuller and use them for the
@@ -1486,7 +1571,40 @@ wfdagain:
 	    wp->drawaddr = ( BYTE *)( *((LONG*)&iw[0] ));
 	    break;
 
-	    break;
+
+	case WF_TOOLBAR:    /* Set the tree for the ToolBar cjg - 05/26/93 */
+	     wp->ad_tools = ( OBJECT *)( *(LONG *)&iw[0] );
+
+	     /* Readjust the window structure, redraw
+	      * and send a WM_SIZE and WM_REDRAW message notifying the app.
+	      * 1) The window is OPEN
+	      * 2) The window is NOT iconified
+	      */
+
+	     if( wp->status.opened && !wp->iconflag ) {
+		/* Check for a minimum size...*/
+	        wm_min( wp, &w, &h );
+
+                if ( w > wp->curr.g_w )
+                   wp->curr.g_w = w;
+
+                if ( h > wp->curr.g_h )
+                   wp->curr.g_h = h;
+
+	        w_adjust( wp, &wp->curr, TRUE );
+		w_clipdraw( wp, W_BOX, ( GRECT *)NULLPTR );
+		w_tooldraw( wp, W_BOX, ( GRECT *)NULLPTR );
+
+	    	ap_sendmsg( WM_SIZED, wp->owner->p_pid, handle,
+			    wp->curr.g_x, wp->curr.g_y, wp->curr.g_w, 
+			    wp->curr.g_h);
+
+	    	ap_sendmsg( WM_REDRAW, wp->owner->p_pid, handle,
+			    wp->curr.g_x, wp->curr.g_y, wp->curr.g_w, 
+			    wp->curr.g_h);
+	     }
+	     break;
+
 	case WF_RESVD:	    /* old WMLIB has code, but doc says RESERVED */
 	default:
 	    ret = FALSE;
@@ -1646,8 +1764,8 @@ WORD *oh;	/* output height of work/border area */
  *
  */
 VOID
-wm_min( kind, ow, oh )
-	REG WORD 	kind;	/* coamponents present in the window */
+wm_min( wp, ow, oh )
+	WINDOW	 	*wp;	/* window pointer */
 	WORD 		*ow;	/* output width of work/border area */
 	WORD 		*oh;	/* output height of work/border area */
 
@@ -1655,8 +1773,12 @@ wm_min( kind, ow, oh )
     REG WORD	w1, w2, w3, h1, h2, h3;
     REG	WORD	yinc, xinc;
     WORD	hparts, vparts;
+    REG	WORD	kind;	/* coponents present in the window */
+    GRECT	rclip;
 
-    w1 = w2 = w3 = h1 = h2 = h3 = 1;
+    kind = wp->kind;
+
+    w1 = w2 = w3 = h1 = h2 = h3 = 0;	/* init to 0 cjg 06/01/93 */
 
     xinc = gl_wbox + (ADJ3DPIX << 1);
     yinc = gl_hbox + (ADJ3DPIX << 1);
@@ -1677,13 +1799,25 @@ wm_min( kind, ow, oh )
 	  w1 += xinc;
     }
 
-    if ( kind & INFO )
-	h1 += yinc;
+    if ( kind & INFO ) {
+/*	h1 += yinc; */
+	h1 += gl_hbox;	/* Changed from yinc to gl_hbox cause the */
+			/* INFO line is NOT 3D... cgj 06/01/93    */
+    }
 
 #ifdef MNBAR
     if ( kind & MNBAR )
 	h1 += yinc;
 #endif
+    /* Add in the height of the toolbar, if one exists
+     * AND if the window is not iconified
+     * The height includes any 3D, shadow etc effects.
+     * cjg 05/27/93
+     */
+    if( wp->ad_tools && !wp->iconflag ) {
+      ob_actxywh( ( LONG )wp->ad_tools, ROOT, &rclip );
+      h1 += rclip.g_h;
+    }
 
     vparts = kind & (UPARROW | DNARROW | VSLIDE);
     hparts = kind & (LFARROW | RTARROW | HSLIDE);
@@ -2001,12 +2135,14 @@ totop( handle, caller )
     {
       if ( caller == WMOPEN )
       {
+	w_tooldraw( ntwp, W_BOX, &ntwp->curr );
 	ap_sendmsg( WM_REDRAW, ntwp->owner->p_pid, handle,
 	    ntwp->curr.g_x, ntwp->curr.g_y, ntwp->curr.g_w, ntwp->curr.g_h);
       }
       else
       if ( ( caller == WMSET ) && ( !notset ) )
       {
+	w_tooldraw( ntwp, W_BOX, &temp );
 	ap_sendmsg( WM_REDRAW, ntwp->owner->p_pid, handle,
 	    temp.g_x, temp.g_y, temp.g_w, temp.g_h);
       }
@@ -2214,9 +2350,11 @@ setcol(wp, ndx, topped)
  *		given window with the window's x, y, w and h.
  */
 VOID
-w_adjust(wp, rect)
+w_adjust(wp, rect, wflag)
 REG WINDOW  *wp;	/* pointer to window structure */
 REG GRECT   *rect;	/* pointer to window's coords and dimensions */
+WORD	    wflag;	/* FALSE - Check for a move  */
+			/* TRUE  - Don't check for a move*/
 {
     WORD	ulx;	    /* x offset from upper left corner */
     WORD	uly;	    /* y offset from upper left corner */
@@ -2230,6 +2368,7 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
     WORD	blen;	    /* length of base bar */
     UWORD	sz;	    /* slider size */
     WORD	w3dbox, h3dbox;
+    GRECT	drect;	    /* offsets for toolbar cjg -05/27/93 */
 
     /***
      *
@@ -2246,10 +2385,18 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
     w_obrect(wp, W_BOX, rect->g_x, rect->g_y, rect->g_w, rect->g_h);
 
     /* reinit work area if it is just a move */
-    if (rect->g_w == wp->prev.g_w && rect->g_h == wp->prev.g_h) {
+    if (!wflag && (rect->g_w == wp->prev.g_w) && (rect->g_h == wp->prev.g_h)) {
 	/* initialize window work area */
 	wp->obj[W_WORK].ob_x -= (wp->prev.g_x - rect->g_x);
 	wp->obj[W_WORK].ob_y -= (wp->prev.g_y - rect->g_y);
+	/* Initialize the toolbar for a move - cjg 05/27/93
+	 * We use the displacement of prev and rect to offset to
+         * our new position.
+	 */
+	if( wp->ad_tools && !wp->iconflag ) {
+ 	  wp->ad_tools[ ROOT ].ob_x -= ( wp->prev.g_x - rect->g_x );
+ 	  wp->ad_tools[ ROOT ].ob_y -= ( wp->prev.g_y - rect->g_y );
+	}
 	return;
     }
 
@@ -2293,6 +2440,26 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
     if (wp->kind & INFO) {
 	w_obrect(wp, W_INFO, 0, uly, rect->g_w, gl_hbox);
 	uly = ury += gl_hbox;
+    }
+
+    /* Add in support for a ToolBar Tree cjg -05/26/93
+     * Position this under the INFO bar.
+     * This tree is added in if 'ad_tools' is NON-ZERO AND if
+     * the window is not currenty icondified.
+     */
+    if( wp->ad_tools && !wp->iconflag ) {
+	
+	/* Get the offsets of x,y,w,h to account for the 
+	 * ObFlags, Border Width and 3D effect...
+	 */
+	ob_dxywh( ( LONG )wp->ad_tools, ROOT,
+		  &drect.g_x, &drect.g_y,
+		  &drect.g_w, &drect.g_h );
+
+	wp->ad_tools[ ROOT ].ob_x = rect->g_x + 1 - drect.g_x;
+	wp->ad_tools[ ROOT ].ob_y = rect->g_y + uly - drect.g_y;
+	wp->ad_tools[ ROOT ].ob_width = rect->g_w - SHADOW - drect.g_w;
+	uly = ury += wp->ad_tools[ ROOT ].ob_height + drect.g_h;
     }
 
 #ifdef MNBAR
@@ -2509,6 +2676,8 @@ w_drawchange(dirty, skip, stop)
 	if ( rc_intersect(dirty, &exposed) ) 
 	{
 	  w_clipdraw(wp, W_BOX, &exposed);
+	  w_tooldraw( wp, W_BOX, &exposed );
+
 	  if ( handle )			/* if not background window */
 	  {
 	    if ( wp->owner == currpd )
@@ -2598,66 +2767,66 @@ VOID
 w_hideparts(wp)
 WINDOW	*wp;
 {
-	LONG		obaddr;
+	OBJECT		*obaddr;
 	WORD		hparts, vparts;
 	WORD		kind;
 
 	/* initialize object */
-    	obaddr = (LONG)wp->obj;
+    	obaddr = wp->obj;
 	kind = wp->kind;
 
 	hparts = kind & HPARTS;	/* mask for vertical slider elements */
         vparts = kind & VPARTS;	/* mask for horizontal slider elements */
 
 	if (kind & CLOSER)
-		ob_delete(obaddr, W_CLOSER);
+		ob_delete((LONG)obaddr, W_CLOSER);
 	if (kind & FULLER)
-		ob_delete(obaddr, W_FULLER);
+		ob_delete((LONG)obaddr, W_FULLER);
 	if (kind & SMALLER)
-		ob_delete(obaddr, W_SMALLER);
+		ob_delete((LONG)obaddr, W_SMALLER);
 	if (kind & INFO)
-		ob_delete(obaddr, W_INFO);
+		ob_delete((LONG)obaddr, W_INFO);
 	if (kind & SIZER) {
-		ob_delete(obaddr, W_SIZER);
+		ob_delete((LONG)obaddr, W_SIZER);
 
 		if (!hparts && !vparts) {
-			ob_delete(obaddr, W_VBAR);
+			ob_delete((LONG)obaddr, W_VBAR);
 		}
     	} else if (hparts && vparts) {
-		ob_delete(obaddr, W_SIZER);
+		ob_delete((LONG)obaddr, W_SIZER);
     	}
 
 	if (vparts) {
-		ob_delete(obaddr, W_VBAR);
+		ob_delete((LONG)obaddr, W_VBAR);
 
 		if (kind & UPARROW) {
-			ob_delete(obaddr, W_UPARROW);
+			ob_delete((LONG)obaddr, W_UPARROW);
 		}
 
 		if (kind & DNARROW) {
-			ob_delete(obaddr, W_DNARROW);
+			ob_delete((LONG)obaddr, W_DNARROW);
 		}
 
 		if (kind & VSLIDE) {
-			ob_delete(obaddr, W_VSLIDE);
-			ob_delete(obaddr, W_VELEV);
+			ob_delete((LONG)obaddr, W_VSLIDE);
+			ob_delete((LONG)obaddr, W_VELEV);
 		}
     	}
 
 	if (hparts) {
-		ob_delete(obaddr, W_HBAR);
+		ob_delete((LONG)obaddr, W_HBAR);
 
 		if (kind & LFARROW) {
-			ob_delete(obaddr, W_LFARROW);
+			ob_delete((LONG)obaddr, W_LFARROW);
 		}
 
 		if (kind & RTARROW) {
-			ob_delete(obaddr, W_RTARROW);
+			ob_delete((LONG)obaddr, W_RTARROW);
 		}
 
 		if (kind & HSLIDE) {
-			ob_delete(obaddr, W_HSLIDE);
-			ob_delete(obaddr, W_HELEV);
+			ob_delete((LONG)obaddr, W_HSLIDE);
+			ob_delete((LONG)obaddr, W_HELEV);
 		}
     	}
 
@@ -2669,65 +2838,65 @@ WINDOW	*wp;
 VOID w_showparts(wp)
 WINDOW	*wp;
 {
-	REG LONG  	obaddr;
+	REG OBJECT  	*obaddr;
 	WORD		hparts, vparts;
 	WORD		kind;
 	/* initialize object */
-    	obaddr = (LONG)wp->obj;
+    	obaddr = wp->obj;
 	kind = wp->kind;
 
 	hparts = kind & HPARTS;	/* mask for vertical slider elements */
         vparts = kind & VPARTS;	/* mask for horizontal slider elements */
 
 	if (kind & CLOSER)
-		ob_add(obaddr, W_TITLE, W_CLOSER);
+		ob_add((LONG)obaddr, W_TITLE, W_CLOSER);
 	if (kind & FULLER)
-		ob_add(obaddr, W_TITLE, W_FULLER);
+		ob_add((LONG)obaddr, W_TITLE, W_FULLER);
 	if (kind & SMALLER)
-		ob_add(obaddr, W_TITLE, W_SMALLER);
+		ob_add((LONG)obaddr, W_TITLE, W_SMALLER);
 	if (kind & INFO)
-		ob_add(obaddr, W_BOX, W_INFO);
+		ob_add((LONG)obaddr, W_BOX, W_INFO);
 	if (kind & SIZER) {
-		ob_add(obaddr, W_BOX, W_SIZER);
+		ob_add((LONG)obaddr, W_BOX, W_SIZER);
 
 		if (!hparts && !vparts) {
-			ob_add(obaddr, W_BOX, W_VBAR);
+			ob_add((LONG)obaddr, W_BOX, W_VBAR);
 		}
     	} else if (hparts && vparts) {
-		ob_add(obaddr, W_BOX, W_SIZER);
+		ob_add((LONG)obaddr, W_BOX, W_SIZER);
     	}
 
 	if (vparts) {
-		ob_add(obaddr, W_BOX, W_VBAR);
+		ob_add((LONG)obaddr, W_BOX, W_VBAR);
 
 		if (kind & UPARROW) {
-			ob_add(obaddr, W_VBAR, W_UPARROW);
+			ob_add((LONG)obaddr, W_VBAR, W_UPARROW);
 		}
 
 		if (kind & DNARROW) {
-			ob_add(obaddr, W_VBAR, W_DNARROW);
+			ob_add((LONG)obaddr, W_VBAR, W_DNARROW);
 		}
 
 		if (kind & VSLIDE) {
-			ob_add(obaddr, W_VBAR, W_VSLIDE);
-			ob_add(obaddr, W_VSLIDE, W_VELEV);
+			ob_add((LONG)obaddr, W_VBAR, W_VSLIDE);
+			ob_add((LONG)obaddr, W_VSLIDE, W_VELEV);
 		}
     	}
 
 	if (hparts) {
-		ob_add(obaddr, W_BOX, W_HBAR);
+		ob_add((LONG)obaddr, W_BOX, W_HBAR);
 
 		if (kind & LFARROW) {
-			ob_add(obaddr, W_HBAR, W_LFARROW);
+			ob_add((LONG)obaddr, W_HBAR, W_LFARROW);
 		}
 
 		if (kind & RTARROW) {
-			ob_add(obaddr, W_HBAR, W_RTARROW);
+			ob_add((LONG)obaddr, W_HBAR, W_RTARROW);
 		}
 
 		if (kind & HSLIDE) {
-			ob_add(obaddr, W_HBAR, W_HSLIDE);
-			ob_add(obaddr, W_HSLIDE, W_HELEV);
+			ob_add((LONG)obaddr, W_HBAR, W_HSLIDE);
+			ob_add((LONG)obaddr, W_HSLIDE, W_HELEV);
 		}
     	}
 
@@ -2972,4 +3141,56 @@ dk_redraw( obj, root, px )
 	gsx_mon();
 }
 
+          
+/*
+ * w_tooldraw() - REDRAW the TOOLBAR AREA
+ *		  set clipping according to the rectangle list
+ *		  of the current size of the window, or the 
+ *		  clipping rectangle passed in, and draw the
+ *		  object specified.
+ */
+	VOID
+w_tooldraw(wp, obj, pc)
+	WINDOW	*wp;	    /* pointer to window structure */
+	WORD	obj;	    /* object to be drawn */
+	GRECT	*pc;	    /* pointer to clipping rectangle */
+{
+    REG RLIST	*rl;
+    GRECT	rclip;
+    RLIST	*rlist;
+		
+    if (wp->obj[obj].ob_flags & HIDETREE)
+	return;
+
+    /* If not W_BOX OR no toolbar or iconified, just return */
+    if( ( obj != W_BOX ) || !wp->ad_tools || wp->iconflag )
+        return;
+
+    gsx_moff();
+
+    rlist = genrlist(wp->handle, WF_TOOLBAR );
+
+    for ( rl = rlist; rl; rl = rl->rnext ) 
+    {
+			/* if no clipping rectangle given, clip to screen and itself */
+	rclip = rl->rect;
+
+	if ( !rc_intersect( &gl_rfull, &rclip ) )	/* clip to screen */
+	   continue;
+
+	if ( !pc || rc_intersect(pc, &rclip ) ) 
+	{
+
+	    gsx_sclip(&rclip);
+
+	    /* TOOLBAR Support.	cjg 05/26/93 */
+	    ob_draw( ( LONG )wp->ad_tools, ROOT, MAX_DEPTH );
+	}
+    }
+
+    gsx_mon();
+
+    if ( rlist )
+	delrect( ( RLIST *)0L, ( BYTE *)rlist );
+}
           

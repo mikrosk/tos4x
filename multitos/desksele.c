@@ -1,6 +1,6 @@
 /*	DESKSELE.C		10/9/89			Derek Mui	*/
 /*	Change all the iconblk to ciconblk	7/11/92	D.Mui		*/
-
+/*	Support for iconified windows added	6/01/93 h.M.Krober	*.
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
 /*	Atari Corp							*/
@@ -8,6 +8,7 @@
 /************************************************************************/
 
 #include "portab.h"
+#include "machine.h"
 #include "obdefs.h"
 #include "deskdefi.h"
 #include "deskwin.h"
@@ -43,8 +44,12 @@ x_deselect( )
 
 	if ( x_type == WINICON )
 	{
-	  dir = (DIR *) x_win->w_memory;
-	  dir[x_cur].d_state = NORMAL;
+	  if (x_win->w_iconified) /* get the right dir */
+		x_win->w_icndir.d_state = NORMAL;
+	  else {
+		  dir = (DIR *) x_win->w_memory;
+		  dir[x_cur].d_state = NORMAL;
+	  }
 	}
 	else
 	  background[x_cur].ob_state = NORMAL;
@@ -137,8 +142,11 @@ o_select( )
 	
 	while( win )
 	{
-	  obj = win->w_obj;
-	  j = win->w_obj->ob_tail;
+	  if (win->w_iconified)	/* get the right object */
+		obj = win->w_icnobj;
+	  else
+		obj = win->w_obj;
+	  j = obj->ob_tail;
 
 	  for ( i = 1; i <= j; i++ )
 	  {
@@ -172,6 +180,7 @@ x_select( )
 	REG DIR		*dir;
 	REG WORD	i;
 	WORD		j;
+	WORD		items;
 
 	x_win = (WINDOW*)0;
 	x_type = DESKICON;
@@ -180,8 +189,14 @@ x_select( )
 
 	while( win )
 	{
-	  dir = (DIR *)win->w_memory;
-	  for ( i = 0; i < win->w_items; i++ )
+	  if (win->w_iconified) { /* get the right dir */
+		dir = &win->w_icndir;
+		items = 1;	 /* just one */
+	  } else {
+		  dir = (DIR *)win->w_memory;
+		  items = win->w_items;
+	  }
+	  for ( i = 0; i < items; i++ )
 	  {
 	    if ( dir[i].d_state & SELECTED )
 	    {
@@ -211,14 +226,22 @@ x_next( name, type )
 
 	if ( x_type == WINICON )
 	{
-	  dir = (DIR *) x_win->w_memory;
-	  limit = x_win->w_items;
-
+	  if (x_win->w_iconified) { /* get the right dir */
+		dir = &x_win->w_icndir;
+		limit = 1;	    /* just one */
+	  } else {
+		  dir = (DIR *) x_win->w_memory;
+		  limit = x_win->w_items;
+	  }
 	  for ( i = x_index; i < limit; i++ )
 	  {
 	    if ( dir[i].d_state & SELECTED )
 	    {
-	      str = put_name( x_win, &dir[i].d_name[0] );
+	      if (x_win->w_iconified) {
+		      str = put_name( x_win, NULL ); /* get rid of '*.*' */
+	      } else {
+		      str = put_name( x_win, &dir[i].d_name[0] );
+	      }
 	      if ( dir[i].d_att & SUBDIR )
 	      {
 	        strcat( wilds, str );	
@@ -265,9 +288,13 @@ x_first( name, type )
 
 	while( win )			/* inside a window?	*/
 	{
-	  dir = (DIR *) win->w_memory;
-	  j = win->w_items;
-
+	  if (win->w_iconified) {	/* get right dir */
+		dir = &win->w_icndir;
+		j = 1;			/* just one */
+	  } else {
+		  dir = (DIR *) win->w_memory;
+		  j = win->w_items;
+	  }
 	  for ( i = 0; i < j; i++ )
 	  {
 	    if ( dir[i].d_state & SELECTED )
@@ -304,7 +331,11 @@ i_find( mx, my, winout, item, type )
 
 	while( win )		
 	{				/* inside a window boundary	*/
+#if 0
 	  if ( !(win->w_iconified) && inside( mx, my, &win->w_sizes ) )
+#else	  /* now working inside iconified windows, too: */
+	  if (inside( mx, my, &win->w_sizes))
+#endif
 	  {				
 	    *winout = win;
 	    *type = WINICON;
@@ -312,8 +343,14 @@ i_find( mx, my, winout, item, type )
 	    				/* inside the work area		*/
 	    if ( inside( mx, my, &win->w_work ) )
 	    {
-	      if ( ( which = m_objfind( win->w_obj, mx, my, TRUE ) ) != -1 )
-	        *item = which;
+		OBJECT	*obj;
+
+		if (win->w_iconified)	/* get right object */ 
+			obj = win->w_icnobj;
+		else
+			obj = win->w_obj; 
+	      if ( ( which = m_objfind(obj, mx, my, TRUE ) ) != -1 )
+	     		*item = which;
 	    }
 
 #if 1

@@ -151,5 +151,13 @@ typedef struct idtype
 	BYTE	i_name[14];
 } IDTYPE;
 
+
+typedef struct fntlst {
+	WORD	fnt_id;
+	WORD	fnt_type;
+	BYTE	fnt_name[36];
+} FNTLST;
+
+
 #endif
 

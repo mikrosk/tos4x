@@ -9,6 +9,7 @@
 /*	The #E will save 10 fields instead of 4	7/17/92	D.Mui		*/ 
 /*	Converted to Lattice C 5.51		2/18/93 C.Gee		*/
 /*	Saving also window iconifying inform.	5/11/93 H.M.Krober	*/
+/*	Save font used in text windows		5/26/93 H.M.Krober	*/
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -33,6 +34,11 @@ EXTERN	APP	*applist;
 EXTERN	WORD	q_change;
 EXTERN	BYTE	*q_addr;
 EXTERN	WORD	d_maxcolor;	/* max number of color	*/
+
+EXTERN	WORD	win_font;
+EXTERN	WORD	win_fsize;
+EXTERN	WORD	d_numfonts;
+
 
 UWORD	d_rezword;
 WORD	font_save;
@@ -496,6 +502,13 @@ i_12:
 		tt_color( TRUE );
 		break;
 
+	      case 'S':		/* set window font and font size */
+		pcurr = scan_2(pcurr, &win_font);
+		pcurr = scan_2(pcurr, &win_fsize);
+		if (win_font > (d_numfonts - 1))
+			win_font = 0;	/* sytem font */
+		break;
+
 	      case 'E':				/* environment string	*/
 		pcurr = scan_2( pcurr, &envr );
 		s_view = ( ( envr & 0x80 ) != 0 );
@@ -710,10 +723,10 @@ hex_dig(achar)
 		pcurr = save_2( pcurr, win->w_sizes.g_y / gl_hchar );
 		pcurr = save_2( pcurr, win->w_sizes.g_w / gl_wchar );
 		pcurr = save_2( pcurr, win->w_sizes.g_h / gl_hchar );
-		pcurr = save_2( pcurr, win->w_iconified); /* == 0 */
+		pcurr = save_2( pcurr, win->w_iconified); /* w_iconified == 0 !!! */
 	}
 
-	if ( win->w_id != -1 )
+	if ( (win->w_id != -1) || (win->w_saveid != -1) )
 	{
 	  ptmp = win->w_path;
 	  while( *ptmp )
@@ -857,9 +870,21 @@ if_1:
 	*pcurr++ = 0x0d;
 	*pcurr++ = 0x0a;
 
+	/* save window font & point size */
+
+	*pcurr++ = '#';
+	*pcurr++ = 'S';
+	*pcurr++ = ' ';
+	pcurr = save_2(pcurr, win_font);
+	pcurr = save_2(pcurr, win_fsize);
+
+	*pcurr++ = 0x0d;
+	*pcurr++ = 0x0a;
+
+
 	/********* save the opened window first	************/
 	
-	win = w_gfirst();
+	win = w_agfirst();
 		
 	i = -1;
 
@@ -867,7 +892,7 @@ if_1:
 	{
 	  i++;
 	  warray[i] = win;
-	  win = w_gnext();
+	  win = w_agnext();
 	}
 					/* save windows		*/
 	for ( j = i; j >= 0; j-- )
@@ -879,7 +904,7 @@ if_1:
 		
 	while( win )
 	{
-	  if ( win->w_id == -1 )
+	  if ( (win->w_id == -1) && (win->w_saveid == -1))
 	    pcurr = save_win( win, pcurr );
 
 	  win = ( WINDOW *)win->w_next;

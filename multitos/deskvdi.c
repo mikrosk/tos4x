@@ -240,7 +240,7 @@ vs_clip( clip_flag, pxyarray )
 
 
 	VOID
-v_clsvwk( )
+d_v_clsvwk( )
 {
 	control[0] = 101;
 	control[1] = 0;
@@ -283,7 +283,147 @@ vq_chcells( row, col )
 	*col = intout[1];
 }
 
+	WORD	
+d_v_load_fonts()
+{
+	control[0] = 119;
+	control[1] = 0;
+	control[3] = 1;
+	intin[0] = 0;
+	d_ncode();
+	return intout[0];
+}
+	VOID	
+d_v_unload_fonts()
+{
+	control[0] = 120;
+	control[1] = 0;
+	control[3] = 1;
+	intin[0] = 0;
+	d_ncode();
+}
 
+
+	WORD
+d_v_font_name( i, name, fsmflag )
+	WORD	i;
+	BYTE	*name;
+	WORD	*fsmflag;
+{
+	intin[0] = i;
+	control[0] = 130;
+	control[1] = 0;
+	control[3] = 1;
+	d_ncode();
+
+	for ( i = 1; i <=32; i++ )
+	  *name++ = (BYTE)intout[i];
+
+	*fsmflag = intout[33];
+	return( intout[0] );
+}
+
+	WORD
+d_vqt_width(c, w, ld, rd)
+	WORD	c;
+	WORD 	*w, *ld, *rd;
+{
+	intin[0] = c;
+	control[0] = 117;
+	control[1] = 0;
+	control[3] = 1;
+	d_ncode();
+
+	*w = ptsout[0];
+	*ld = ptsout[2];
+	*rd = ptsout[4];
+	return intout[0];
+}
+
+	WORD
+d_vqt_attributes( attrib )
+	WORD	*attrib;
+{
+	control[0] = 38;
+	control[1] = 0;
+	control[3] = 0;
+	d_ncode();
+	attrib[0] = intout[0];
+	attrib[1] = intout[1];
+	attrib[2] = intout[2];	
+	attrib[3] = intout[3];
+	attrib[4] = intout[4];
+	attrib[5] = intout[5];
+	attrib[6] = ptsout[0];
+	attrib[7] = ptsout[1];
+	attrib[8] = ptsout[2];
+	attrib[9] = ptsout[3];
+}
+
+	WORD
+d_v_setfont(font)
+WORD	font;
+{
+	intin[0] = font;
+	control[0] = 21;
+	control[1] = 0;
+	control[3] = 1;
+	d_ncode();
+	return intout[0];
+}
+
+	WORD
+d_vst_point(point, chw, chh, cew, ceh)
+WORD	point;
+WORD	*chw, *chh, *cew, *ceh;
+{
+	intin[0] = point;
+	control[0] = 107;
+	control[1] = 0;
+	control[3] = 1;
+	d_ncode();
+	*chw = ptsout[0];
+	*chh = ptsout[1];
+	*cew = ptsout[2];
+	*ceh = ptsout[3]; 
+	return intout[0];
+}
+
+	WORD
+d_vst_arbpt(point, chw, chh, cew, ceh)
+WORD	point;
+WORD	*chw, *chh, *cew, *ceh;
+{
+	intin[0] = point;
+	control[0] = 246;
+	control[1] = 0;
+	control[3] = 1;
+	d_ncode();
+	*chw = ptsout[0];
+	*chh = ptsout[1];
+	*cew = ptsout[2];
+	*ceh = ptsout[3]; 
+	return intout[0];
+}
+
+	WORD
+d_vst_height(h, chw, chh, cew, ceh)
+WORD	h;
+WORD	*chw, *chh, *cew, *ceh;
+{
+	ptsin[0] = 0;
+	ptsin[1] = h;
+	control[0] = 12;
+	control[1] = 1;
+	control[3] = 0;
+	d_ncode();
+	*chw = ptsout[0];
+	*chh = ptsout[1];
+	*cew = ptsout[2];
+	*ceh = ptsout[3]; 
+	return intout[0];
+}
+ 	
 
 
 /*	Hard Copy */

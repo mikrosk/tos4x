@@ -525,7 +525,14 @@ eralert( n, d )
 	  }
 	  else
 	  {
-#if 0
+#if 1
+/* we have to use the BIOS, because GEMDOS isn't re-entrant. Fortunately,
+ * this works even under MiNT, because MiNT restores the "native" BIOS
+ * trap while it is inside of GEMDOS. Otherwise, BIOS I/O would be coming
+ * from the AES_BIOS device under MiNT, which would be real bad news.
+ * If MiNT ever changes this, you may have to change the "#if 1" above to
+ * a "#if 0".
+ */
 	    if ( Bconstat( 2 ) == -1 )
 	    {
 	      if ( ( Bconin( 2 ) & 0x00ff ) == 0x0D )
@@ -535,6 +542,7 @@ eralert( n, d )
 	      }
 	    }
 #else
+/* see comment above */
 	    if ( (newchkkbd() & 0x00ff) == 0x0D )
 	    {
 	      ret = 1;

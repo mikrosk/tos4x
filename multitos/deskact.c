@@ -3,6 +3,8 @@
  * New Desktop for Atari ST/TT computers.
  * ½ 1989-93 Atari Corporation
  * ======================================================================
+ * 930610	hmkrober	srollable r_box implemented
+ * 930601	hmkrober	support for iconified windows added
  * 930209	towns		started conversion to LC5
  * 921214	esmith		Add new drag and drop code.
  * 920711	dmui		change all the iconblk to ciconblk
@@ -42,6 +44,9 @@ EXTERN	WINDOW	*o_win;
 EXTERN	WORD	d_dir;
 EXTERN	WINDOW	*x_win;
 EXTERN	WORD	x_type;
+EXTERN	WORD	win_wchar;
+EXTERN	WORD	win_xoff;
+EXTERN	WORD	win_yoff;
 
 WORD	back_update;					/* update background	*/
 BYTE	scapath[] = "?:\\CLIPBRD\\";	/* default clip board path */
@@ -234,11 +239,19 @@ ch_obj( WORD mx, WORD my, WINDOW **win, WORD *item, WORD *type )
   
 				return( TRUE );
 			} else {
+
+				if ((*win)->w_iconified)	/* +++ HMK 5/28/83 */
+					i = 1;			/* just one object */
+
+
 				dir = get_dir( *win, i );
 				if ( dir->d_att & SUBDIR )	/* dir is OK	*/
 					return( TRUE );		     
 
-				str = put_name( *win, dir->d_name );
+				if ((*win)->w_iconified)	/* get path */
+					str = put_name( *win, NULL );
+				else
+					str = put_name( *win, dir->d_name );
 						/* check file type	*/
 ch_1:			app = app_xtype( str, &install );
 
@@ -297,6 +310,10 @@ file_op( BYTE *dest, WORD mode )
 
 	if ( !x_first( &source, &type ) )
 		return;
+
+	if (source[3] == '\0') {		/* +++ HMK 6/2/93 */
+		rep_path( getall, source ); 	/* if root dir, then append '*.*' */		
+	}					/* needed for iconified window	  */
 
 	if ( mode != OP_DELETE )
 		if ( !ch_drive( *dest ) )	return;	
@@ -434,6 +451,9 @@ file_op( BYTE *dest, WORD mode )
 		obj[HIDECBOX].ob_flags &= ~HIDETREE;
 		bfill( 32, 0, dr );
 		x_first( &source, &type );
+		if (source[3] == '\0') {		/* +++ HMK 6/2/93 */
+			rep_path( getall, source ); 	/* if root dir, then append '*.*' */		
+		}					/* needed for iconified windows	  */
 		ret = dofiles(source,dest,mode,&ndir,&nfile,&nsize,type,TRUE,handle );
 	}
 
@@ -530,21 +550,26 @@ build_rect( REG OBJECT *obj, REG GRECT *rect, WORD w, WORD h )
 
 /*	Check whose is inside the rect and select the object	*/
 VOID
-chk_rect( REG WINDOW *win, GRECT *rect, WORD id )
+chk_rect( REG WINDOW *win, GRECT *rect, WORD id)
 {
-	REG OBJECT	*obj;
+	REG OBJECT	*op, *obj;
  	REG WORD	i;
 	REG WORD	minx,miny,maxx,maxy;
 	WORD		/*limit,*/orgx,orgy,select;
 	GRECT		pt;
 	WORD		doit;
-	DIR			*dir;
-	
+	WORD		tail;
+	DIR		*dir;
+
 	if ( win )
 	{
 		rc_intersect( &win->w_work, rect );
 		doit = TRUE;
-		obj = win->w_obj;
+		if (win->w_iconified) {
+			obj = win->w_icnobj;
+		} else {
+			obj = win->w_obj;
+		}
 	} else {
 		obj = background;
 		doit = FALSE;
@@ -558,30 +583,31 @@ chk_rect( REG WINDOW *win, GRECT *rect, WORD id )
 	miny = orgy + obj[0].ob_height;
 	maxx = 0;
 	maxy = 0;
-	
-	for ( i = 1; i <= obj[0].ob_tail; i++ )
+
+	tail = obj->ob_tail;
+
+	for ( i = 1, op = &obj[i]; i <= tail; i++, op++ )
 	{
-		if ( !(obj[i].ob_flags & HIDETREE) )
+		if ( !(op->ob_flags & HIDETREE) )
 		{
-			rc_copy( &obj[i].ob_x, (WORD *)&pt );
+			rc_copy( &op->ob_x, (WORD *)&pt );
 			pt.g_x += orgx;
 			pt.g_y += orgy;
 			if ( rc_intersect( rect, &pt ) )
 			{
-				if ( minx > obj[i].ob_x )
-					minx = obj[i].ob_x;
+				if ( minx > op->ob_x )
+					minx = op->ob_x;
 	 
-				if ( miny > obj[i].ob_y )
-					miny = obj[i].ob_y;
+				if ( miny > op->ob_y )
+					miny = op->ob_y;
 
-				if ( obj[i].ob_x > maxx )
-					maxx = obj[i].ob_x;
+				if ( op->ob_x > maxx )
+					maxx = op->ob_x;
 
-				if ( obj[i].ob_y > maxy )
-					maxy = obj[i].ob_y;
+				if ( op->ob_y > maxy )
+					maxy = op->ob_y;
 
-				obj[i].ob_state ^= SELECTED;		 
-
+				op->ob_state ^= SELECTED;		 
 				if ( doit )
 				{
 					dir = get_dir( win, i );
@@ -592,6 +618,7 @@ chk_rect( REG WINDOW *win, GRECT *rect, WORD id )
 		}
 	}
 
+
 	if ( select )
 	{
 		pt.g_w = maxx - minx + obj[1].ob_width;
@@ -600,7 +627,160 @@ chk_rect( REG WINDOW *win, GRECT *rect, WORD id )
 		pt.g_y = miny + obj[0].ob_y;
 		do_redraw( id, &pt, 0 );
 	}
+
 }
+
+/*
+ *	Check rectangle for scrollable windows and select
+ *	objects inside the rectangle.
+ */
+
+	VOID
+chk_r2(win, id, mode, x, y)
+	WINDOW	*win;
+	WORD	id;
+	WORD	x, y;
+{
+	MLOCAL	WORD	osrow, oscol;
+	MLOCAL	WORD	ox, oy, ow, oh;
+	LOCAL	WORD	srtitem, enditem;
+	LOCAL	WORD	crow, ccol;
+	LOCAL	WORD	srow, scol;
+	MLOCAL	OBJECT	*obj;
+	REG	WORD	i, j;
+	LOCAL	WORD	index, oi, ncol, nrow;
+	MLOCAL	WORD	limit;
+	LOCAL	WORD	doit;
+	REG	DIR	*dir;
+	MLOCAL	DIR	*wdir;
+	REG 	WORD	irow, jcol, acol;
+	LOCAL	WORD	ii, jj;
+	LOCAL	WORD	wx, wy;
+
+	if (mode == 0) { 
+		/* 
+		 * INIT MODE 
+		 */
+		if (win->w_iconified) {
+			obj = win->w_icnobj;
+			limit = 1;
+			wdir = &win->w_icndir;
+		} else { 
+			obj = win->w_obj;
+			limit = win->w_items;
+			wdir = (DIR *) win->w_memory;
+		}
+		ox = win->w_work.g_x; /* work area */
+		oy = win->w_work.g_y;
+		ow = obj[1].ob_width;
+		oh = obj[1].ob_height;
+
+		/* original start column and start row */		 
+		oscol = win->w_coli + (x - ox) / (win_xoff + ow);
+		osrow = win->w_rowi + (y - oy) / (win_yoff + oh);
+	} else {	
+		/*
+		 * ACTION MODE
+		 */
+
+		/* total number of rows and columns in window */
+		nrow = win->w_vvicons + win->w_xrow;
+		ncol = win->w_hvicons + win->w_xcol;
+
+		/* current column and current row */
+		ccol = win->w_coli + (x - ox) / (win_xoff + ow);
+		ccol = (ccol >= ncol) ? (ncol - 1) : ccol;
+		crow = win->w_rowi + (y - oy) / (win_yoff + oh);
+
+		srtitem = win->w_srtitem;
+		enditem = srtitem + obj->ob_tail;
+
+		/*
+		 *	check direction
+		 */
+		if (osrow > crow) {
+			srow = crow;
+			crow = osrow;
+			irow = nrow - 1;
+			ii = -1;
+		} else {
+			srow = osrow;
+			irow = 0;
+			ii = 1;
+		}
+		if (oscol > ccol) {
+			scol = ccol;
+			ccol = oscol;
+			acol = ncol - 1;
+			jj = -1;
+		} else {
+			scol = oscol;
+			acol = 0;
+			jj = 1;
+		}
+
+		doit = FALSE;
+
+		/*
+		 *	now check all files (objects)
+		 *	by row and column
+		 */
+		for (i = 0; i < nrow; i++, irow += ii) {
+			for (j = 0, jcol = acol; j < ncol; j++, jcol += jj) {
+				index = irow * ncol + jcol;
+				if (index >= limit) {
+					continue;
+				}
+				dir = &wdir[index]; /* get file */
+
+				/*
+				 *	is it inside the rectangle?
+				 *
+				 *	srow, scol
+				 *        |
+				 *	  +------------------+
+				 *	  |                  |
+				 *	  |                  |
+				 *	  +------------------+
+				 *                           |
+				 *	               crow, ccol
+		                 */
+				if ((irow >= srow) && (irow <= crow) && 
+				    (jcol >= scol) && (jcol <= ccol)) {
+					/*
+					 * Has it already been touched?
+				         */
+					if (!(dir->d_att & 0x1000) ) { 
+						/* NO TOUCHED YET */
+						dir->d_state ^= SELECTED;
+						dir->d_att |= (0x1000);
+						doit = TRUE;
+					}
+				} else { /* not inside rect */
+					if ((dir->d_att & 0x1000)) {
+						/* HAS BEEN TOUCHED */
+					   	dir->d_state ^= SELECTED;
+						dir->d_att &= (~0x1000);
+						doit = TRUE;
+					}
+				}
+				/*
+				 *	Do we have to redraw the object?
+				 */	 
+				if (doit && ((index >= srtitem) && 
+				   (index < enditem))) {
+					oi = index - srtitem + 1; 
+					obj[oi].ob_state = dir->d_state;
+					doit = FALSE;
+					objc_offset(obj, oi, &wx, &wy);
+					draw_loop(id, obj, 0, MAX_DEPTH, wx, wy, 
+					     obj[oi].ob_width, obj[oi].ob_height);
+				}	
+			}
+		}
+	}
+}
+
 
 /*	Draw a box	*/
 
@@ -620,8 +800,8 @@ frame( WORD x1, WORD y1, WORD x2, WORD y2 )
 }
 
 
-/*	Draw a box and wait for button to go up		*/
-
+/*	Draw a box and wait for button to go up				*/
+/*	+++ 6/10/93 HMK If inside window, it's able to do scrolling now */
 VOID
 r_box( WORD id, WINDOW *win )
 {
@@ -630,6 +810,11 @@ r_box( WORD id, WINDOW *win )
 	WORD 		gr_mkmx,gr_mkmy;
 	WORD 		gr_mkmstate,gr_mkkstate;
 	GRECT		rect;
+	GRECT		srect;
+	WORD		ww, wh, wx, wy, in_w;
+	OBJECT		*obj;
+	REG DIR		*dirp;	
+	WORD		i, limit, noframe;
 
 	graf_mkstate( &gr_mkmx, &gr_mkmy, &gr_mkmstate, &gr_mkkstate );
 	if ( !( 0x0001 & gr_mkmstate ) )
@@ -638,6 +823,25 @@ r_box( WORD id, WINDOW *win )
 	wind_update( 1 );	
 	desk_mice( POINT_HAND|0x8000 );
 
+	if (win) {	
+		wx = win->w_work.g_x;	/* window work area */
+		wy = win->w_work.g_y;
+		ww = win->w_work.g_x + win->w_work.g_w;
+		wh = win->w_work.g_y + win->w_work.g_h;
+		if (win->w_iconified)
+			obj = win->w_icnobj;
+		else
+			obj = win->w_obj;
+
+		/* Mark all directories as NOT touched yet. */
+		
+		limit = (win->w_iconified) ? 1  : win->w_items;
+		for (i = 0, dirp = (DIR *) win->w_memory; i < limit; i++)
+			dirp++->d_att &= (~0x1000);  /* use free bit */  
+	} else {
+		obj = background;  /* desktop */
+	}
+
 	rect.g_x = full.g_x;
 	rect.g_y = full.g_y;
 	rect.g_w = full.g_x + full.g_w; 
@@ -645,21 +849,72 @@ r_box( WORD id, WINDOW *win )
 
 	vs_clip( 1, (WORD *) &rect );
 
+	srect.g_x = gr_mkmx;
+	srect.g_y = gr_mkmy;
+	srect.g_w = 0;
+	srect.g_h = 0;
+	in_w = FALSE;		/* not touching the window borders */
+	noframe = FALSE;	/* draw frame */
+
 	while( TRUE )	
 	{
 		if ( 0x0001 & gr_mkmstate )	
 		{
 			tmpy = tmpy1 = gr_mkmy;
 			tmpx = tmpx1 = gr_mkmx;
+			if (id) 
+				chk_r2(win, id, 0, tmpx1, tmpy1);
+
 			frame( tmpx, tmpy, tmpx1, tmpy1 );
 
 			while ( 0x0001 & gr_mkmstate )	
 			{
-				if (((tmpx1 != gr_mkmx) || (tmpy1 != gr_mkmy)) && 
-					(0x0001&gr_mkmstate))	
+					
+				if ((tmpx1 != gr_mkmx) || (tmpy1 != gr_mkmy))
+					noframe = FALSE;
+				else
+					noframe = TRUE; /* mouse stays still, no frame */
+				
+				if (!noframe || in_w)	
 				{
+					in_w = FALSE;
 					frame( tmpx, tmpy, tmpx1, tmpy1 );
+
+					if (id) {  /* only if window and NOT desk */
+						srect.g_x = min( tmpx, gr_mkmx );
+						srect.g_y = min( tmpy, gr_mkmy );
+
+						srect.g_w = abs( tmpx, gr_mkmx );
+						srect.g_h = abs( tmpy, gr_mkmy );	
+
+
+						if (gr_mkmx < wx) { /* scroll */
+						        srl_col( win, 1, SRIGHT);
+							in_w = TRUE;
+						} else if (gr_mkmx > ww) {
+						        srl_col( win, 1, SLEFT);
+							in_w = TRUE;
+						}
+
+						if (gr_mkmy < wy) { /* scroll */
+						        srl_row( win, 1, SUP );
+							in_w = TRUE;
+						} else if (gr_mkmy > wh) {
+						        srl_row( win, 1, SDOWN );
+							in_w = TRUE;
+						}
+
+						if (in_w) { /* turn on proper clipping */
+							vs_clip( 1, (WORD *) &rect );
+						}
+						if ((srect.g_w ) && (srect.g_h ) ) {
+							/* check rectangle (window only) */
+							chk_r2(win, id, 1, gr_mkmx, gr_mkmy);
+						}
+					} 
+					
 					frame( tmpx, tmpy, gr_mkmx, gr_mkmy );
+
 					tmpy1 = gr_mkmy;
 					tmpx1 = gr_mkmx;
 				}
@@ -670,14 +925,22 @@ r_box( WORD id, WINDOW *win )
 		break;
 	}
 
-	rect.g_x = min( tmpx, tmpx1 );
-	rect.g_y = min( tmpy, tmpy1 );
+	if (!id) { /* do desktop rubber band stuff */
+		rect.g_x = min( tmpx, tmpx1 );
+		rect.g_y = min( tmpy, tmpy1 );
 
-	rect.g_w = abs( tmpx, tmpx1 );
-	rect.g_h = abs( tmpy, tmpy1 );	
+		rect.g_w = abs( tmpx, tmpx1 );
+		rect.g_h = abs( tmpy, tmpy1 );	
 
-	if ( ( rect.g_w ) && ( rect.g_h ) )
-		chk_rect( win, &rect, id );
+		if ( ( rect.g_w ) && ( rect.g_h ) )
+			chk_rect( win, &rect, id );
+	} else {
+r_1:
+		limit = win->w_items;
+		for (i = 0, dirp = (DIR *) win->w_memory; 
+		     i < limit; i++)
+			dirp++->d_att &= (~0x1000);  
+	}
 
 	desk_mice( ARROW );
 	wind_update( 0 );
@@ -702,14 +965,16 @@ VOID
 win_desk( REG WINDOW *swin, WORD sitems, WORD ditem, WORD mx, WORD my )
 {
 /*	DIR			*dir; */
-/*	REG OBJECT	*obj; */
+	REG OBJECT	*obj; 
 	REG WORD	i;
 	WORD		temp,first,type,status,ntype;
 	WORD		x,y;
 	BYTE		buffer[14];
 	BYTE		*str;
 	BYTE		*tail;
+	BYTE		drive;
 
+	drive = 0;
 	if ( !ditem )
 	{
 		first = TRUE;
@@ -720,14 +985,25 @@ win_desk( REG WINDOW *swin, WORD sitems, WORD ditem, WORD mx, WORD my )
 			if ( type == SUBDIR )
 			{
 				ntype = XDIR;
-				save_mid( str, buffer );
+				if (ch_level(str) <= 1) {	/* +++ HMK 6/2/93 */	
+					buffer[0] = str[0];
+					buffer[1] = ':';
+					buffer[2] = '\\';	/* root directory */
+					buffer[3] = '\0';
+					drive = str[0];		/* type is DISK on the desktop!!! */
+					ntype = DISK;	
+				} else
+					save_mid( str, buffer );			
 			} else {
 				ntype = XFILE;
 				save_ext( str, buffer );		    	
-			}
-			app_icon( buffer, ( type == SUBDIR ) ? FOLDER : -1, &temp );
+			} 
+			if (ntype != DISK)
+				app_icon( buffer, ( type == SUBDIR ) ? FOLDER : -1, &temp );
+			else
+				temp = 0; /* Cabin Icon */
 			
-			if ( ( i = make_icon( 0, temp, ntype, buffer ) ) == -1 )
+			if ( ( i = make_icon( drive, temp, ntype, buffer ) ) == -1 )
 			{
 				do1_alert( NOICON );
 				break;
@@ -735,7 +1011,11 @@ win_desk( REG WINDOW *swin, WORD sitems, WORD ditem, WORD mx, WORD my )
 
 			if ( first )
 			{
-				objc_offset( swin->w_obj, sitems, &x, &y );
+				if (swin->w_iconified)		/* get the right object */
+					obj = swin->w_icnobj;
+				else
+					obj = swin->w_obj;
+				objc_offset( obj, sitems, &x, &y );
 				app_mtoi( mx + x, my + y, &background[i].ob_x, &background[i].ob_y );
 				first = FALSE;
 			}
@@ -984,14 +1264,17 @@ hd_down( REG WORD sitem, REG WORD stype, REG WINDOW *swin )
 	  sobj = background;
 	else				/* source is window	*/
 	{
-	  if ( s_view != S_ICON )
+	  if (!swin->w_iconified && (s_view != S_ICON) )
 	  {
 	    itype = FALSE;
 	    w = f_xywh[2];
 	    h = f_xywh[5];
 	  } 
 	
-	  sobj = swin->w_obj;
+	  if (!swin->w_iconified)	/* get the right object */
+		  sobj = swin->w_obj;
+	  else
+		sobj = swin->w_icnobj;	
 	}
 					/* if no object selected  */
 	if ( !(sobj[sitem].ob_state & SELECTED) )
@@ -1114,7 +1397,10 @@ h_4:		  pt.g_y -= offy;
 	      else
 	      {
 		pid = dwin->w_id;
-		pobj = dwin->w_obj;
+		if (dwin->w_iconified)	/* +++ HMK 5/28/93 */
+			pobj = dwin->w_icnobj;
+		else
+			pobj = dwin->w_obj;
 	      } 		
 
 	      state = pobj[ditem].ob_state;
@@ -1180,7 +1466,6 @@ h_4:		  pt.g_y -= offy;
 	    if ( id != desk_id )
 	    {	
 	      d_dragdrop( id, handle, mx, my );
-	      Debug1( "Return from d_drag\r\n" );
 	      goto h_2;
 	    }
 	  }
@@ -1279,9 +1564,10 @@ to_win( WORD sitem, WINDOW *swin, WORD ditem, WINDOW *dwin )
 	if ( ditem )			/* copy to something	*/
 	{
 	  dir = get_dir( dwin, ditem );
-	  if ( dir->d_att & SUBDIR ) 	/* win file to folder	*/
-	    cat_path( dir->d_name, temp );
-	  else				/* launch application	*/
+	  if ( dir->d_att & SUBDIR ) { 	/* win file to folder	*/
+	    if (!dwin->w_iconified)
+		    cat_path( dir->d_name, temp );
+	  } else				/* launch application	*/
 	  {
 	    if ( swin )			/* window to window	*/
 	    {

@@ -46,7 +46,6 @@ dispvars.h
 dosbind.c
 error.h
 extern.h
-frestr.h
 gemaints.c
 gemaplib.c
 gemasync.c
@@ -90,7 +89,6 @@ mediach.s
 message.h
 mintbind.h
 mn_event.c
-mn_func.c
 mn_index.c
 mn_mbar.c
 mn_menu.c

@@ -25,6 +25,7 @@
  *
  * 02/11/93  cjg   - Converted to Lattice 5.51
  * 02/19/93  cjg   - Force the use of prototypes
+ * 05/14/93  cjg   - Modified menu_popup() for drop down lists
  */
 
 
@@ -55,7 +56,10 @@ EXTERN MENU_PTR gl_menuptr;
 EXTERN GRECT    gl_rfull;
 EXTERN WORD     gl_button;
 
-
+EXTERN WORD	DListFlag;
+EXTERN MENU_PTR DListPtr;
+EXTERN WORD	MAX_LIST_HEIGHT;
+EXTERN OBJECT   *ad_list;
 
 /* GLOBALS
  * ================================================================
@@ -115,7 +119,10 @@ MENU	*MData;			/* the output menu structure	 */
 	}while( gl_button );
 			        /* moved 03/23/92 cjg 		 */
 
-      wm_update( BEG_MCTRL );	/* Lock the menus and mouse      */
+       wm_update( BEG_MCTRL );	/* Lock the menus and mouse      */
+
+       DListFlag = FALSE;	/* Reset DropDown List Flag	 */
+
 
       /* Get the new Menu ID! */
       if( ( MenuID = Menu_Insert( tree, Menu->mn_menu )) > 0 )
@@ -127,30 +134,69 @@ MENU	*MData;			/* the output menu structure	 */
 	/* Initialize the menu data. Set the starting item */
         AssignMenuData( MenuPtr, Menu->mn_item );		
 
-	/* Adjust for scrolling, if its wanted. Do this by checking
-         * the height of the menu.
-         */
 
-	/* Make sure we stay within the limits */
-	if( Menu->mn_scroll )
+        /* Is this a normal popup menu? or a Drop Down List?  */
+
+        if( Menu->mn_scroll >= 0 )
 	{
-	    Menu->mn_scroll = max( Menu->mn_scroll, ObHead( Menu->mn_menu ) );
+	   /* ----- POPUP MENU -------
+            * ---------------------------------------------------------
+	    * Adjust for scrolling, if its wanted. Do this by checking
+            * the height of the menu.
+            */
 
-	    if( Menu->mn_scroll >= ( ObTail( Menu->mn_menu ) - 1 ) )
-		Menu->mn_scroll = ObHead( Menu->mn_menu );
+	   /* Make sure we stay within the limits */
+	   if( Menu->mn_scroll )
+	   {
+	       Menu->mn_scroll = max( Menu->mn_scroll, ObHead( Menu->mn_menu ) );
+
+	       if( Menu->mn_scroll >= ( ObTail( Menu->mn_menu ) - 1 ) )
+		   Menu->mn_scroll = ObHead( Menu->mn_menu );
+	   }
+
+	   MSCROLL( MenuPtr ) = Menu->mn_scroll;
+           if( Menu->mn_scroll )
+               CheckMenuHeight( MenuPtr );
+
+	   /* Adjust the x and y position of the popup */
+           AdjustMenuPosition( MenuPtr, xpos, ypos, &rect, FALSE, TRUE );
+        }
+ 	else
+	{
+	   /* ---- Drop Down List -------- - cjg 05/14/93
+	    * If Menu->mn_scroll is < 0, specifically, -1, then
+	    * We're a drop down list.  For our purposes,
+	    * any negative value for now, means drop down list.
+	    */
+	   DListFlag = TRUE;		/* Set Drop Down List Flag ACTIVE*/
+	   DListPtr  = MenuPtr;	/* Global MENU pointer for sliders.*/
+	   MSCROLL( MenuPtr ) = 0;	/* Reset to ZERO the scroll flag   */
+
+	   CheckListHeight( MenuPtr );  /* Check Height of List  */
+
+	   /* Adjust the x and y position of the Drop Down List */
+	   ObX( MPARENT( MenuPtr ) ) = MXPOS( MenuPtr ) = xpos;
+	   ObY( MPARENT( MenuPtr ) ) = MYPOS( MenuPtr ) = ypos;
+
+	   /* If there are fewer than MAX_LIST_HEIGHT menu items,
+	    * then just display as a popup in the drop down list spot.
+	    * Otherwise, initialize the drop down list sliders.
+	    */
+	   if( MNUM_ITEMS( MenuPtr ) < MAX_LIST_HEIGHT )
+	       DListFlag = FALSE;
+	   else
+	       InitListSliders( MenuPtr );
 	}
 
-	MSCROLL( MenuPtr ) = Menu->mn_scroll;
-        if( Menu->mn_scroll )
-            CheckMenuHeight( MenuPtr );
-
-	/* Adjust the x and y position of the popup */
-        AdjustMenuPosition( MenuPtr, xpos, ypos, &rect, FALSE, TRUE );
 
 	/* Save the area underneath the menu */
         if( Pop_Blit( MenuPtr, FALSE ) )
         {
 	  ObjcDraw( tree, MPARENT( MenuPtr ), &gl_rfull );	
+
+	  /* If we have a drop down list, draw the sliders */
+	  if( DListFlag )
+	     ObjcDraw( ad_list, ROOT, &gl_rfull );
 
           obj = EvntSubMenu( id, MenuPtr ); 	         /* Do EVNT!*/
           Pop_Blit( MenuPtr, TRUE );			 /* Restore */
@@ -160,6 +206,10 @@ MENU	*MData;			/* the output menu structure	 */
         RestoreMenu( MenuPtr );				   /* Rebuild menu  */
         Menu_Delete( MenuID );				   /* Delete Node   */
       }
+
+
+
+
     }
     else
     { /* MENU BAR ROUTINES  */

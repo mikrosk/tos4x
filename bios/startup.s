@@ -1,19 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: lozben $
 * =======================================================================
 *
-* $Date: 89/08/29 17:36:45 $
+* $Date: 89/08/30 15:18:42 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.26  89/08/30  15:18:42  lozben
+* Fixed a bug in _EsetShift().
+*
 * Revision 2.25  89/08/29  17:36:45  apratt
 * Added code (two lines) to set GEMDOS date/time when XBIOS Settime()
 * call is made.
-*
+* 
 * Revision 2.24  89/08/28  21:01:16  kbad
 * Changed mushroom code to get rid of the LUT for initial screen offset,
 * since there are only two of them (and TT res offsets are > word length)
@@ -303,7 +306,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.25 $
+* $Revision: 2.26 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -4345,7 +4348,7 @@ crctab:
 	dc.w	$48c4,$58e5,$6886,$78a7,$0840,$1861,$2802,$3823
 	bsr	wvbl			; wait for start of vertical-blank
 	move.w	shiftmd(a5),-(sp)	; save return value
-	move.w	8(sp),shiftmd(a5)	; set shift mode register
+	move.w	6(sp),shiftmd(a5)	; set shift mode register
 	clr.w	vblsem(a5)		; disable vblank processing
 	dc.w	$1080,$00a1,$30c2,$20e3,$5004,$4025,$7046,$6067
 	move.w	#1,vblsem(a5)		; re-enable vblank
@@ -4523,7 +4526,6 @@ eget_ok:
 
 eget_loop:
 .endc
-
 
 eget_dec:
 	dbra	d1,eget_loop		; do untill count = -1

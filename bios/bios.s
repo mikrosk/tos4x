@@ -4,16 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/01/31 13:50:17 $
+* $Date: 91/03/27 12:33:58 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.28  91/03/27  12:33:58  apratt
+* Turned on Bconmap for TT+STPLUS rather than just TT. It should really be on
+* for ANYTHING.  Also, a bug fix in RSCONF for MFP's: was writing rsmode in
+* iorec as word, not byte.  Could be other problems which I haven't handled
+* yet, but which are fixed by SERPTCH.
+*
+* Took out midi part of ikbd/midi interrupt if STPAD, since pad has no MIDI.
+*
 * Revision 2.27  91/01/31  13:50:17  apratt
 * Fixed some bugs in serial port handling for SCC.
-*
+* 
 * Revision 2.26  90/10/15  12:08:02  apratt
 * Fixed keyboard tables so they're right: the arrow keys for some countries
 * did NOT give ASCII codes of digits when shifted, as the VDI spec says
@@ -41,7 +49,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.27 $
+* $Revision: 2.28 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2399,14 +2407,14 @@ bumxit:	rts
 * For TT, if the argument is 0 (for RS232), we read the current mapping
 * from the variable mapiorec, which is maintained by Bconmap.
 *
-.ifne TT
+.ifne TT+STPLUS
 
 .endc
 	.globl	iorec
 
 iorec:
 	move.w	4(sp),d1
-.ifne TT
+.ifne TT+STPLUS
 .globl mapiorec
 
 	beq	auxiorec
@@ -2546,7 +2554,8 @@ auxc0:	cmp.b	rsmode(a0),d0	; is this a change?
 	beq	auxc0a
 	clr.b	txoff(a0)	; start sending
 	bsr	sender
-	move.w	(sp)+,rsmode(a0) ; get new mode off stack & write it
+auxc0a:
+	tst.b	rxoff(a0)	; need to send XON or raise RTS?
 	beq	auxc0b		; no.
 	bsr	aux_rxok
 auxc0b:
@@ -3741,7 +3750,7 @@ rs2:	move.w	8(sp),d0
 	bmi	rs3		; negative is no change
 
 * save incoming ucr value in our iorec so we can return it later
-* We have 0,1,2 or 3 in bits 6-7 of d1.  These represent 8, 7, 6, and 5
+
 	move.b	d0,ucr_shadow(a0)
 
 * decode word-length bits 6-5
@@ -4001,8 +4010,12 @@ chbirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 *	this code handles the midi/keyboard interrupt exception		*
 *************************************************************************
 
+.ifeq STPAD
+* This code is IFEQ STPAD because PAD has no MIDI, and worse, if you
+* read from there, it'll look like it's interrupting! So don't touch it.
 	.globl	midikey
 
+.endc
 midikey:
 	movem.l d0-d3/a0-a3,-(sp)	;save all registers (8/16/85 dbg)
 keymidi:

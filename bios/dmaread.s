@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/12 19:56:18 $
+* $Date: 1991/09/13 00:46:52 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.21  1991/09/13  00:46:52  apratt
+* Minna added yet another delay: Conner wants 0.5sec between
+* power up and the Identify command.
+*
 * Revision 1.20  1991/09/12  19:56:18  apratt
 * Changed to assemble IDE_AT for ALL MACHINES, now that there's no
 * distinction at assembly time between ST and STPLUS.
@@ -103,7 +107,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.20 $
+* $Revision: 1.21 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\dmaread.s,v $
@@ -194,6 +198,10 @@ IDE_AT		=	1	; Always! (AKP 9/91)
 ; Aug-20-91	ml.	Added iderdy() to check if an IDE drive is ready
 ;			or not, this includes the check for the existence 
 ;			of the slave drive (IDE unit 1.)
+;
+; Sep-12-91	ml.	Added in yet another delay for IDE drive.  Conner
+;			requires a 500ms delay before calling identify()
+;			after power on.
 ;-
 
 .globl	_dmaread
@@ -201,34 +209,35 @@ IDE_AT		=	1	; Always! (AKP 9/91)
 
 
 ; System variables
-flock		equ	$43e	; FIFO lock variable
-_hz_200		equ	$4ba	; system 200hz timer
+flock	    equ	    $43e    ; FIFO lock variable
+_hz_200	    equ	    $4ba    ; system 200hz timer
 
 ; For ACSI and SCSI drives
-READ		equ	$08	; opcode for Read sectors
-WRITE		equ	$0a	; opcode for Write sectors
-NCMD		equ	6	; normal command length (6 bytes)
-MAXACSI		equ	7	; highest ACSI unit#
-MAXSCSI		equ	15	; highest SCSI unit#
+READ	    equ	    $08	    ; opcode for Read sectors
+WRITE	    equ	    $0a	    ; opcode for Write sectors
+NCMD	    equ	    6	    ; normal command length (6 bytes)
+MAXACSI	    equ	    7	    ; highest ACSI unit#
+MAXSCSI	    equ	    15	    ; highest SCSI unit#
 
 ; For IDE-AT drives
-ATREAD		equ	$20	; opcode for Read sectors
-ATWRITE		equ	$30	; opcode for Write sectors
-INITPARM	equ	$91	; opcode for Initialize Drive Parameters
-IDENTIFY	equ	$ec	; opcode for Identify Drive
-D_WORST		equ	2000	; worst case delay (10s)
-ATRDY		equ	1000	; delay to wait for IDE drive to be ready
-MAXAT		equ	17	; highest IDE-AT unit#
+ATREAD	    equ	    $20	    ; opcode for Read sectors
+ATWRITE	    equ	    $30	    ; opcode for Write sectors
+INITPARM    equ	    $91	    ; opcode for Initialize Drive Parameters
+IDENTIFY    equ	    $ec	    ; opcode for Identify Drive
+D_IDENTIFY  equ	    101	    ; delay between power on and identify() (500ms)
+D_WORST	    equ	    2000    ; worst case delay (10s)
+ATRDY	    equ	    1000    ; delay to wait for IDE drive to be ready
+MAXIDE	    equ	    16	    ; highest IDE-AT unit# 
 
 ; Error codes to return to BIOS
-EUNDEV	equ	(-15)		; UNknown DEVice
-EREADF	equ	(-11)		; READ Fault
-EWRITF	equ	(-10)		; WRITe Fault
+EUNDEV	    equ	    (-15)   ; UNknown DEVice
+EREADF	    equ	    (-11)   ; READ Fault
+EWRITF	    equ	    (-10)   ; WRITe Fault
 
 ; Offsets for registers addressing on data bus
-REGBASE		equ	1	; most are on odd part of data bus
-REGSTEP		equ	2	; for regs that are on word boundaries
-REGLSTEP	equ	4	; for regs that are on long word boundaries
+REGBASE	    equ	    1	    ; most are on odd part of data bus
+REGSTEP	    equ	    2	    ; for regs that are on word boundaries
+REGLSTEP    equ	    4	    ; for regs that are on long word boundaries
 
 
 ;+
@@ -281,7 +290,7 @@ _dmawrite:
 	
 dmarw:
 .if IDE_AT
-	cmpi.w	#MAXAT,$e(sp)		; unit# > IDE-AT unit# 16-17?
+	cmpi.w	#MAXIDE,$e(sp)		; unit# > IDE-AT unit# 16-17?
 .else
 .if SCSI
 	cmpi.w	#MAXSCSI,$e(sp)		; unit# > SCSI unit# 8-15?
@@ -340,6 +349,11 @@ at:	move.l	$8,a0
 	beq	undev			; if drive never gets ready, return
 					;   with unknown device
 					; else
+	move.l	#D_IDENTIFY,d0		; Delay required by Conner drives
+	add.l	_hz_200,d0		;  between identify() and power on
+at00:	cmp.l	_hz_200,d0
+	bcc	at00
+
 	pea	sbuf			; scratch buffer for drive parameters
 	move.w	$12(sp),-(sp)		; IDE unit#
 	bsr	_identify		; identify()
@@ -348,8 +362,8 @@ at:	move.l	$8,a0
 	bmi	rwend			; if timed-out, return
 	bne	rw2			; if error, return with error code
 					; else init drive with these params
-	moveq	#2,d0			; FOR DEBUGGING - Conner drives
-	add.l	_hz_200,d0
+	moveq	#2,d0			; Delay required by Conner drives
+	add.l	_hz_200,d0		;  between identify() and initparm()
 at0:	cmp.l	_hz_200,d0
 	bcc	at0
 

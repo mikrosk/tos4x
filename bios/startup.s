@@ -1,19 +1,24 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/12 20:23:32 $
+* $Date: 89/02/17 12:09:32 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.35  89/02/17  12:09:32  apratt
+* Fixed byte-count for clearing screen at clrm_2, and
+* fixed priv handler: must clear & disable caches after clobbering
+* the instruction, then restore cacr to its previous value.
+*
 * Revision 1.34  89/02/12  20:23:32  kbad
 * changed version, date, and dosdate equates from `=' to `equ'.  It seems
 * that as68 doesn't like `=' assignments inside conditional statements.  Urk.
-*
+* 
 * Revision 1.33  89/02/08  17:45:15  apratt
 * Backed off screen base to phystop-$25800 for TT (in two places).
 * 
@@ -173,7 +178,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.34 $
+* $Revision: 1.35 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1362,7 +1367,7 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 .endc
 .ifne TT
 	sub.l	#$25800,a0		; TT needs LOTS of video RAM
-	move.w	#$9600-1,d1
+	move.w	#$2580-1,d1		; clear d1*16 bytes
 .endc
 	move.l	a0,_v_bas_ad(a5)
 	move.b	_v_bas_ad+1(a5),dbaseh(a5) ; load high addr
@@ -1650,7 +1655,17 @@ priv:	movem.l	d0/a0,-(sp)
 * Take 2: copy the dest EA bits and extension words of the instruction into
 * a "move.w (a0),ea" instruction elsewhere in memory, point a0 to the
 	bne.s	priv1			; no.
+.ifne TT
+* if TT, need to clear caches after this instruction
+	dc.w	$4e7a, $8002		; (movec cacr,a0) save cacr
 	move.b	#$42,(a0)		; clobber the instruction
+	move.l	#$808,d0		; clear & disable both caches
+	dc.w	$4e7b, $0002		; (movec d0,cacr)
+	dc.w	$4e7b, $8002		; (movec a0,cacr) restore cacr
+.endc
+.ifeq TT
+	move.b	#$42,(a0)		; clobber the instruction
+.endc
 	movem.l	(sp)+,d0/a0
 	bsr	clrcache
 .endif

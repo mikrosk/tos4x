@@ -1,16 +1,19 @@
 /*
 ******************* Revision Control System *****************************
 *
-* $Author: unknown $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 1991/01/02 19:07:12 $
+* $Date: 1992/07/27 20:12:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: prtblk.c,v $
+* Revision 2.4  1992/07/27  20:12:04  kbad
+* Nearly last Sparrow test BIOS
+*
 * Revision 2.3  1991/01/02  19:07:12  unknown
 * Checkin to shut up rcsdiff: no changes.
 *
@@ -25,7 +28,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.3 $
+* $Revision: 2.4 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\prtblk.c,v $
@@ -198,8 +201,8 @@ PRTARG *args;
 
 /* normalize BitMap block pointer */
 /* NB -- all bits are addressed left to right */
-   rasword = a.blkptr & 0xfffffffe;
-   rasbit = (rasword == a.blkptr) ? a.offset : a.offset + 8;
+   rasword = (short *)((long)(a.blkptr) & 0xfffffffe);
+   rasbit = (rasword == (short *)a.blkptr) ? a.offset : a.offset + 8;
 
 /* map pixels and print */
    LS = TRUE;

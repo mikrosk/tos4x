@@ -1,16 +1,19 @@
 /*
 ******************* Revision Control System *****************************
 *
-* $Author: unknown $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/05/18 23:08:30 $
+* $Date: 1992/07/27 20:12:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.10  1992/07/27  20:12:04  kbad
+* Nearly last Sparrow test BIOS
+*
 * Revision 2.9  1992/05/18  23:08:30  unknown
 * Added USE_DISK_CHANGE for Sparrow.  Flop.s and this file need to be
 * built with that switch in the same state.  In this file the consequence
@@ -89,7 +92,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.9 $
+* $Revision: 2.10 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\rwabs.c,v $
@@ -1012,7 +1015,7 @@ WORD dsksiz, execflg;
      * Make the sector executable or non-executable.
      */
     w = 0;
-    for (p = buf; p < (buf + 0x1fe);)
+    for (p = buf; p < (WORD *)(buf + 0x1feL);)
 	w += *p++;
     *p = BOOT_MAGIC - w;
     if (!execflg) ++(*p);

@@ -1,16 +1,19 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: unknown $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/05/18 23:07:56 $
+* $Date: 1992/07/27 20:12:04 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.31  1992/07/27  20:12:04  kbad
+* Nearly last Sparrow test BIOS
+*
 * Revision 1.30  1992/05/18  23:07:56  unknown
 * Sparrow and TT are M68030 - no longer read from a file
 *
@@ -139,7 +142,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.30 $
+* $Revision: 1.31 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\dmaread.s,v $
@@ -147,9 +150,7 @@
 *
 *************************************************************************
 
-* TT and STPAD equates are in switches.s
-
-.include "switches.s"
+* TT and STPAD equates must be specified on the command line
 
 * The code you get in assembling this file depends on the switches SCSI and
 * IDE_AT.  For now (2/91), only TT has SCSI and all STPLUSes have IDE.

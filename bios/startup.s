@@ -1,18 +1,23 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/01/23 11:43:21 $
+* $Date: 89/02/06 12:39:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.28  89/02/06  12:39:45  apratt
+* Split STPLUS conditional assembly into STPLUSVIDEO and DMASND, because
+* DMASND is true for TT as well, but STPLUSVIDEO isn't.  This
+* is in preparation for adding TT conditional assembly.
+*
 * Revision 1.27  89/01/23  11:43:21  kbad
 * Restored `nop' after jsr in _term, it's required because of dumb AS68.
-*
+* 
 * Revision 1.26  89/01/13  15:41:07  apratt
 * NO CODE CHANGE: just comment changes around trp13tab and trp14tab
 * documenting assigned BIOS and XBIOS function numbers.
@@ -147,7 +152,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.27 $
+* $Revision: 1.28 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -207,7 +212,17 @@ denmark		=      13 ***DON'T  CHANGE***
 * reading RAM address >3fffff).
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
-STPLUS		=	0		; set to 1 for ST PLUS video & palette
+* set DMASND to 1 if you want to enable DMA sound: this assumes that
+* the chip actually exists (so clearing the control register will
+* not cause a bus error) and that MONOMON is XORed with the sound chip's
+* IRQ line.
+
+DMASND		=	0
+* have a short-frame processor (68000).  Currently that's only TT.
+* set STPLUSVIDEO to 1 if you have ST PLUS video, with four bits per
+* gun instead of three in the palette.
+
+STPLUSVIDEO	=	0		; set to 1 for ST PLUS video & palette
 
 * Set LONGFRAME to 1 for code which runs on 68000 *or* 680[1-3]0.
 * Even if this is zero, the new system variable _longframe at $59e
@@ -647,7 +662,7 @@ SPAR_CONF	equ	$ffff8006	; read here to auto-config
 
 shiftmd		equ	$ffff8260	; video	shift mode (resolution)
 SPAR_VMC	equ	$ffff82c0	; video master control
-.ifne STPLUS
+.ifne STPLUSVIDEO
 *--- ST PLUS shifter
 shiftmd		=	$ffff8260	; video	shift mode (resolution)
 * that the low bit of this register will always read as zero.
@@ -715,9 +730,9 @@ ttucr	equ	ttmfp+$29		; USART control reg
 ttrsr	equ	ttmfp+$2b		; receiver status
 tttsr	equ	ttmfp+$2d		; transmit status
 ttudr	equ	ttmfp+$2f		; USART data
-.ifne STPLUS
+.ifne DMASND
 *--- DMA SOUND REGISTERS (only one interesting one)
-DMASND	equ	$ffff8900
+*--- 6850 registers:
 .endc
 midictl	equ	$fffffc06		; MIDI ACIA control
 ttsysistate	equ	$ffff8e03	; "sys" int state in SCU
@@ -1078,7 +1093,7 @@ notpal:	lea	color0(a5),a1		; a1 ->	hardware reg
 * from the STylus touch-screen hardware.  This is as good a place to
 	move.b	#$01,dbaseh(a5)		; set high ptr
 	clr.b	dbasel(a5)		; set low ptr
-   .ifne STPLUS
+   .ifne STPLUSVIDEO
 	clr.b	dbasell(a5)		; set lo byte ptr
    .endc
  endc
@@ -1202,7 +1217,7 @@ mt_done:
 	move.b	d0,dbasel(a5)		; dbasel = d0 >> 8
 	swap	d0
 	move.b	d0,dbaseh(a5)		; dbaseh = d0 >> 16
- .ifne STPLUS
+ .ifne STPLUSVIDEO
 	clr.b	dbasell(a5)
  .endc
 	move.l	d5,a0			; start at the end
@@ -1281,7 +1296,7 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 	move.l	a0,_v_bas_ad(a5)
 	move.b	_v_bas_ad+1(a5),dbaseh(a5) ; load high addr
 	move.b	_v_bas_ad+2(a5),dbasel(a5) ; load low (really, medium) addr
- .ifne STPLUS
+ .ifne STPLUSVIDEO
 	move.b	_v_bas_ad+3(a5),dbasell(a5)	; load lo byte addr
  .endc
 	move.w	#$800-1,d1		; d1 = # 16-byte chunks to zero
@@ -1337,8 +1352,8 @@ usem:	move.l	4(a0),end_os(a5)	; init end-of-OS pointer
 *--- Disk vectors:
 	move.l	#_dskinit,hdv_init.w	; initialization
 *--- Prtblk vectors:
- .ifne STPLUS
-	clr.w	DMASND(a5)		; reset sound chip
+ .ifne DMASND
+	clr.w	dmasndc(a5)		; reset sound chip
  .endc
  .ifeq LONGFRAME
 	clr.w	_longframe(a5)		; clear this (NEW 12/6/88)
@@ -1494,11 +1509,11 @@ TBCR	equ	$fffffa1b		* timer B control reg
 tb_x:	move.b	d0,sshiftmd(a5)		; set software rez
 
 	move.b	gpip(a5),d0		; monochrome monitor attached?
-.ifeq STPLUS
+.ifeq DMASND
 	bmi	nomono			; (no)
 .endc
-.ifne STPLUS
-	bpl	nomono			; (POSITIVE means color for STPLUS)
+.ifne DMASND
+	bpl	nomono			; (POSITIVE means color for DMASND)
 .endc
 	lea	vwt_r(pc),a6		; a6 -> ret addr
 	bra	vwait			; wait for vblank
@@ -1929,7 +1944,7 @@ ca_r:	rts
 
 
 
- .ifeq STPLUS
+ .ifeq STPLUSVIDEO
 
 colors:	dc.w	$777			; 0 white
 	dc.w	$700			; 1 red
@@ -1950,7 +1965,7 @@ colors:	dc.w	$777			; 0 white
 
  .endc
 
- .ifne STPLUS
+ .ifne STPLUSVIDEO
 
 * full-magnitude colors for STPLUS palette means 'f' not 7
 
@@ -2026,13 +2041,13 @@ hbl:	move.w	d0,-(sp)		; save d0
 *** (note: the move from shiftmd is inside the conditional so the conditional
 *** doesn't end with a label, which is a no-no in old as68)
 hbl_r:	move.w	(sp)+,d0		; restore d0, back to victim
- .ifne STPLUS
+ .ifne DMASND
 	addq.l	#1,_frclock		; bump frame clock
-	move.b	DMASND+1(a5),d0		; read sound state once
+	move.b	dmasndc+1(a5),d0	; read sound state once
 	move.b	gpip(a5),d1		; get gpip with monomon
 	cmp.b	gpip(a5),d1		; still the same?
 	bne.s	v_read1			; no - start over
-	cmp.b	DMASND+1(a5),d0		; sound state still the same?
+	cmp.b	dmasndc+1(a5),d0	; sound state still the same?
 	move.l	_vblqueue.w,a0		; a0 ->	vectors
 	tst.b	d0			; was sound active?
 	bne.s	v_read2			; yes - don't invert monomon
@@ -2043,7 +2058,7 @@ v_read2:
 
 *** non-STPLUS equivalent: just get the input from gpip
 
- .ifeq STPLUS
+ .ifeq DMASND
 	move.b	gpip(a5),d1		; get "High Rez" input
 	move.b	shiftmd(a5),d0		; get current rez
  .endc
@@ -2092,7 +2107,7 @@ vbl1:	tst.l	screenpt(a5)		; if(screenpt == NULL) don't;
 
 	move.l	screenpt(a5),_v_bas_ad(a5)	; set OS variable
 	move.l	_v_bas_ad(a5),d0		; d0 ->	screen bottom
- .ifne STPLUS
+ .ifne STPLUSVIDEO
 	move.b	d0,dbasell(a5)		; for STPLUS use these 8 bits
  .endc
 	lsr.l	#8,d0			; strip	lower 8	bits
@@ -2529,7 +2544,7 @@ _get_mpb:
 	bls	nottram
 	move.b	dbasel(a5),d0		; load and shift bits 8..15
 	lea.l	ttmd.w,a2
- .ifne	STPLUS
+ .ifne	STPLUSVIDEO
  	move.b	dbasell(a5),d0		; load low byte for STPLUS
  .endc
 
@@ -2575,7 +2590,7 @@ f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
 	move.b	dbasel,d0		; load and shift bits 8..15
 	move.b	9(sp),dbaseh(a5)	; set bits 16..23 of hardware pointer
 	move.b	$a(sp),dbasel(a5)	; set bits 8..15 of hardware pointer
- .ifne STPLUS
+ .ifne STPLUSVIDEO
  	move.b	$b(sp),dbasell(a5)	; STPLUS set low 8 bits, too
  .endc
 phydone:
@@ -2612,10 +2627,10 @@ _setscreen:
 *--- set logical location:
 	lea	color0(a5),a0		; a0 -> base of palette memory
 	bmi	f5a
- .ifeq STPLUS
+ .ifeq STPLUSVIDEO
 *--- set physical location:
  .endc
- .ifne STPLUS
+ .ifne STPLUSVIDEO
 	and.w	#$0fff,d0		; STPLUS has different dirty bits 
  .endc
 	tst.w	6(sp)			; if new color is <0, don't set it
@@ -2703,7 +2718,7 @@ _term:
 savp_2:	move.l	(sp)+,proc_pc.w		; save bogus PC + exception number
 	move.b	dbasel(a5),d0
 .else
- .ifne STPLUS
+ .ifne STPLUSVIDEO
 	move.b	dbasell(a5),d0
  .endc
 	movem.l	d0-d7/a0-a7,proc_regs

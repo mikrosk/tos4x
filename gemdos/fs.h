@@ -1,15 +1,20 @@
 /*
 ***************************      FS.H      ******************************
 *
-* $Revision: 2.9 $	$Source: fs.h,v $
+* $Revision: 2.10 $	$Source: fs.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:29:50 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 17:06:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fs.h,v $
+* Revision 2.10  91/01/23  17:06:48  apratt
+* Use voidfn for "function returning void" in prototypes.  Changed d_left to
+* d_child, d_right to d_next globally.  Removed o_thread, d_scan, m_fatofd,
+* m_ofl, and d_dirfil.
+*
 * Revision 2.9  91/01/23  14:29:50  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 
@@ -29,6 +34,7 @@
 #else
 #define _P(x) ()
 #define void char
+#define voidfn void
 #define volatile
 #define const
 #endif
@@ -241,6 +247,7 @@ MPB
 #define O_COMPLETE 2		/* directory traversal is complete */
 OFD
 {
+	/* info intrinsic to the file on disk */
 	OFD	*o_link;
 	int	o_flag;
 
@@ -252,14 +259,15 @@ OFD
 	DMD	*o_dmd;
 	DND	*o_dnode;  /* DND of this file's parent */
 	OFD	*o_dirfil; /* OFD of parent */
-	long	o_dirbyt;  /* pos in dir of this files fcb (dcnt) */
+	long	o_dirbyt;  /* pos in dir of this files fcb (was dcnt) */
 
+	/* file position and per-open information */
 	long	o_bytnum;  /* byte pointer within file */
 	int	o_curcl;   /* current cluster pointer */
 	int	o_currec;  /* rec number of current cluster */
 	int	o_curbyt;  /* byte offset in current cluster */
 	int	o_usecnt;  /* use count for inherited files */
-	OFD	*o_thread; /* mulitple open thread list */
+	long	o_res1;	   /* unused */
         int     o_mod;     /* mode file opened in (r, w, r/w) */
 };
 
@@ -303,12 +311,12 @@ DND
 	int	d_date;		/* 0x12 creation date */
 	OFD	*d_ofd;		/* 0x14 -> OFD of this directory file */
 	DND	*d_parent;	/* 0x18 -> parent DND */
-	DND	*d_left;	/* 0x1c -> child DND (down the tree) */
-	DND	*d_right;	/* 0x20 -> next DND (across the tree) */
+	DND	*d_child;	/* 0x1c -> child DND (down the tree) */
+	DND	*d_next;	/* 0x20 -> next DND (across the tree) */
 	DMD	*d_drv;		/* 0x24 -> drive's DMD */
-	OFD	*d_dirfil;	/* 0x28 -> OFD of parent directory file */
+	long	d_res0;		/* 0x28 unused */
 	long	d_dirpos;	/* 0x2c offset in parent of this dir */
-	long	d_scan;		/* 0x30 current position in dir for DND tree */
+	long	d_res1;		/* 0x30 unused */
 	OFD	*d_files;	/* 0x34 -> first open file on this node */
 };
 
@@ -352,9 +360,9 @@ DMD
 	int	m_rblog;	/* 0x18 recsiz in bytes, shift */
 	int	m_rbm; 		/* 0x1a recsiz in bytes, mask */
 	int	m_clblog;	/* 0x1c */
-	OFD	*m_fatofd;	/* 0x1e -> "fake" OFD for FATs */
+	long	m_res1;		/* 0x1e not used any more */
 
-	OFD	*m_ofl;		/* 0x22 */
+	long	m_res2;		/* 0x22 not used */
 	DND	*m_dtl;		/* 0x26 -> root DND */
 	int	m_16;		/* 0x2a 16 bit fat flag */
 };
@@ -423,17 +431,17 @@ struct block {
  */
 
 int setjmp _P(( long *jmpbuf ));	/* takes three longs */
-void longjmp _P(( long *jmpbuf,int error ));
+voidfn longjmp _P(( long *jmpbuf,int error ));
 long trap13 _P(( int,... ));
-void s68 _P(( void *word_to_swap ));
-void s68l _P(( void *long_to_swap ));
-void clear _P(( void *start, void *last_plus_1 ));
-void usr2xfr _P(( int n, void *d, void *s ));
-void xfr2usr _P(( int n, void *s, void *d ));
+voidfn s68 _P(( void *word_to_swap ));
+voidfn s68l _P(( void *long_to_swap ));
+voidfn clear _P(( void *start, void *last_plus_1 ));
+voidfn usr2xfr _P(( int n, void *d, void *s ));
+voidfn xfr2usr _P(( int n, void *s, void *d ));
 
 volatile void gouser _P(( void ));
-void dojmp _P(( long addr ));
-void clksync _P(( void ));
-void osinit _P(( void ));
+voidfn dojmp _P(( long addr ));
+voidfn clksync _P(( void ));
+voidfn osinit _P(( void ));
 long oscall _P(( int,... ));
-void upd_tod _P(( void ));
+voidfn upd_tod _P(( void ));

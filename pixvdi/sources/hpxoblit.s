@@ -218,6 +218,13 @@ blt_p_sync:
 	nop				; this is executed prior to restart
 	bmi	blt_p_sync		; quit if blt had finished
 
+.ifeq	P68030
+
+	movec.l	cacr,d0			; d2 <- cache control register
+	bset.l	#11,d0			; set "Clr DATA Cache" bit
+	movec.l	d0,cacr			; clear the data cache
+.endc
+
 leave:	rts
 
 ******************************************************************************
@@ -274,6 +281,13 @@ blt_n_sync:
 	tas	(a5)			; attempt to restart blt
 	nop				; this is executed prior to restart
 	bmi	blt_n_sync		; quit if blt had finished
+
+.ifeq	P68030
+
+	movec.l	cacr,d0			; d2 <- cache control register
+	bset.l	#11,d0			; set "Clr DATA Cache" bit
+	movec.l	d0,cacr			; clear the data cache
+.endc
 	rts
 
 	.end

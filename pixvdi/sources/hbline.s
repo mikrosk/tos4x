@@ -202,6 +202,13 @@ vl_cont:
 
 	addq.w	#2,a1			; a1 -> start of next plane
 	dbra	d0,vl_loop		; do the next plane
+
+.ifeq	P68030
+
+	movec.l	cacr,d0			; d2 <- cache control register
+	bset.l	#11,d0			; set "Clr DATA Cache" bit
+	movec.l	d0,cacr			; clear the data cache
+.endc
 	rts
 
 
@@ -287,6 +294,13 @@ hl_cont:
 
 	addq.l	#2,a1			; a1 -> next dst plane
 	dbra	d7,hl_loop
+
+.ifeq	P68030
+
+	movec.l	cacr,d7			; d2 <- cache control register
+	bset.l	#11,d7			; set "Clr DATA Cache" bit
+	movec.l	d7,cacr			; clear the data cache
+.endc
 	rts
 
 

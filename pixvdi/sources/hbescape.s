@@ -32,7 +32,7 @@
 *************************************************************************
 
 .include	"lineaequ.s"
-
+.include 	"vdiincld.s"
 *  Offsets into BLASTER parameter block
 
 B_OFF		equ	 60	; offset to reference register
@@ -163,6 +163,12 @@ char_cont:
 
 	dbra	d2,char_loop			; do the next plane
 
+.ifeq	P68030
+
+	movec.l	cacr,d2			; d2 <- cache control register
+	bset.l	#11,d2			; set "Clr DATA Cache" bit
+	movec.l	d2,cacr			; clear the data cache
+.endc
 	rts
 
 
@@ -256,6 +262,13 @@ su_sync:
 	nop				; blt restarts after this is executed
 	bmi	su_sync			; quit if blt had already finished
 
+.ifeq	P68030
+
+	movec.l	cacr,d0			; d2 <- cache control register
+	bset.l	#11,d0			; set "Clr data Cache" bit
+	movec.l	d0,cacr			; clear the data cache
+.endc
+
 fu_start:
 
 	clr.w	d0			; d0 <- Xmin
@@ -310,6 +323,13 @@ sd_sync:
 	tas	(a5)			; restart blt
 	nop				; blt restarts after this is executed
 	bmi	sd_sync			; quit if blt had already finished
+
+.ifeq	P68030
+
+	movec.l	cacr,d0			; d2 <- cache control register
+	bset.l	#11,d0			; set "Clr Data Cache" bit
+	movec.l	d0,cacr			; clear the data cache
+.endc
 
 fd_start:
 
@@ -438,5 +458,12 @@ blank_cont:
 
 	addq.l	#2,a2			; a2 -> start of next plane
 	dbra	d6,blank_loop
+
+.ifeq	P68030
+
+	movec.l	cacr,d0			; d2 <- cache control register
+	bset.l	#11,d0			; set "Clr Data Cache" bit
+	movec.l	d0,cacr			; clear the data cache
+.endc
 
 	rts

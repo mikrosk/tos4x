@@ -517,6 +517,12 @@ blt_0_mono:
 blt_0_count:
 
 	dbra	d5,blt_0_loop
+.ifeq	P68030
+
+	movec.l	cacr,d5			; d2 <- cache control register
+	bset.l	#11,d5			; set "Clr DATA Cache" bit
+	movec.l	d5,cacr			; clear the data cache
+.endc	
 	rts
 
 
@@ -602,6 +608,13 @@ blt_1_enter:
 blt_1_start:
 
 	dbra	d5,blt_1_loop
+
+.ifeq	P68030
+
+	movec.l	cacr,d5			; d2 <- cache control register
+	bset.l	#11,d5			; set "Clr DATA Cache" bit
+	movec.l	d5,cacr			; clear the data cache
+.endc	
 	rts
 
 	.end

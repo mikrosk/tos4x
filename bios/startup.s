@@ -1,22 +1,17 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/07/28 21:54:43 $
+* $Date: 89/07/29 21:40:50 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
-* Revision 2.15  89/07/28  21:54:43  apratt
-* Changed the hard-disk delay timing so it starts from when the power
-* was turned on, not when we started looking. This makes warm boots
-* really fast, not 10sec.
-*
-* The reset instruction at the start of the ROM has been gone for a 
-* rev or two - I wish I knew this was not a bad idea.
+* Revision 2.16  89/07/29  21:40:50  kbad
+* Put the reset back at reseth.  It was a gratuitous incomprattibility.
 *
 * Revision 2.15  89/07/28  20:59:12  apratt
 * Changed delay for DMA command bytes and data to count time from
@@ -269,7 +264,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.15 $
+* $Revision: 2.16 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1119,7 +1114,7 @@ sizeof_hdr = *-ostext			; = size of OS header
 *  or when the RESET button is pressed,
 *
 * There is code here to reset the ACSI chip and leave it in the read state.
-*	reset				; reset	hardware (removed AKP 7/89)
+
  endc
 	move.w	#$2700,sr		; super mode, no interrupts
 

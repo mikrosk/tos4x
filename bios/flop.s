@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/06 14:49:02 $
+* $Date: 1991/09/12 19:41:34 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.32  1991/09/12  19:41:34  apratt
+* Changed conditionals: ! is bitwise in MAS, so !TT is $FFFFFFFE when TT is 1.
+* So we use (TT == 0) instead.  Sigh.
+*
 * Revision 2.31  1991/09/06  14:49:02  apratt
 * Removed a lot of comments and log messages.  Removed SLOWACSI
 * conditional -- now we're always SLOWACSI.  Made the "nospindelay"
@@ -98,7 +102,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.31 $
+* $Revision: 2.32 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\flop.s,v $
@@ -171,7 +175,7 @@ QD	equ	0
 * (the "high-density" configuration switch) and test the flag at	*
 * flopcmds: if nonzero, then inhibit the delay.	Since we seek with	*
 * verify, the fact that the read-data line is masked means you can't	*
-HI_DEN		equ	TT+STPLUS	; 1.44MB flag
+* get in trouble: you can't see a sector ID before the drive is up	*
 * to speed.								*
 *									*
 
@@ -1267,7 +1271,7 @@ hseek2:	move.w	#datareg,(a6)		; write destination track# to data reg
 * reseek - home	head, then reseek track
 * Returns:	EQ/NE on success/failure
 * Falls-into:	go2track
-.if !HI_DEN
+*
 *-
 reseek:
 	move.w	#e_seek,curr_err	; set "seek error"
@@ -1331,7 +1335,7 @@ go2bad:
 	move.w	d0,denselect
 .else
 	tst.b	_iamanst
-.if !QD
+	bne	noden2
 	move.w	d0,denselect
 noden2:
 .endif
@@ -1755,7 +1759,7 @@ getspinup:
 *	eor.b	#7,d0
 *	bsr	setporta	; (d2 = old bits)
 *	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
-.if !TT
+*	btst	#6,d0
 *	sne.b	d0		; d0 = $00 or $ff
 *	move.b	d0,(a0)		; wpstatus = $00 or $ff
 *	move.b	d2,d0		; d0 = old bits

@@ -3,16 +3,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/27 12:36:29 $
+* $Date: 89/08/18 14:28:59 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.2  89/08/18  14:28:59  apratt
+* Added TT clock code. Not extensively tested. Includes switch for TT,
+* set to zero for not TT.
+*
 * Revision 2.1  89/02/27  12:36:29  apratt
 * *** TOS 1.4  FINAL RELEASE VERSION ***
-*
+* 
 * Revision 1.4  89/02/27  12:35:02  apratt
 * Blasted fatfinger again, in the no-bus-error case in clktest. Fixed.
 * 
@@ -29,7 +33,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.1 $
+* $Revision: 2.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -52,35 +56,39 @@
 *									:
 *------------------------------------------------------------------------
 
+TT	equ	1
+
 	.globl	clktest		; test for clock chip (returns CC/CS)
 	.globl	_iclock		; clock setup
 	.globl	_setclock	; setclock() BIOS call
 	.globl	_getclock	; getclock() BIOS call
 	.globl	_date,_time	; GEMDOS date and time variables
 
-RTCBASE	=	$fffffc20	; base address of RTC chip
+.ifeq TT
+
+RTCBASE	equ	$fffffc20	; base address of RTC chip
 
 *
 *  Clock chip registers
 *
-RT01SEC	=	$1		; 1-second counter
-RT10SEC	=	$3		; 10-second counter
-RT01MIN	=	$5		; 1-minute counter
-RT10MIN	=	$7		; 10-minute counter
-RT01HR	=	$9		; 1-hour counter
-RT10HR	=	$B		; 10-hour counter
-RTDOW	=	$D		; day of week
-RT01DAY	=	$F		; 1-day counter
-RT10DAY	=	$11		; 10-day counter
-RT01MON	=	$13		; 1-month counter
-RT10MON	=	$15		; 10-month counter
-RT01YR	=	$17		; 1-year counter
-RT10YR	=	$19		; 10-year counter
-RTMODE	=	$1B		; mode bits
-RTTEST	=	$1D		; test register (must be 0)
-RTRES	=	$1F		; reset register
+RT01SEC	equ	$1		; 1-second counter
+RT10SEC	equ	$3		; 10-second counter
+RT01MIN	equ	$5		; 1-minute counter
+RT10MIN	equ	$7		; 10-minute counter
+RT01HR	equ	$9		; 1-hour counter
+RT10HR	equ	$B		; 10-hour counter
+RTDOW	equ	$D		; day of week
+RT01DAY	equ	$F		; 1-day counter
+RT10DAY	equ	$11		; 10-day counter
+RT01MON	equ	$13		; 1-month counter
+RT10MON	equ	$15		; 10-month counter
+RT01YR	equ	$17		; 1-year counter
+RT10YR	equ	$19		; 10-year counter
+RTMODE	equ	$1B		; mode bits
+RTTEST	equ	$1D		; test register (must be 0)
+RTRES	equ	$1F		; reset register
 
-READS	=	13		; number of reads to do (up to RT10YR)
+READS	equ	13		; number of reads to do (up to RT10YR)
 
 
 *
@@ -88,19 +96,19 @@ READS	=	13		; number of reads to do (up to RT10YR)
 *  They are in "reverse order" in a misguided
 *  attempt to save bytes.  Sue me.
 *
-RD01SEC	=	$c
-RD10SEC	=	$b
-RD01MIN	=	$a
-RD10MIN	=	$9
-RD01HR	=	$8
-RD10HR	=	$7
-RDDOW	=	$6		; day of week
-RD01DAY	=	$5
-RD10DAY	=	$4
-RD01MON	=	$3
-RD10MON	=	$2
-RD01YR	=	$1
-RD10YR	=	$0
+RD01SEC	equ	$c
+RD10SEC	equ	$b
+RD01MIN	equ	$a
+RD10MIN	equ	$9
+RD01HR	equ	$8
+RD10HR	equ	$7
+RDDOW	equ	$6		; day of week
+RD01DAY	equ	$5
+RD10DAY	equ	$4
+RD01MON	equ	$3
+RD10MON	equ	$2
+RD01YR	equ	$1
+RD10YR	equ	$0
 
 
     .text
@@ -406,3 +414,228 @@ sclerr:	moveq	#-1,d0			; return -1L = bad
 read1:	.ds.b	READS
 read2:	.ds.b	READS
 	.even
+
+.endc
+
+.ifne TT
+
+*
+* Clock chip in the TT is the Motorola MC146818A
+*
+
+RTCA	equ	$ffff8961
+RTCD	equ	$ffff8963
+
+* registers
+
+SEC	equ	0
+MIN	equ	2
+HOUR	equ	4
+WKDAY	equ	6
+DAY	equ	7
+MONTH	equ	8
+YEAR	equ	9
+REGA	equ	$a
+REGB	equ	$b
+REGC	equ	$c
+REGD	equ	$d
+
+*--------------
+*
+* Initialize clock at startup:
+*   probe for clock chip
+*   if missing, return CS
+*   else if not VRT (valid RAM and TIME)
+*	perform the SET operation with some sane time and date
+*   endif
+*   Set GEMDOS's time to RTC time
+*   return CC.
+*
+
+_iclock:
+	bsr	clktest		; chip present? (this clears a2 for zeropage)
+	bcs.b	iclkfail	; missing; give up.
+
+* chip is present; test VRT bit (Valid RAM and Time)
+
+	move.b	#REGD,RTCA(a2)
+	move.b	RTCD(a2),d0
+	btst	#7,d0		; VRT bit set?
+	bne.s	timeok		; yes - it's fine
+
+* VRT is clear - set a sane time & date & initialize the chip
+*
+*		  YYYYYYYMMMMDDDDDHHHHHMMMMMMSSSSS 6/16/1989
+	move.l	#%00010010110010000000000000000000,-(sp)
+	bsr	_setclock
+	addq	#4,sp
+
+timeok:
+	bsr	_getclock
+	cmp.l	#-1,d0
+	beq.s	iclkfail
+	move.w	d0,_time
+	swap	d0
+	move.w	d0,_date
+
+	moveq.l	#0,d0
+	rts
+
+iclkfail:
+	moveq.l	#-1,d0
+	rts
+
+*
+* Get GEMDOS format of the date and time.  Returns D0.L with date in hi word.
+*
+*	HHHH HMMM MMMS SSSS
+*	YYYY YYYM MMMD DDDD
+* 
+* Does not validate what it gets from the clock chip, except that if
+* the chip test fails or the VRT bit is clear, returns -1L.
+*
+
+_getclock:
+	bsr	clktest		; (this also clears a2 for zeropage)
+	bcs	iclkfail	; use a handy error return (above)
+	move.b	#REGD,RTCA(a2)
+	btst.b	#7,RTCD(a2)
+	beq.s	gclfail
+
+* I don't know if you have to reload RTCA each time or not. Can't hurt.
+
+gwait:	move.b	#REGA,RTCA(a2)
+	btst.b	#7,RTCD(a2)	; test UIP bit
+	bne	gwait		; wait until it's clear
+
+	moveq.l	#0,d0
+	move.l	d0,d1
+	move.b	#SEC,RTCA(a2)
+	move.b	RTCD(a2),d0
+	asr.w	#1,d0		; GEMDOS tells times in pairs of seconds
+	move.b	#MIN,RTCA(a2)
+	move.b	RTCD(a2),d1
+	asl.w	#4,d1
+	or.w	d1,d0
+	move.b	#HOUR,RTCA(a2)
+	moveq.l	#0,d1
+	move.b	RTCD(a2),d1
+	asl.w	#8,d1
+	asl.w	#3,d1
+	or.w	d1,d0		; d0 is now complete GEMDOS time
+	swap	d0
+
+	moveq.l	#0,d1
+
+	move.b	#DAY,RTCA(a2)
+	move.b	RTCD(a2),d0
+	move.b	#MONTH,RTCA(a2)
+	move.b	RTCD(a2),d1
+	asl.w	#5,d1
+	or.w	d1,d0
+	moveq.l	#0,d1
+	move.b	#YEAR,RTCA(a2)
+	move.b	RTCD(a2),d1
+	asl.w	#8,d1
+	asl.w	#1,d1
+	or.w	d1,d0		; d0 is now complete GEMDOS date
+	swap	d0
+	rts
+
+gclfail:
+	move.l	#-1,d0
+	rts
+
+*
+* _setclock(newtime)
+*
+* newtime is a longword with the date in the upper half; date and
+* time are GEMDOS format.
+*
+* SET operation:
+*	set SET bit
+*	set 32KHz input, 64Hz periodic interrupt (register A)
+*	set SET bit again, no interrupt enables, binary data, 24-hr mode,
+*		and no DST (silicon can't keep up with Congress).
+*		(register B)
+*	set the time and date (1970 base year; warranty expires 12/31/2069)
+*	set the VRT bit, clear the SET bit
+*
+
+_setclock:
+	bsr	clktest		; (this also clears a2 for zeropage)
+	bcs	iclkfail	; use a handy error return (above)
+	move.l	4(sp),d0
+	subq.l	#6,sp		; get some stack space
+	move.w	d0,d1
+	and.w	#%11111,d1
+	asl.w	#1,d1
+	move.b	d1,5(sp)	; write seconds
+	lsr.l	#5,d0
+	move.w	d0,d1
+	and.w	#%111111,d1
+	move.b	d1,4(sp)	; write minutes
+	lsr.l	#6,d0
+	move.w	d0,d1
+	and.w	#%11111,d1
+	move.b	d1,3(sp)	; write hours
+	lsr.l	#5,d0
+	move.w	d0,d1
+	and.w	#%11111,d1
+	move.b	d1,2(sp)	; write day
+	lsr.w	#5,d0
+	move.w	d0,d1
+	and.w	#%1111,d1
+	move.b	d1,1(sp)	; write month
+	lsr.w	#4,d0
+	sub.w	#10,d0		; subtract 10 to get year since 1970
+	move.b	d0,(sp)		; write year
+
+	move.b	#REGB,RTCA(a2)
+	move.b	#$80,RTCD(a2)	; set the SET bit and clear all else
+	move.b	#REGA,RTCA(a2)
+	move.b	#$2a,RTCD(a2)	; set 32KHz input, 64Hz periodic
+	move.b	#REGB,RTCA(a2)
+	move.b	#%10001110,RTCD(a2)	; SET, enable SQWE, DM=binary, 24hr
+
+	move.b	#SEC,RTCA(a2)
+	move.b	5(sp),RTCD(a2)	; set seconds
+	move.b	#MIN,RTCA(a2)
+	move.b	4(sp),RTCD(a2)
+	move.b	#HOUR,RTCA(a2)
+	move.b	3(sp),RTCD(a2)
+	move.b	#DAY,RTCA(a2)
+	move.b	2(sp),RTCD(a2)
+	move.b	#MONTH,RTCA(a2)
+	move.b	1(sp),RTCD(a2)
+	move.b	#YEAR,RTCA(a2)
+	move.b	(sp),RTCD(a2)
+
+	move.b	#REGB,RTCA(a2)
+	move.b	#%00001110,RTCD(a2)	; clear SET, leave others
+	add.w	#6,sp		; clean off stack space
+	rts
+
+*
+* probe for the clock chip.  Returns CS if the chip is missing, cc if found.
+*
+
+clktest:
+	clr.l	a2		; handy zeropage (don't use a5!)
+	move.l	sp,a0
+	move.l	$8,a1
+	move.l	#berr,$8
+
+	move.b	#0,RTCA(a2)
+	move.b	RTCD(a2),d0	; read seconds register
+
+	move.l	a1,$8		; restore bus error vector
+	and.w	#$fe,ccr	; clear carry bit
+	rts			; and return
+
+berr:	move.l	a0,sp		; restore SP after bus error
+	move.l	a1,$8		; restore bus error vector
+	or	#1,ccr		; set carry bit
+	rts			; and return
+.endc
+

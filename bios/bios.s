@@ -4,18 +4,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/02 10:47:58 $
+* $Date: 90/03/06 15:22:27 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.15  90/03/06  15:22:27  apratt
+* Fixed a fatfinger: if you get a bus error while initting SCC,
+* the code is supposed to return safely.  Now it does.
+*
 * Revision 2.14  90/03/02  10:47:58  apratt
 * Added initialization of ST MFP Timer B to something other than 1.
 * See startup.s, at the label noblank, for why this is necessary
 * and not sufficient (!).
-*
+* 
 * Revision 2.13  90/03/01  15:33:46  apratt
 * Made dowait global; changed delay in ikput to use STMFP Timer C rather
 * than instructions.  Made bus error during SCC init just return.
@@ -174,7 +178,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.14 $
+* $Revision: 2.15 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -3376,7 +3380,7 @@ nolan:
 * This also short-circuits if you're on an STPLUS, not Mega STe.
 *
 
-	move.l	sccberr,$8
+.globl _setupscc
 
 	clr.w	sccctl		; disable DMA
 	move.l	#sccberr,$8

@@ -1,5 +1,5 @@
 #
-# $Header: /home/mikro/atari/tos/work/bios/rcs/rcs-repaired/makefile,v 1.1 88/09/19 14:00:58 kbad Exp $
+# $Header: /home/mikro/atari/tos/work/bios/rcs/rcs-repaired/makefile,v 1.2 88/10/03 15:07:07 kbad Exp $
 #
 # Author Slavik Lozben
 # This makefile builds the bios object files
@@ -9,6 +9,9 @@
 #
 # 880824 kbad
 # added actions to makefile
+#
+# 880922 kbad
+# changed makefile for new build method (now uses alnnew)
 #
 TMPDIR	=	m:
 .SUFFIXES: .o .c .s
@@ -25,18 +28,15 @@ TMPDIR	=	m:
 #
 ################################################################
 
-SFILES	=	flop.o xinout.o startup.o clear.o clock.o bios.o 
+STARTUP	=	startup.o
+
+SFILES	=	flop.o xinout.o clear.o clock.o bios.o 
 
 CFILES	=	prtblk.o rwabs.o
 
-allbios.o:	$(SFILES) $(CFILES) allbios.aln
-		aln -c allbios.aln
-		mv $@ ..\build
-		@echo $@ linked.
-
-rallbios.o:	$(SFILES) $(CFILES) rallbios.aln
-		aln -c rallbios.aln
-		mv $@ ..\build
+allbios.o:	$(STARTUP) $(SFILES) $(CFILES) allbios.aln
+		alnnew -c allbios.aln
+		cp $@ ..\build
 		@echo $@ linked.
 
 prtblk.o:	prtblkc.h

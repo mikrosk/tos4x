@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/13 00:46:52 $
+* $Date: 1991/09/13 17:45:58 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.22  1991/09/13  17:45:58  apratt
+* Oops - the delay was supposed to be 500us, not 500ms.  Made it
+* two ticks, which is btw 5 and 10 ms.
+*
 * Revision 1.21  1991/09/13  00:46:52  apratt
 * Minna added yet another delay: Conner wants 0.5sec between
 * power up and the Identify command.
@@ -107,7 +111,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.21 $
+* $Revision: 1.22 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\dmaread.s,v $
@@ -224,7 +228,7 @@ ATREAD	    equ	    $20	    ; opcode for Read sectors
 ATWRITE	    equ	    $30	    ; opcode for Write sectors
 INITPARM    equ	    $91	    ; opcode for Initialize Drive Parameters
 IDENTIFY    equ	    $ec	    ; opcode for Identify Drive
-D_IDENTIFY  equ	    101	    ; delay between power on and identify() (500ms)
+D_IDENTIFY  equ	    2	    ; delay between power on and identify() (500us)
 D_WORST	    equ	    2000    ; worst case delay (10s)
 ATRDY	    equ	    1000    ; delay to wait for IDE drive to be ready
 MAXIDE	    equ	    16	    ; highest IDE-AT unit# 

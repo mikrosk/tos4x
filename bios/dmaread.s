@@ -1,21 +1,25 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: minna $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/20 13:22:25 $
+* $Date: 91/08/21 11:18:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.18  91/08/21  11:18:56  apratt
+* Fixed two oopses: iderdy is now consistently _iderdy,
+* and undev is outside IDEAT conditionals.
+*
 * Revision 1.17  91/08/20  13:22:25  minna
 * Added iderdy() to test if IDE drive is ready before 
 * it's being talked to.  If the drive does not become
 * ready in 5 sec., it's considered as an unknown device.
-*
+* 
 * Revision 1.16  91/08/15  16:18:07  apratt
 * Added code for IDE to wait until ATASR shows READY before
 * doing anything else.  Also changed so IDE_AT is assembled for
@@ -92,7 +96,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.17 $
+* $Revision: 1.18 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -312,8 +316,7 @@ rw0:	bsr	_dowcmd			; send a write data command
 
 noide:	move.l	a1,sp			; got the bus error on ATASR;
 	move.l	a0,$8			; restore vector & sp, return EUNDEV
-undev:	moveq.l	#EUNDEV,d0
-	bra	rwend			; branch to rts
+	bra	undev
 
 at:	move.l	$8,a0
 	move.l	sp,a1
@@ -323,7 +326,7 @@ at:	move.l	$8,a0
 	move.l	a0,$8			; restore vector & sp and continue.
 
 	move.b	$f(sp),d0		; IDE unit#
-	bsr	iderdy			; wait for drive to be ready
+	bsr	_iderdy			; wait for drive to be ready
 	beq	undev			; if drive never gets ready, return
 					;   with unknown device
 					; else
@@ -382,6 +385,8 @@ rw2:	moveq	#EREADF,d0		; assume it's a read error
 	moveq	#EWRITF,d0		; else, it's a write error
 rwend:	rts
 
+undev:	moveq	#EUNDEV,d0
+	bra	rwend
 
 ;+++++++++++++++++++++++++++++++;
 ;				;
@@ -1321,7 +1326,7 @@ wb0:	move.l	(a0)+,(a1)	; write data to bus
 
 
 ;+
-; iderdy() - test if the IDE drive is ready
+; _iderdy() - test if the IDE drive is ready
 ;
 ; Passed:
 ;	d0.b = IDE drive unit #

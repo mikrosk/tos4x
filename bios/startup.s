@@ -3,22 +3,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/11/02 15:21:19 $
+* $Date: 88/11/16 15:10:19 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.18  88/11/16  15:10:19  apratt
+* Added STPLUS assembly-time flag.  Set to 1 for ST PLUS, 0 for ST.
+* This flag influences the following:
+* Physbase/Setscreen: read & write new low-byte-of-display-base register.
+* Setcolor: after reading color register, masks with $0777 for ST, $0fff
+* for STPLUS.
+* No other changes required for ST PLUS.  Even screen dump is fine.
+*
 * Revision 1.17  88/11/02  15:21:19  apratt
 * Backed out clearing of _bootdev; caused more pain than it's worth.
 * Specifically, people with bootable ramdisks (!) became unhappy.
-*
+* 
 * Also added code to set GEMDOS time from IKBD if real-time clock chip
 * doesn't exist or has a bad time, and if IKBD has a good time.
 * JWT says IKBD clock is defined as starting up at 0/0/00, which is
 * an unambiguously illegal date.
-*
+* 
 * Revision 1.16  88/10/12  17:25:57  apratt
 * Added table entry for floprate call: see flop.s for more.
 * 
@@ -87,7 +95,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.17 $
+* $Revision: 1.18 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -147,6 +155,7 @@ denmark		=      13 ***DON'T  CHANGE***
 * reading RAM address >3fffff).
 * should still be even-numbered, and since the minor vers. number marches
 * in step with TT, we're stuck.
+STPLUS		=	0		; set to 1 for ST PLUS video & palette
 systype		=	ram		; 'rom' or 'ram'
 country		=	usa      	; 'usa', etc....
 version		=	$0104		; version number *MUST BE EVEN*
@@ -2333,6 +2342,10 @@ _get_mpb:
 	bls	nottram
 	move.b	dbasel,d0		; load and shift bits 8..15
 	lea.l	ttmd.w,a2
+	.ifne	STPLUS
+	move.b	$ffff820c,d0		; load bits 0..7 on STPLUS only
+	.endc
+
 	sub.l	#$01000000,d0
 	move.l	d0,8(a2)		; ttmd.m_length = (length)
 	clr.l	$c(a2)			; ttmd.m_rover (not used any more)
@@ -2375,6 +2388,9 @@ f5a:	tst.l	8(sp)			; if(physloc < 0) then ignore it
 	move.b	dbasel,d0		; load and shift bits 8..15
 	move.b	9(sp),dbaseh		; set bits 16..23 of hardware pointer
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
+	.ifne	STPLUS
+	move.b	$b(sp),$ffff820c	; STPLUS set low 8 bits, too
+	.endc
 phydone:
 	rts				; return pointer in d0
 
@@ -2409,7 +2425,12 @@ _setscreen:
 *--- set logical location:
 	lea	color0,a0		; a0 -> base of palette memory
 	bmi	f5a
+	.ifeq	STPLUS
 *--- set physical location:
+	.endc
+	.ifne	STPLUS
+	and.w	#$0fff,d0		; STPLUS has different dirty bits
+	.endc
 	tst.w	6(sp)			; if new color is <0, don't set it
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
  	move.b	$b(sp),dbasell		; STPLUS set low 8 bits, too

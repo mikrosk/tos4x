@@ -14,6 +14,8 @@
 		.globl	spx_cell
 		.globl	spx_blank
 		.globl	spx_neg_cell
+		.globl	spx_scrup
+		.globl	spx_scrdn
 
 *******************************************************************************
 *	
@@ -125,6 +127,119 @@ cell_8_fg:	move.b	d6,(a3)+		; set dst to foreground color
 		add.w	d3,a3			; point to next line of dest
 		dbra	d4,new_8_line		; do next line of the cell
 		rts
+
+
+
+*******************************************************************************
+*
+* title:	 Scroll
+*
+*
+* author:	jim eisenstein
+*
+*
+*   Scroll copies a source region as wide as the screen to an overlapping
+*   destination region on a one cell-height offset basis.  Two entry points
+*   are provided:  Partial-lower scroll-up, partial-lower scroll-down.
+*   Partial-lower screen operations require cell y # indicating the top line
+*   where scrolling will take place.
+*
+*   After the copy is performed, any non-overlapping area of the previous
+*   source region is "erased" by filling with the background color.
+*
+* 
+*  in:  d1.w	   cell Y of region top
+*	v_cel_my   cell Y of region bottom
+*
+*
+*  munged:	d0-d7/a2-a3
+*		
+*
+*******************************************************************************
+
+spx_scrup:
+
+	move.w	v_cel_my(a4),d3		; d3 <- Ymax
+	move.w	d3,d7
+	sub.w	d1,d7			; d7 <- height of region in cells -1
+	beq	blank_up
+
+	mulu	v_cel_ht(a4),d7		; d7 <- scroll region height
+
+	move.w	v_cel_ht(a4),d0		; d0 <- cell height
+	mulu.w	d0,d1
+	mulu.w	_v_lin_wr(a4),d0	; d0 <- cell wrap
+	mulu.w	_v_lin_wr(a4),d1	; d1 <- offset to (0,Ymin)
+
+	move.l	_v_bas_ad,a3		; a3 -> base of screen
+	add.l	d1,a3			; a3 -> scroll dst: Ymin
+	move.l	a3,a2
+	add.l	d0,a2			; a2 -> scroll src: Ymin+1
+
+	move.w	_v_lin_wr(a4),d0	; d0 <- bytes per line
+	lsr.w	#4,d0			; d0 <- iterations per line
+	mulu	d0,d7			; d7 <- total iterations
+	subq.w	#1,d7			; d7 <- dbra loop counter
+
+loop_up:
+
+	move.l	(a2)+,(a3)+		; move 16 bytes in a hurry
+	move.l	(a2)+,(a3)+
+	move.l	(a2)+,(a3)+
+	move.l	(a2)+,(a3)+
+	dbra	d7,loop_up
+
+blank_up:
+
+	clr.w	d0			; d0 <- Xmin
+	move.w	v_cel_mx(a4),d2		; d2 <- Xmax
+	move.w	d3,d1			; d1 <- Ymax  d3 <- Ymax
+	move.l	V_ROUTINES(a4),a2
+	move.l	V_BLANK(a2),a2		; a2 -> proper blank routine
+	jmp	(a2)			; fill the vacated space
+
+
+
+spx_scrdn:
+
+	move.w	v_cel_my(a4),d3		; d3 <- Ymax
+	move.w	d3,d7
+	sub.w	d1,d7			; d7 <- height of region in cells -1
+	beq	blank_dn
+
+	mulu	v_cel_ht(a4),d7		; d7 <- scroll region pixel height
+
+	move.w	v_cel_ht(a4),d0		; d0 <- cell height
+	mulu.w	d0,d3
+	mulu.w	_v_lin_wr(a4),d0	; d0 <- cell wrap
+	mulu.w	_v_lin_wr(a4),d3	; d3 <- offset to (0,Ymin)
+
+	move.l	_v_bas_ad,a2		; a2 -> base of screen
+	add.l	d3,a2			; a2 -> scroll src: 1st word of Ymax
+	move.l	a2,a3
+	add.w	d0,a3			; a3 -> scroll dst: 1st word of Ymax+1
+
+	move.w	_v_lin_wr(a4),d0	; d0 <- bytes per line
+	lsr.w	#4,d0			; d0 <- iterations per line
+	mulu	d0,d7			; d7 <- total iterations
+	subq.w	#1,d7			; d7 <- dbra loop counter
+
+loop_dn:
+
+	move.l	-(a2),-(a3)		; move 16 bytes in a hurry
+	move.l	-(a2),-(a3)
+	move.l	-(a2),-(a3)
+	move.l	-(a2),-(a3)
+	dbra	d7,loop_dn
+
+blank_dn:
+
+	clr.w	d0			; d0 <- Xmin
+	move.w	v_cel_mx(a4),d2		; d2 <- Xmax
+	move.w	d1,d3			; d1 <- Ymin  d3 <- Ymin
+	move.l	V_ROUTINES(a4),a2
+	move.l	V_BLANK(a2),a2		; a2 -> proper blank routine
+	jmp	(a2)			; fill the vacated space
 
 
 *******************************************************************************

@@ -87,8 +87,8 @@ _STSoftList:	dc.l	sb_cell			; cell_xfer subroutine
 
 _PixHardList:
 _PixSoftList:	dc.l	spx_cell		; done
-		dc.l	sb_scrup		; done
-		dc.l	sb_scrdn		; done
+		dc.l	spx_scrup		; done  changed 9/2/92
+		dc.l	spx_scrdn		; done  changed 9/2/92
 		dc.l	spx_blank		; done
 		dc.l	spx_bitblt		; done
 		dc.l	spx_mono		; done

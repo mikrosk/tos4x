@@ -4,13 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/05/21 16:54:10 $
+* $Date: 91/06/13 16:29:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.33  91/06/13  16:29:56  apratt
+* Added alt-keypad functionality: hold down ALT, type a decimal number on the
+* keypad, and let go of alt to get that ASCII code into the keyboard buffer. 
+* The result has zero as the scan code and the kbshift value at the moment
+* you let go of ALT (so you can't get ALT itself in there).
+*
 * Revision 2.32  91/05/21  16:54:10  apratt
 * Changed error handling in midi/ikbd so I could hook in a TSR to fix the
 * overrun problems.  The overrun fixing might one day be part of the OS.  The
@@ -18,7 +24,8 @@
 * has been read from the chip, so it must read the data to clear the error. 
 * Also, if there is an error, the data byte is not presumed valid and is not
 * used.  Set OLDIKBD to 1 to get the old behavior back.
-*
+* 
+* 
 * Revision 2.31  91/04/26  17:44:39  apratt
 * Removed the STPAD conditional around MIDI code.  Bconmap probably isn't as
 * unconditional as it's cracked up to be: it's not been tested when neither
@@ -69,7 +76,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.32 $
+* $Revision: 2.33 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -620,7 +627,8 @@ statintvec:	ds.l	1	;general ikbd status record interrupt vector
 msintvec:	ds.l	1	;mouse interrupt vector
 clkintvec:	ds.l	1	;ikbd real-time clock interrupt vector
 joyintvec:	ds.l	1	;general joystick interrupt vector
-
+midisys:	ds.l	1	;midi system interrupt handler
+ikbdsys:	ds.l	1	;ikbd system interrupt handler
 kstate:		ds.b	1	;present state of ikbd reception routine
 kindex:		ds.b	1	;index used to count down bytes left to
 *				;receive for current state's record
@@ -1616,6 +1624,9 @@ initmfp:
 
 *	initialize the midi buffer record structure
 
+	lea	mbufrec.w,a0
+	lea	minit,a1
+	moveq	#mssize,d0
 .if OLDIKBD
 	bsr	lbmove		;do block move and return
 .else
@@ -4271,11 +4282,11 @@ ML35:
 	bra.b	ikserve
 
 itsakey:
-	bra.b	ari10
+	move.b	kbshift.w,d1	;load in kbshift.w for manipulation...
 * check the special keys
 	cmpi.b	#$2A,d0		;left shift?
 	bne.b	ari2
-	bra.b	ari10
+	bset	#KBLSH,d1
 	bra	ari10
 ari2:	cmpi.b	#$AA,d0
 	bne.b	ari3
@@ -4298,9 +4309,25 @@ ari6:	cmpi.b	#$9D,d0
 	bclr	#KBCTL,d1
 	bra.b	ari10
 ari7:	cmpi.b	#$38,d0		;ALT
+	bne.b	ari8
 	bset	#KBALT,d1
 	bra.b	ari10
-ari9:	cmpi.b	#$3A,d0		;CAPS LOCK
+ari8:	cmpi.b	#$B8,d0
+	bne.b	ari9
+* it's the break code for alt!
+	bclr	#KBALT,d1
+* test here for altkp.
+	tst.w	altkp
+	bmi	ari10		; no altkp handling
+
+* handle altkp now.  But first, write the new kbshift value.
+
+	move.b	d1,kbshift.w
+	move.l	a0,-(sp)	; store kbufrec pointer because we're about
+				; to jump into the middle of code that
+				; expects it to have been saved.
+	moveq.l	#0,d1		; Use zero for the scan code,
+	move.w	d1,d0		; (do an unsigned byte fetch to d0),
 	move.b	altkp+1,d0	; get the accumulated value,
 	move.w	#-1,altkp	; mark as invalid for next time
 	bra	conin25		; and put it on the keyboard queue.
@@ -4428,6 +4455,28 @@ conin24c:
 *
 * DON'T control-ize other keys just yet... wait until after the int'l munge.
 *
+
+conin24a:
+	btst.b	#KBALT,kbshift.w	;is the alt key down?
+	beq	conin25a
+
+	cmp.b	#$67,d1			;is it alt plus keypad?
+	blo	notaltkp
+	cmp.b	#$70,d1
+	bhi	notaltkp
+	move.w	altkp,d0		;get accumulated value
+	bpl	altkp1
+	moveq.l	#0,d0			;use zero if it was negative
+altkp1:
+	mulu.w	#10,d0			;multiply by 10
+
+	ext.w	d1
+	move.b	(a0,d1.w),d1		; (a0 already points to a table)
+	sub.b	#'0',d1
+	add.b	d1,d0			;add this digit to accumulator
+	move.w	d0,altkp		;and store it back
+	move.l	(sp)+,a0		;pop saved register
+	rts				;and return
 	ifeq	country-germany
 * no, it wasn't ALT plus a keypad number key
 
@@ -4927,7 +4976,7 @@ conin25:
 	cmp.w	bufsize(a0),d1	;check to see if buffer should wrap
 	bcs.b	ari13		;no...
 	moveq	#$0,d1		;wrap pointer
-	move.w	#$0,d0		;clear out low word
+ari13:	cmp.w	bufhead(a0),d1 ;head=tail?
 	beq.b	ari14		;yes
 	move.l	bufptr(a0),a2	;get buffer pointer
 

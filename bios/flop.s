@@ -4,13 +4,18 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/02/26 17:10:24 $
+* $Date: 90/03/01 15:47:26 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.11  90/03/01  15:47:26  apratt
+* Changed track leadin on high-density floppies from 60 bytes to 120.
+* Changed track trailer, too: 700 bytes in reg. den., 1400 in high.
+* Reset1770 code had a bug, and rwdelay: fixed.
+*
 * Revision 2.10  90/02/26  17:10:24  apratt
 * Removed all instruction-dependent timing loops.  The delay at reset1770
 * and rwdelay are done with a trick which assumes that Timer C is still
@@ -18,7 +23,7 @@
 * the interrupt is actually enabled or that the system interrupt handler
 * is handling it.  (This is in preparation for Mega STe with 16MHz CPU
 * but no extra MFP with its extra timers.)
-*
+* 
 * Revision 2.9  90/02/22  17:50:49  apratt
 * Worked around a MAS PC-relative bug, and added "and.w #3,d0" to
 * mask off the unwanted bits in denselect before using it.
@@ -105,7 +110,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.10 $
+* $Revision: 2.11 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -190,6 +195,7 @@ denselect	equ	$ffff860e	; density bits (WRITE ONLY)
 timeout		equ	200	; short	timeout (motor already on) (1 sec)
 ltimeout	equ	400	; long timeout (to startup motor) (2 sec)
 retries		equ	2	; default # of retries - 1
+midretry	equ	1	; "middle" retry (when to reseek)
 
 timeout		equ	300	; short	timeout (motor already on) (1.5 sec)
 ltimeout	equ	600	; long timeout (to startup motor) (3 sec)
@@ -685,23 +691,27 @@ noden1:
 	move.w	spt.w,ccount.w		; set number of sectors to verify
 	move.w	#1,csect.w		; starting sector# = 1
 	bsr	verify1			; verify sectors
-	move.w	#60-1,d1		; 60 x $4e (track leadin)
-	move.b	#$4e,d0
+	bra	flopfail		; return error
+
+
+*+
+* fmtrack - format a track
+* Passed:	variables setup by _flopfmt
 * Returns:	NE on failure, EQ on success
 * Uses:		almost everything
 * Called-by:	_flopfmt
 *
 *-
 fmtrack:
-	move.w	#1,d3			; start	with sector 1, first pass
+	move.w	#e_write,def_error.w	; set default error number
 	move.l	cdma.w,a2		; a2 ->	prototyping area
 	move.l	skewtbl.w,a3		; a3 -> skewtbl (if nesssary!)
 
-ot1:	move.w	#12-1,d1		; 12 x $00
+* lines below added by AKP 3/88 for Intel 82072 compatibility
 * then backed out 6/88 because 10-sector formats stopped working.
 *
-	move.w	#3-1,d1			; 3 x $f5
-	move.b	#$f5,d0
+*	move.w	#80-1,d1		; 80 x $4e as GAP 4a
+*	move.w	#$4e,d0
 *	bsr	wmult
 *
 *	move.w	#12-1,d1		; 12 x $00 as sync
@@ -711,14 +721,14 @@ ot1:	move.w	#12-1,d1		; 12 x $00
 *	move.b	#$f6,d0			; 3 x $C2 as IAM preamble
 *	move.b	d0,(a2)+
 *	move.b	d0,(a2)+
-	move.w	#22-1,d1		; 22 x $4e
-	move.b	#$4e,d0
+*	move.b	d0,(a2)+
+*
 *	move.b	#$fc,(a2)+		; 1 x $fc as IAM
-	move.w	#12-1,d1		; 12 x $00
+*
 * end of lines added by AKP for 82072 compatibility
 
-	move.w	#3-1,d1			; 3 x $f5
-	move.b	#$f5,d0
+.if QD
+	move.w	#240-1,d1		; 4x low-den track leadin
 	cmp.w	#26,spt.w
 	bhs	d1ok
 .endif
@@ -728,8 +738,8 @@ ot1:	move.w	#12-1,d1		; 12 x $00
 	bhs	d1ok
 	moveq	#60-1,d1		; use recommended track-leadin size
 d1ok:
-	move.w	#40-1,d1		; 40 x $4e
-	move.b	#$4e,d0
+	moveq	#$4e,d0
+	bsr	wmult
 
 	clr.w	d3			; init for uses with skew table
 	tst.w	interlv.w		; if NEG
@@ -743,10 +753,16 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	clr.b	d0
 	bsr	wmult
 	moveq	#3-1,d1			; 3 x $f5
-*--- end-of-track
+*--- end-of-track: write 4e into the buffer a lot (700 in regular density,
+* 1400 in high density.
+	move.b	#$fe,(a2)+		; $fe -- address mark intro
 	move.b	ctrack+1.w,(a2)+	; track#
-	move.w	#1400,d1		; 1401 x $4e --	end of track trailer
-	move.b	#$4e,d0
+	move.w	#1400,d1		; high-density value
+	moveq	#$4e,d0
+	bsr	wmult
+	moveq	#700,d1			; low-density value
+	clr.b	d0
+	bsr	wmult
 	moveq	#3-1,d1			; 3 x $f5
 	moveq	#$fffffff5,d0		; (really just $f5; mas complains)
 	bsr	wmult
@@ -776,7 +792,7 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	bmi	use_skewtbl		; 
 .endc
 
-	move.w	#$1f,d7			; (absurd sector count)
+	moveq	#$30,d7			; (absurd sector count)
 	cmp.w	spt.w,d4		; if(d4	<= spt)	then_continue;
 	ble	ot1			; proto	more sectors this pass
 	cmp.w	interlv.w,d3		; if(d3	<= interlv) then_continue;
@@ -1318,8 +1334,8 @@ flopcto:
 * bit)).
 *
 
-r1770:	move.b	mfp+tadr,d1
-r1770a:	cmp.b	mfp+tadr,d1
+do_hiden:
+	tst.w	d0			; hi den?
 	bne	padhi1
 
 .endc
@@ -1416,8 +1432,8 @@ setporta:
 	and.b	#$ff-7,d1		; strip	low three bits there
 	or.b	d0,d1			; or-in	our new	bits
 	move.b	d1,giwrite		; and write 'em	back out there
-rwd1:	move.b	mfp+tadr,d1
-rwd2:	cmp.b	mfp+tadr,d1
+	move	(sp)+,sr		; restore IPL to terminate CS, return
+	rts
 	beq	rwd1			; wait for a change
 	dbra	d0,rwd2			; loop d0 times
 *+

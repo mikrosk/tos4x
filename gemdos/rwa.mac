@@ -1,12 +1,16 @@
 .super
 ***************************     RWA.S      ******************************
 *
-* $Revision: 1.3 $	$Source: e:/tos/gd2\RCS\rwa.mac,v $
+* $Revision: 1.4 $	$Source: d:/tos/dos\rcs\rwa.mac $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/11/20 19:44:04 $    $Locker:  $
+* $Author: unknown $ 	$Date: 1992/05/20 00:31:58 $    $Locker:  $
 * =======================================================================
 *
 * $Log: rwa.mac,v $
+* Revision 1.4  1992/05/20  00:31:58  unknown
+* This ci removes the memprot stuff from this file.  Other changes
+* from revision 1.3 persist.
+*
 * Revision 1.3  1991/11/20  19:44:04  apratt
 * Memory protection, first cut (no workee yet)
 *
@@ -688,32 +692,6 @@ bloop:	move.b	(a0)+,(a1)+
 odd:	dbra	d0,bloop
 	rts
 
-.mc68030
-
-.globl _set_pmmu
-_set_pmmu:
-	clr.l	-(sp)
-	pmove	(sp),tc		; disable translation
-	addq.l	#4,sp
- 	pmove	8(sp),crp
-	pmove	4(sp),tc
-	rts
-
-.globl _flush_pmmu
-_flush_pmmu:
-	subq.l	#4,sp
-	pmove	tc,(sp)
-	pmove	(sp),tc
-	addq.l	#4,sp
-	rts
-
-ask_pmmu:
-	ptestr	sfc,(a0),#0
-	pmove	psr,_mmusr
-	ptestr	sfc,(a0),#7,a1
-	pmove	psr,_mmusr
-	bra	ask_pmmu
-
 	.bss
 	.even
 biosav:		ds.l	1
@@ -723,6 +701,5 @@ fstrt:		ds.l	1
 _otime:		ds.l	1
 _obdos:		ds.l	1
 __dblev:	ds.l	1
-_mmusr:		ds.w	1
 
     .end

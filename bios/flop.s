@@ -4,18 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/01 15:47:26 $
+* $Date: 90/03/01 17:11:39 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.12  90/03/01  17:11:39  apratt
+* Oops - end of track is 1400 bytes regular, 2800 high density. Fixed.
+*
 * Revision 2.11  90/03/01  15:47:26  apratt
 * Changed track leadin on high-density floppies from 60 bytes to 120.
 * Changed track trailer, too: 700 bytes in reg. den., 1400 in high.
 * Reset1770 code had a bug, and rwdelay: fixed.
-*
+* 
 * Revision 2.10  90/02/26  17:10:24  apratt
 * Removed all instruction-dependent timing loops.  The delay at reset1770
 * and rwdelay are done with a trick which assumes that Timer C is still
@@ -110,7 +113,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.11 $
+* $Revision: 2.12 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -753,14 +756,14 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	clr.b	d0
 	bsr	wmult
 	moveq	#3-1,d1			; 3 x $f5
-*--- end-of-track: write 4e into the buffer a lot (700 in regular density,
-* 1400 in high density.
+	moveq	#$fffffff5,d0		; (really just $f5; mas complains)
+	bsr	wmult
 	move.b	#$fe,(a2)+		; $fe -- address mark intro
 	move.b	ctrack+1.w,(a2)+	; track#
-	move.w	#1400,d1		; high-density value
+	moveq	#22-1,d1		; 22 x $4e
 	moveq	#$4e,d0
 	bsr	wmult
-	moveq	#700,d1			; low-density value
+	moveq	#12-1,d1		; 12 x $00
 	clr.b	d0
 	bsr	wmult
 	moveq	#3-1,d1			; 3 x $f5

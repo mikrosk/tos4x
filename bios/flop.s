@@ -4,21 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/11/19 19:35:27 $
+* $Date: 90/11/20 18:20:27 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.21  90/11/20  18:20:27  apratt
+* Removed the one place that reads the denselect register: it's
+* WRITE ONLY in Mega STE.  It's shadowed anyway in the DSB, so
+* this is no hardship.
+*
 * Revision 2.20  90/11/19  19:35:27  apratt
 * Fixed a bug which has been here since day 1: on single-drive systems,
 * Flopfmt and Flopwr to the boot sector set the state of disk A to "has
 * changed" even if you formatted/wrote to disk B.
-*
+* 
 * Documentation alert: the docs say writing to sector zero causes the flag
 * to go to "maybe changed" but it actually goes to "has changed."
-*
+* 
 * Revision 2.19  90/11/19  15:45:12  apratt
 * Changed HI_DEN to be TT+STPLUS - it's available in Mega STe.
 * Removed READFIFO, which was unused (was there for an old MCU).
@@ -155,7 +160,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.20 $
+* $Revision: 2.21 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -232,7 +237,7 @@ SLOWACSI	equ	TT+STPLUS	; set to 1 for TT(?) @check@
 
 HI_DEN		equ	TT+STPLUS	; 1.44MB flag
 * to speed.								*
-denselect	equ	$ffff860e	; density bits (in TT only)
+*									*
 
 HI_DEN		equ	1		; always enable this code
 
@@ -1275,8 +1280,10 @@ reseek:
 	bsr	wdiskctl
 
 	move.w	#datareg,(a6)		; seek out to track five
+	move.w	#5,d7
+	bsr	wdiskctl		; dest track = 5
 	move.w	#$10,d6
-	move.w	denselect,d0		; set the other density
+	bsr	flopcmds		; seek w/o verify (can't fail)
 
 * a seek with no verify can't fail! Why do we bother to check?
 * have failed and we wouldn't know.

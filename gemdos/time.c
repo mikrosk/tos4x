@@ -1,15 +1,18 @@
 /*
 ***************************     TIME.C     ******************************
 *
-* $Revision: 2.4 $	$Source: time.c,v $
+* $Revision: 2.5 $	$Source: e:/tos/gd2\RCS\time.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:30:40 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: time.c,v $
+* Revision 2.5  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.4  91/01/23  14:30:40  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 

@@ -1,15 +1,18 @@
 /*
 ***************************      MEM.C     ******************************
 *
-* $Revision: 2.10 $	$Source: mem.c,v $
+* $Revision: 2.11 $	$Source: e:/tos/gd2\RCS\mem.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:30:22 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: mem.c,v $
+* Revision 2.11  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.10  91/01/23  14:30:22  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 

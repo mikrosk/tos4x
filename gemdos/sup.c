@@ -1,16 +1,19 @@
 /*
 ***************************     SUP.C      ******************************
 *
-* $Revision: 2.8 $	$Source: sup.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\sup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 17:08:56 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: sup.c,v $
+* Revision 2.9  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.8  91/01/23  17:08:56  apratt
 * Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
 * d_scan, m_fatofd, m_ofl, and d_dirfil.
-*
+* 
 * Revision 2.7  91/01/23  14:30:36  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
 * 
@@ -160,11 +163,6 @@ FND funcs[0x58] = {
 	&xrename,2,	&xdatime,1
 } ;
 
-PD rootpd;
-char callno;
-
-char biosdev[NUMSTD] = { -1, -1, -2, -3, -1, -1 };
-
 /*
  * Initialize GEMDOS;
  * called early-on by the BIOS.
@@ -202,7 +200,7 @@ REG	long *p;
  */
 void
 freetree(d)
-DND *d;
+char *d;
 {
 REG	int i;
 

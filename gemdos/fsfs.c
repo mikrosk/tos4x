@@ -1,19 +1,22 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.7 $	$Source: fsfs.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 17:07:46 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.8  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.7  91/01/23  17:07:46  apratt
 * Previously, using Fdatime to write the date/time of a zero-length file
 * would write that date/time to any open zero-length file in that dir. Fixed.
-*
+* 
 * Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
 * d_scan, m_fatofd, m_ofl, and d_dirfil.
-*
+* 
 * Revision 2.6  91/01/23  14:30:04  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
 * 
@@ -23,471 +26,261 @@
 #include "fs.h"
 
 /*
-	Error returns
-		EINTRN
-
-	Last modified	SCC	10 Apr 85
-
-NOTE:	I'm not sure that returning immediatly upon an error from ixlseek()
-	is the right thing to do.  Some data structures may not be updated
-	correctly.  Watch out for this!
-	Also, I'm not sure that the EINTRN return is ok.
-*/
-
-long
-ixclose(fd, part)
-OFD *fd;			/* file to close */
-int part;			/* flags */
+ * getdfd: if there's a DFD for the file described by
+ * the DIR structure, return a pointer to it, else NULL.
+ */
+DFD 
+*getdfd(dir)
+DIR *dir;
 {
-  REG OFD *p;
-  REG OFD **q;
-  OFD tmpofd;
+    DFD *dfd;
 
-  /*
-   *  Update FCB in directory if the file length
-   *  or starting cluster changed.
-   *
-   */
-
-  if (fd->o_flag & O_DIRTY)
-    {
-      ixlseek(fd->o_dirfil,fd->o_dirbyt+22); /* seek to spot in FCB */
-
-      tmpofd.o_time = fd->o_time;
-      tmpofd.o_date = fd->o_date;
-      tmpofd.o_strtcl = fd->o_strtcl;
-      tmpofd.o_fileln = fd->o_fileln;
-
-      swp68(tmpofd.o_strtcl);	/* convert to 8086 format */
-      swp68l(tmpofd.o_fileln);
-
-      /*
-       *  Directories always APPEAR to have a file size of zero
-       *  (but normal files don't...)
-       */
-      if (part & CL_DIR)
-	{			/* munge apparent dir file size */
-	  tmpofd.o_fileln = 0;
-	  ixwrite(fd->o_dirfil, 10L, &tmpofd.o_time);
+    for (dfd = dfd_head; dfd; dfd = dfd->dfd_next) {
+	if (dfd->dfd_dev == dir->dir_dev &&
+	    dfd->dfd_dirrec == dir->dir_recno &&
+	    dfd->dfd_diroffs == dir->dir_recoffs) {
+		/* same file */
+		return dfd;
 	}
-      else {
-	char *p;
-	ixwrite(fd->o_dirfil, 10L, &tmpofd.o_time);
-
-	/* get ptr to attr byte in (now-dirty) disk buffer */
-	ixlseek(fd->o_dirfil,fd->o_dirbyt+11);	/* seek to attrib byte */
-	p = (char *)ixread(fd->o_dirfil,1L,NULPTR);
-	if (!(*p & (FA_SUBDIR | FA_ARCHIVE | FA_LABEL))) {
-	    *p |= FA_ARCHIVE;	/* change byte in disk buffer in place */
-	}
-      }
-
-      fd->o_flag &= ~O_DIRTY;	/* AKP: clear the dirty bit */
     }
-
-  /*
-   *  "Full" close
-   *    - search for file in DND's open-list
-   *    - rip it out
-   */
-  if ((!part) || (part & CL_FULL))
-    {
-      q = &fd->o_dnode->d_files;
-      for (p = *q; p ; p = *(q = &p->o_link))
-	if (p == fd)
-	  break;
-
-      /*  $BUG$
-       *  If someone else also has this file open
-       *  then just ripping it out will lose big.
-       */
-      if (p)
-	*q = p->o_link;
-      else
-	return EINTRN;		/* "cannot happen" */
-
-    }
-
-  /* 
-   * Flush all dirty buffers on all drives: 
-   * Fclose on a file is guaranteed to do this.
-   */
-
-  flushall();
-
-  return(E_OK);
+    return NULL;
 }
 
-
 /*
- *  Make Open File Descriptor node (OFD)
- *  and return a pointer to it.
+ *  Create a file.  Called by xcreat and xmkdir.  Returns error codes,
+ *  fills in dir with a fresh DIR for the file.
  *
- */
-OFD
-*makofd(p)
-DND *p;
-{
-  REG OFD *f;
-
-  f = MGET(OFD);		/* panics when it fails */
-      f->o_strtcl = p->d_strtcl;
-      f->o_fileln = 0x7fffffffL;
-      f->o_dirfil = p->d_parent->d_ofd;
-      f->o_dnode = p->d_parent;
-      f->o_dirbyt = p->d_dirpos;
-      f->o_date = p->d_date;
-      f->o_time = p->d_time;
-      f->o_dmd = p->d_drv;
-      f->o_link = NULL;		/* AKP */
-      f->o_flag = 0;		/* AKP */
-  return f;
-}
-
-
-/*
- *  Read from file
- *
+ * ERROR CONSIDERATIONS:
+ * All disk errors longjmp.  Other errors return their error codes.
  */
 long
-ixread(p, len, ubufr)
-OFD *p;			/* open file */
-long len;		/* #bytes to read */
-void *ubufr;		/* -> user buffer */
-{
-  REG long maxlen;
-
-  /*
-   *  Make sure file not opened mode=1 (write-only)
-   */
-#ifdef RO_FASCISM
-  if (p->o_mod == 1)		/* $BUG$ */
-    return (EACCDN);
-#endif
-
-  if (len > (maxlen = p->o_fileln - p->o_bytnum))
-    len = maxlen;		/* ensure request is in range */
-
-  if (len > 0)			/* only bother with non-zero requests */
-    return len = xrw(0, p, len, ubufr, xfr2usr);
-
-  return len;
-}
-
-
-/*
- *  Write to file
- *
- *  I made this a macro once, but it's smaller as a procedure call. (AKP 8/88)
- */
-long
-ixwrite(p, len, ubufr)
-OFD *p;				/* open file */
-long len;			/* #bytes to write */
-void *ubufr;			/* -> user buffer */
-{
-  return xrw(1, p, len, ubufr, usr2xfr);
-}
-
-/*
- *  Make open file for SFT handle h
- *
- */
-long
-makopn(f, dn, h, mod)
-FCB *f;			/* raw FCB */
-DND *dn;		/* directory file is in */
-int h;			/* handle number to use */
-int mod;		/* open mode */
-{
-  REG OFD *p;
-  OFD *p2;
-  REG DMD *dm;
-
-  dm = dn->d_drv;
-
-  p = MGET(OFD);
-
-  /*
-   *  Setup OFD and install in SFT
-   */
-  p->o_mod = mod;		/* open mode */
-  p->o_dmd = dm;		/* -> DMD */
-  sft[h-NUMSTD].f_ofd = p;	/* setup ptr in system file table */
-  p->o_usecnt = 0;		/* reference (open) count = 0 */
-  p->o_curcl = 0;		/* current cluster = 0 */
-  p->o_curbyt = 0;		/* current file pos = 0 */
-  p->o_dnode = dn;		/* -> directory file is in */
-  p->o_dirfil = dn->d_ofd;	/* -> directory file */
-  p->o_dirbyt = dn->d_ofd->o_bytnum - 32; /* = offset of FCB in directory */
-
-  /*
-   *  Hook into directory's open file list
-   */
-  for (p2 = dn->d_files; p2; p2 = p2->o_link)
-    if (p2->o_dirbyt == p->o_dirbyt)
-      break; /* same dir, same dirbyt */
-
-  p->o_link = dn->d_files;
-  dn->d_files = p;
-
-  if (p2)
-    { /* steal time,date,startcl,fileln and add to thread */
-      xmovs(12, &p2->o_time, &p->o_time);
-    }
-  else
-    {
-      p->o_strtcl = f->f_clust;
-      swp68(p->o_strtcl);
-      p->o_fileln = f->f_fileln;
-      swp68l(p->o_fileln);
-      p->o_date = f->f_date;
-      p->o_time = f->f_time;
-    }
-
-  return(h);
-}
-
-
-/*
- *  Create a file
- */
-long
-ixcreat(name,attr)
+ixcreat(name,attr,dir)
 char *name;
 char attr;
+DIR *dir;
 {
-  REG DND *dn;
-  REG FCB *f;
-  REG OFD *fd;
-  char *s,n[2],a[11];
-  REG int i;
-  REG int f2;
-  long pos;
-  long rc;
+    char *namepart;
+    long err;
+    FCB *fcb;
+    int i;
 
-  n[0] = 0xe5;
-  n[1] = 0;
+    /*
+     *  Find path;
+     *  reject illegal files (empty, or starting with dots)
+     */
 
-  /*
-   *  Find path;
-   *  reject illegal files (empty, or starting with dots)
-   */
-  if (!(dn = findit(name,&s,0)))
-    return(EPTHNF);
+    namepart = name;
+    err = fn2dir(&namepart,dir,FN_NORM);
 
-  if (eordot(s, '\0'))
-    return(EPTHNF);
+    /* Anything but EFILNF fails now */
+    if (err && err != EFILNF) return err;
 
-  /*
-   * make sure there's an empty slot for handle (AKP 8/88)
-   * Do this before deleting the file! (AKP 10/88)
-   */
+    /*
+     *  Special case for volume label here: only works in RD, and
+     *  deletes any existing label, not a file with the same name.
+     */
 
-  if (sftprobe() < 0) return (ENHNDL);
-
-  /*
-   *  Make dirfil OFD if one isn't installed there
-   */
-  if (!(fd = dn->d_ofd))
-    dn->d_ofd = (fd = makofd(dn));
-
-  /*
-   *  Check if file already exists;
-   *  remove it if it does.
-   */
-  pos = 0;
-    if (attr == FA_LABEL) {
-    /* create a volume label: first, make sure we're in the root directory */
-    /* (make sure this dir's drive's root dir is this dir) */
-
-    if (dn->d_drv->m_dtl != dn) return EACCDN;
-
-    /* second, find & delete any existing volume label */
-    if (f = scan(dn,"*.*",FA_LABEL,&pos)) {
-	/* there's a volume label here already: delete it. */
-	pos -= 32;
-	if (rc = ixdel(dn,f,pos)) return rc;
-    }
-    else pos = 0;
-  }
-  else if (f = scan(dn,s,~FA_LABEL,&pos))	/* don't match label */
-    {
-    /* don't create file over existing RO or SUBDIR, dir over existing file */
-      if ( (f->f_attrib & (FA_RO | FA_SUBDIR)) || (attr == FA_SUBDIR) )
-	return(EACCDN);
-      pos -= 32;
-      if (rc = ixdel(dn, f, pos)) return rc;
-    }
-  else
-    pos = 0;
-
-  /*
-   * Scan for empty space in the directory file (find
-   * an empty slot); grow directory if no free slots left.
-   */
- rescan:
-  if (!(f = scan(dn,n,-1,&pos)))
-    {
-      /* grow directory (append a cluster) */
-      if (fd->o_curcl < 0)
-	return(EACCDN);		/* can't grow root dir */
-
-      newcl = TRUE;		/* AKP: new cluster call */
-      rc = nextcl(fd, 1);	/* append cluster */
-      newcl = TRUE;		/* AKP: just in case */
-      if (rc)
-	return(EACCDN);
-
-      dirinit(dn);		/* zero new cluster */
-      pos = 0;			/* back to the start */
-      goto rescan;
+    if (attr & FA_LABEL) {
+	/* Not coded up yet */
+	ASSERT(0);
     }
 
-  builds(s, a);
+    /*
+     *  If the file exists, remove it, unless it's open.
+     *
+     *  Don't remove if existing file is RO or subdir, and don't
+     *  create a subdir over an existing file.
+     */
 
-  /*
-   *  Fill in FCB
-   */
-  /* set ARCHIVE bit on files except subdirs & labels */
-  if (!(attr & (FA_SUBDIR | FA_LABEL))) attr |= FA_ARCHIVE;
-  f->f_attrib = attr;
-  for (i=0; i<10; i++)		/* clobber "unused" parts */
-    f->f_fill[i] = 0;
+    if (err == 0) {
+	/* the file exists; check existing attribs */
+	if ((dir->dir_fcb->f_attrib & (FA_RO | FA_SUBDIR)) || 
+	    (attr & FA_SUBDIR))
+		return EACCDN;
 
-  f->f_time = time;		/* copy and byteswap time and date */
-  swp68(f->f_time);
-  f->f_date = date;
-  swp68(f->f_date);
+	/* check to see if anybody has it open */
+	if (getdfd(dir) != NULL) return EACCDN;
 
-  f->f_clust = 0;		/* no starting cluster */
-  f->f_fileln = 0;		/* file length = zero */
+	/* nuke the file, return if can't for some reason */
+	if (err = ixdel(dir)) return err;
+    }
 
-  pos -= 32;			/* backup to FCB in dir file */
-  ixlseek(fd, pos);
-  ixwrite(fd, 11L, a);		/* write name, set dirty flag */
-  ixclose(fd, CL_DIR);		/* partial close to flush dirty dir sector */
-  ixlseek(fd, pos);
-  s = (char *)ixread(fd, 32L, NULPTR);
-  f2 = rc = opnfil((FCB *)s, dn, (f->f_attrib & FA_RO) ? 0 : 2);
+    /* The file doesn't exist (any more). */
 
-  if (rc < 0)
-    return(rc);
+    /*
+     * Scan for empty space in the directory file (find an empty slot); 
+     * grow directory if no free slots left. This can fail.
+     */
 
-  getofd(f2)->o_flag |= O_DIRTY;	/* getofd can't fail */
+    if (err = dirslot(dir)) return err;
 
-  return(f2);
+    /*
+     * write the new file info there, flush back to disk.
+     */
+
+    fcb = dir->dir_fcb;
+
+    if (err = name2fcb(namepart,NULL,fcb)) return err;
+
+    fcb->f_attrib = attr | FA_ARCHIVE;
+    for (i=10; i; fcb->f_fill[--i] = 0) ;
+    fcb->f_time = time;
+    swp68(time);
+    fcb->f_date = date;
+    swp68(date);
+    fcb->f_clust = 0;
+    fcb->f_fileln = 0;
+    dirdirty(dir);
+    return 0;
 }
 
 
 /*
- *  Open file
- *
+ *  Open file.  Finds the DIR entry for the file & calls ixopen.
  */
+
 long
-ixopen(name, mod)
+xopen(name, mod)
 char *name;
 int mod;
 {
-  REG FCB *f;
-  REG DND *dn;
-  char *s;
-  long pos;
+    DIR dir;
+    long err;
 
-  /*
-   *  Find path and scan for filename
-   */
-  if (!(dn = findit(name, &s, 0)))
-    return(EFILNF);
+    /* find the file */
+    err = fn2dir(&name,&dir,FN_NORM);
+    if (err) return err;
 
-  pos = 0;
-  if (!(f = scan(dn, s, FA_NORM, &pos)))
-    return(EFILNF);
-
-  /*
-   *  Check if file is read-only
-   *  (and open mode != READ)
-   */
-  if ((f -> f_attrib & 1) && (mod != 0))
-    return (EACCDN);
-
-  return opnfil(f, dn, mod);
+    return ixopen(&dir,mod);
 }
 
+/*
+ * ixopen: given a DIR entry, open the file.
+ *
+ *  ERROR CONSIDERATIONS:
+ *  Since this function doesn't do any writes, it can't mangle the disk.
+ *  You have to pre-allocate an OFD because you know you'll need one,
+ *  and free it if you then need a DFD and can't get one, but that's
+ *  all that can go wrong.
+ */
+
+long
+ixopen(dir,mod)
+DIR *dir;
+int mod;
+{
+    FCB *fcb;
+    int h;
+    DFD *dfd;
+    OFD *ofd;
+
+    /* fail if opening for mode other than zero and file is RO */
+    if ((mod > 0) && (dir->dir_fcb->f_attrib & FA_RO)) return EACCDN;
+
+    /* fail if there are no handles left */
+    if (h = sftprobe()) return ENHNDL;
+
+    /* get an OFD first, because we know we'll need one */
+    /* and failure should get us out of here NOW. */
+
+    if ((ofd = newofd()) == NULL) return ENHNDL;
+
+    if ((dfd = getdfd(dir)) == NULL) {
+	/* no DFD for this file already; get a new one, fill it in */
+	if ((dfd = newdfd()) == NULL) {
+	    freeofd(ofd);
+	    return ENHNDL;
+	}
+
+	fcb = dir->dir_fcb;
+
+	dfd->dfd_time = fcb->f_time;
+	dfd->dfd_date = fcb->f_date;
+	dfd->dfd_strtcl = fcb->f_clust;
+	dfd->dfd_fileln = fcb->f_fileln;
+	swp68l(fcb->f_fileln);
+	dfd->dfd_attrib = fcb->f_attrib;
+	dfd->dfd_dev = dir->dir_dev;
+	dfd->dfd_dircl = dir->dir_clust;
+	dfd->dfd_dirrec = dir->dir_recno;
+	dfd->dfd_diroffs = dir->dir_recoffs;
+	dfd->dfd_use = 0;
+	dfd->dfd_dirty = 0;
+
+	/* link it in */
+	dfd->dfd_next = dfd_head;
+	dfd_head = dfd;
+    }
+
+    /* fill in the OFD */
+    ofd->o_next = ofd_head;
+    ofd_head = ofd;
+    ofd->o_mode = mod;
+    ofd->o_curcl = 0;	/* flag meaning r/w clust info uninitialized */
+    ofd->o_currec = 0;
+    ofd->o_curbyt = 0;
+    ofd->o_bytnum = 0;
+
+    ofd->o_use = 1;
+    ofd->o_dfd = dfd;
+    dfd->dfd_use++;
+
+    /* make handle h refer to this ofd and return h */
+
+    sft[h].f_ofd = ofd;
+    sft[h].f_own = run;
+
+    return h;
+}
 
 /*
- *  Get/Set file attributes;
+ *  Fattrib: Get/Set file attributes.  There are some restrictions on 
+ *  "set:" mainly, you can't change the "folder" bit, and you can't change
+ *  the "label" bit of a subdir.  You can get YOURSELF into trouble
+ *  with this, but you can't get GEMDOS into trouble!
  *
+ * ERROR CONSIDERATIONS: when writing, we just call dirdirty().
  */
+
 long
 xchmod(p,wrt,attr)
 char *p;			/* -> filename */
-char attr;			/* attribute byte */
 int wrt;			/* 0:get, 1:set */
+char attr;			/* attribute byte */
 {
-  REG OFD *fd;
-  REG DND *dn;
-  char *s;
-  long pos;
-  char oattr;
+    char oattr;
+    DIR dir;
+    long err;
 
-  /*
-   *  Get DND containing file
-   *  and scan for the file entry
-   */
-  pos = 0;
-  if (!(dn = findit(p,&s,0)) ||
-      !scan(dn,s,FA_NORM,&pos))	/* won't find directories or labels */
-    return(EFILNF);
+    /* Will match anything but a label; return any error */
+    if (err = fn2dir(&p,&dir,FN_NORM)) return err;
 
-  /*
-   *  Backup in dirfile to attribute byte
-   */
-  pos -= 21;
-  fd = dn->d_ofd;
-  ixlseek(fd, pos);
-
-  ixread(fd,1L,&oattr);			/* get old attribute */
-  if (!wrt) return ((long)oattr) & 0xff;
-  else {
-    /* deny changes which set subdir, label, or illegal bits */
-    /* (that is, only allow ARCHIVE, SYSTEM, HIDDEN, and RO bits; */
-    /* these bits happen to be FA_NORM.) */
-    /* this used to allow setting the LABEL bit -- no more. AKP 10/88 */
-
-    if (attr & ~FA_NORM) return EACCDN;
-
-    ixlseek(fd, pos);
-    ixwrite(fd, 1L, &attr);		/* write attribute byte */
-    ixclose(fd, CL_DIR);		/* flush dirty directory sector */
-  }
-
-  return ((long)attr) & 0xff;
+    oattr = dir.dir_fcb->f_attrib;
+    if (wrt) {
+	/* can't change FA_SUBDIR bit, or label bit of dir */
+	if (((attr & FA_SUBDIR) ^ (oattr & FA_SUBDIR)) ||
+	    ((attr & FA_LABEL) && (oattr & FA_LABEL)))
+		return EACCDN;
+	dir.dir_fcb->f_attrib = attr;
+	dirdirty(dir);
+	return (unsigned long)attr;
+    }
+    else return (unsigned long)oattr;
 }
 
 
 /*
  *  Fdatime, Get/Set File Date and Time
  *
- *  $BUG$: this function is rumored not to work
- *
- * 04/18/88 AKP This function didn't check getofd() for zero return
- * (meaning invalid handle).
- *
- * Megamax relies on this function leaving the input buffer alone on
+ * Megamax C relies on this function leaving the input buffer alone on
  * a read when the handle isatty, and on changing it (with the file's
  * info) when the handle !isatty.  We can preserve that and still
  * return EIHNDL with the handle refers to a tty.
  *
- * This function used to act on the directory itself, causing an
- * unnecessary disk hit.  Now it just modifies the ofd, which gets
- * written (unmodified) when the file is closed.
+ * We change the DFD for the open file, not what's on disk.
+ * Fsfirst/next has to look for a DFD or it will be out of date.
  *
- * This function and its documentation don't match: the docs say
- * the handle arg comes first.  Since we can't change the code, we
- * change the documentation.  ...and so it goes.
- *
- * Changed this function name from the nonsensical xgsdtof().
+ * NO DISK ACTIVITY, NO ERROR CONSIDERATIONS.
  */
 
 long
@@ -496,196 +289,216 @@ int *buf;			/* -> user buffer */
 int h;				/* file handle */
 int wrt;			/* 0:get, 1:set */
 {
-  REG OFD *f;
-  REG OFD *fd;
-  int t[2];			/* buffer to hold user input for swapping */
+    DFD *dfd;
+    int t[2];			/* buffer to hold user input for swapping */
 
-/*
-   *
-   *  Get directory file,
-   *  see to FCB's date+time area
-   * 
-  f = getofd(h);
-
-  fd = f->o_dirfil;
-  ixlseek(fd,f->o_dirbyt + 22);
-
-  if (!wrt) {			* read date+time into user buffer *
-    ixread(fd, 4L, buf);
-    swp68(buf[0]);		* convert 68000 <---> 8086 formats *
-    swp68(buf[1]);
-  }
-  else {
-      t[0] = buf[0];
-      t[1] = buf[1];
-      swp68(t[0]);
-      swp68(t[1]);
-      ixwrite(fd, 4L, t);	* write date+time to file *
-      ixclose(fd, CL_DIR);	* flush dirty directory sector *
-  }
-*/
-  /*
-   * NEW CODE (AKP): For a read, copy the time & date from the ofd.
-   * For a write, copy the user's time & date to ALL OFD'S WITH THE
-   * SAME STARTING CLUSTER.  That way, a write to one handle's date&time
-   * will read back the same way from another handle.
-   *
-   * makopn already takes an existing ofd's time&date over the one
-   * on disk, so this works fine.  The only place where this
-   * doesn't work is when you Fsfirst while the file is still open...
-   * So what, big deal.
-   */
-
-  if (!(f = getofd(h)) || ((long)f < 0)) return (EIHNDL);
-
-  if (!wrt) {
-    buf[0] = f->o_time;
-    buf[1] = f->o_date;
-    swp68(buf[0]);
-    swp68(buf[1]);
-    return E_OK;
-  }
-
-  /* else it's a write */
-
-  t[0] = buf[0];
-  t[1] = buf[1];
-  swp68(t[0]);
-  swp68(t[1]);
-
-  /* write the time/date of all OFD's for this file. */
-  for (fd = f->o_dnode->d_files; fd; fd = fd->o_link) {
-    if (fd->o_dirbyt == f->o_dirbyt) {
-	fd->o_time = t[0];
-	fd->o_date = t[1];
-	fd->o_flag |= O_DIRTY;
+    h = syshnd(h);
+    if ((h < 0) || ofdisatty(sft[h].f_ofd)) return EIHNDL;
+  
+    dfd = sft[h].f_ofd->o_dfd;
+    if (!wrt) {
+	buf[0] = dfd->dfd_time;
+	buf[1] = dfd->dfd_date;
+	swp68(buf[0]);
+	swp68(buf[1]);
+	return E_OK;
     }
-  }
-  return E_OK;
+
+    /* else it's a write */
+
+    t[0] = buf[0];
+    t[1] = buf[1];
+    swp68(t[0]);
+    swp68(t[1]);
+
+    dfd->dfd_time = t[0];
+    dfd->dfd_date = t[1];
+    dfd->dfd_dirty = 1;
+    return E_OK;
 }
 
-
 /*
- *  Delete a file
- *
+ *  Delete a file.  This is the external version: calls ixdel to
+ *  do the dirty deed.  Simple returns from errors suffice.
  */
 long
-xunlink(name)
+xdelete(name)
 char *name;
 {
-  REG DND *dn;
-  char *s;
-  long pos;
-  REG FCB *f;
+    DIR dir;
+    long err;
+    FTAB *ftab;
+    OFD *ofd;
+    DFD *dfd;
+    int youflag = 0;
+    int sftindex;
+    int i;
 
-  /* first find path */
+    /* find normal files only, return any error */
+    if (err = fn2dir(&name,&dir,FN_NORM)) return err;
 
-  /*
-   *  Find path and scan for filename
-   */
-  pos = 0;
-  if (!(dn = findit(name,&s,0)) ||
-      !(f = scan(dn,s,FA_NORM,&pos)))	/* don't match directories or label */
-    return(EFILNF);
+    /*
+     *  Refuse if file is read-only
+     */
+    if (dir.dir_fcb->f_attrib & FA_RO)
+	return(EACCDN);
 
-  /*
-   *  Refuse if file is read-only
-   */
-  if (f->f_attrib & FA_RO)
-    return(EACCDN);
+    /*
+     * Refuse if the file is open by anybody else.  This involves
+     * scanning through the SFT looking for a DFD with a matching dev,
+     * dirrec, and diroffs.  We might visit a DFD more than once,
+     * but that's OK.  We look through SFT, not the linked list of
+     * dfd's, because we need the 'own' field in the SFT.
+     */
 
-  /*
-   *  Back up (in directory file) and clobber the thing
-   */
-  pos -= 32;
-  return(ixdel(dn,f,pos));
+    for (ftab = &sft[0]; ftab < &sft[OPNFILES]; ftab++) {
+	if (ftab->f_own) {
+	    ofd = ftab->f_ofd;
+	    if (!ofdisatty(ofd)) {
+		dfd = ofd->o_dfd;
+		if (dfd->dfd_dev == dir.dir_dev &&
+		    dfd->dfd_dirrec == dir.dir_recno &&
+		    dfd->dfd_diroffs == dir.dir_recoffs) {
+			/* same file */
+			if (ftab->f_own != run) return EACCDN;
+			else youflag = 1;
+		}
+	    }
+	}
+    }
+
+    /*
+       OK, nobody else has it open.  If you do, youflag is 1, in which
+       case we have to call xclose for each time you have it open.  If
+       any of these fails, we return the error code.  Hopefully, either
+       the first one will fail or none of them will; otherwise, some of
+       your handles to the file are closed and some are not. 
+       The structure of this is as follows:
+
+	if (you have it open) {
+	    for (each slot in SFT) {
+		if (slot is valid) {
+		    if (!isatty(slot)) {
+			if (is the same file) {
+			    for (each std handle) {
+				if (this std handle referrs to the slot) {
+				    close the std handle (return errors)
+				    goto handle_is_closed;
+				}
+			    }
+			    (wasn't a std handle)
+			    close the handle (return errors)
+	handle_is_closed: ;
+	                }
+	            }
+	        }
+	    }
+	}
+     */
+	    
+
+    if (youflag) {
+	/* for (each SFT slot) */
+	for (sftindex = 0, ftab = &sft[0]; 
+	     ftab < &sft[OPNFILES];
+	     ftab++, sftindex++) {
+		/* if (valid) */
+		if (ftab->f_own) {
+		    ofd = ftab->f_ofd;
+		    /* if (!isatty) */
+		    if (!ofdisatty(ofd)) {
+			/* if (is the same file) */
+			dfd = ofd->o_dfd;
+			if (dfd->dfd_dev == dir.dir_dev &&
+			    dfd->dfd_dirrec == dir.dir_recno &&
+			    dfd->dfd_diroffs == dir.dir_recoffs) {
+				/* close std if std, else close slot */
+				for (i=0; i<NUMSTD; i++) {
+				    if (run->p_uft[i] == sftindex) {
+					if (err = xclose(i)) return err;
+					goto handle_is_closed;
+				    }
+				}
+				/* wasn't a std handle */
+				if (err = xclose(sftindex)) return err;
+handle_is_closed:		;
+			}
+		    }
+		}
+	 }
+    }
+
+    /* hoo boy! Now nobody has the file open. Freshen bcb & fcb and nuke. */
+
+    dir2dir(&dir);
+    return ixdel(&dir);
 }
 
 
 /*
- *  Internal version of delete-file
- *  (called by ixcreat(), xunlink() and xrmdir()).
+ *  Internal version of delete-file.  Takes a dir structure with fresh
+ *  bcb and fcb fields.  Assumes the file is not open by anyone:
+ *  caller must check this.  All this function does is e5 out the
+ *  dir entry and zap the FAT.
+ *  (called by ixcreat(), xdelete() and xrmdir()).
+ *
+ *  ERROR CONSIDERATIONS: e5 out the directory slot first, so if
+ *  dirwrite() fails you could at worst end up with lost clusters,
+ *  not an entry that points to zeros.
  */
 long
-ixdel(dn, f, pos)
-DND *dn;			/* directory file is contained in */
-FCB *f;				/* -> file's FCB */
-long pos;			/* position of file in directory file */
+ixdel(dir)
+DIR *dir;
 {
-  REG DMD *dm;
-  REG unsigned int n;		/* AKP: MUST be unsigned */
-  REG unsigned int n2;		/* AKP: MUST be unsigned */
-  REG OFD *fd;
-  char c;
-  unsigned int temp;
+    DMD *dm;
+    unsigned int n;
+    unsigned int n2;
+    unsigned int temp;
 
-  /*
-    Traverse the list of files open for this directory node.
+    /*
+     * Mark the directory entry as erased.
+     */
 
-    If a file is found that has the same position in the directory as the one
-    we are to delete, then scan the system file table to see if this process
-    is then owner.  If so, then close it, otherwise abort.
+    dir->dir_fcb->f_name[0] = 0xe5;
+    dirdirty(dir);
 
-    NOTE that both 'for' loops scan for the entire length of their respective
-    data structures, and do not drop out of the loop on the first
-    occurence of a match.
-  */
+    /*
+     * Traverse this file's chain of allocated clusters, freeing them.
+     * Note: stop at (and don't touch) entries in the range [0xfff0..0xfffe],
+     * and also stop if the entry is 0 (possible for inconsistent filesystems).
+     */
 
-  for (fd = dn->d_files; fd; fd = fd->o_link)
-    if (fd->o_dirbyt == pos)
-      for (n = 0; n < OPNFILES; n++)
-	if (sft[n].f_ofd == fd)
-	  {
-	    if (sft[n].f_own == run)
-	      ixclose(fd,0);
-	    else
-	      return(EACCDN);
-	  }
-  /*
-   * Traverse this file's chain of allocated clusters, freeing them.
-   * Note: stop at (and don't touch) entries in the range [0xfff0..0xfffe],
-   * and also stop if the entry is 0 (possible for inconsistent filesystems).
-   */
-  dm = dn->d_drv;
-  temp = f->f_clust;
-  swp68(temp);
-  n = temp;
+    dm = &drvtbl[dir->dir_dev];
+    temp = dir->dir_fcb->f_clust;
+    swp68(temp);
+    n = temp;
 
-  newcl = TRUE;			/* AKP: new loop of cluster calls */
-  while (n && n != 0xffff)
-    {
-      n2 = getcl(n,dm);
-      if (!n2 || (n2 >= 0xfff0 && n2 != 0xffff)) {
-      	/* bad sector mark or other reserved situation: stop now. */
-      	break;
-      }
-      else
-      	clfix(n,0,dm);
-      n = n2;
+    newcl = TRUE;			/* AKP: new loop of cluster calls */
+    while (n && n != 0xffff) {
+	n2 = getcl(n,dm);
+	if (!n2 || (n2 >= 0xfff0 && n2 != 0xffff)) {
+	    /* bad sector mark or other reserved situation: stop now. */
+	    break;
+	}
+	else clfix(n,0,dm);
+	n = n2;
     }
-  newcl = TRUE;			/* AKP: set this just in case */
+    newcl = TRUE;			/* AKP: set this just in case */
 
-  /*
-   * Mark the directory entry as erased.
-   */
-  fd = dn->d_ofd;
-  ixlseek(fd,pos);
-  c = 0xe5;
-  ixwrite(fd,1L,&c);
-  ixclose(fd,CL_DIR);
-
-  /*
-   * that the preceding routines that do physical disk operations will
-   * 'longjmp' on failure at the BIOS level, thereby allowing us to
-   * simply return with E_OK.
-   */
-
-  return OK;
+    return E_OK;
 }
 
-
 /*
- *  Rename a file
+ *  Rename a file.
+ *
+ * ERROR CONSIDERATIONS:
+ * First we create the new file, then remove the old.  Creating the new file
+ * includes calling dirslot, which might fail; this is harmless.  It also
+ * involves writing the new slot.  If this fails, then the buffer we wrote 
+ * into will be invalidated, so that's OK. If the write to dir2 succeeds but
+ * the write to dir1 fails, you end up with the same file in two places;
+ * tough.  This is worse for Freanme of a directory through the structure.
+ * Still tough.
  */
 long
 xrename(n, p1, p2)
@@ -693,230 +506,148 @@ int n;				/* unused */
 char *p1;			/* old name */
 char *p2;			/* new name */
 {
-  char *s1,*s2;
-  char buf[11];
-  REG int hnew;
-  REG int att;
-  FCB *f;
-  DND *dn1,*dn2;
-  REG OFD *f1;
-  REG OFD *fd;
-  REG OFD *fd2;
-  REG long rc;
-  REG long h1;
-  long pos = 0;
+    DIR dir1;
+    DIR dir2;
+    long err;
+    char attr;
+    FCB fcbhold;
+    uint cl;
 
-  /* try to find the old file */
-  if (!(dn1 = findit(p1,&s1,0)))
-    return(EPTHNF);
+    /* try to find the old file, return any error. */
 
-  /* scan, including subdirs, but won't match the volume label */
-  if (!(f = scan(dn1,s1,~FA_LABEL,&pos))) return (EFILNF);
-  att = f->f_attrib;
+    if (err = fn2dir(&p1,&dir1,FN_NORM)) return err;
+    fcbhold = *dir1.dir_fcb;		    /* structure copy of FCB */
+    attr = fcbhold.f_attrib;
+    if (attr & FA_RO) return EACCDN;
 
-  /* the attribute below used to be zero, but this missed directories */
-  if (!ixsfirst(p2, ~FA_LABEL, NULPTR))
-    return(EACCDN);
+    /* try to find the dir of the new file; return any error but EFILNF */
+    if ((err = fn2dir(&p2,&dir2,FN_NORM)) && err != EFILNF) return err;
 
-  /* find the directory he wants the new file in */
-  if (!(dn2 = findit(p2,&s2,0)))
-    return(EPTHNF);
+    /* if there was NO error in the fn2dir above, the dest file exists! */
+    if (!err) return EACCDN;
 
-  /* s2 is the filename part of the target name. If empty, error! */
-  if (!(*s2))
-    return(EBADRQ);
+    if (dir1.dir_dev != dir2.dir_dev) return ENSAME;
 
-  if (dn1->d_drv->m_drvnum != dn2->d_drv->m_drvnum)
-    return(ENSAME);
+    /* at this point, dir2 is fresh, dir1 might not be */
 
-  /* if old file is a directory, use drename */
-  if (att == FA_SUBDIR) {
-  	if (dn1 != dn2) return EACCDN;
-  	return drename(dn1,p1,s2);
-  }
+    /* Can you rename an open file? No. Don't even check if directory */
+    if (!(attr & FA_SUBDIR) && (getdfd(&dir1) != NULL)) return EACCDN;
 
-  if ((h1 = xopen(p1, 2)) < 0L)
-    return (h1);
-  f1 = getofd ((int)h1);		/* can't fail */
-
-  fd = f1->o_dirfil;
-  buf[0] = 0xe5;
-  ixlseek(fd,f1->o_dirbyt);
-
-  if (dn1 != dn2)
-    {
-      /* get old attribute */
-      f = (FCB *) ixread(fd,32L,NULPTR);
-      /* erase (0xe5) old file */
-      ixlseek(fd,f1->o_dirbyt);
-      ixwrite(fd,1L,buf);
-
-      /* copy time/date/clust, etc. */
-
-      ixlseek(fd,f1->o_dirbyt + 22);
-      ixread(fd,10L,buf);
-
-      /* att still has the original file's attribute from above */
-      hnew = xcreat(p2,att);
-      fd2 = getofd(hnew);		/* can't fail */
-      ixlseek(fd2->o_dirfil,fd2->o_dirbyt + 22);
-      ixwrite(fd2->o_dirfil,10L,buf);
-      fd2->o_flag &= ~O_DIRTY;
-      xclose(hnew);
-      ixclose(fd2->o_dirfil,CL_DIR);
+    if (dir1.dir_clust == dir2.dir_clust) {
+	/* same directory. Copy new name in. Error on illegal file names */
+	if (err = name2fcb(p2,NULL,dir2.dir_fcb)) return err;
+	dirdirty(&dir2);
+	return 0;
     }
-  else
-    {
-      builds(s2,buf);
-      ixwrite(fd,11L,buf);
+    else {
+	if (err = dirslot(&dir2)) return err;
+	/* copy FCB, then replace name with new name */
+	*dir2.dir_fcb = fcbhold;
+	if (err = name2fcb(p2,NULL,dir2.dir_fcb)) return err;
+	dirdirty(&dir2);
+
+	/* new file was (successfully?) created in dir2; remove from dir1 */
+	dir2dir(&dir1);
+	*dir1.dir_fcb->f_name = 0xe5;		/* erase old file */
+	dirdirty(&dir1);
+
+	if (fcbhold.f_attrib & FA_SUBDIR) {
+	    /* we just renamed a subdir; change its .. entry too. */
+	    /* construct a dir struct for the second slot of the dir */
+	    cl = fcbhold.f_clust;
+	    swp68(cl);
+	    dir1.dir_recno = cl2rec(cl,&drvtbl[dir1.dir_dev]);
+	    dir1.dir_recoffs = sizeof(FCB);
+
+	    /* "freshen" our constructed struct, change strtcl */
+	    dir2dir(&dir1);
+	    dir1.dir_fcb->f_clust = dir2.dir_clust;
+	    swp68(dir1.dir_fcb->f_clust);
+	    dirdirty(&dir1);
+        }
+        return E_OK;
     }
-
-  if ((rc = xclose((int)h1)) < 0L)
-    return(rc);
-
-  return(ixclose(fd,CL_DIR));
 }
-
-/***********************************************************************
- *
- * Drename: rename a directory.
- * The arguments are partly digested by xrename.  dp is the DND
- * of the directory in which the rename will take place.  p1 is
- * the full pathname (as passed in initially) to be renamed.
- * s2 is the new name (just the name part).  This has already
- * been checked, and doesn't also exist in dp.
- *
- * Returns EBADRQ for illegal new name.
- *
- * (By Allan Pratt 03/11/88)
- *
- ***********************************************************************/
-long
-drename(dp, p1, s2)
-DND *dp;	/* DND where the files are */
-char *p1;	/* old name (full pathname) */
-char *s2;	/* new name (just the name part) */
-{
-    char buf[20];
-    char *s;
-    DND *d;
-
-    if (eordot(s2,'\0')) return EBADRQ;
-
-    if (!(d = findit(p1,&s,1))) return EPTHNF;
-
-    builds(s2,buf);
-    xmovs(11,buf,d->d_name);
-
-    /* change the file name in the parent */
-
-    ixlseek(d->d_parent->d_ofd,d->d_dirpos);
-    ixwrite(d->d_parent->d_ofd,11L,buf);
-
-    return ixclose(d->d_parent->d_ofd,CL_DIR);
-}
-
-/*	Function 0x42	f_seek
-	
-	Error returns
-	EIHNDL
-	EINVFN
-	ixlseek()
-	*/
-
-long
-xlseek(n,h,flg) /*+ seek file handle h, byte position n */
-int h,flg;
-long n;
-{
-  REG OFD *f;
-
-  if (!(f = getofd(h)) || ((long)f < 0))
-    return(EIHNDL);
-
-  if (flg == 2)
-    n += f->o_fileln;
-  else if (flg == 1)
-    n += f->o_bytnum;
-  else if (flg)
-    return(EINVFN);
-
-  return(ixlseek(f,n));
-}
-
 
 /*
-  Error returns
-  ERANGE
-  EINTRN
-
-  Last modified	SCC	10 Apr 85
-
-  NOTE:	This function returns ERANGE and EINTRN errors, which are new error
-  numbers I just made up (that is, they were not defined by the BIOS
-  or by PC DOS).
-  */
+ * xlseek: update the read-write pointer of a file.
+ * Calls ixlseek on the OFD and new pointer location.
+ */
 
 long
-ixlseek(p,n)
-OFD *p;
+xlseek(n,h,flg)
 long n;
+int h;
+int flg;
 {
-  int curnum,curflg;
-  REG int clnum;
-  REG int clx;
-  REG int i;
-  REG DMD *dm;
+    OFD *ofd;
+    int curnum,curflg;
+    int clnum;
+    int clx;
+    int i;
+    DMD *dm;
 
-  if (n > p->o_fileln)
-    return(ERANGE);
+    if ((h = syshnd(h)) < 0) return EIHNDL;
+    ofd = sft[h].f_ofd;
+    if (ofdisatty(ofd)) return EIHNDL;
 
-  if (n < 0)
-    return(ERANGE);
+    if (flg == 2)
+	n += ofd->o_dfd->dfd_fileln;
+    else if (flg == 1)
+	n += ofd->o_bytnum;
+    else if (flg)
+	return(EINVFN);
 
-  dm = p->o_dmd;
-  if (!n)
-    {
-      clx = 0;
-      p->o_curbyt = 0;
-      goto fillin;
+    if (n > ofd->o_dfd->dfd_fileln || n < 0)
+	return(ERANGE);
+
+    dm = &drvtbl[ofd->o_dfd->dfd_dev];
+    if (!n) {
+	clx = 0;
+	ofd->o_curbyt = 0;
+	goto fillin;
     }
 
-  /* do we need to start from the beginning ? */
+    /* do we need to start from the beginning ? */
 
-  curflg = (!p->o_curbyt) || (p->o_curbyt == dm->m_clsizb);
-  clnum = divmod(&p->o_curbyt,n,dm->m_clblog);
+    curflg = (!ofd->o_curbyt) || (ofd->o_curbyt == dm->m_clsizb);
+    clnum = divmod(&ofd->o_curbyt,n,dm->m_clblog);
 
-  if (p->o_curcl && (n >= p->o_bytnum))
-    {
-      curnum = p->o_bytnum >> dm->m_clblog;
-      clnum -= curnum;
-      clnum += curflg;
-      clx = p->o_curcl;
+    if (ofd->o_curcl && (n >= ofd->o_bytnum)) {
+	curnum = ofd->o_bytnum >> dm->m_clblog;
+	clnum -= curnum;
+	clnum += curflg;
+	clx = ofd->o_curcl;
     }
-  else
-    clx = p->o_strtcl;
-
-  /* AKP: the -1 below was any 0xfff0..0xffff but I backed that out */
-
-  newcl = TRUE;			/* AKP: new loop of cluster calls */
-  for (i=1; i < clnum; i++) {
-    if ((clx = getcl(clx,dm)) == -1) {
-      newcl = TRUE;		/* AKP: set this just in case */
-      return(-1);
+    else {
+      clx = ofd->o_dfd->dfd_strtcl;
+      swp68(clx);
     }
-  }
 
-  /* go one more except on cluster boundary */
+    /* stop looking (and leave file pointer alone) if you encounter a */
+    /* cluster value of zero or $FFFx.  One is also invalid. */
+    /* Something like this was put here, then backed out, before. */
+    /* Don't know why it was backed out... */
 
-  if (p->o_curbyt && clnum)
-    clx = getcl(clx,dm);
+    newcl = TRUE;			/* AKP: new loop of cluster calls */
+    for (i=1; i < clnum; i++) {
+	if (!(clx = getcl(clx,dm)) || ((clx & 0xfff0) == 0xfff0)) {
+	    newcl = TRUE;		/* AKP: set this just in case */
+	    return(ERROR);
+	}
+    }
 
-  newcl = TRUE;			/* AKP: set this just in case */
+    /* go one more except on cluster boundary */
 
- fillin:	p->o_curcl = clx;
-  p->o_currec = cl2rec(clx,dm);
-  p->o_bytnum = n;
+    if (ofd->o_curbyt && clnum)
+	clx = getcl(clx,dm);
 
-  return(n);
+    newcl = TRUE;			/* AKP: set this just in case */
+
+fillin:
+    ofd->o_curcl = clx;
+    ofd->o_currec = cl2rec(clx,dm);
+    ofd->o_bytnum = n;
+
+    return(n);
 }

@@ -1,16 +1,19 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.7 $	$Source: fsdir.c,v $
+* $Revision: 2.8 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 17:09:46 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/02/11 19:56:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.8  1991/02/11  19:56:48  apratt
+* Checkin lest I lose work (again)
+*
 * Revision 2.7  91/01/23  17:09:46  apratt
 * Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
 * d_scan, m_fatofd, m_ofl, and d_dirfil.
-*
+* 
 * Revision 2.6  91/01/23  14:30:00  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
 * 
@@ -19,536 +22,308 @@
 
 #include "fs.h"
 
-/* dndtouch: lock this dnd by marking it as used in this OS call */
-
-#define dndtouch(dnd) (*(((char *)(dnd))-1) = callno)
-
-void
-ixdirdup(h, dn, p)
-int h;			/* current dir slot# */
-int dn;			/* directory number */
-PD *p;			/* -> basepage */
-{
-  p->p_curdir[h] = dn;
-  diruse[dn]++;
-}
-
-
 /*
- *  Make a child subdirectory (FCB *b) of directory (DND *p).
- *
+ * User-level directory operations
  */
-DND
-*makdnd(p, b)
-DND *p;
-FCB *b;
-{
-  OFD *fd;
-  REG DND *p1;
-  int temp;
-  
-  temp = b->f_clust;
-  swp68(temp);
-
-    /* don't add duplicate entries */
-  for (p1 = p->d_child; p1; p1 = p1->d_next)
-    if (xcmps(b->f_name,p1->d_name))		/* same parent, same name */
-      return p1;
-
-  fd = p->d_ofd;
-
-  dndtouch(p);			/* lock the dnd we're making a child for */
-
-  p1 = MGET(DND);
-
-  if (p->d_child)
-    p1->d_next = p->d_child;
-  
-  p->d_child = p1;
-  p1->d_ofd = NULPTR;
-  p1->d_parent = p;
-  p1->d_strtcl = b->f_clust;
-  swp68(p1->d_strtcl);
-  p1->d_drv = p->d_drv;
-  p1->d_dirpos = fd->o_bytnum - 32;
-  p1->d_fill = 0;
-  p1->d_time = b->f_time;
-  p1->d_date = b->f_date;
-  xmovs(11,b->f_name,p1->d_name);
-  
-  return(p1);
-}
-
-
-/*
- *  Scan directory
- *
- */
-FCB
-*scan(p, n, att, posp)
-DND *p;			/* directory to scan */
-char *n;		/* filename */
-int att;		/* search attributes */
-long *posp;		/* directory position */
-{
-  REG OFD *fd;
-  REG FCB *b;
-  DND *p1;
-  REG int m;
-  long srchpos;
-  char d[12];			/* buffer for name and attribute byte */
-  
-  p1 = NULPTR;			/* initialize this like old GEMDOS did. */
-  dndtouch(p);			/* lock the directory we're scanning in */
-
-  /*
-   *  Build crunched filename + attribute byte
-   */
-  m = 0;
-  builds(n, d);
-  d[11] = att;
-
-  /*
-   *  Make OFD for directory file
-   *  if one isn't already there.
-   */
-  if (!(fd = p->d_ofd))
-    p->d_ofd = (fd = makofd(p));
-
-  /*
-   * set srchpos to 0 if directory search, else to *posp.
-   */
-  if ((srchpos = *posp) == -1) {
-    srchpos = 0;
-  }
-
-  ixlseek(fd, srchpos);
-
-  while ((b = (FCB *) ixread(fd,32L,NULPTR)) && (b->f_name[0]))
-    {
-      /* if this slot matches our target and is a subdir, add it */
-
-      if (m = match(d,b->f_name)) {		/* if there's a match... */
-	if ((*posp == -1) &&			/*  if looking for a dir */
-	  (b->f_name[0] != '.') &&		/*   and not . or .. */
-	  (b->f_attrib & FA_SUBDIR) &&		/*   and is subdir */
-	  (b->f_name[0] != 0xffffffe5)) {	/*   and isn't erased */
-	    if (!(p1 = makdnd(p, b))) {		/*    add to cache. */
-		return (NULPTR);
-	    }
-	}
-	break;			/* break on a match (always) */
-      }
-    }
-
-  /* fall out of here with a match or end of directory */
-
-  /* set *posp to (just past) this match if NOT a dir search */
-  if (*posp != -1)
-    *posp = fd->o_bytnum;
-
-  if (!m) {
-      /* no match: were we looking for erased files? */
-      if (b && (*n == 0xffffffe5)) {
-	return(b);		/* yes: return b (which is 1st zero slot) */
-      }
-      return(NULPTR);		/* no: total miss; return null */
-  }
-
-  if (*posp == -1) {
-      /* match and was a search for a subdir: seek to slot and return it */
-      ixlseek(fd,fd->o_bytnum - 32);
-      return(((FCB *) p1));
-  }
-  
-  /* match and was not a search for a subdir: return the FCB */
-  return(b);
-}
-
-
-/*
- *  Crack open a directory
- *
- */
-DND
-*dcrack(np)
-char **np;			/* -> ->filename (ptr modified on return) */
-{
-  REG char *n;
-  REG int d;
-  REG DND *p;
-  
-  /*
-   *  Compute drive number
-   */
-  n = *np;
-  if (n[1] == ':')
-    {
-      d = uc(n[0]) - 'A';
-      n += 2;
-    }
-  else
-    d = run->p_curdrv;
-  
-  /*
-   *  Crack open drive
-   */
-  if (ckdrv(d) < 0)
-    return(0L);
-  
-  /*
-   *  If path begins with a slash start at root directory,
-   *  otherwise start at current directory.
-   */
-  if (*n == SLASH)
-    {				/* [D:]\path... */
-      p = drvtbl[d]->m_dtl;
-      n++;
-    }
-  else				/* path... */
-    p = dirtbl[run->p_curdir[d]];
-  
-  *np = n;			/* set pointer to rest of filename */
-  dndtouch(p);			/* lock this directory */
-  return(p);			/* return starting DND */
-}
-
-
-/*
- *  Return DND->directory that a file is in,
- *  or just return DND->directory.
- *
- */
-DND
-*findit(name, sp, dflag)
-char *name;			/* -> filename */
-char **sp;			/* set to -> name part of path on return */
-int dflag;			/* if true, no file name is present */
-{
-  char *n;
-  REG DND *p;
-  REG DND *pp;
-  DND *newp;
-
-  REG int i;
-  char s[11];
-  REG char *ptemp;
-  
-  /*
-   *  Crack open directory and drive
-   */
-  n = name;
-  if (!(p = dcrack(&n))) {
-    return(p);
-  }
-
-  do
-    {
-      if (!(i = getpath(n, s, dflag)))
-	break;
-      
-      if (i < 0)
-	{
-	  if (i == -2) {
-	    p = p->d_parent;
-	  }
-	  i = -i;
-	  goto scanxt;
-	}
-
-      /* reject any directory component of a path with wildcards (1/89 AKP) */
-      ptemp = &s[11];
-      while (ptemp > s) if (*(--ptemp) == '?') return NULL;
-
-      if (!(newp = p->d_child))
-	newp = ((DND *)scan(p, n, FA_SUBDIR, &negone));
-
-      pp = p;
-
-      if (!(p = newp))
-	break;
-      
-      /*
-       *  Check all subdirectories at this level
-       */
-      while (p && (!xcmps(s,p->d_name))) 
-	{
-	  /*
-	   *  If directory not entirely traversed,
-	   *  scan until next match or end
-	   */
-	  if (!(newp = p->d_next))
-	    {
-	      p = 0;
-	      if (pp)
-		  p = (DND *)scan(pp, n, FA_SUBDIR, &negone);
-	    }
-	  else {
-	    p = newp;
-	  }
-	}
-    scanxt:
-      if (*(n = n + i))
-	n++;
-      else
-	break;
-    } while (p && i);
-  
-  /*
-   *  p = 0 ==> not found
-   *  i = 0 ==> found at p (dnd entry)
-   *  n = points at filename
-   */
-  
-  *sp = n;
-  if (p) dndtouch(p);	/* lock the directory we just found */
-  return(p);
-}
-
 
 /*
  *  Dsetpath(path)
  *    Set current directory
  * 
- * Calling this function with an arg containing a drive letter and colon
- * causes something you don't expect.  The call xchdir("c:\sub1\sub2") when
- * your current drive is D: causes the current directory on C: to be
- * D:\sub1\sub2.  That's right, D:. 
+ * QUIET CHANGE FROM ORIGINAL GEMDOS:
+ *
+ * Originally, calling this function with an arg containing a drive letter 
+ * and colon causes something you don't expect.  The call 
+ * xchdir("c:\sub1\sub2") when your current drive is D: causes the current 
+ * directory on C: to become D:\sub1\sub2.  That's right, D:. 
  * 
- * This is a bug, but it can be passed off as a feature: any program which
- * doesn't know about subdirectories (i.e.  only uses drive letters:
- * "c:file.typ") can be fooled into using them. 
+ * This is not bug, as you can tell in the original code by the careful
+ * use of two local variables, one for your current drive and one for the
+ * drive mentioned in the argument. The "feature" here is that a program 
+ * which doesn't know about subdirs (i.e. only uses drive letters:
+ * "c:file.typ") can be fooled into using them (in this case, 
+ * "d:\sub1\sub2\file.typ").
  * 
- * To remove this "feature" just remove the statement "p += 2;"
- *
- * In any case, this code used to decrement diruse for the current dir on
- * the drive in question *before* determining that the chdir would succeed. 
- * This caused bad things to happen.
- *
- * Improvements over 8/8/88 are: checking for success before any side effects,
- * and re-using a slot in dirtbl if it already points to the dir in question.
- *
+ * This feature is now (1/91) declared obsolete, and calling 
+ * Dsetpath("d:\foo") will cause the current directory on d: to 
+ * become d:\foo.  It still doesn't change your current drive; it
+ * only changes d's current directory.  (Hmm, should it?)
+ * Part of the reason is that the current directory for each drive is now
+ * represented by the cluster number only, not a reference to a struct.
  */
 
 long
 xchdir(p)
 char *p;
 {
-  REG DND *l;
-  REG int dr;
-  REG int dphy;
-  REG int odr;
-  char *s;
+    int drv = run->p_curdrv;
+    DIR dir;
+    long err;
 
-  /*
-   *  Check for device name on the front
-   */
-  if (p[1] == ':')
-    {
-      dphy = uc(p[0]) - 'A';
-      p += 2;
+    if (!*p) return 0;	/* Dsetpath("") is a no-op */
+    if (*(p+1) == ':') {
+	/* drive spec */
+	drv = uc(*p) - 'A';
+	if (drv < 0 || drv >= MAXDEVS) return EACCDN;
+	p += 2;
     }
-  else dphy = run->p_curdrv;
-
-  if (!(l = findit(p,&s,1)))
-    return(EPTHNF);
-
-  /* remember old cur dir slot on this drive */
-  odr = run->p_curdir[dphy];
-
-  /*
-   * see if this is already somebody's current directory
-   */
-  for (dr = 1; dr < NCURDIR; ++dr) {
-    if (dirtbl[dr] == l) {
-	goto usedr;
+    if (!*p) return E_OK;	/* Dsetpath("") or "c:" is a no-op */
+    if (*p == SLASH && !*(p+1)) {
+	/* set something to the root directory; can't fail */
+	run->p_curdir[drv] = 0;
+	return E_OK;
     }
-  }
 
-  /*
-   * Nobody's already using this dir; find an empty slot in dirtbl.
-   */
-  for (dr = 1; dr < NCURDIR; ++dr) {
-    if (!diruse[dr]) {
-	dirtbl[dr] = l;
-	goto usedr;
-    }
-  }
-  return EPTHNF;	/* no empty current-directory slots */
+    if (err = fn2dir(&p,&dir,FN_DOTSOK)) return err;
 
-usedr:
-  if (odr) {
-    if (diruse[odr]) --diruse[odr];
-  }
-  diruse[dr]++;
-  run->p_curdir[dphy] = dr;
-  return OK;
+    run->p_curdir[drv] = dir.dir_clust;
+    return E_OK;
 }
 
-/*	Function 0x47	d_getpath
-	
-	Error returns
-	EDRIVE
-	
-	Last modified	SCC	11 Apr 85
-	*/
+/*
+ * xgetdir(buf,drv): return the text of the current dir on 'drv' into buf.
+ *
+ * This call is bad because it doesn't take the SIZE of the buffer as an arg.
+ * We fixed this by adding a new call: Dgetnpath(buf,n,drv) where n is the
+ * size of the buffer.  xgetdir calls xgetndir with a LARGE length arg.
+ *
+ * This code is recursive, and its depth is the depth of your current 
+ * directory on that drive.  It could create the text backwards, then reverse
+ * it in place, if that would help.  Returns EGENRL if the buffer isn't
+ * big enough;
+ */
 
 long
 xgetdir(buf,drv) /*+ return text of current dir into specified buffer */
-int drv;
 char *buf;
+int drv;
 {
-  REG DND *p;
-  
-  drv = (drv ? drv-1 : run->p_curdrv);
-  
-  if (ckdrv(drv) < 0)
-    {
-      *buf = 0;
-      return(EDRIVE);
+  return xgetndir(buf,0x7fffffffL,drv);
+}
+
+long
+xgetndir(buf,len,drv)
+char *buf;
+ulong len;
+uint drv;
+{
+    DIR dir;
+    long err;
+
+    if (drv == 0) drv = run->p_curdrv;
+    else {
+	drv--;
+	if (drv >= MAXDEVS) return EBADRQ;
     }
-  
-  p = dirtbl[run->p_curdir[drv]];
-  buf = dopath(p,buf);
-  *--buf = 0;	/* null as last char, not slash */
-  
-  return OK;
+
+    if (ckdrv(drv)) return EPTHNF;
+
+    dir.dir_dev = drv;
+    dir.dir_clust = run->p_curdir[drv];
+    dirfirst(&dir,&drvtbl[drv]);
+
+    *buf = '\0';
+    if ((err = _getndir(&buf,len,&dir,&drvtbl[drv])) < 0) 
+	return err;
+    return E_OK;
 }
 
-
 /*
- *  Fill in DTA buffer with Fsfirst/Fsnext information
- */
-void
-makbuf(f, ubufr)
-FCB *f;
-DTA *ubufr;
-{
-  ubufr->fattrib = f->f_attrib;
-  ubufr->ftime = f->f_time;
-  ubufr->fdate = f->f_date;
-  swp68(ubufr->ftime);
-  swp68(ubufr->fdate);
-  ubufr->flength = f->f_fileln;
-  swp68l(ubufr->flength);
-  (void)packit(f->f_name,ubufr->fname);
-}
-
-
-/*
- *  Initialize a directory sector
+ * recursive get-current-directory call
  *
+ * First call _getndir on the parent of the dir in 'dir,'
+ * then put this dir's name in at buf.  Fail if no room.
+ * Assume that 'dir' is fresh coming in, and that its FCB
+ * points to the "." entry.
+ *
+ * Each stage returns the remaining len, which is to say
+ * the len arg it got minus the length of the name it added.
+ * Returns a negative error code for errors.
  */
-FCB
-*dirinit(dn)
-DND *dn;
+
+long
+_getndir(pbuf,len,dir,dmd)
+char **pbuf;
+ulong len;
+DIR *dir;
+DMD *dmd;
 {
-  REG OFD *fd;
-  int num;
-  REG int i;
-  REG int i2;
-  char *s1;
-  DMD *dm;
-  REG FCB *f1;
-  
-  fd = dn->d_ofd;
-  num = (dm = fd->o_dmd)->m_recsiz;
-  for (i2 = 1; i2 < dm->m_clsiz; i2++)
-    {
-      s1 = getrec(fd->o_currec+i2, dn->d_drv, 1);
-      for (i = 0; i < num; i++)
-	*s1++ = 0;
+    DIR dir2;
+    long err;
+    uint swapped_cl;
+    char *buf, *src;
+    uint count;
+
+    /* return now without doing anything if root dir */
+    if (!dir->dir_clust) return len;
+
+    /* set up dir2 as dir's parent */
+    dir2.dir_dev = dir->dir_dev;
+    dir2.dir_clust = dir->dir_fcb[1].f_clust;	/* f_clust of .. slot */
+    swp68(dir2.dir_clust);
+    dir2.dir_curcl = dir2.dir_clust;
+    dir2.dir_recno = cl2rec(dir2.dir_clust,dmd);
+    dir2.dir_recoffs = 0;
+
+    /* "freshen" this new dir */
+    dir2dir(&dir2);
+    if ((len = _getndir(pbuf,len,&dir2,dmd)) <= 0) return len;
+
+    /* now *pbuf points to the place where dir's name should go. */
+    /* scan in dir's parent for a valid slot whose startcl is dir's cl */
+    swapped_cl = dir->dir_clust;
+    swp68(swapped_cl);
+
+    for (err = dirfirst(&dir2,dmd);
+	 (!err && 
+	  dir2.dir_fcb->f_name[0] != 0 && 
+	  dir2.dir_fcb->f_name[0] != ERASED &&
+	  dir2.dir_fcb->f_clust != swapped_cl);
+	err = dirnext(&dir2,dmd)) /* empty */ ;
+
+    if (dir2.dir_fcb->f_name[0] == 0 || err == ENMFIL) {
+	/* return ERROR if you fell off without finding the dir! */
+	/* it's not really an EINTRN since it's external */
+	return ERROR;
     }
-  f1 = (FCB *) (s1 = getrec(fd->o_currec, dn->d_drv, 1));
-  for (i = 0; i < num; i++)
-    *s1++ = 0;
+    if (err) return err;
 
-  return f1;
+    buf = *pbuf;
+    *buf++ = SLASH;
+    len--;
+    src = dir2.dir_fcb->f_name;
+
+    for (count = (len < 8 ? len : 8);
+	 count && *src != ' ';
+	 *buf++ = *src++, --len, --count) /* empty */;
+
+    if (!len) return (*buf = 0);    /* null-terminate & return 0 */
+
+    if (*buf != ' ') *buf++ = '.', --len;
+
+    for (count = (len < 3 ? len : 3);
+	 count && *src != ' ';
+	 *buf++ = *src++, --len, --count) /* empty */;
+    *buf = 0;
+    return len;
 }
 
-
 /*
- *  Dcreate(path)
- *    Make directory
- *
+ * mkdir: create directory.
  */
+
 long
 xmkdir(s)
 char *s;
 {
-  int h;
-  int cl;
-  int i;
-  long rc;
-  OFD *f;
-  FCB fcb;
+    DIR dir;
+    long err;
+    uint cl;
+    uint rec;
+    DMD *dmd;
+    BCB *bcb;
+    FCB *fcb;
+    FCB fcbhold;
+    static char dotdotstr[12] = "..         ";
+    int i;
 
-  /*
-   *  Create directory file.
-   */
+    /* allocate a cluster, initialize it, ixcreat the file, and link them */
 
-  if ((h = rc = ixcreat(s, FA_SUBDIR)) < 0)
-    return rc;
+    /* first, call fn2dir so we know where this *will* go. */
+    /* Fail on anything but EFILNF. */
 
-  f = getofd(h);		/* can't fail */
+    if ((err = fn2dir(&s,&dir,FA_NORM)) != EFILNF) {
+	if (!err) return EACCDN;
+	else return err;
+    }
 
-  /*
-   * Write "." directory entry
-   */
+    dmd = &drvtbl[dir.dir_dev];
 
-  if ((rc = ixwrite(f,1L,dots)) != 1) {
-    /* build just the strtcl of an FCB for ixdel - that's all it uses. */
-    fcb.f_clust = f->o_strtcl;
-    ixdel(f->o_dnode,&fcb,f->o_dirbyt);
-    xclose(h);
-    return (rc ? rc : EACCDN);		/* full disk -> EACCDN */
-  }
-  ixlseek(f,0L);			/* seek back to beginning */
+    /* reset dir to first slot of dir this will go in, to get date & time */
+    if (dir.dir_clust) {
+	if (err = dirfirst(&dir,dmd)) return err;
+	fcbhold = *dir.dir_fcb;		    /* structure copy of first slot */
+    }
+    else {
+	/* parent is root directory */
+	fcbhold.f_time = fcbhold.f_date = fcbhold.f_clust = 0;
+    }
 
-  xmovs(22, dots, &(fcb.f_name[0]));
-  fcb.f_attrib = FA_SUBDIR;
-  fcb.f_time = time;
-  swp68(fcb.f_time);
-  fcb.f_date = date;
-  swp68(fcb.f_date);
-  fcb.f_clust = f->o_strtcl;
-  swp68(fcb.f_clust);
-  fcb.f_fileln = 0;
+    /* allocate a new cluster */
 
-  ixwrite(f,32L,&fcb);
+    newcl = TRUE;
+    if (!(cl = nextcl(0,dmd,TRUE,NULL))) return ERROR;
+    newcl = TRUE;
+    rec = cl2rec(cl,dmd);
 
-  /*
-   * Write ".." directory entry
-   */
-  xmovs(22, dots2, &(fcb.f_name[0]));
-  fcb.f_attrib = FA_SUBDIR;
+    if (err = xgetrec(dir.dir_dev,rec,&bcb,&fcb)) return err;
 
-  /* o_date, o_time in 8088 format already; no need to swap them.  */
-  fcb.f_time = f->o_dirfil->o_time;
-  fcb.f_date = f->o_dirfil->o_date;
-  cl = f->o_dirfil->o_strtcl;
-  if (cl < 0) cl = 0;
-  swp68(cl);
-  fcb.f_clust = cl;
-  fcb.f_fileln = 0;
+    /* make 'dot' entry */
+    xmovs(11,dotdotstr,fcb->f_name);
+    fcb->f_name[1] = 0x20;
+    fcb->f_attrib = FA_SUBDIR;
+    for (i=10; i; fcb->f_fill[--i] = 0) ;
+    fcb->f_time = time;
+    fcb->f_date = date;
+    fcb->f_clust = cl;
+    fcb->f_fileln = 0;
 
-  ixwrite(f,32L,&fcb);
+    /* make 'dotdot' entry */
+    fcb++;
+    xmovs(11,dotdotstr,fcb->f_name);
+    fcb->f_attrib = FA_SUBDIR;
+    for (i=10; i; fcb->f_fill[--i] = 0) ;
+    fcb->f_time = fcbhold.f_time;
+    fcb->f_date = fcbhold.f_date;
+    fcb->f_clust = fcbhold.f_clust;
 
-  /*
-   * write as many zero fcb's as will fill the cluster.
-   */
+    /* zero out the rest of the record */
+    fcb++;
+    clear(fcb,((char *)fcb)+dmd->m_recsiz);
+    bcb->b_dirty = 1;
 
-  clear(&fcb,&fcb+1);
+    /* zero out the rest of the cluster */
+    for (i=dmd->m_clsiz-1; i; --i) {
+	xgetrec(dir.dir_dev,rec+i,&bcb,&fcb);
+	clear(fcb,((char *)fcb)+dmd->m_recsiz);
+	bcb->b_dirty = 1;
+    }
 
-  for (i = (f->o_dmd->m_clsizb / sizeof(FCB)) - 2; i; i--) {
-    ixwrite(f,32L,&fcb);
-  }
+    /* code stolen from ixcreate; at this point we know what dir */
+    /* to look for a slot in.  If dirslot fails, the cluster we just */
+    /* initialized becomes a lost cluster.  Boo hoo. */
 
-  f->o_fileln = 0;	/* zap file length */
-  xclose(h);		/* force flush and write */
-  return OK;
+    /*
+     * Scan for empty space in the directory file (find an empty slot); 
+     * grow directory if no free slots left. This can fail.  Note that
+     * dir doesn't have to be fresh on input, but definitely is on out.
+     */
+
+    if (err = dirslot(&dir)) return err;
+
+    /*
+     * write the new file info there, flush back to disk.
+     */
+
+    fcb = dir.dir_fcb;
+
+    /* 's' below is what's left of s from fn2dir(&s,...) */
+    if (err = name2fcb(s,NULL,fcb)) return err;
+
+    fcb->f_attrib = FA_SUBDIR;
+    for (i=10; i; fcb->f_fill[--i] = 0) ;
+    fcb->f_time = time;
+    swp68(time);
+    fcb->f_date = date;
+    swp68(date);
+    fcb->f_fileln = 0;
+
+    /* set the starting-cluster field of the entry */
+    fcb->f_clust = cl;
+
+    dirdirty(&dir);
+    return E_OK;
 }
-
 
 /*
  *  Ddelete(path)
@@ -560,69 +335,66 @@ char *s;
  *		EINTRN (can't find the DND in the tree)
  *		EBADRQ (attempting to rmdir the root)
  *
+ * NOTE: check to see if it's somebody's current directory by going through
+ * all basepages from 'run' up; later, when there are more processes,
+ * this will have to change.  Presumes that exec doesn't "inherit"
+ * directories until "go" time, not at "load" time.
+ *
+ * There are some systems now which change 'run' to implement some
+ * limited multi-tasking. These make it possible to remove a directory
+ * which is somebody else's current directory.  One way for a user to
+ * guard against this is not to have empty directories as their current
+ * directories very much.  Still, rm -r will do it.  This is deadly, because
+ * your run->p_curdir array isn't checked for validity. [dirfirst could..]
  */
 long
 xrmdir(p)
 char *p;
 {
-  REG DND *d;
-  DND *d1;
-  REG DND **q;
-  REG FCB *f;
-  OFD *fd,*f2;
-  REG long pos;
-  char *s;
-  
-  if (!(d = findit(p, &s, 1)))
-    return(EPTHNF);
-  
-  if (!(fd = d->d_ofd))
-    fd = makofd(d);
-  
-  ixlseek(fd, 0x40L);		/* seek past "." and ".." */
-  
-  do
-    {
-      if (!(f = (FCB *) ixread(fd,32L,NULPTR)))
-	break;
-    } while (f->f_name[0] == 0xffffffe5);
-  
-  if (f)
-    if (f->f_name[0] != 0)
-      return(EACCDN);
-  
-  /* if no parent, it's the root, and you can't rmdir root */
-  if (d->d_parent == NULPTR) return EBADRQ;
+    DIR dir, dir2;
+    PD *pd;
+    long err;
+    uint cl;
+    DMD *dmd;
+    uint dev;
 
-  /*
-   *  Search tree for our DND
-   */
-  for (d1 = *(q = &d->d_parent->d_child);
-       d1 != d;
-       d1 = *(q = &d1->d_next) )
-    ; /* follow sib-links */
-  
-  if (d1 != d ||		/* not found? */
-      d->d_files ||		/* open files? */
-      d->d_child)		/* subdirectory? */
-    {
-      return EINTRN;		/* ... internal error */
+    if (err = fn2dir(&p,&dir,FN_NORM)) {
+	if (err == EFILNF) return EPTHNF;
+	else return err;
     }
-  
-  /*
-   *  Remove DND from tree
-   */
-  *q = d->d_next;
-  
-  if (d->d_ofd)
-    xmfreblk(d->d_ofd);
-  
-  d1 = d->d_parent;
-  xmfreblk(d);
-  ixlseek((f2 = fd->o_dirfil), (pos = fd->o_dirbyt));
-  f = (FCB *) ixread(f2,32L,NULPTR);
-  
-  return(ixdel(d1, f, pos));
+
+    if (!(dir.dir_fcb->f_attrib & FA_SUBDIR)) return EACCDN;
+
+    dev = dir.dir_dev;
+    cl = dir.dir_fcb->f_clust;
+    swp68(cl);
+
+    /* check to see that nobody has cl as his current dir */
+    for (pd = run; pd; pd = pd->p_parent) {
+	if (pd->p_curdir[dev] == cl) return EACCDN;
+    }
+
+    dmd = &drvtbl[dev];
+
+    /* make 'dir2' refer to the start of the dir to remove */
+    dir2.dir_dev = dev;
+    dir2.dir_clust = cl;
+    if (err = dirfirst(&dir2,dmd)) return err;
+
+    /* advance to .. entry before starting loop */
+    if (err = dirnext(&dir2,dmd)) return err;
+
+    /* see if there are any files in this dir (except . and ..) */
+    while (((err = dirnext(&dir2,dmd)) == 0) && dir2.dir_fcb->f_name[0] != 0) {
+	if (dir2.dir_fcb->f_name[0] != ERASED)
+	    return EACCDN;		/* not empty */
+    }
+
+    if (err && err != ENMFIL) return err;
+
+    /* freshen the parent and call ixdel */
+    dir2dir(&dir);
+    return ixdel(&dir);
 }
 
 /************************************************************************
@@ -636,157 +408,141 @@ char *p;
 ************************************************************************/
 
 long
-ixsfirst(name,att,addr)
+xsfirst(name,att)
 char *name;
 int att;
-DTA *addr;
 {
-    char *s;
-    REG DND *dn;
-    REG FCB *f;
-    long pos;
-
-    if (att != 8) att |= (FA_ARCHIVE | FA_RO);
-
-    if (!(dn = findit(name,&s,0)))
-	return(EPTHNF);
-
-    /* now scan for filename from start of directory */
-
-    pos = 0;
-
-    if (!(f = scan(dn,s,att,&pos)))
-	return(EFILNF);
-
-    if (addr) {
-	xmovs(12,s,addr);
-	addr->dta_attr = att;		/* attribute field of next search */
-	if (dn->d_strtcl < 0) {		/* root directory search */
-	    addr->dta_rdpos = pos;
-	}
-	else {
-	    addr->dta_rdpos = 0;
-	    addr->dta_clust = dn->d_ofd->o_curcl;
-	    addr->dta_pos = dn->d_ofd->o_curbyt;
-	}
-	addr->dta_rdpos |= dn->d_drv->m_drvnum;
-	makbuf(f,addr);
-    }
-
-    return OK;
+    return(ixsfirst(name,att,(DTA *)run->p_xdta));
 }
 
+long
+ixsfirst(name,att,dta)
+char *name;
+int att;
+DTA *dta;
+{
+    DIR dir;
+    FCB fcb;
+    DMD *dmd;
+    long err;
+    uint m = 0;
 
-/*	Function 0x4F	f_snext */
+    if (err = fn2dir(&name,&dir,FN_EARLY)) return err;
+
+    /* stuff the last part of the name and the attribs into an FCB */
+    if (err = name2fcb(name,NULL,&fcb)) return err;
+    fcb.f_attrib = att;
+
+    dmd = &drvtbl[dir.dir_dev];
+    for (err = dirfirst(&dir,dmd);
+	 !err && dir.dir_fcb->f_name[0] && !(m = wmatch(&fcb,dir.dir_fcb));
+	 err = dirnext(&dir,dmd)) /* empty loop */ ;
+
+    if (err == ENMFIL || !m) return EFILNF;
+    if (err) return err;
+
+    /* fill in the invariants of the search in the DTA */
+
+    xmovs(11,fcb.f_name,dta->dta_sname);
+    dta->dta_attr = att;
+    dta->dta_dev = dir.dir_dev;
+    dta->dta_clust = dir.dir_clust;
+
+    /* now fill in the things that can change, both user and system */
+    filldta(dta,&dir);
+
+    return E_OK;
+}
 
 /*
- * This code uses the DTA wierdly.
- * For root-directory searches, it puts the position of the last
- * match in dta->dta_rdpos, and uses that for the next search.
- * But it ALSO puts the device number there, in the low 4 bits
- * (since offsets are multiples of 0x20).
+ * xsnext
  */
 
 long
 xsnext() /*+ search next, return into dta */
 {
-    REG DTA *dta; 
-    REG DMD *dm; 
-    char att; 
-    REG unsigned int pos;
-    REG unsigned int cl;
-    long rdpos;
-    REG FCB *f;
-    char *buf = NULL;	/* initialized to shut compiler up */
-    char d[12];
-    REG int first;
+    DIR dir;
+    FCB fcb;
+    DTA *dta;
+    DMD *dmd;
+    long err;
 
     dta = run->p_xdta;
-    dm = drvtbl[dta->dta_rdpos & 0xf];
-    att = dta->dta_attr;
-    pos = dta->dta_pos;
-    cl = dta->dta_clust;
-    rdpos = dta->dta_rdpos & ~0x0f;
-    first = 0;
 
-    if (!dta->dta_sname[0])		/* marked as exhausted? */
-    	return ENMFIL;			/* return early. */
+    /* fill FCB with search info from DTA */
 
-    if (rdpos) {		/* marked as root directory search? */
-	DND *dn = dm->m_dtl;
+    xmovs(11,dta->dta_sname,fcb.f_name);
 
-	if (!(f = scan(dn,&(dta->dta_sname[0]),att,&rdpos))) {
-	    goto notfound;
-	}
-	else {
-	    dta->dta_rdpos = rdpos | dm->m_drvnum;
-	    goto found;
+    fcb.f_attrib = dta->dta_attr;
+    dir.dir_dev = dta->dta_dev;
+    dir.dir_clust = dta->dta_clust;
+    dir.dir_curcl = dta->dta_curcl;
+    dir.dir_recno = dta->dta_recno;
+    dir.dir_recoffs = dta->dta_recoffs;
+
+    dmd = &drvtbl[dir.dir_dev];
+    dir2dir(&dir);
+
+    while (((err = dirnext(&dir,dmd)) == 0) && (dir.dir_fcb->f_name[0] != 0)) {
+	if ((dir.dir_fcb->f_name[0] != ERASED) && wmatch(&fcb,dir.dir_fcb)) {
+	    /* found a match */
+	    filldta(dta,&dir);
+	    return E_OK;
 	}
     }
-
-    /* end of old code for root-directory searches */
-
-    builds(&dta->dta_sname[0],d);
-    d[11] = dta->dta_attr;
-
-    newcl = TRUE;
-    first = TRUE;
-
-    /* This code uses pos as the offset into a cluster. */
-    /* Since pos is an unsigned, we are assuming that clusters are <= 64K */
-
-    while (1) {
-	/* major (per-sector) loop */
-	if (first || (pos % dm->m_recsiz) == 0) {
-	    first = FALSE;
-	    /* get the pos/recsiz'th sector of this cluster */
-	    if (pos == dm->m_clsizb) {
-		/* last sector of a cluster: go to next cluster */
-		pos = 0;
-		cl = getcl(cl,dm);
-		if (cl == 0xffff) {
-		    goto notfound;
-		}
-	    }
-
-	    /* cl is cluster number, pos is offset within that cluster. */
-
-	    buf = getrec(cl2rec(cl,dm) + pos/dm->m_recsiz,dm,0);
-	}
-
-	/* set f to the offset within that sector to start with */
-	f = (FCB *)(buf + (pos % dm->m_recsiz));
-
-	/* f points to dir slot to start searching at */
-	/* if f falls off end of this sector, go back and get another one. */
-
-	do {
-	    /* minor (in-sector) loop */
-	    if (!(f->f_name[0])) {
-		goto notfound;
-	    }
-	
-	    if (match(d,f->f_name)) {
-		dta->dta_pos = pos+0x20;
-		dta->dta_clust = cl;
-		goto found;
-	    }
-	    else {
-		f++;
-		pos += sizeof(FCB);
-	    }
-	} while (pos % dm->m_recsiz);
-    }
-
-notfound:
-    dta->dta_sname[0] = 0;
-    dta->fname[0] = 0;
-    newcl = TRUE;	/* just in case */
+    if (err) return err;
     return ENMFIL;
-
-found:
-    makbuf(f,dta);
-    newcl = TRUE;		/* just in case */
-    return OK;
 }
 
+voidfn
+filldta(dta,dir)
+DTA *dta;
+DIR *dir;
+{
+    FCB *fcb;
+    int count;
+    char *buf, *src;
+    DFD *dfd;
+
+    dta->dta_curcl = dir->dir_curcl;
+    dta->dta_recno = dir->dir_recno;
+    dta->dta_recoffs = dir->dir_recoffs;
+
+    /* move an FCB-style name into a normal string in DTA */
+
+    src = dir->dir_fcb->f_name;
+    buf = dta->fname;
+
+    for (count = 8;
+	 count && *src != ' ';
+	 *buf++ = *src++, --count) /* empty */;
+
+    if (*buf != ' ') *buf++ = '.';
+
+    for (count = 3;
+	 count && *src != ' ';
+	 *buf++ = *src++, --count) /* empty */;
+    *buf = 0;
+
+    fcb = dir->dir_fcb;
+
+    /* check for an open file with this rec/recoffs */
+
+    if (dfd = getdfd(dir)) {
+	/* take date, time, length, and attr from open file */
+	dta->ftime = dfd->dfd_time;
+	dta->fdate = dfd->dfd_date;
+	dta->flength = dfd->dfd_fileln;
+	dta->fattrib = dfd->dfd_attrib;
+    }
+    else {
+	/* fill in date, time, length, and attr from FCB */
+	dta->ftime = fcb->f_time;
+	dta->fdate = fcb->f_date;
+	dta->flength = fcb->f_fileln;
+	dta->fattrib = fcb->f_attrib;
+	swp68l(dta->flength);
+    }
+    swp68(dta->ftime);
+    swp68(dta->fdate);
+}

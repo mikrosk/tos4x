@@ -1,15 +1,19 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.6 $	$Source: fsdir.c,v $
+* $Revision: 2.7 $	$Source: fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 91/01/23 14:30:00 $    $Locker:  $
+* $Author: apratt $ 	$Date: 91/01/23 17:09:46 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.7  91/01/23  17:09:46  apratt
+* Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
+* d_scan, m_fatofd, m_ofl, and d_dirfil.
+*
 * Revision 2.6  91/01/23  14:30:00  apratt
 * Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
-*
+* 
 *************************************************************************
 */
 
@@ -47,7 +51,7 @@ FCB *b;
   swp68(temp);
 
     /* don't add duplicate entries */
-  for (p1 = p->d_left; p1; p1 = p1->d_right)
+  for (p1 = p->d_child; p1; p1 = p1->d_next)
     if (xcmps(b->f_name,p1->d_name))		/* same parent, same name */
       return p1;
 
@@ -57,16 +61,15 @@ FCB *b;
 
   p1 = MGET(DND);
 
-  if (p->d_left)
-    p1->d_right = p->d_left;
+  if (p->d_child)
+    p1->d_next = p->d_child;
   
-  p->d_left = p1;
+  p->d_child = p1;
   p1->d_ofd = NULPTR;
   p1->d_parent = p;
   p1->d_strtcl = b->f_clust;
   swp68(p1->d_strtcl);
   p1->d_drv = p->d_drv;
-  p1->d_dirfil = fd;
   p1->d_dirpos = fd->o_bytnum - 32;
   p1->d_fill = 0;
   p1->d_time = b->f_time;
@@ -113,7 +116,7 @@ long *posp;		/* directory position */
     p->d_ofd = (fd = makofd(p));
 
   /*
-   * set srchpos to 0 if directory search, else to *posp. (was d_scan)
+   * set srchpos to 0 if directory search, else to *posp.
    */
   if ((srchpos = *posp) == -1) {
     srchpos = 0;
@@ -257,7 +260,7 @@ int dflag;			/* if true, no file name is present */
       ptemp = &s[11];
       while (ptemp > s) if (*(--ptemp) == '?') return NULL;
 
-      if (!(newp = p->d_left))
+      if (!(newp = p->d_child))
 	newp = ((DND *)scan(p, n, FA_SUBDIR, &negone));
 
       pp = p;
@@ -274,7 +277,7 @@ int dflag;			/* if true, no file name is present */
 	   *  If directory not entirely traversed,
 	   *  scan until next match or end
 	   */
-	  if (!(newp = p->d_right))
+	  if (!(newp = p->d_next))
 	    {
 	      p = 0;
 	      if (pp)
@@ -519,8 +522,10 @@ char *s;
    */
   xmovs(22, dots2, &(fcb.f_name[0]));
   fcb.f_attrib = FA_SUBDIR;
-  fcb.f_time = f->o_dirfil->o_time;	/* o_time & o_date are 8088 format */
-  fcb.f_date = f->o_dirfil->o_date;	/* already; no need to swap them.  */
+
+  /* o_date, o_time in 8088 format already; no need to swap them.  */
+  fcb.f_time = f->o_dirfil->o_time;
+  fcb.f_date = f->o_dirfil->o_date;
   cl = f->o_dirfil->o_strtcl;
   if (cl < 0) cl = 0;
   swp68(cl);
@@ -592,14 +597,14 @@ char *p;
   /*
    *  Search tree for our DND
    */
-  for (d1 = *(q = &d->d_parent->d_left);
+  for (d1 = *(q = &d->d_parent->d_child);
        d1 != d;
-       d1 = *(q = &d1->d_right) )
+       d1 = *(q = &d1->d_next) )
     ; /* follow sib-links */
   
   if (d1 != d ||		/* not found? */
       d->d_files ||		/* open files? */
-      d->d_left)		/* subdirectory? */
+      d->d_child)		/* subdirectory? */
     {
       return EINTRN;		/* ... internal error */
     }
@@ -607,7 +612,7 @@ char *p;
   /*
    *  Remove DND from tree
    */
-  *q = d->d_right;
+  *q = d->d_next;
   
   if (d->d_ofd)
     xmfreblk(d->d_ofd);

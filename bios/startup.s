@@ -3,22 +3,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/03/31 15:58:23 $
+* $Date: 88/04/05 17:47:50 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.6  88/04/05  17:47:50  apratt
+* Changed Flopwp call to Xbios $29 because of internal versions of AKP's
+* debugger, which uses $28.  Must keep Xbios $11 unused.
+* (Newer versions of the debugger use Xbios calls $11 and $F000)
+*
 * Revision 1.5  88/03/31  15:58:23  apratt
 * Fixed reset bailout vector so it leaves the right number in a6.
 * If (a6) == $9bcd you have buggy ROMs -- return via jmp'ing to $24(a6).
 * Else you have new ROMs -- return via jmp'ing to (a6)
-*
+* 
 * Also fixed some bsr's to jsr's so gemdos can be far away from here.
-*
+* 
 * Revision 1.4  88/03/28  11:46:47  apratt
-* Added Flopwp call (Xbios call $28).  Actual code is in flop.s
+* Added Flopwp call (Xbios call $29).  Actual code is in flop.s
 * 
 * Revision 1.3  88/03/18  16:16:59  apratt
 * Added code to dmaread: retry the read if the first one succeeds (status
@@ -34,7 +39,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.5 $
+* $Revision: 1.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -864,7 +869,7 @@ reset2:	clr.l	a5			; quick zeropage
 	move.w	$d00004,d0
 	and.b	#%00000110,d0		; test for both STylus buttons
 	bne	resv1			; if either is up, don't clobber
-* The first instruction here MUST NOT BE CLR.L A6.  Use NOP if you have to.
+* The first instruction here MUST NOT BE CLR.L A5.  Use NOP if you have to.
 * This is because of the old bug in the reset vector code above.
 *
 	cmp.l	#resmagic,resvalid.w	; is resvalid the magic	number?
@@ -1914,6 +1919,10 @@ no_print:
 *	 (sp) SR		 (ssp) SR
 * wvbl - wait for next vblank
 * Passed:	nothing
+* Returns:	at beginning of next vblank
+* Uses:		D0
+* AKP 9/91: drop IPL to somewhere from 0 to 3, not always to zero.
+* If we're already at three, the normal level for TOS, it isn't changed.
 *-
 wvbl:
 	move.w	sr,-(sp)		; save psw
@@ -1955,6 +1964,8 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 *		available from supervisor mode only).
 *
 * There is code to check _longframe and handle  long frames.  
+* It seems to be true that RTE doesn't care what the offset
+* part of the format/offset word is, because I just push a zero.
 * 
 *-
 	move.w	d0,-(a1)		; (need in D0 for user-mode test)
@@ -2031,8 +2042,8 @@ trp13tab:
 	dc.l	_drvmap			; 10: get active-drive bit vector
 	dc.l	_shift			; 11: get/set keyboard shift bits
 
-	dc.l	_flopwp			; 40: new: check floppy wp state
-	dc.l	unimpl			; 41: unused
+	dc.l	unimpl			; 40: used by AKP's DB alpha vers.
+	dc.l	_flopwp			; 41: new: check floppy WP state
 	dc.l	unimpl			; 42: unused
 	dc.l	unimpl			; 43: unused
 	dc.l	unimpl			; 44: unused

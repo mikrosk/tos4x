@@ -3,19 +3,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/05 17:45:52 $
+* $Date: 88/04/27 13:36:26 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.6  88/04/27  13:36:26  apratt
+* Added code to set last-access time of both drives to "long ago"
+* when you change logical disks in a physical drive, so the next call
+* to mediach() won't think it's still in the "grace period."
+*
 * Revision 1.5  88/04/05  17:45:52  apratt
 * Tested Flopwp call; it returns TRUE when there is no disk in the drive.
 * This can be overcome by doing a READ to make sure there *is* a disk
 * in the drive.  The read should come from GEMDOS (e.g. Fsfirst("A:\\*.*",-1))
 * rather than BIOS to be sure that media change is processed.
-*
+* 
 * Revision 1.4  88/04/04  15:39:24  apratt
 * Didn't do anything: don't know why it was locked.
 * 
@@ -33,7 +38,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.5 $
+* $Revision: 1.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1119,6 +1124,7 @@ rwdly1:	dbra	d7,rwdly1		; busy-loop: give 1770 time to settle
 wdiskct6:				; write	d6 to diskctl
 	bsr	rwdelay			;	delay
 	move.w	d6,diskctl		;	write it
+	rts
 
 wdiskctl:				; write	d7 to diskctl
 	bsr	rwdelay			;	delay
@@ -1136,6 +1142,12 @@ rdiskctl:				; read diskctl into d0
 	rts
 
 rwdelay:
+.if TT
+	; code added 4/27/88 AKP
+	move.w	#$0119,d0		; 25 * 1.6us > 32us
+	bsr	ttwait
+	move.w	(sp)+,d0		; restore register
+.else
 * wait for >32us using a trick; see reset1770 for why this works.
 
 	movem.l	d0-d1,-(sp)

@@ -2,14 +2,17 @@
 *************************************************************************
 *			REVISION144 Control System
 * =======================================================================
-*  $Revision: 1.3 $	$Source: f:\multitos/RCS/gemobed.c,v $
+*  $Revision: 1.4 $	$Source: f:\multitos/RCS/gemobed.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/12 19:51:12 $	$Locker:  $
 * =======================================================================
 *  $Log: gemobed.c,v $
-*  Revision 1.3  1993/03/10  20:12:42  ersmith
-*  Lattice port
+*  Revision 1.4  1993/03/12  19:51:12  ersmith
+*  Merged HMK's loadable resource stuff
 *
+ * Revision 1.3  1993/03/10  20:12:42  ersmith
+ * Lattice port
+ *
 *
 * Revision 1.1  1993/02/24  23:52:46  ersmith
 * 1 meg floppy MultiTOS
@@ -49,6 +52,7 @@
 /*	Change at ob_center for 3D buttons	7/7/92	D.Mui		*/
 /*  	02/16/93	cjg	Convert to Lattice C 5.51		*/
 /*	02/23/93	cjg	Force the use of prototypes		*/
+/*	Fix at pxl_rect to use ob_offset again  2/25/93 H.Krober	*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -232,10 +236,48 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 	GRECT		o;
 	WORD		numchs;
 
+	WORD		thickness;
+	WORD		type;
+
+#if 0	/* ++HMK 02/25/93 
+	/* Since of 08/06/92 ob_actxywh is no longer using  */
+	/* ob_offset to calculate the size. Now it's using  */
+	/* ob_gclip which will also takes OUTLINE, SHADOW   */
+	/* and borders in consideration. But this will      */
+	/* mess up the position of the cursor when the      */
+	/* object is left or right aligend. So we call good */
+	/* old ob_offset directly.			    */
+
 	ob_actxywh(tree, obj, &o);
+
+#else
+	ob_offset(tree, obj, &o.g_x, &o.g_y);
+	o.g_w = LWGET(OB_WIDTH(obj));
+	o.g_h = LWGET(OB_HEIGHT(obj));
+#endif
+
 	numchs = gr_just(edblk->te_just, edblk->te_font, edblk->te_ptmplt, 
 				o.g_w, o.g_h, &o);
+
+#if 0
 	pt->g_x = o.g_x + (ch_pos * gl_wchar);
+#else
+			/* ++HMK: "edblk->thickness stuff added "  added 02/25/93 */
+
+	type = LWGET(OB_TYPE(obj));
+	if ((type == G_FBOXTEXT) || (type == G_BOXTEXT)) {
+		thickness = edblk->te_thickness;
+		if (edblk->te_just == TE_RIGHT)
+			thickness = (thickness < 0) ? 1 : thickness;
+		else if (edblk->te_just == TE_LEFT)
+			thickness = (thickness < 0) ? 0 : (-thickness);
+		else
+			thickness = 0;
+	} else
+		thickness = 0;
+
+	pt->g_x = o.g_x + (ch_pos * gl_wchar) - thickness;
+#endif
 	pt->g_y = o.g_y;
 	pt->g_w = gl_wchar;
 	pt->g_h = gl_hchar;

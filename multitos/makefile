@@ -89,7 +89,7 @@ STARTUP =	gemstart.o
 
 AESOBJ =	gemaints.o gemaplib.o gembase.o gemcli.o\
 		gemdisp.o gemevlib.o gemflag.o gemfmalt.o gemfmlib.o\
-		gemfslib.o gemsignal.o \
+		gemfslib.o gemsigna.o \
 		gemobjop.o gemqueue.o gemrlist.o gemrom.o\
 		gemsclib.o gemshlib.o gemtcpip.o gemwmlib.o romcart.o\
 		apgrlib.o apgsxif.o gembind.o gemgrlib.o gemgsxif.o\
@@ -105,9 +105,9 @@ DESKOBJ = 	deskact.o deskapp.o deskvdi.o deskbutt.o \
 		deskmenu.o deskmisc.o deskmn.o deskopen.o \
 		deskpref.o desksele.o deskshel.o deskshow.o deskvari.o\
 		deskupda.o desksear.o kballoc.o \
- 		deskstart.o deskmem.o \
+ 		deskstar.o deskmem.o \
 		deskwin.o desktop.o \
-		aesbin73 nosbind.oo
+		aesbin73
 
 LCFILES = deskact.o gemrom.o gemrslib.o gemsclib.o gemwmlib.o gemsclib.o \
 gemshlib.o gemsigna.o gemtcpip.o mn_event.o mn_index.o mn_mbar.o mn_menu.o \
@@ -135,7 +135,7 @@ DESK = $(LCFILES)
 ##		aln -w -l -k gemstart -q -o $@
 
 gem.sys:	$(STARTUP) $(AB) $(DESKOBJ) $(AESOBJ) $(RSC1) $(RSC2) $(RSC3)\
-		$(RSC4) $(RSC5) $(RSC6)
+		$(RSC4) $(RSC6)
 		.\aln -u -u -q -k _iscrmgr -k _mn_hdo -k _mn_popup\
 		-k _mn_attach -k _mn_istart -k _mn_settings\
 		-k _mn_free -k _mn_new -k _mn_init -k _ArrowScroll\

@@ -1,6 +1,9 @@
 /* kballoc.c - fast allocator for LC5 based on AKP's nalloc2.c
  * ===========================================================================
  * $Log: kballoc.c,v $
+ * Revision 1.4  1993/03/12  19:51:12  ersmith
+ * Merged HMK's loadable resource stuff
+ *
  * Revision 1.3  1993/03/10  20:12:42  ersmith
  * Lattice port
  *

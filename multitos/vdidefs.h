@@ -4,14 +4,17 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.3 $	$Source: f:\multitos/RCS/vdidefs.h,v $
+*  $Revision: 1.4 $	$Source: f:\multitos/RCS/vdidefs.h,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/10 20:12:42 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/03/12 19:51:12 $	$Locker:  $
 * =======================================================================
 *  $Log: vdidefs.h,v $
-*  Revision 1.3  1993/03/10  20:12:42  ersmith
-*  Lattice port
+*  Revision 1.4  1993/03/12  19:51:12  ersmith
+*  Merged HMK's loadable resource stuff
 *
+ * Revision 1.3  1993/03/10  20:12:42  ersmith
+ * Lattice port
+ *
 * Revision 2.2  89/04/26  18:20:13  mui
 * TT
 * 

@@ -1,18 +1,23 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/29 21:40:50 $
+* $Date: 90/01/03 15:44:29 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.16.1.1  90/01/03  15:44:29  apratt
+* This is STE TOS BIOS with nothing changed except the date
+* and version number.  It is to be built with the 1/90 version
+* of GEMDOS, with the OS POOL bug fixed.
+*
 * Revision 2.16  89/07/29  21:40:50  kbad
 * Put the reset back at reseth.  It was a gratuitous incomprattibility.
-*
+* 
 * Revision 2.15  89/07/28  20:59:12  apratt
 * Changed delay for DMA command bytes and data to count time from
 * power on, not from when we started looking.  This makes warm boots
@@ -264,7 +269,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.16 $
+* $Revision: 2.16.1.1 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -354,16 +359,16 @@ STPLUS		=	1	; @check@
 
 LONGFRAME	=	1	; @check@
 
-systype		=	ram	; 'rom' or 'ram' @check@
+systype		=	rom	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
 
 .ifeq TT
-version		equ	$0106		; version number *MUST BE EVEN*
-date		equ	$03301989	; date, $MMDDYYYY
+version		equ	$0162		; version number *MUST BE EVEN*
+date		equ	$01011990	; date, $MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001001111110 ; Mar 30, 1989
+dosdate		equ	%0001010000100001 ; Jan 1, 1990
 .endc
 
 .ifne TT

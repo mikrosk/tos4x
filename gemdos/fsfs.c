@@ -1,12 +1,15 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
+* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 17:14:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.19  1991/06/20  17:14:06  apratt
+* changes for new newcl/Getfat code
+*
 * Revision 2.18  1991/06/18  17:52:02  apratt
 * Updated to DB release 3 (new print)
 *
@@ -331,7 +334,6 @@ DIR *dir;
     swp68(temp);
     n = temp;
 
-    newcl = TRUE;			/* AKP: new loop of cluster calls */
     while (n && n != 0xffff) {
 	n2 = getcl(n,dm);
 	if (!n2 || (n2 >= 0xfff0 && n2 != 0xffff)) {
@@ -341,7 +343,6 @@ DIR *dir;
 	else clfix(n,0,dm);
 	n = n2;
     }
-    newcl = TRUE;			/* AKP: set this just in case */
 
     fatdirty(dir->dir_dev);
     return E_OK;

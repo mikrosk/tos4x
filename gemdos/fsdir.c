@@ -1,12 +1,15 @@
 /*
 ***************************    FSDIR.C     ******************************
 *
-* $Revision: 2.18 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
+* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fsdir.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 17:14:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdir.c,v $
+* Revision 2.19  1991/06/20  17:14:06  apratt
+* changes for new newcl/Getfat code
+*
 * Revision 2.18  1991/06/18  17:52:02  apratt
 * Updated to DB release 3 (new print)
 *
@@ -324,9 +327,7 @@ char *s;
 
     /* allocate a new cluster */
 
-    newcl = TRUE;
     if (!(cl = nextcl(0,dmd,TRUE))) return ERROR;
-    newcl = TRUE;
     rec = realcl2rec(cl,dmd);
 
     /* use the special flag to getrec: don't pre-read the sector */

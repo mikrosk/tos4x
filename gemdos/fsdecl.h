@@ -1,12 +1,15 @@
 /*
 ***************************    FSDECL.H    ******************************
 *
-* $Revision: 2.11 $	$Source: e:/tos/gd2\RCS\fsdecl.h,v $
+* $Revision: 2.12 $	$Source: d:/tos/dos\rcs\fsdecl.h,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:47:08 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 17:14:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsdecl.h,v $
+* Revision 2.12  1991/06/20  17:14:06  apratt
+* changes for new newcl/Getfat code
+*
 * Revision 2.11  1991/03/28  17:47:08  apratt
 * THIS VERSION WORKS! DESKTOP OPS WORK!
 *
@@ -42,7 +45,6 @@ extern uint logmsk[];
 
 extern PD *run;
 
-extern uint newcl;	/* AKP: set this TRUE at start of a cluster loop */
 extern uint drvsel;	/* mask of drives selected since power up */
 extern long rwerr;	/* hard error number currently in progress */
 extern uint errdrv;	/* drive on which error occurred */

@@ -1,0 +1,57 @@
+OUTPUT of egrep BLASTER *.s
+
+blaster.s 33: 		xdef	BLASTER
+blaster.s 36: BLASTER		equ	$FF8A00
+blastman.s 76: 	jmp	(a5)			; routine ("blast_man" uses BLASTER)
+blitinit.s 36: *	Set the BLASTER primitive vector list then call initialize routine.   *
+copyrfm.s 491: 	jsr	(a5)			; routine ("blast_man" uses BLASTER)
+escape.s 1328: *		V_BLANK  pointer to blanking routine (hb_blank uses BLASTER)
+gsxasm1.s 1015: **	BLASTER hardware bit blt.					     **
+hbbitblt.s 18: 	.globl	BLASTER
+hbbitblt.s 68: *  offsets into the BLASTER register block for the new blit ST
+hbbitblt.s 70: *  note:  base address = BLASTER+B_OFF
+hbbitblt.s 119: * purpose:	this is the VDI preamble to the BLASTER hardware bit blt.
+hbbitblt.s 164: 	lea	BLASTER+B_OFF,a5	; a5 -> SKEW (bit blt reference reg)
+hbbitblt.s 461: *  the commonly used multi-plane BLASTER control loop
+hbbitblt.s 510: 	lea	28(a5),a5		; a5 -> B_SKEW (BLASTER reference reg)
+hbbitblt.s 545: *  the degenerate pattern BLASTER control loop (one row at a time)
+hbbitblt.s 585: 	tas	(a5)			; restart the BLASTER
+hbescape.s 36: *  Offsets into BLASTER parameter block
+hbescape.s 82: 	xdef	BLASTER		* first register of bit blt
+hbescape.s 111: 	lea	BLASTER+B_OFF,a5		; a5 -> B_SKEW (reference reg)
+hbescape.s 134: 	moveq.l	#BF_GO-8,d4			; d4 -> BLASTER GO flag
+hbescape.s 139: 	move.l	a0,B_S_ADDR(a5)			; BLASTER doesn't see LSB
+hbescape.s 213: 	lea	BLASTER+B_OFF+B_S_NXWD,a5
+hbescape.s 269: 	lea	BLASTER+B_OFF+B_S_NXWD,a5
+hbescape.s 338: *	_BV_BLANK pointer to blanking routine (hb_blank uses BLASTER)
+hbescape.s 362: 	lea	BLASTER+B_OFF+B_F1_MSK,a5
+hbescape.s 428: 	move.w	d3,(a5)			; dispatch BLASTER
+hbline.s 35: 		.globl	BLASTER
+hbline.s 88: 	lea	BLASTER+B_OFF,a5	; a5 -> BLASTER reference register
+hbline.s 225: 	lea	BLASTER+B_OFF,a5	; a5 -> bit blt reference register
+hbline.s 266: 	move.w	(a0),(a2)		; load the pattern into BLASTER
+hbline.s 278: 	move.w	d4,(a5)			; start the BLASTER
+hbmono.s 17: 	.globl	 BLASTER
+hbmono.s 22: *  note:  base address = BLASTER+B_OFF
+hbmono.s 79: 	lea	BLASTER+B_OFF,a4    ;12	 a4 -> base of bitblt regs
+hbmono.s 112: *	a4   -> BLASTER base address
+hbmono.s 203: 	tst.w	(a4)		;8     BLASTER has finished
+hbrect.s 33: *  offsets into the BLASTER register block for the new blit ST
+hbrect.s 35: *  note:  base address = BLASTER+B_OFF
+hbrect.s 81: *	BLASTER based rectangle fill
+hbrect.s 98: 	lea	BLASTER+B_OFF,a5	; a5 -> bit blt reference register
+hbrect.s 189: 	move.w	d4,(a5)			; start the BLASTER
+hbrect.s 239: 	move.w	d4,(a5)			; start the BLASTER
+hbrect.s 299: 	move.w	d1,(a5)			 ; start the BLASTER
+hbtxtblt.s 25: 	.globl	 BLASTER
+hbtxtblt.s 35: *  offsets into the BLASTER register block for the new blit ST
+hbtxtblt.s 37: *  note:  base address = BLASTER+B_OFF
+hbtxtblt.s 149: 	lea	BLASTER+B_OFF,a5	;a5 -> BLASTER regs
+hbtxtblt.s 1385: 	lea	28(a5),a5		; a5 -> B_SKEW (BLASTER reference reg)
+hbtxtblt.s 1432: *  the commonly used multi-plane BLASTER control loop
+hpxoblit.s 61: *  offsets into the BLASTER register block for the new blit ST
+hpxoblit.s 63: *  note:  base address = BLASTER+B_OFF
+hpxoblit.s 170: 	lea	BLASTER+B_OFF,a5	; a5 -> SKEW (bit blt reference reg)
+jin.s 369: BLASTER	equ	$ffff8a00
+jin.s 380: 		tst.w	BLASTER(a0)	; touch blitter
+spxhline.s 24: **	BLASTER hardware bit blt.					     **

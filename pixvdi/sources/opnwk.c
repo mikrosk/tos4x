@@ -40,8 +40,8 @@ VOID v_opnwk()
 
 	if (INTIN[0] == SETMODEFLAG) {
 	    videoMode = SETMODE(-1);		/* get current video mode    */
-	    if (videoMode != INTOUT[0])		/* see if cur mode != dsred  */
-		SETMODE(INTOUT[0]);		/* set the video to new mode */
+	    if (videoMode != PTSOUT[0])		/* see if cur mode != dsred  */
+		SETMODE(PTSOUT[0]);		/* set the video to new mode */
 	}
 	else {
 	    if (FindDevice(INTIN[0]) == NULL) {

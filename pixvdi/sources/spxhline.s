@@ -212,10 +212,13 @@ H32M4FG:
 * Replace mode (1)
 *-
 H16M1Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H16M1FG			; if cary is set set to foreground
-	move.w	d4,(a1)+		; set to background
-	dbra	d6,H16M1Line		; do next pixel
+	asr	#1,d6
+	move.w	d3,d4
+	swap	d3
+	move.w	d4,d3	
+h16m1loop:
+	move.l	d3,(a1)+		; set to background
+	dbra	d6,h16m1loop		; do next pixel
 	rts
 
 H16M1FG:

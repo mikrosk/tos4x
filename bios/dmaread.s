@@ -4,16 +4,21 @@
 * $Author: minna $
 * =======================================================================
 *
-* $Date: 91/08/02 15:07:10 $
+* $Date: 91/08/02 16:21:23 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.15  91/08/02  16:21:23  minna
+* Added delay between identify() and initparm(),
+* and reversed changes made earlier today.
+*
 * Revision 1.14  91/08/02  15:07:10  minna
 * Added handling of final interrupt after data transfer
-*
+* on IDE drive.
+* 
 * Revision 1.13  91/07/29  12:37:45  minna
 * _atread() and _atwrite modified to not use the
 * ATSC (sector count register) to count down on
@@ -75,7 +80,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.14 $
+* $Revision: 1.15 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -142,9 +147,14 @@ IDE_AT		=	STPAD
 ;			To check if the IDE bus is there, read from
 ;			the alternate status register instead of the
 ;			data register.
+;
 ; Aug-02-91	ml.	Added handling of final interrupt from the
 ;			IDE drive after data transfer. (Routines that 
 ;			call readbuf() and wrtbuf() are modified).
+;
+; Aug-02-91	ml.	Change again!  Conner now says there is no
+;			final interrupt after data transfer, but need
+;			a delay between the identify() and initparm().
 ;-
 
 .globl	_dmaread
@@ -294,7 +304,12 @@ at:	move.l	$8,a0
 	tst.w	d0			; successful?
 	bmi	rwend			; if timed-out, return
 	bne	rw2			; if error, return with error code
-					; else init drive with these parameters
+					; else init drive with these params
+	moveq	#2,d0			; FOR DEBUGGING - Conner drives
+	add.l	_hz_200,d0
+at0:	cmp.l	_hz_200,d0
+	bcc	at0
+
 	lea	sbuf,a0			; a0 -> beginning of scratch buffer
 	move.w	NSPT(a0),-(sp)		; sectors per track
 	move.w	NHEAD(a0),-(sp)		; number of heads
@@ -1114,7 +1129,7 @@ atr0:	bsr	w4int		; wait for interrupt
 
 	bsr	readbuf		; fill sector buffer
 	dbra	d1,atr0		; more to read?
-	bra	w4int
+	moveq	#0,d0		; everything's fine
 atr1:	rts
 
 
@@ -1155,7 +1170,7 @@ atw1:	bsr	wrtbuf		; fill sector buffer
 	btst	#3,d0		; DRQ?
 	beq.b	atw2		; if not, return
 	dbra	d1,atw1		; else go transfer data
-	bra	w4int
+	moveq	#0,d0		; everything's fine
 atw2:	rts
 
 
@@ -1242,7 +1257,7 @@ _identify:
 	beq.b	id0		; if not, return with error
 
 	bsr	readbuf		; read data
-	bra	w4int
+	moveq	#0,d0		; everything's fine
 
 id0:	rts 
 

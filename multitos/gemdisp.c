@@ -469,8 +469,11 @@ swap_next( p, pterm )
 	  }
 
 	  if ( ( item = w_tophandle( newp ) ) != -1 )
-/*	    wmset( item, WF_TOP, (GRECT*)0 ); CJG */
+	  {
 	    wmset( item, WF_TOP, (WORD*)0 );
+	    if (gl_multi || !sh_inwrite)
+	      ap_sendmsg( WM_ONTOP, newp->p_pid, item, 0, 0, 0, 0 );
+	  }
 	  else
 	    openphanwind( newp );
 

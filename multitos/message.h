@@ -21,6 +21,7 @@
 /* what is 32 for? assume it is reserved */
 #define WM_BOTTOMED	33
 #define WM_ICONIFIED	34
+#define WM_UNICONIFIED	35
 
 #define AC_OPEN 	40
 #define AC_CLOSE 	41

@@ -4,6 +4,9 @@
 #ifndef _WINDLIB_H_
 #define _WINDLIB_H_
 
+#define WINICON_W	72
+#define WINICON_H	72
+
 #define WS_FULL 0
 #define WS_CURR 1
 #define WS_PREV 2
@@ -119,6 +122,11 @@
 
 #define WF_BEVENT	24	/* button event		*/
 #define WF_BOTTOM	25	/* set window to bottom	*/
+
+/* iconify feature added 930429 - hmk */
+#define WF_ICONIFY	26
+#define WF_UNICONIFY	27
+#define WF_UNICONIFYXYWH	28
 
 #ifdef MNBAR
 #define	WF_MENUBAR	99

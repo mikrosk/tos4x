@@ -91,6 +91,8 @@ VOID	put_keys( VOID );
 
 WORD	loop_find( WORD input, WORD table[], WORD *index );
 
+WORD	key_find( WORD keycode, WORD *index );
+
 VOID	men_ienable( OBJECT *obj, WORD which, WORD enable );
 
 VOID	menu_verify( VOID );
@@ -382,6 +384,9 @@ VOID	do_xyfix(GRECT *);
 VOID	do_blit(WORD, GRECT *, WORD, WORD);
 VOID	blit(WORD, WINDOW *, GRECT *, WORD);
 VOID	setclip(GRECT *);
+VOID	iconify_window(WORD, GRECT *);
+VOID	uniconify_window(WORD, GRECT *);
+VOID	set_wiconname(WINDOW *);
 
 /*	----------------------------------------------------------
  *	deskvdi.c
@@ -453,7 +458,7 @@ VOID	print_file(VOID);
 VOID	launch_pref(VOID);
 WORD	set_dir(BYTE *);
 VOID	exec_file(BYTE *, WINDOW *, WORD, BYTE *);
-VOID	run_it(BYTE *, BYTE *, WORD, WORD, WORD);
+VOID	run_it(BYTE *, BYTE *, WORD, WORD, WORD, LONG);
 VOID 	hide_windows( WORD flag );
 
 /*	----------------------------------------------------------
@@ -507,5 +512,5 @@ WORD	drv_exist(WORD);
 WORD	ch_drive(WORD);
 VOID	upfdesk(BYTE *, BYTE *);
 VOID	locate_item(WORD, BYTE *, WORD);
-
+WORD	winsmall( WINDOW *win, WORD x, WORD y );
 

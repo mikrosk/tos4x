@@ -940,7 +940,8 @@ WORD	height;
      MAX_MENU_HEIGHT = MIN_HEIGHT;
 
    /* See if we exceed the height of the screen */
-   max_height = (( gl_rfull.g_h - ( gl_hchar / 2 ) - 1 )/ gl_hchar);
+   /* max_height = (( gl_rfull.g_h - ( gl_hchar / 2 ) - 1 )/ gl_hchar); */
+   max_height = (( gl_rfull.g_h - ( gl_hchar * 2) )/ gl_hchar);
    if( height >= max_height )
      MAX_MENU_HEIGHT = max_height;
 

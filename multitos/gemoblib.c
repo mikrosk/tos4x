@@ -10,6 +10,7 @@
 /*	Convert to Lattice C 5.51	        02/16/93	C.Gee   */
 /*	Force to use prototypes			02/23/93	C.Gee	*/
 /*	Fix ob_format to not right justify	2/25/93 H.Krober	*/
+/*	Fix trans_cicon() and free_cicon()	4/30/93 C.Gee and E.Smith */
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -724,25 +725,23 @@ just_draw(tree, obj, sx, sy)
 	    case G_TEXT:
 	    case G_BOXTEXT:
 		gr_inside(pt, tmpth);
-/* June 2 1992 - ml.
-		gr_gtext(edblk.te_just, edblk.te_font, edblk.te_ptext, 
-				pt, tmode);
-/**/
+
 /* July 30 1992 - ml.  Draw text of 3D objects */	/* 8/1/92 */
 
 		if (three_d) {
 		    if (!(state & SELECTED) && mvtxt) {
-			pt->g_x -= 1;
+			pt->g_x += 1;
 			pt->g_y -= 1;
 			gr_gtext(edblk.te_just, edblk.te_font, 
 			    edblk.te_ptext, pt, tmode);
-			pt->g_x += 1;
+			pt->g_x -= 1;
 			pt->g_y += 1;
 		    } else {
+		        pt->g_x += 2;
 			gr_gtext(edblk.te_just, edblk.te_font, 
 			    edblk.te_ptext, pt, tmode);
+			pt->g_x -= 2;
 		    }
-
 		} else {
 		    gr_gtext(edblk.te_just, edblk.te_font, edblk.te_ptext, 
 				pt, tmode);
@@ -955,6 +954,12 @@ ob_draw( tree, obj, depth )
 *	over.  Since each parent object contains its children the
 *	idea is to walk down the tree, limited by the depth parameter,
 *	and find the last object the mx,my location was over.
+*
+*	New feature 4/28/93: it is now possible to look at whole objects
+*	(including borders, shadows, etc.) by using the ob_xfind()
+*	function. (We had changed ob_find to do this automatically, but
+*	this broke a lot of things, so we had to change it back).
+*	++ERS
 */
 
 /************************************************************************/
@@ -966,6 +971,32 @@ ob_find(tree, currobj, depth, mx, my)
 	REG WORD		currobj;
 	REG WORD		depth;
 	WORD		mx, my;
+{
+	return doobfind(tree, currobj, depth, mx, my, 1);
+}
+
+/************************************************************************/
+/* o b _ xf i n d							*/
+/************************************************************************/
+	WORD
+ob_xfind(tree, currobj, depth, mx, my)
+	REG LONG		tree;
+	REG WORD		currobj;
+	REG WORD		depth;
+	WORD		mx, my;
+{
+	return doobfind(tree, currobj, depth, mx, my, 0);
+}
+
+/* doobfind: does the real work for ob_find and ob_xfind */
+
+	WORD
+doobfind(tree, currobj, depth, mx, my, just_inside)
+	REG LONG		tree;
+	REG WORD		currobj;
+	REG WORD		depth;
+	WORD		mx, my;
+	WORD		just_inside;
 {
 	WORD		lastfound,dummy;
 	WORD		dosibs, done, state;
@@ -994,17 +1025,22 @@ ob_find(tree, currobj, depth, mx, my)
 						/*   might be inside a	*/
 						/*   child, so check	*/
 
-	  state = LWGET(OB_STATE(currobj));
+	  if (!just_inside)
+	  {
+	    state = LWGET(OB_STATE(currobj));
 
-	  if ( state & SHADOWED )
-	  {	
-	    ob_relxywh(tree, currobj, pt);
-	    pt->g_x += o.g_x;
-	    pt->g_y += o.g_y;
+	    if ( state & SHADOWED )
+	    {	
+	      ob_relxywh(tree, currobj, pt);
+	      pt->g_x += o.g_x;
+	      pt->g_y += o.g_y;
+	    }
+	    else
+	      ob_gclip( tree, currobj, &dummy, &dummy, &pt->g_x, &pt->g_y,
+		      &pt->g_w, &pt->g_h );
 	  }
 	  else
-	    ob_gclip( tree, currobj, &dummy, &dummy, &pt->g_x, &pt->g_y,
-		      &pt->g_w, &pt->g_h );
+	    ob_actxywh(tree, currobj, pt);
 
 	  flags = LWGET(OB_FLAGS(currobj));
 	  if ( (inside(mx, my, pt)) &&
@@ -1274,7 +1310,7 @@ ob_actxywh(tree, obj, pt)
 	REG WORD		obj;
 	REG GRECT		*pt;
 {
-#ifndef NO_OB_GCLIP
+#ifdef USE_OB_GCLIP
 	WORD	x, y;
 	ob_gclip(tree, obj, &x, &y, &pt->g_x, &pt->g_y, &pt->g_w, &pt->g_h);
 #else
@@ -1835,7 +1871,10 @@ my_trans(saddr, swb, daddr, dwb, h, nplanes)
  * In either case, the memory will be malloced so that we can avoid the
  * transform form in place.  Must deallocate at a later time.
  * The data is put in a buffer of the same size or larger (if no match for
- * current resolution).  
+ * current resolution).
+ *
+ * Modification 4/30/93: Now we ask for only 1 big block of memory
+ * from GEMDOS, right at the beginning, and use it for all calculations.
  */
 VOID
 trans_cicon( tot_icons, carray )
@@ -1847,23 +1886,55 @@ CICONBLK **carray;
     CICON *ctemp;
     WORD w, h;
     WORD *databuffer,*selbuffer,*tempbuffer;
-    LONG tot_size;
+    LONG tot_size, this_size;
+    BYTE *glbuffer;
 
-    for (i = 0; i < tot_icons; i++ ) {
-	ciconblk = carray[i];
+/* Count up how much memory we will need */
+    tot_size = 0;
+    for (i = 0; i < tot_icons; i++) {
+ 	ciconblk = carray[i];
 	w = ciconblk->monoblk.ib_wicon;
 	h = ciconblk->monoblk.ib_hicon;
 	ctemp  = find_eq_or_less( ciconblk->mainlist, gl_nplanes );
-
 	ciconblk->mainlist = ctemp;
+
+	this_size = w/8 * h * gl_nplanes;
 	if (ctemp) {
-	    tot_size = w/8 * h * gl_nplanes;
+	    tot_size += this_size;	/* size needed for image */
+	    if (ctemp->sel_data)
+		tot_size += this_size;	/* size needed for selected image */
+	}
+    }
+
+/* get the memory */
+    glbuffer = (BYTE *)dos_xalloc( tot_size, 3 );
+    if (!glbuffer) {
+        Debug1("Can't get memory for trans_cicon()\r\n");
+	for (i = 0; i < tot_icons; i++)
+	{
+	   ciconblk = carray[i];
+	   ciconblk->mainlist = 0;
+	}
+	return;
+    }
+
+/* now actually do the icons */
+    for (i = 0; i < tot_icons; i++ ) {
+ 	ciconblk = carray[i];
+	w = ciconblk->monoblk.ib_wicon;
+	h = ciconblk->monoblk.ib_hicon;
+	ctemp  = ciconblk->mainlist;
+
+	if (ctemp) {
+	    this_size = w/8 * h * gl_nplanes;
 
 	    /* if not same size, allocate bigger buffers and expand */
 	    if (ctemp->num_planes != gl_nplanes) {
-		tempbuffer = (WORD *)dos_xalloc( tot_size, 3 );
-		databuffer = (WORD *)dos_xalloc( tot_size, 3 );
-		if ( !tempbuffer || !databuffer ) {
+		tempbuffer = (WORD *)dos_xalloc( this_size, 3 );
+		databuffer = (WORD *)glbuffer;
+		glbuffer += this_size;
+
+		if ( !tempbuffer ) {
 		    ciconblk->mainlist = 0L;
 		    Debug1("Out of memory for trans_cicon()\r\n");
 		    return;	/* just quit */
@@ -1874,7 +1945,8 @@ CICONBLK **carray;
 		   w, h,gl_nplanes );
 		ctemp->col_data = databuffer;
 		if (ctemp->sel_data) {
-		    selbuffer = (WORD *)dos_xalloc( tot_size, 3 );
+		    selbuffer = (WORD *)glbuffer;
+		    glbuffer += this_size;
 		    if ( selbuffer ) {
 			expand_data( ( BYTE *)ctemp->sel_data,( BYTE *)tempbuffer, ( BYTE *)ctemp->sel_mask,
 			   ctemp->num_planes,gl_nplanes, w, h);
@@ -1886,16 +1958,14 @@ CICONBLK **carray;
 		dos_free( ( LONG )tempbuffer );
 	    } else {   /* just allocate same size, copy over because */
 		       /* we don't want to transform form in place */
-		databuffer = (WORD *)dos_xalloc( tot_size, 3 );
-		if ( !databuffer ) {
-		    ciconblk->mainlist = 0L;
-		    return;
-		}
+		databuffer = (WORD *)glbuffer;
+		glbuffer += this_size;
 		my_trans( ( LONG )ctemp->col_data, w/8, (LONG)databuffer, w/8, h, 
 		    gl_nplanes );
 		ctemp->col_data = databuffer;
 		if (ctemp->sel_data) {
-		    selbuffer = (WORD *)dos_xalloc( tot_size, 3 );
+		    selbuffer = (WORD *)glbuffer;
+		    glbuffer += this_size;
 		    if ( selbuffer ) {
 			my_trans( ( LONG )ctemp->sel_data, w/8, (LONG)selbuffer, w/8, h,
 			   gl_nplanes );
@@ -1913,6 +1983,11 @@ CICONBLK **carray;
 /* Frees extra memory allocated when fixing up the icons.  There should
  * be freeable memory for every icon, since fixup even mallocs memory
  * for non-expanded data (so that we avoid the transform form in place)
+ * (OOPS: THE COMMENT ABOVE IS OBSOLETE: SEE BELOW)
+ *
+ * Modification 4/30/93: Now only the first icon has truly "freeable"
+ * memory; the others point into the (large) block allocated for the
+ * first icon.
  */
     VOID
 free_cicon( carray )
@@ -1933,8 +2008,7 @@ CICONBLK **carray;
 	ctemp = ciconblk->mainlist;
 	if (ctemp) {
 	    dos_free( ( LONG )ctemp->col_data );
-	    if ( ctemp->sel_data )
-		dos_free( ( LONG )ctemp->sel_data );
+	    return;
 	}
     }
 }

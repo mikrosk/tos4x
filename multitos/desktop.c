@@ -68,7 +68,7 @@
  *	replacement Desktop. Clear it for making GEM.SYS
  *      DESKPRG must also be set/cleared in
  *	      DESKSTAR.S, DESKVARI.C, DESKROM.C, DOSBIND.C
- *	See the Defines in the makegem/makedesk files.
+ *	See the Define in softload.h
  */
 
 typedef struct cblk
@@ -96,6 +96,7 @@ EXTERN	WORD	ctldown;
 EXTERN	WORD	st_lang;
 
 GLOBAL	WORD	d_multi;		/* flag for multitasking mode (MiNT) */
+GLOBAL  LONG	mintvers;		/* MiNT version number */
 GLOBAL	WORD	v_handle;
 GLOBAL	WORD	desk_id;
 GLOBAL	WORD	m_st;		/* machine type flag	*/	
@@ -148,21 +149,28 @@ GLOBAL WORD	romdesk;
 #endif
 
 
-
-
-
 /*	Check if we're running MINT or not */
 	WORD
 desk_cMiNT( VOID )
 {
-	LONG	value;
-
-	return( d_multi = getcookie( 0x4D694E54L, &value ) );
+	return( d_multi = getcookie( 0x4D694E54L, &mintvers ) );
 }
 
 
 
+MLOCAL WORD tosvers;
 
+/* get the TOS version number; this *must* be executed in supervisor mode */
+
+MLOCAL VOID gettosvers()
+{
+	LONG *sysbase;
+
+	sysbase = *((LONG **)(0x4f2L));	/* get the RAM OS header */
+	sysbase = (LONG *)sysbase[2];	/* get the real one */
+
+	tosvers = (WORD)(sysbase[0] & 0x0000ffffL);
+}
 
 
 /*	Catch desktop terminate signal */
@@ -320,6 +328,8 @@ ini_rsc()
 	ICONBLK		*iblk;
 	WORD		w,i;
 	CICONBLK	*icblk;
+	BYTE		*verstring;
+	TEDINFO		*ted;
 
 #if SOFTLOAD
 	if (romdesk) {				/* if loading rsc from */
@@ -418,6 +428,37 @@ ini_rsc()
 	f_xywh[4] = w;
 	f_xywh[5] = obj[TSTYLE].ob_height;
 	f_xywh[7] = obj[TSTYLE].ob_height;
+
+/* set up the "Desktop Info..." dialog to show multi/single tasking,
+ * and also the right TOS version number
+ */
+	obj = get_tree(ADDINFO);
+	ted = (TEDINFO *)obj[VERTEXT].ob_spec;
+	verstring = (BYTE *)ted->te_ptext;
+	trap14(0x26, gettosvers);	/* Supexec(gettosvers) */
+
+/* if MiNT is not present, don't show the MiNT copyright box */
+/* also, if the TOS version is < 5.00, then show "MultiTOS" instead
+ * of "TOS"
+ */
+	if (!d_multi) {
+		obj[MINTCBOX].ob_flags |= HIDETREE;
+	} else if (tosvers < 0x0500) {
+		tosvers = mintvers;
+		verstring = get_string(MTOSVERS);
+		ted->te_ptext = verstring;
+	}
+/* put the version number into the right place in the string */
+/* ASSUMPTION: major TOS version is < 10 */
+	while (*verstring && *verstring != '#')
+		verstring++;
+	if (*verstring) {
+		*verstring++ = '0' + tosvers/256;
+		tosvers &= 0xff;
+		*verstring++ = '.';
+		*verstring++ = '0' + (tosvers/10);
+		*verstring++ = '0' + (tosvers % 10);
+	}
 	Debug1( "Ini_rsc done\r\n" );	
 	return( TRUE );
 }
@@ -470,7 +511,9 @@ VOID deskrsc()			/* load the desk rsc from disk */
 {
 	
 	WORD	load = 0;
+#if DESKRSVER
 	WORD	verflg;
+#endif
 	UWORD	*rscaddr;
 
 	*DESKRSC = ( isdrive() & 0x4 ) ? 'C' : 'A';

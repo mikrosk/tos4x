@@ -188,8 +188,96 @@ ap_getinfo( mode, out1, out2, out3, out4 )
 
 	  case AI_LANG:		/* language info, etc */
 	    *out1 = st_lang;	/* which language */
+	    *out2 = 0;
+	    *out3 = 0;
+	    *out4 = 0;
 	    break;		/* we really should report more */
 
+	  case AI_E2:		/* general environment 2 */
+	    *out1 = (gl_multi) ? 1 : 0;		/* preemptive OS */
+	    *out2 = 1;		/* appl_find extensions supported */
+	    *out3 = 1;		/* appl_search supported */
+	    *out4 = 1;		/* rsrc_rcfix supported */
+	    break;
+	  case AI_E3:		/* more general environment */
+	    *out1 = 1;		/* objc_xfind supported */
+	    *out2 = 0;		/* objc_gclip supported */
+	    *out3 = 0;		/* menu_click supported */
+	    *out4 = 0;		/* shel_r/wdef supported */
+	    break;
+	  case AI_E4:		/* more general environment */
+	    *out1 = 1;		/* appl_read -1 reads only when data present */
+	    *out2 = 1;		/* shel_get(-1) supported */
+	    *out3 = 1;		/* menu_bar(-1) supported */
+	    *out4 = 0;		/* menu_bar(MENU_INSTL) supported */
+	    break;
+	  case AI_RES1:		/* reserved for Mag!X */
+	    *out1 = 0;
+	    *out2 = 0;
+	    *out3 = 0;
+	    *out4 = 0;
+	    break;
+	  case AI_MOUSE:	/* mouse info */
+	    *out1 = 1;		/* modes 258/269/260 supported */
+	    *out2 = 0;		/* mouse form preserved by OS */
+	    *out3 = 0;
+	    *out4 = 0;
+	    break;
+	  case AI_MENU:
+	    *out1 = 1;		/* submenus supported */
+	    *out2 = 1;		/* popup menus supported */
+	    *out3 = 1;		/* scrollable menus supported */
+	    *out4 = 1;		/* words 5/6/7 in MN_SELECTED valid */
+	    break;
+	  case AI_SHW1:		/* shel_write info */
+	    *out1 = 0x0f0a;	/* which shel_write modes are supported */
+	    if (!gl_multi) *out1 |= 0x1000;
+	    *out2 = 0;		/* shel_write(0) cancels old shel_write */
+	    *out3 = gl_multi;	/* shel_write(1) is a "chain" */
+	    *out4 = 1;		/* ARGV parameter passing supported */
+	    break;
+	  case AI_WIND:		/* window stuff */
+	    *out1 = 0x01ff;	/* new WF_ modes supported */
+	    *out2 = 0;		/* reserved */
+	    *out3 = 5;		/* new gadgets supported:
+					1 == iconifier
+					2 == bottomer
+					4 == shift+click to bottom a window
+					8 == "hot" close box
+				 */
+	    *out4 = 1;		/* wind_update check and set allowed */
+	    break;
+	  case AI_MSG:
+	    *out1 = 0x07be;  /* messages supported
+				bit 0: WM_NEWTOP message meaningful
+				bit 1: WM_UNTOPPED message sent
+				bit 2: WM_ONTOP message sent
+				bit 3: AP_TERM message sent
+				bit 4: MultiTOS shutdown and resolution change
+				       messages supported
+				bit 5: desktop sends AP_DRAGDROP
+				bit 6: desktop understands AP_DRAGDROP
+				bit 7: desktop understands SH_WDRAW
+				bit 8: AES sends CH_EXIT
+				bit 9: WM_ICONIFIED message sent
+				bit 10: WM_UNICONIFIED message sent
+			      */
+	    *out2 = 0;		/* more messages */
+	    *out3 = 1;		/* WM_ICONIFIED message gives coordinates */
+	    *out4 = 0;
+	    break;
+	  case AI_OBJ:
+	    *out1 = 1;		/* 3D gadgets use objc_flags */
+	    *out2 = 1;		/* objc_sysvar version */
+	    *out3 = 0;		/* reserved */
+	    *out4 = 0;		/* reserved for Mag!X */
+	    break;
+	  case AI_FORM:
+	    *out1 = 0;		/* flying dialogs supported */
+	    *out2 = 0;		/* keyboard tables supported */
+	    *out3 = 0;		/* returning last cursor position */
+	    *out4 = 0;		/* reserved */
+	    break;
 	  default:
 	    ret = FALSE;	
 	}

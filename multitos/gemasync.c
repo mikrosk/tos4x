@@ -343,10 +343,15 @@ i_3:
 					/* if already in (or	*/
 					/*   out) signal	*/
 					/*   immediately	*/
+		
 		if ( mob.m_out != inside( cu_xrat, cu_yrat, ( GRECT *)&mob.m_x ) )
+		{
+		  Debug7("iasync: AMOUSE: Enter zombie\r\n");
 	  	  zombie(e);
+		} 
 		else
 		{
+		  Debug7("iasync: AMOUSE: handling rect\r\n");
 	  	  if ( mob.m_out )
 		    e->e_flag |= EVMOUT;
 	  	  else

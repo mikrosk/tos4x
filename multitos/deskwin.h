@@ -33,7 +33,7 @@
 #define RTARROW		0x0400
 #define HSLIDE		0x0800
 
-#define ALLITEMS 0x0FFF
+#define ALLITEMS 0x1FFF
 
 #if 0
 typedef struct	grect
@@ -56,7 +56,10 @@ typedef	struct	window
 	BYTE	w_info[INFOLEN];	/* info line		*/
 	GRECT	w_sizes;	/* window current size and pos	*/
 	GRECT	w_work;		/* the current working xywh	*/
+	GRECT	w_normsizes;	/* window's size & pos when not iconified */
 	OBJECT	*w_obj;		/* pointer to objects			*/
+	WORD	w_iconified;	/* true == window is iconified		*/
+	OBJECT	*w_icnobj;	/* pointer to objects in iconified state*/
 	WORD	w_srtitem;	/* file item # to start with		*/
 	WORD	w_icon;		/* disk icon that owns this window	*/
 	WORD	w_vicons;	/* maximum visible icons		*/
@@ -153,7 +156,9 @@ typedef struct myblk
 
 #define WF_BEVENT	24
 #define WF_BOTTOM	25
-
+#define WF_ICONIFY	26
+#define WF_UNICONIFY	27
+#define WF_UNICONIFYXYWH	28
 						/* update flags		*/
 #define	END_UPDATE 0
 #define	BEG_UPDATE 1

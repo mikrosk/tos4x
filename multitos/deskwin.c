@@ -10,7 +10,7 @@
 /*	Codes written by Je We						*/
 /*	Change all the iconblk to ciconblk	7/11/92	D.Mui		*/
 /*	Change w_iblk to w_ciblk	7/11/92		D.Mui		*/
-
+/*	Handling for iconified windows added 5/04/93	H.Krober	*/
 
 /************************************************************************/
 /*	New Desktop for Atari ST/TT Computer				*/
@@ -19,6 +19,7 @@
 /************************************************************************/
 
 #include "portab.h"
+#include "machine.h"
 #include "obdefs.h"
 #include "deskdefi.h"
 #include "deskwin.h"
@@ -1015,11 +1016,11 @@ alloc_obj( mode, win )
 
 	len = strlen ((BYTE *)( (TEDINFO*)(obj2[TSTYLE].ob_spec) )->te_ptext );
 
-	size = 0;
-	size += (UWORD)(( item + 1 ) * sizeof( OBJECT ) );
-	size += (UWORD)( item * len );
-	size += (UWORD)( item * sizeof( TEDINFO ) );
-	size += (UWORD)( item * sizeof( CICONBLK ) );
+	size = 0L;
+	size += (LONG)(( item + 1 ) * sizeof( OBJECT ) );
+	size += (LONG)( item * len );
+	size += (LONG)( item * sizeof( TEDINFO ) );
+	size += (LONG)( item * sizeof( CICONBLK ) );
 
 	if ( win->w_obj = (OBJECT *) malloc( size ) )
 	{
@@ -1044,13 +1045,48 @@ alloc_obj( mode, win )
 	  win->w_text = (BYTE *) ted;		/* set the text pointer		*/
 
 	  win->w_maxicons = (WORD) item;
-	  return( TRUE );
 	}
 	else
 	{	
 	  win->w_maxicons = 0;
 	  do1_alert( NOWINMEM );
 	  return( FALSE );
+	}
+	
+	/*
+ 	 *	allocate memory for objedct tree in iconified state
+	 */
+	size = 0L;
+	size += (LONG)(2 * sizeof( OBJECT ) ); 	/* form + one icon */
+	size += (LONG)( 128 ); 			/* buffer for file name */
+	size += (LONG)(sizeof( CICONBLK ) );	/* the icon */
+	if ( win->w_icnobj = (OBJECT *) malloc( size ) ) {
+		obj1 = win->w_icnobj;
+
+	 	LBCOPY( (BYTE *)obj1,(BYTE *)blank, sizeof( OBJECT ) );		
+		obj1++;
+
+	    	LBCOPY((BYTE*)obj1,(BYTE*)&iconaddr[ICON0], sizeof(OBJECT));
+		obj1++;
+
+		win->w_icnobj[1].ob_spec = (LONG) obj1;
+		win->w_icnobj[1].ob_next = 0;
+		win->w_icnobj[1].ob_head = -1;
+		win->w_icnobj[1].ob_tail = -1;
+		win->w_icnobj[1].ob_x = 0;
+		win->w_icnobj[1].ob_y = 0;
+
+					/* start of the iconblk area	*/
+	   	LBCOPY( (BYTE *)obj1,(BYTE *)iconaddr[ICON0].ob_spec, 
+			sizeof( CICONBLK ) );	
+
+		((CICONBLK *)obj1)->monoblk.ib_ptext  = 
+			(LONG) (obj1) + sizeof(CICONBLK);
+
+		objc_add(win->w_icnobj, 0, 1);
+	} else {
+		do1_alert( NOWINMEM );
+		return( FALSE );
 	}
 }
 
@@ -1070,6 +1106,7 @@ ini_windows( )
 	for( i = 0; i < MAXWIN; i++, win++ )
 	{
 	  win->w_obj = (OBJECT*)0;
+	  win->w_icnobj = (OBJECT*)0;
 	  win->w_path = (BYTE*)0;	/* window path	*/
 	  win->w_buf = (BYTE*)0;	  
 	  win->w_free = FALSE;		/* window is not free yet	*/
@@ -1078,11 +1115,13 @@ ini_windows( )
 	  win->w_rowi = 0;
 	  win->w_coli = 0;	  
 	  win->w_memory = 0x0L;		/* clean up file memory		*/
+	  win->w_iconified = FALSE;
 
 	  /* Put in default sizes, in case users have old inf file */
 	  
 	  rc_copy( (WORD *)sizes, (WORD *)&win->w_work );
 	  rc_copy( (WORD *)sizes, (WORD *)&win->w_sizes );
+	  rc_copy( (WORD *)sizes, (WORD *)&win->w_normsizes );
 	}		
 
 	path_alloc( 4 );		/* allocate path memory	*/
@@ -1185,19 +1224,36 @@ open_window( handle )
 
 	win->w_obj->ob_spec = windspec;		/* set window's color	*/
 
-	do_xyfix( &win->w_sizes );
-	wind_open( handle, win->w_sizes.g_x, win->w_sizes.g_y, win->w_sizes.g_w, 
-		   win->w_sizes.g_h );
+	if (win->w_icnobj) 
+		win->w_icnobj->ob_spec = windspec; /* +++ HMK 5/6/93 */
 
-	wind_get( handle, WF_CURRXYWH, &win->w_sizes.g_x, &win->w_sizes.g_y, 
-		  &win->w_sizes.g_w, &win->w_sizes.g_h );
+	if (win->w_iconified) {
+		wind_set(handle, WF_UNICONIFYXYWH, 
+			win->w_normsizes.g_x, win->w_normsizes.g_y, 
+			win->w_normsizes.g_w, win->w_normsizes.g_h);
+		wind_set(handle, WF_ICONIFY, 
+			win->w_sizes.g_x, win->w_sizes.g_y, 
+			win->w_sizes.g_w, win->w_sizes.g_h); 
+		
+		set_wiconname(win);
+	} else
+		do_xyfix( &win->w_sizes );
+
+	wind_open( handle, win->w_sizes.g_x, win->w_sizes.g_y, 
+			win->w_sizes.g_w, win->w_sizes.g_h );
+
+	wind_get( handle, WF_CURRXYWH, &win->w_sizes.g_x, 
+		&win->w_sizes.g_y, &win->w_sizes.g_w, &win->w_sizes.g_h );
 
 						/* get the working area	*/
 						/* and set it to object	*/
-	wind_get( handle, WF_WORKXYWH, &win->w_work.g_x, &win->w_work.g_y,
-		  &win->w_work.g_w, &win->w_work.g_h );
-						
-	rc_copy( (WORD *)&win->w_work, &win->w_obj->ob_x );
+	wind_get( handle, WF_WORKXYWH, &win->w_work.g_x, &win->w_work.g_y, 
+		&win->w_work.g_w, &win->w_work.g_h );
+	
+	if (win->w_iconified)					
+		rc_copy( (WORD *)&win->w_work, &win->w_icnobj->ob_x );
+	else
+		rc_copy( (WORD *)&win->w_work, &win->w_obj->ob_x );
 	make_top( win );
 }
 
@@ -1212,9 +1268,10 @@ create_window( )
 					/* Do we have any window pd ?	*/
 	if ( win = alloc_win( ) )
 	{
-	  handle = wind_create( ALLITEMS, win->w_sizes.g_x, win->w_sizes.g_y, 
-			win->w_sizes.g_w, win->w_sizes.g_h );
-		
+	  handle = wind_create( ALLITEMS, 
+			win->w_normsizes.g_x, win->w_normsizes.g_y, 
+			win->w_normsizes.g_w, win->w_normsizes.g_h );
+	  Debug1("NEWDESK: Create window\r\n");		
 	  if ( handle < 0 )		/* release windows	*/
 	    ret_win( win );
 	  else
@@ -1256,15 +1313,24 @@ create_window( )
 close_window( handle, closeit )
 	WORD	handle,closeit;
 {
+	GRECT		r;
 	REG WINDOW	*win;
 
-	if ( closeit )		/* close window		*/
-	  wind_close( handle );
+	win = get_win( handle );
 
+	if ( closeit ) {		/* close window		*/
+		if (win && win->w_iconified) {
+			wind_get(handle, WF_UNICONIFY, 
+				&r.g_x, &r.g_y, &r.g_w, &r.g_h);
+	      		win->w_iconified = FALSE;	/* no icon anymore */
+	      		rc_copy( (WORD *)&r, (WORD *)&win->w_sizes ); /* old sizes */
+ 		}
+	  wind_close( handle );
+	}
 	/*	Delete window and assume it is closed	*/
 	/*	Free up the file memory 		*/
 
-	if ( win = get_win( handle ) )
+	if ( win )
 	{
 	  win->w_id = -1;
 
@@ -1317,8 +1383,23 @@ free_windows( )
 	   {
 	     free( win->w_obj );
 	     win->w_obj = (OBJECT*)0;
-	   }			
-	
+	   }
+#if 0
+	   if (win->w_iconified) {
+		GRECT	pc;
+		wind_get(win->w_id, WF_UNICONIFY, 
+			&pc.g_x, &pc.g_y, &pc.g_w, &pc.g_h);
+		wind_set(win->w_id, WF_UNICONIFY, 
+			pc.g_x, pc.g_y, pc.g_w, pc.g_h); 
+		
+	   }
+#endif
+/*	   win->w_iconified = FALSE;	  */ 
+	   if (win->w_icnobj) {
+	   	free( win->w_icnobj );
+	   	win->w_icnobj = (OBJECT*)0;		
+	   }
+
 	   /* don't close window, do it at the sh_main */
 
 	   if ( win->w_id != -1 )	
@@ -1347,7 +1428,12 @@ do_redraw( handle, pc, which )
 	if ( handle > 0 )
 	{
 	  win = get_win( handle );
-	  obj = win->w_obj;
+
+	  if (win->w_iconified) {
+		  obj = win->w_icnobj; 	/* Draw this tree if window is	*/
+					/* icnonified.			*/
+	  } else
+		  obj = win->w_obj;
 	}
 	else
 	  obj = background;
@@ -1563,3 +1649,116 @@ setclip(p)
 	ptr[3] = p->g_y + p->g_h - 1;
 	vs_clip( 1, ptr );
 }
+
+/* 
+ *	Iconify a window
+ */
+VOID
+iconify_window(handle, pc)
+WORD		handle;
+REG GRECT	*pc;		/* recommended size for iconified window */
+{
+	REG WINDOW	*win;
+
+	if ( !( win = get_win( handle ) ) )
+	    return;		/* illegal window handle */
+
+	rc_copy((WORD *)&win->w_sizes, (WORD *)&win->w_normsizes); 
+
+	form_dial(FMD_SHRINK, pc->g_x, pc->g_y, pc->g_w, pc->g_h,
+	  win->w_work.g_x, win->w_work.g_y, win->w_work.g_w, win->w_work.g_h);
+
+	wind_set(handle, WF_ICONIFY, pc->g_x, pc->g_y, pc->g_w, pc->g_h); 
+
+	clr_xwin(win, FALSE); 			/* deselect everything */
+	win->w_iconified = TRUE; 		/* set icon flag */
+	rc_copy( (WORD *)pc, (WORD *)&win->w_sizes );
+					
+	wind_get( handle, WF_WORKXYWH, &pc->g_x, &pc->g_y, &pc->g_w, &pc->g_h);
+
+	rc_copy( (WORD *)pc, (WORD *)&win->w_work );
+	/*
+	 *	Set up coord for w_icnobj object tree.
+	 *	This tree with one icon will be drawn when
+	 *	window is iconified.
+	 */
+	win->w_icnobj[0].ob_x  = win->w_work.g_x;
+	win->w_icnobj[0].ob_y  = win->w_work.g_y;	
+	win->w_icnobj[0].ob_width  = win->w_work.g_w;
+	win->w_icnobj[0].ob_height = win->w_work.g_h;	
+
+	set_wiconname(win);	/* set name of icon in work area of 	*/
+				/* iconified window 			*/
+}
+
+/*
+ *	Uniconify winow, bring it back to normal state
+ */
+VOID
+uniconify_window(handle, pc)
+WORD		handle;
+REG GRECT	*pc;	/* old window's size */
+{
+	REG WINDOW	*win;
+
+	if ( !( win = get_win( handle ) ) )
+	    return;		/* illegal window handle */
+
+	win->w_icnobj[1].ob_state |= SELECTED;
+	do_redraw(win->w_id, &win->w_work, 0);
+
+	form_dial(FMD_GROW, win->w_work.g_x, win->w_work.g_y, win->w_work.g_w, 
+		win->w_work.g_h, pc->g_x, pc->g_y, pc->g_w, pc->g_h);
+
+	wind_set(handle, WF_UNICONIFY, pc->g_x, pc->g_y, pc->g_w, pc->g_h); 
+
+	win->w_icnobj[1].ob_state &= (~SELECTED);
+	win->w_iconified = FALSE;			/* no icon anymore */
+	rc_copy( (WORD *)pc, (WORD *)&win->w_sizes ); 	/* old sizes */
+
+	wind_get( handle, WF_WORKXYWH, &pc->g_x, &pc->g_y, &pc->g_w, &pc->g_h);
+	rc_copy( (WORD *)pc, (WORD *)&win->w_work ); 	/* work area */
+	rc_copy( (WORD *)pc, (WORD *)&win->w_obj->ob_x );
+	view_fixmode(win);	/* Make sure items show up correctly,   */
+	view_adjust(win);	/* necessary because user could have    */
+				/* changed something in the Index menu. */
+}
+
+/*
+ *	Set name of Icon in iconified Window
+ */
+VOID
+set_wiconname(win)
+REG WINDOW	*win;
+{
+	REG BYTE	*s1, *s2;
+	BYTE		savechr;
+
+	/*
+	 *	Get the current folder name for the
+	 *	icon's name.
+	 */
+	if ((win->w_path!=NULL)&&((s2=r_slash(win->w_path))!=NULL)) {
+		savechr = *s2;	
+		*s2 = '\0'; 
+   
+		if ((s1 = r_slash(win->w_path)) == NULL)
+			goto else_slash;
+			
+		if (s1 == win->w_path) {
+			*s2++ = (BYTE) savechr;
+			savechr = *s2;
+			*s2 = '\0';
+			s1 += 2;
+		} else {
+			s1++;
+		}
+		strcpy(s1,  ((CICONBLK *)win->w_icnobj[1].ob_spec)->monoblk.ib_ptext);
+			*s2 = (BYTE) savechr;
+	} else { /* we are at root, so use baskslash as name */
+else_slash:
+		   strcpy("\\",  
+		     ((CICONBLK *)win->w_icnobj[1].ob_spec)->monoblk.ib_ptext); 
+	}
+}
+

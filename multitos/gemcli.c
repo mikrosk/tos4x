@@ -38,7 +38,7 @@
 
 EXTERN	PD	*alr;
 EXTERN	WORD	gl_multi;
-EXTERN	BYTE	*runacc;
+EXTERN	WORD	(*runacc)(PD *, BYTE *);
 EXTERN	WORD	mn_maxitem;
 EXTERN	BYTE	*ad_shcmd;
 EXTERN	THEGLO	D;
@@ -165,19 +165,15 @@ ps_rename( id, name, special )
 	      if (gl_multi) {
 	        p->p_textaddr = ( BYTE *)ldaddr[2];/* real text segment		*/
 	        ldaddr[2] = ( LONG )runacc;
-		waitforaes();
 	        if ( ( p->p_sysid = dos_pexec( 106, 0x0L, ( BYTE *)ldaddr, 0x0L ) ) >= 0 )
 	        {				/* converts X.??? number into name.id */
 		  Psetpgrp( p->p_sysid, p->p_sysid );
 		  ps_rename( p->p_sysid, name, 0 );
 		  strcpy( pfilespec, p->p_where );
 		  strcpy( tail, p->p_wtail );
-		  releaes();
 	          return( p );
 	        } 
-	        releaes();
 	      } else {
-	
   		  pstart(p, runacc, (BYTE *) ldaddr);
 		  ps_rename( p->p_sysid, name, 0 );
 		  strcpy( pfilespec, p->p_where );
@@ -273,7 +269,11 @@ ldaccs( VOID )
 
 	  while( ( ret ) && ( i < ( mn_maxitem - 4 ) ) )
   	  {
-	    if ( sndcli( &name[30], "", ad_envrn, TRUE ) )
+	    PD *p;
+	    waitforaes();
+	    p = sndcli( &name[30], "", (BYTE *)ad_envrn, TRUE );
+	    releaes();
+	    if ( p )
 	      i++;		/* increment number of accessory count	*/
 	    else
 	      break;
@@ -314,6 +314,7 @@ free_accs( VOID )
 
 /*	Give everyone a chance to run, at least once	*/
 
+	VOID
 all_run()
 {
 	WORD		i;
@@ -333,6 +334,7 @@ all_run()
 	wm_update(FALSE);	
 }
 
+	VOID
 accwait()
 {
 	PD	*p;

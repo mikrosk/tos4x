@@ -12,6 +12,8 @@
 /*	Add rs_fixit			10/1/91		D.Mui		*/
 /*	Modify for Lattice C 5.51	02/24/93	C.Gee		*/
 /*	Force the use of prototypes					*/
+/*	Fixed 'About' item to allow it to be enabled/disabled		*/
+/*	and to allow text change	4/29/93		C.Gee		*/
 
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
@@ -53,6 +55,7 @@ EXTERN 	THEGLO	D;
 EXTERN	WORD	spdid;
 EXTERN	WORD	gl_mnpid;
 EXTERN	PD	*scr_pd;
+EXTERN	OBJECT	*mn_addr;
 
 /*
 *	Routine to change the state of a particular object.  The
@@ -219,16 +222,28 @@ crysbind( pcrys_blk )
 		Debug7( "menu_ienable\r\n" ); 
 		do_chg( ( OBJECT *)MM_ITREE, (ITEM_NUM & 0x7FFF), DISABLED,
 			!ENABLE_IT, ((ITEM_NUM & 0x8000) != 0x0), FALSE);
+		/* if this is the About menu item, change the state of the AES
+		   copy also */
+		tree = MM_ITREE;
+		if ( ( ITEM_NUM & 0x7FFF ) == (LWGET(OB_HEAD(THEMENUS))+1) )
+		   do_chg( (OBJECT *)mn_addr, 1, DISABLED, !ENABLE_IT, 0, FALSE);
 		break;
 	  case MENU_TNORMAL:
 		Debug7( "menu_tnormal\r\n" ); 
 		do_chg( ( OBJECT *)MM_ITREE, TITLE_NUM, SELECTED, !NORMAL_IT, TRUE, TRUE);
 		break;
 	  case MENU_TEXT:
-		Debug7( "menu_text\r\n" ); 
+		Debug7( "menu_text\r\n" );
 		tree = MM_ITREE;
-		LSTCPY( ( BYTE *)LLGET(OB_SPEC(ITEM_NUM)), ( BYTE *)MM_PTEXT);
+		LSTCPY( ( BYTE *)LLGET(OB_SPEC(ITEM_NUM)), ( BYTE *)MM_PTEXT );
+		/* if this is the About menu item, change the AES copy too */
+		if ( ( ITEM_NUM & 0x7FFF ) == (LWGET(OB_HEAD(THEMENUS))+1) )
+		{
+		   tree = mn_addr;
+		   LSTCPY( (BYTE *)LLGET(OB_SPEC(1)), (BYTE *)MM_PTEXT );
+		}
 		break;
+
 	  case MENU_REGISTER:
 		Debug7( "menu_register\r\n" ); 
 		ret = mn_register(MM_PID, ( BYTE *)MM_PSTR);
@@ -269,6 +284,11 @@ crysbind( pcrys_blk )
 	  case OBJC_FIND:
 		Debug7( "objc_find\r\n" ); 
 		ret = ob_find(OB_TREE, OB_STARTOB, OB_DEPTH, OB_MX, OB_MY);
+		break;
+
+	  case OBJC_XFIND:
+		Debug7( "objc_xfind\r\n" );
+		ret = ob_xfind(OB_TREE, OB_STARTOB, OB_DEPTH, OB_MX, OB_MY);
 		break;
 
 	  case OBJC_OFFSET:
@@ -617,12 +637,14 @@ chkbind( pcrys_blk, what )
 		Debug7( " call menu_tnormal\r\n" );  
 		do_chg( ( OBJECT *)MM_ITREE, TITLE_NUM, SELECTED, !NORMAL_IT, TRUE, TRUE);
 		break;
-
+/*
 	  case MENU_TEXT:
 	  	Debug7( "menu_text\r\n" ); 
 		tree = MM_ITREE;
 		LSTCPY( ( BYTE *)LLGET(OB_SPEC(ITEM_NUM)), ( BYTE *)MM_PTEXT);
 		break;
+*/
+
 /*
 	  case MENU_REGISTER:		
 	  	Debug7( "menu_register\r\n" ); 
@@ -652,9 +674,15 @@ chkbind( pcrys_blk, what )
 		ret = ob_find(OB_TREE, OB_STARTOB, OB_DEPTH, OB_MX, OB_MY);
 		break;
 
+	  case OBJC_XFIND:
+	  	Debug7( "objc_xfind\r\n" ); 
+		ret = ob_xfind(OB_TREE, OB_STARTOB, OB_DEPTH, OB_MX, OB_MY);
+		break;
+
 	  case OBJC_OFFSET:
 	  	Debug7( "objc_offset\r\n" ); 
-/*		ob_offset(OB_TREE, OB_OBJ, &OB_XOFF, &OB_YOFF);	*/
+/*		ob_offset(OB_TREE, OB_OBJ, &OB_XOFF, &OB_YOFF); */
+
 		ob_gclip(OB_TREE, OB_OBJ, &OB_XOFF, &OB_YOFF, &OB_GX, 
 			 &OB_GY, &OB_GW, &OB_GH);
 		break;

@@ -190,6 +190,7 @@ EXTERN	WORD	gl_port;
 EXTERN	WS	gl_ws;
 EXTERN	WORD	gl_moff;
 EXTERN	WORD	gl_mouse;
+EXTERN	WORD	_inaes;
 
 GLOBAL	LONG	aesAKP;
 GLOBAL	USERBLK	*aesDDD;
@@ -199,8 +200,8 @@ GLOBAL	BYTE	*aesTR2;
 GLOBAL	WORD	gl_doitonce;
 GLOBAL	WORD	gl_restype;	
 				/* screen resolution 1 = default, 
-				1 = 320x200, 2 = 640x200,  3 = 640x400
-				4 = 640x480, 5 = 1280x960, 6 = 320x480
+				2 = 320x200, 3 = 640x200,  4 = 640x400
+				5 = 640x480, 6 = 1280x960, 7 = 320x480
 				*/
 GLOBAL	WORD	gl_rschange;
 GLOBAL	GRECT	gl_offscreen;
@@ -262,7 +263,7 @@ EXTERN LONG dos_lseek();
 
 MLOCAL BYTE 	*kbt_buf;
 MLOCAL BYTE	*KBTFNAME = "C:\\MULTITOS\\KEYBD.TBL";
-MLOCAL WORD	set_kbdtbl();
+MLOCAL VOID	set_kbdtbl( VOID );
 
 typedef struct {
 	BYTE	*unshift;
@@ -577,11 +578,16 @@ main( VOID )
 		st_lang = 0;
 
 	shel_magic = 0x0L;			/* shell magic number	*/
-				/* This is the trap2 AES semaphore */
-					/* ("_MUI") */
+
 	if (gl_multi) {
 	  mt_opendev();			/* install our special AES device */
+#if 0
+				/* This is the trap2 AES semaphore */
+					/* ("_MUI") */
 	  Psemaphore( 0, 0x5F4D5549L, 0x0L );
+#else
+	  _inaes = 1;
+#endif
 
 /*
  * ERS: create a semaphore (_SCP) which applications can use to control
@@ -860,9 +866,12 @@ i_7:
 	sti();
 
 	waitforaes();			/* get the semaphore */
+#if 0
 					/* destroy the semaphore */
 	Psemaphore( 1, 0x5F4D5549L, 0x0L );
-
+#else
+	_inaes = 0;
+#endif
 	if ( ad_aescnf )
 	{
 	  dos_free( ( LONG )ad_aescnf );
@@ -1237,7 +1246,7 @@ bailout( ptr )
 /*
  *	Try to read keyboard table from disk
  */
-
+	MLOCAL VOID
 set_kbdtbl()
 {
 	WORD	fd;
@@ -1253,13 +1262,13 @@ set_kbdtbl()
 	  if (len <= 0L)
 		goto sl_end;
 	  dos_lseek(fd, 0, 0L);
-	  if ( dos_read( fd, sizeof(WORD), &hdr ) <= 0 )
+	  if ( dos_read( fd, (WORD)sizeof(WORD), (LONG)&hdr ) <= 0 )
 		goto sl_end;
 	  if (hdr != KBTMAGIC)	/* check magic word to see if it's a kbt */
 		goto sl_end;  
 	  if ((kbt_buf = dos_xalloc(len, 0)) == NULL)
 		goto sl_end;
-	  if ( dos_read( fd, (UWORD) len, kbt_buf ) > 0 )
+	  if ( dos_read( fd, (WORD) len, (LONG)kbt_buf ) > 0 )
 	  {
 		kbtp = (KEYTAB * ) trap14(16, -1L, -1L, -1L);
 		kbtp->unshift = kbt_buf;	/* normal key table */

@@ -1,38 +1,3 @@
-/*
-*************************************************************************
-*			Revision Control System
-* =======================================================================
-*  $Revision: 1.6 $	$Source: f:\multitos/RCS/gemevlib.c,v $
-* =======================================================================
-*  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
-* =======================================================================
-*  $Log: gemevlib.c,v $
-*  Revision 1.6  1993/04/27  23:00:14  ersmith
-*  Merged Cary's and Hans-Martin's changes
-*
- * Revision 1.4  1993/03/12  19:51:12  ersmith
- * Merged HMK's loadable resource stuff
- *
- * Revision 1.3  1993/03/10  20:12:42  ersmith
- * Lattice port
- *
-* Revision 1.1  1993/02/24  23:52:46  ersmith
-* 1 meg floppy MultiTOS
-*
-* Revision 1.0  1993/02/03  21:26:46  ersmith
-* MultiTOS version 1.0
-*
-* Revision 2.2  89/04/26  18:22:19  mui
-* TT
-* 
-* Revision 2.1  89/02/22  05:25:53  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.1  88/06/02  12:31:43  lozben
-* Initial revision
-* 
-*************************************************************************
-*/
 /*	GEMEVLIB.C	1/28/84 - 02/02/85	Lee Jay Lorenzen	*/
 /*	Reg Opt		03/09/85		Derek Mui		*/
 /*	1.1		03/21/85 - 04/10/85	Lowell Webster		*/
@@ -307,7 +272,17 @@ check_event( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 						/* quick check mouse rec*/
 	if (flags & MU_M1)
 	{
-	  Debug7( "Check mu_m1\r\n" );
+	  Debug7( "Check mu_m1: out=" );
+	  Ndebug7(pmo1->m_out);
+	  Debug7("x=");
+	  Ndebug7(pmo1->m_x);
+	  Debug7("y=");
+	  Ndebug7(pmo1->m_y);
+	  Debug7("w=");
+	  Ndebug7(pmo1->m_w);
+	  Debug7("h=");
+	  Ndebug7(pmo1->m_h);
+	  Debug7("\r\n");
 	  if ( ev_mchk( pmo1 ) )
 	    what |= MU_M1;
 	}
@@ -497,6 +472,7 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 
 	  if ( which & m1msk )
 	  {
+	    Debug7("ev_multi: m1msk event\r\n");
 	    aret( m1msk );
 	    what |= MU_M1;
 	  }
@@ -520,7 +496,7 @@ ev_multi( flags, pmo1, pmo2, tmcount, buparm, mebuff, prets )
 	  }
 	}
 
-	
+	Debug7("ev_multi(): exiting\r\n");	
 	return( what );			/* return what happened */
 }
 

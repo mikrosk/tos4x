@@ -46,6 +46,7 @@ EXTERN 	GRECT	gl_rmenu;
 EXTERN 	WORD	gl_hchar;
 EXTERN 	PD	*scr_pd;
 EXTERN 	PD	*plr;
+EXTERN	PD	*shellpd;
 EXTERN	OBJECT	*gl_newdesk;
 EXTERN	WORD	gl_newroot;
 EXTERN	WORD	gl_multi;
@@ -148,6 +149,8 @@ mn_bar( tree, showit )
 	WORD		addline,change;
 	PD		*p1,*p;
 	WINDOW		*win;
+	WORD		disabled_menu = FALSE;
+	static PD	*dis_pd = NULL;		
 
 	if ( showit == -1 )	/* inquire the menu owner */
 	   return( ( gl_mnpid ) ? gl_mnpid : -1 );
@@ -165,13 +168,31 @@ mn_bar( tree, showit )
 	  else
 	    return (FALSE);
 	  Debug1("mn_bar() does send_ctrl(8)\r\n");
+#if 0
+	  if (tree != NULL) {
+		  ((OBJECT*)tree)[0].ob_spec &= 0x7FFFFFFFL;	/* menu bar enabled */
+	  }
+	  currpd->ps_state &= (!PS_HIDEMENU);
+#endif
 	  send_ctrl( currpd, 8 );
 	  return( TRUE );			
 	}
 
 	if ( !showit )
 	{
-	  send_ctrl( currpd, 9 );
+	  Debug1("mn_bar(): HIDE MENU: show==0, currpd=="); 
+	  Debug1(currpd->p_name);
+	  Debug1("\r\n");
+#if 0
+	  currpd->p_state |= PS_HIDEMENU;	  
+
+	  if (tree != NULL)
+		((OBJECT*)tree)[0].ob_spec |= 0x80000000L;
+
+#endif					  /* menu bar disabled */
+/*	  send_ctrl( currpd, 9 );*/
+	  currpd->p_mnaddr = NULL;
+	  send_ctrl(currpd, 8);
 	  return( TRUE );
 	}
 
@@ -184,7 +205,12 @@ mn_bar( tree, showit )
 	    return( FALSE );
 	  }
 	  p1 = idtopd( gl_mnpid );
-	  tree = ( LONG )p1->p_mnaddr;		
+	  tree = ( LONG )p1->p_mnaddr;	
+#if 0
+	  if ((tree != NULL) && (((OBJECT*)tree)[0].ob_spec & 0x80000000L)) {
+		disabled_menu = TRUE;
+	  }	
+#endif
 	  showit &= ~0x0200;	
 	}
 
@@ -193,6 +219,11 @@ mn_bar( tree, showit )
 	  Debug1("showit & 100 \r\n");
 	  p1 = (PD*)tree;
 	  tree = ( LONG )p1->p_mnaddr;
+#if 0
+	  if ((tree != NULL) && (((OBJECT*)tree)[0].ob_spec & 0x80000000L)) {
+		disabled_menu = TRUE;
+	  }	
+#endif
 	  showit &= ~0x0100;
 	}
 
@@ -299,6 +330,15 @@ mn_bar( tree, showit )
 	    if ( set_desk( p ) )
 	      dk_redraw( gl_newdesk, gl_newroot, &gl_rfull );
 	  }
+#if 0
+	  if (((OBJECT*)tree)[0].ob_spec & 0x80000000L) {
+
+	  if (currpd->ps_sate & PS_HIDEMENU) {
+		Debug5("mn_bar: flag set, send_ctrl(9)\r\n");
+		send_ctrl(currpd, 9);
+
+	  }
+#endif
 	}
 	else
 	{
@@ -309,6 +349,13 @@ mn_bar( tree, showit )
 						/* wait for no menu bar	*/
 	    rc_copy( ( WORD *)&gl_rmenu, &gl_ctwait.m_x );
 	    gl_mnpid = 0;
+#if 0
+	    if ((dis_pd != NULL) && (p1->p_mnaddr != NULL)) {
+		((OBJECT*)p1->p_mnaddr)[0].ob_spec |= 0x80000000L;
+					  /* menu bar disabled */
+		dis_pd = NULL;
+	    }
+#endif
 	    Debug1( currpd->p_name );
 	    Debug1( " mn_bar 0\r\n" );
 	  }

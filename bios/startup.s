@@ -3,17 +3,34 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/27 18:06:22 $
+* $Date: 89/07/28 21:54:43 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.15  89/07/28  21:54:43  apratt
+* Changed the hard-disk delay timing so it starts from when the power
+* was turned on, not when we started looking. This makes warm boots
+* really fast, not 10sec.
+*
+* The reset instruction at the start of the ROM has been gone for a 
+* rev or two - I wish I knew this was not a bad idea.
+*
+* Revision 2.15  89/07/28  20:59:12  apratt
+* Changed delay for DMA command bytes and data to count time from
+* power on, not from when we started looking.  This makes warm boots
+* happen fast.
+* 
+* Note that the 'reset' instruction at reseth was taken out.
+* I sure hope it wasn't necessary, and some devices (esp. SCSI) really
+* hated it.
+* 
 * Revision 2.14  89/07/27  18:06:22  apratt
 * Added kcl_hook and bell_hook variables and initializations.
 * Added _SWI cookie and set bit 1 of _SND based on bit 7 of _SWI.
-*
+* 
 * Revision 2.13  89/07/26  19:42:08  apratt
 * Final BIOS for STPLUS: Added cookie jar, full-volume DMA sound,
 * added hard-disk boot delay, backed out MOVEVBL.
@@ -252,7 +269,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.14 $
+* $Revision: 2.15 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -2349,10 +2366,9 @@ dmaagain:
 	or.b	#$08,d0		; d0.b = devno<<5 .OR. "READ" command bits
 	swap	d0
 	move.w	#$08a,d0
-* timeout for the command bytes to ack is max((orig_time+10) - _hz_200,.05)
-	move.l	4(sp),d1	; get time we started this mess
-	add.l	#10*200,d1
-	sub.l	_hz_200,d1	; d1 = (orig_time+10) - _hz_200
+* timeout for the command bytes to ack is max(2000 - _hz_200,10)
+	move.l	#2000,d1
+	sub.l	_hz_200,d1	; d1 = (2000 - _hz_200)
 	moveq.l	#10,d2
 	cmp.l	d2,d1
 	bgt	dmr_wc
@@ -2372,10 +2388,9 @@ dmr_lp:	move.l	(a0)+,d0	; get next command byte
 	dbra	d6,dmr_lp	; (loop for more bytes)
 * Note 9/91: since ST and STPLUS are now the same ROM, we start at IDE in
 	move.l	#$0000000a,(a5)	; write byte 5 (controlByte = $00)
-* timeout for the read to complete is max((orig_time+40) - _hz_200,2)
-	move.l	8(sp),d1	; get orig_time
-	add.l	#40*200,d1
-	sub.l	_hz_200,d1	; d1 = (orig_time+40) - _hz_200
+* timeout for the read to complete is max(8000 - _hz_200,400)
+	move.l	#8000,d1
+	sub.l	_hz_200,d1	; d1 = 8000 - _hz_200
 	move.l	#400,d2
 	cmp.l	d2,d1
 	bgt	dmr_w		; if d1 > 400 use d1 (signed compare!)

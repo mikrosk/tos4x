@@ -62,6 +62,8 @@ EXTERN WORD	cu_hchar;
 
 EXTERN THEGLO	D;
 
+EXTERN GRECT	gl_rzero;
+
 /*
  *	These are needed for proportional GDOS Fonts
  *	+++ 6/14/94 HMK
@@ -299,7 +301,7 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 */
 	VOID
 curfld(tree, obj, new_pos, dist, edblk)
-	LONG		tree;
+	OBJECT		*tree;
 	WORD		obj, new_pos;
 	WORD		dist;
 	TEDINFO		*edblk;
@@ -322,9 +324,9 @@ curfld(tree, obj, new_pos, dist, edblk)
 			wc = gl_wchar;
 		}	
 	}
-        pxl_rect(tree, obj, new_pos, &t, edblk);
+        pxl_rect((LONG)tree, obj, new_pos, &t, edblk);
 
-	if (dist) {
+	if (dist) {	/* redraw text */
 	  if ((edblk->te_font == GDOS_PROP) || (edblk->te_font == GDOS_BITM)) {
 		WORD		pptw = 0;
 		WORD		dummy;
@@ -342,15 +344,28 @@ curfld(tree, obj, new_pos, dist, edblk)
 	  } else 
 		  t.g_w += (dist - 1) * wc + 1;	/* ++ERS: "+1" added 1/19/93 */
 
-	} else
+	  if ((tree[obj].ob_flags & IS3DOBJ) )
+	  {
+	    WORD tmpx;
+
+	    Debug7("\r\ncurfld: is 3d obj\r\n");
+	    tmpx = ADJ3DPIX;
+	    t.g_x -= tmpx;		/* expand object to accomodate */
+	    t.g_y -= tmpx;		/*  hi-lights for 3D */
+	    t.g_w += (tmpx << 1);
+	    t.g_h += (tmpx << 1);
+	  }
+	} 
+        else	/* redraw cursor */
 	{
 	  gsx_attr(FALSE, MD_XOR, BLACK);
-	  t.g_y -= 3;
-	  t.g_h += 6;
+	  t.g_y -= 3; 
+	  t.g_h += 6; 
 	}
 						/* set the new clip rect */
 	gsx_gclip(&oc);
 	gsx_sclip(&t);
+
 						/* redraw the field	*/
 	if (dist) {
 	  if ( prop ) {
@@ -359,7 +374,7 @@ curfld(tree, obj, new_pos, dist, edblk)
 		WORD	ox, oy, d;
 
 		o = &((OBJECT *)tree)[obj];
-		ob_offset(tree, obj, &ox, &oy);
+		ob_offset((LONG)tree, obj, &ox, &oy);
 
 		d = 0;
 		if (((edblk->te_just == GDOS_PROP) || (edblk->te_font == GDOS_BITM)) 
@@ -393,7 +408,8 @@ curfld(tree, obj, new_pos, dist, edblk)
 		if (d == 1)
 			gsx_sclip(&sc);
 	  }
-	  ob_draw(tree, obj, 0);
+
+	  ob_draw((LONG)tree, obj, 0);
 				/* since ob_draw reset the font back to */
 				/* IBM, we have to set it again!!!	*/
 	  set_cufont(edblk->te_font, edblk->te_fontid, edblk->te_fontsize);
@@ -401,7 +417,7 @@ curfld(tree, obj, new_pos, dist, edblk)
 	  gsx_cline(t.g_x, t.g_y, t.g_x, t.g_y+t.g_h-1);
 						/* turn on cursor in	*/
 						/*   new position	*/
-        gsx_sclip(&oc);
+       gsx_sclip(&oc);
 }
 
 
@@ -612,7 +628,7 @@ ob_edit(tree, obj, in_char, idx, kind)
 		ob_stfn(*idx, &start, &finish);
 						/* turn cursor off	*/
 		cur_pos = start;
-		curfld(tree, obj, cur_pos, 0, &edblk);
+		curfld((OBJECT *)tree, obj, cur_pos, 0, &edblk);
 
 		switch(in_char)
 		{
@@ -701,7 +717,7 @@ ob_edit(tree, obj, in_char, idx, kind)
 			    old_w = new_w;
 			    new_w = propStrWidth(&DGLO->g_fmtstr[0]); /* get text width */
 			}
-		    curfld(tree, obj, start, dist, &edblk);
+		    curfld((OBJECT *)tree, obj, start, dist, &edblk);
 		  }
 		} /* switch */
 	        break;
@@ -710,7 +726,7 @@ ob_edit(tree, obj, in_char, idx, kind)
 	} /* switch */
 						/* draw/erase the cursor*/
 	cur_pos = find_pos(&DGLO->g_tmpstr[0], *idx);
-	curfld(tree, obj, cur_pos, 0, &edblk);
+	curfld((OBJECT *)tree, obj, cur_pos, 0, &edblk);
 
 	set_cufont(IBM, 0, 0);			/* just to make sure ... */
 	return(TRUE);

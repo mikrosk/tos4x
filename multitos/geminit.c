@@ -237,6 +237,9 @@ GLOBAL  BYTE *a_strtproc;	/* alert box Screen uses to start desktop */
 GLOBAL  BYTE *a_faildesk;	/* alert box Screen uses when an error
 				   occurs when launching the desktop */
 
+GLOBAL	BYTE	*icnslots;	/* for icon slot management   */
+GLOBAL	BYTE	currIcnmax;	/* see gemctrl.c & gemwmlib.c */
+
 BYTE	AESCNF[] = "C:\\GEM.CNF";
 BYTE	AESCNF2[] = "C:\\MULTITOS\\GEM.CNF";
 BYTE	ARGV[] = "ARGV=";

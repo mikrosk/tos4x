@@ -362,6 +362,7 @@ accwait()
 
 }
 
+#if 0
 WORD	scanq(p)
 PD	*p;
 {
@@ -371,3 +372,4 @@ PD	*p;
 		return FALSE;
 
 }
+#endif

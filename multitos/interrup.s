@@ -146,7 +146,7 @@ _CMP_TICK:	.ds.l	1
 TICKS:		.ds.l	1		; absolute number of ticks NOT GLOBAL!
 		.ds.l	23		; gsx stack for mouse
 gstack:		.ds.l	1
-		.ds.l	100		; tick stack
+		.ds.l	200		; tick stack
 tstack:		.ds.l	1
 
 	.end

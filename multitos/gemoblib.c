@@ -12,7 +12,7 @@
 /*	Fix ob_format to not right justify	2/25/93 H.M.Krober	*/
 /*	Fix trans_cicon() and free_cicon()	4/30/93 C.Gee and E.Smith */
 /*	Add GDOS font support to TEDINFO	5/21/93 H.M.Krober	*/
-
+/*	Fix problem with char mode		7/15/93 H.M.Krober	*/
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
 *	Copyright (C) 1992 
@@ -726,6 +726,8 @@ just_draw(tree, obj, sx, sy)
 		  D.g_fmtstr[1] = NULL;
 		  edblk.te_just = TE_CNTR;
 		  edblk.te_font = IBM;
+		  edblk.te_fontid = 0;
+		  edblk.te_fontsize = 0;
 		}
 						/* fall thru to gr_gtext*/
 	    case G_TEXT:
@@ -801,6 +803,10 @@ just_draw(tree, obj, sx, sy)
 	     (obtype == G_TITLE) ||
              (obtype == G_BUTTON) )
 	{
+	  set_cufont(IBM, 0, 0); 	/* moved up, 7/15/93 HMK 	 */
+					/* because of char map mode, the */
+					/* setting of the font has to	 */
+					/* happen before the str2intin   */
 	  len = str2intin(( BYTE *)spec);
 	  if (len)
 	  { 				/* 8/3/92 */
@@ -824,7 +830,9 @@ just_draw(tree, obj, sx, sy)
 	    } else {
 	      tmpx = pt->g_x;
 	    }
-	    set_cufont(IBM, 0, 0);
+#if 0
+	    set_cufont(IBM, 0, 0);  /* move up a few lines, HMK */
+#endif
 	    gsx_tblt(tmpx, tmpy, len);
 	  }
 	}
@@ -885,8 +893,8 @@ just_draw(tree, obj, sx, sy)
 	  if ( state & CHECKED )
 	  {
 	    gsx_attr(TRUE, MD_TRANS, BLACK);
+	    set_cufont(IBM, 0, 0);		/* moved before str2intin, HMK */
 	    str2intin("\010");			/* a check mark	*/
-	    set_cufont(IBM, 0, 0);
 	    gsx_tblt(pt->g_x+2, pt->g_y, 1);
 	  }
 
@@ -924,7 +932,9 @@ just_draw(tree, obj, sx, sy)
 	    draw_hi(&c, NORMAL, FALSE, thick, icol);
 /**/
 	}
+#if 0
 	set_cufont(IBM, 0, 0);		/* just to make sure ... */
+#endif
 } /* just_draw */
 
 

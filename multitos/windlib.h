@@ -33,8 +33,10 @@
 #define RTARROW 0x0400
 #define HSLIDE	0x0800
 
-/* added 4/22/93 ERS */
-#define SMALLER	0x1000
+/* added 4/22/93 ERS; */
+/* changed from 0x1000 to 0x4000 for PC compatibility, 7/19/93 */
+/* (0x1000 is used under PC GEM for repeat fct on Close Box)   */
+#define SMALLER	0x4000
 
 #if 0
 /* Added Jul 23 91 for new window manager - ml. */
@@ -127,6 +129,7 @@
 #define WF_ICONIFY	26
 #define WF_UNICONIFY	27
 #define WF_UNICONIFYXYWH	28
+#define WF_ICONSLOT	29
 #define WF_TOOLBAR	30
 #define WF_FTOOLBAR	31
 #define	WF_NTOOLBAR	32

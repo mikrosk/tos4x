@@ -11,6 +11,7 @@
 #define	X_SETDRV	0x0E
 #define	X_GETDRV	0x19
 #define	X_SETDTA	0x1A
+#define X_GETDTA	0x2F
 #define	X_GETFREE	0x36
 #define	X_MKDIR		0x39
 #define	X_RMDIR		0x3A

@@ -32,8 +32,9 @@
 #define LFARROW		0x0200
 #define RTARROW		0x0400
 #define HSLIDE		0x0800
+#define SMALLER 	0x4000
 
-#define ALLITEMS 0x1FFF
+#define ALLITEMS 0x4FFF
 
 #if 0
 typedef struct	grect
@@ -131,6 +132,8 @@ typedef	struct	window
 #define LFARROW 0x0200
 #define RTARROW 0x0400
 #define HSLIDE  0x0800
+#define SMALLER 0x4000
+
 						/* wind_create flags	*/
 #define WC_BORDER 	0
 #define WC_WORK   	1
@@ -162,6 +165,7 @@ typedef	struct	window
 #define WF_ICONIFY	26
 #define WF_UNICONIFY	27
 #define WF_UNICONIFYXYWH	28
+#define WF_ICONSLOT	29
 #define WF_TOOLBAR	30
 #define WF_FTOOLBAR	31
 #define	WF_NTOOLBAR	32

@@ -377,8 +377,6 @@
 #define MOK      23  /* BUTTON in Baum MNSYSTEM */
 #define MCANCEL  24  /* BUTTON in Baum MNSYSTEM */
 
-#define SMILEY   27  /* Formular/Dialog */
-
 #define MORE     0   /* Freier String */
 
 #define ENDFILE  1   /* Freier String */

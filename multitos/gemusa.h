@@ -2,45 +2,34 @@
 
 #define SELECTOR 0   /* Formular/Dialog */
 #define FLABEL   1   /* TEXT in Baum SELECTOR */
-#define FDIRECTO 3   /* FBOXTEXT in Baum SELECTOR */
-#define FSELECTI 5   /* FBOXTEXT in Baum SELECTOR */
-#define FSDRIVE  6   /* STRING in Baum SELECTOR */
+#define DIRTITLE 2   /* STRING in Baum SELECTOR */
+#define FDIRECTO 3   /* BOXTEXT in Baum SELECTOR */
+#define FDIRECT2 4   /* BUTTON in Baum SELECTOR */
+#define FSELECTI 6   /* FBOXTEXT in Baum SELECTOR */
 #define FCLSBOX  7   /* BOXCHAR in Baum SELECTOR */
-#define FTITLE   8   /* BOXTEXT in Baum SELECTOR */
-#define DRVBOX   9   /* BOX in Baum SELECTOR */
-#define DRIVEA   10  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEB   11  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEC   12  /* BOXCHAR in Baum SELECTOR */
-#define DRIVED   13  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEE   14  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEF   15  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEG   16  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEH   17  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEI   18  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEJ   19  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEK   20  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEL   21  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEM   22  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEN   23  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEO   24  /* BOXCHAR in Baum SELECTOR */
-#define DRIVEP   25  /* BOXCHAR in Baum SELECTOR */
-#define FILEBOX  26  /* BOX in Baum SELECTOR */
-#define F1NAME   27  /* FBOXTEXT in Baum SELECTOR */
-#define F2NAME   28  /* FBOXTEXT in Baum SELECTOR */
-#define F3NAME   29  /* FBOXTEXT in Baum SELECTOR */
-#define F4NAME   30  /* FBOXTEXT in Baum SELECTOR */
-#define F5NAME   31  /* FBOXTEXT in Baum SELECTOR */
-#define F6NAME   32  /* FBOXTEXT in Baum SELECTOR */
-#define F7NAME   33  /* FBOXTEXT in Baum SELECTOR */
-#define F8NAME   34  /* FBOXTEXT in Baum SELECTOR */
-#define F9NAME   35  /* FBOXTEXT in Baum SELECTOR */
-#define SCRLBAR  36  /* BOX in Baum SELECTOR */
-#define FDNAROW  37  /* BOXCHAR in Baum SELECTOR */
-#define FSVSLID  38  /* BOX in Baum SELECTOR */
-#define FSVELEV  39  /* BOX in Baum SELECTOR */
-#define FUPAROW  40  /* BOXCHAR in Baum SELECTOR */
-#define OK       41  /* BUTTON in Baum SELECTOR */
-#define CANCEL   42  /* BUTTON in Baum SELECTOR */
+#define FTITLE   8   /* FBOXTEXT in Baum SELECTOR */
+#define DBUTTON  9   /* BUTTON in Baum SELECTOR */
+#define FILEBOX  10  /* BOX in Baum SELECTOR */
+#define F1NAME   11  /* FBOXTEXT in Baum SELECTOR */
+#define F2NAME   12  /* FBOXTEXT in Baum SELECTOR */
+#define F3NAME   13  /* FBOXTEXT in Baum SELECTOR */
+#define F4NAME   14  /* FBOXTEXT in Baum SELECTOR */
+#define F5NAME   15  /* FBOXTEXT in Baum SELECTOR */
+#define F6NAME   16  /* FBOXTEXT in Baum SELECTOR */
+#define F7NAME   17  /* FBOXTEXT in Baum SELECTOR */
+#define F8NAME   18  /* FBOXTEXT in Baum SELECTOR */
+#define F9NAME   19  /* FBOXTEXT in Baum SELECTOR */
+#define SCRLBAR  20  /* BOX in Baum SELECTOR */
+#define FDNAROW  21  /* BOXCHAR in Baum SELECTOR */
+#define FSVSLID  22  /* BOX in Baum SELECTOR */
+#define FSVELEV  23  /* BOX in Baum SELECTOR */
+#define FUPAROW  24  /* BOXCHAR in Baum SELECTOR */
+#define PBUTTON  25  /* BUTTON in Baum SELECTOR */
+#define EBUTTON  26  /* BUTTON in Baum SELECTOR */
+#define EBUTTON2 27  /* BUTTON in Baum SELECTOR */
+#define SBUTTON  28  /* BUTTON in Baum SELECTOR */
+#define OK       29  /* BUTTON in Baum SELECTOR */
+#define CANCEL   30  /* BUTTON in Baum SELECTOR */
 
 #define ALERT    1   /* Formular/Dialog */
 
@@ -80,6 +69,87 @@
 #define STOPCC   3   /* USERDEF in Baum CICONS */
 #define INFOCC   4   /* USERDEF in Baum CICONS */
 #define DISKCC   5   /* USERDEF in Baum CICONS */
+
+#define DRVTREE  14  /* Formular/Dialog */
+#define DRVBOX   0   /* BOX in Baum DRVTREE */
+#define DRIVE00  1   /* STRING in Baum DRVTREE */
+#define DRIVEA   2   /* STRING in Baum DRVTREE */
+#define DRIVEB   3   /* STRING in Baum DRVTREE */
+#define DRIVEC   4   /* STRING in Baum DRVTREE */
+#define DRIVED   5   /* STRING in Baum DRVTREE */
+#define DRIVEE   6   /* STRING in Baum DRVTREE */
+#define DRIVEF   7   /* STRING in Baum DRVTREE */
+#define DRIVEG   8   /* STRING in Baum DRVTREE */
+#define DRIVEH   9   /* STRING in Baum DRVTREE */
+#define DRIVEI   10  /* STRING in Baum DRVTREE */
+#define DRIVEJ   11  /* STRING in Baum DRVTREE */
+#define DRIVEK   12  /* STRING in Baum DRVTREE */
+#define DRIVEL   13  /* STRING in Baum DRVTREE */
+#define DRIVEM   14  /* STRING in Baum DRVTREE */
+#define DRIVEN   15  /* STRING in Baum DRVTREE */
+#define DRIVEO   16  /* STRING in Baum DRVTREE */
+#define DRIVEP   17  /* STRING in Baum DRVTREE */
+#define DRIVEQ   18  /* STRING in Baum DRVTREE */
+#define DRIVER   19  /* STRING in Baum DRVTREE */
+#define DRIVES   20  /* STRING in Baum DRVTREE */
+#define DRIVET   21  /* STRING in Baum DRVTREE */
+#define DRIVEU   22  /* STRING in Baum DRVTREE */
+#define DRIVEV   23  /* STRING in Baum DRVTREE */
+#define DRIVEW   24  /* STRING in Baum DRVTREE */
+#define DRIVEX   25  /* STRING in Baum DRVTREE */
+#define DRIVEY   26  /* STRING in Baum DRVTREE */
+#define DRIVEZ   27  /* STRING in Baum DRVTREE */
+
+#define SORT     15  /* Formular/Dialog */
+#define SORTBOX  0   /* BOX in Baum SORT */
+#define SORTNAME 1   /* STRING in Baum SORT */
+#define SORTDATE 2   /* STRING in Baum SORT */
+#define SORTSIZE 3   /* STRING in Baum SORT */
+#define SORTTYPE 4   /* STRING in Baum SORT */
+#define SORTNONE 5   /* STRING in Baum SORT */
+
+#define MASKTREE 16  /* Formular/Dialog */
+#define MASKBOX  0   /* BOX in Baum MASKTREE */
+#define MASK_BEG 1   /* STRING in Baum MASKTREE */
+#define MSPECIAL 17  /* STRING in Baum MASKTREE */
+#define MSKEDIT  19  /* STRING in Baum MASKTREE */
+#define MASKUB   21  /* STRING in Baum MASKTREE */
+#define MASKUEND 40  /* STRING in Baum MASKTREE */
+#define MASK_END 42  /* STRING in Baum MASKTREE */
+
+#define MASKEDIT 17  /* Formular/Dialog */
+#define MASKNAME 2   /* FTEXT in Baum MASKEDIT */
+#define MASKOK   3   /* BUTTON in Baum MASKEDIT */
+
+#define PATHDEL  18  /* Formular/Dialog */
+#define PDELITEM 3   /* BOXTEXT in Baum PATHDEL */
+#define PDELOK   4   /* BUTTON in Baum PATHDEL */
+
+#define FULLMASK 19  /* Formular/Dialog */
+#define FOK      1   /* BUTTON in Baum FULLMASK */
+#define FCANCEL  2   /* BUTTON in Baum FULLMASK */
+#define F1EDIT   5   /* FBOXTEXT in Baum FULLMASK */
+#define F2EDIT   6   /* FBOXTEXT in Baum FULLMASK */
+#define F3EDIT   7   /* FBOXTEXT in Baum FULLMASK */
+#define F4EDIT   8   /* FBOXTEXT in Baum FULLMASK */
+#define F5EDIT   9   /* FBOXTEXT in Baum FULLMASK */
+#define F6EDIT   10  /* FBOXTEXT in Baum FULLMASK */
+
+#define EDITTREE 20  /* Formular/Dialog */
+#define PTITLE1  1   /* BOXTEXT in Baum EDITTREE */
+#define PBOX1    2   /* BOX in Baum EDITTREE */
+#define ETPBEG   3   /* TEXT in Baum EDITTREE */
+#define ETPEND   17  /* TEXT in Baum EDITTREE */
+#define ETPMULTI 18  /* TEXT in Baum EDITTREE */
+#define ETPTMP   19  /* TEXT in Baum EDITTREE */
+#define PTITLE2  20  /* BOXTEXT in Baum EDITTREE */
+#define PBOX2    21  /* BOX in Baum EDITTREE */
+#define ETEBEG   22  /* FTEXT in Baum EDITTREE */
+#define ETEEND   41  /* FTEXT in Baum EDITTREE */
+#define ETEDIT   42  /* BUTTON in Baum EDITTREE */
+#define PTITLE0  43  /* STRING in Baum EDITTREE */
+#define ETOK     44  /* BUTTON in Baum EDITTREE */
+#define ETCANCEL 45  /* BUTTON in Baum EDITTREE */
 
 #define STPATH   0   /* Freier String */
 
@@ -126,6 +196,12 @@
 #define FAILDESK 21  /* Alert String */
 
 #define ALRT35ER 22  /* Alert String */
+
+#define MSKEXIST 23  /* Alert String */
+
+#define MSKNOGO  24  /* Alert String */
+
+#define NOMENU   25  /* Alert String */
 
 #define MICE0    0   /* Freies Icon */
 

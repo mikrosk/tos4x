@@ -93,7 +93,7 @@ CDA
 
 /*	Each process's super stack size		*/
 
-#define STACK1_SIZE 600
+#define STACK1_SIZE 800
 
 
 /*	Warning! Don't change the following structure's size and field	*/

@@ -451,7 +451,7 @@ savestk:	.ds.l	1
 _SAV2TRP:	.ds.l	1	; Save current trap 2 vector.
 _savsup:	.ds.l	1
 errsave:	.ds.l	1
-		.ds.l	400	; lots of space for errors
+		.ds.l	512	; lots of space for errors
 errstk:		.ds.l	1
 
 	.end

@@ -20,7 +20,8 @@
 /*	Double-Clicking on the title bar will send a FULL message. This */
 /*      only occurs if the window has a full button AND the window      */
 /*      is not iconified.			06/11/93        C.Gee   */
-
+/*	Add support for icon tiling		07/18/93	H.Krober*/
+/*									*/
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
 *	Copyright (C) 1992 
@@ -50,8 +51,6 @@
 
 /* FROM DESKMISC.C */
 VOID	rep2_path( BYTE *name, BYTE *path );
-
-
 
 
 #define THEDESK 	3
@@ -103,6 +102,7 @@ EXTERN	WORD	shutdown;
 EXTERN BYTE	*a_strtproc;
 EXTERN BYTE	*a_faildesk;
 
+
 GLOBAL WORD	gl_wa[] =
 {
 	WA_UPLINE,		/* used to convert from	*/
@@ -118,6 +118,8 @@ GLOBAL WORD	gl_wa[] =
 
 MLOCAL	WORD	ctrl_shut;
 
+EXTERN	BYTE	*icnslots;
+EXTERN	BYTE	currIcnmax;
 
 GLOBAL	BYTE	AE_TREDRAW[] = "AE_TREDRAW=";
 GLOBAL	BYTE	AE_SREDRAW[] = "AE_SREDRAW=";
@@ -258,12 +260,22 @@ Debug1("hctl_window()\r\n");
 	switch( cpt )
 	{
 	    case W_SMALLER:		/* +++ 04/93 Iconify Feature */
-	      	if (kshift & 0x0004)	/* CONTROL & Iconify = Iconify All Windows */
+ 	      	if (kshift & 0x0004)	/* CONTROL & Iconify = Iconify All Windows */
 			message = WM_ICONIFYALL;	
 	      	else
 	        	message = WM_ICONIFIED;
 		w = WINICON_W; h = WINICON_H;
-		y = gl_rfull.g_y + gl_rfull.g_h - h - 1;
+
+		set = TRUE;
+		if (icnslots == NULL)  		/* +++ 7/18/93 */
+			set = FALSE ;
+		else if (findIcnslot(icnslots, &currIcnmax, &x, &y, 
+		&pwin->iconslot) == FALSE )
+			set = FALSE;
+		
+		if (!set)
+			y = gl_rfull.g_y + gl_rfull.g_h - h - 1;
+
 		goto do_cpt;
 
 	    case W_CLOSER:
@@ -314,6 +326,8 @@ do_cpt:
 		    ( !pwin->iconflag )  ) {
 		    message = WM_FULLED;
 		    goto do_cpt;
+		} else if ((clicks == 2) && (pwin->iconflag)) { /* +++ HMK 6/30/93 */
+			goto do_uniconify;
 		}
 		
 		if ( !( gl_button & 1 ) ) {
@@ -438,12 +452,14 @@ do_cpt:
 		 * hapening on the window's work area, uniconify the
 		 * window
 		 */
+do_uniconify:
 	      if (pwin->iconflag && (clicks == 2)) {
 		message = WM_UNICONIFIED;
 		x = pwin->icon.g_x;	/* coords before window was 	*/ 
 		y = pwin->icon.g_y;	/* iconified.			*/
 		w = pwin->icon.g_w;
 		h = pwin->icon.g_h;
+		retIcnslot(icnslots, &pwin->iconslot, &currIcnmax);
 		break;
 	      }
 
@@ -586,6 +602,7 @@ swap_prg( p )
 	WORD	item;
 	WORD	msgbuff[8];
 
+	if (!p) return;		/* sanity check */
 	item = c_w_tophandle( p );
 
 	if ( item != -1 )	/* Yes, it has a window */
@@ -726,7 +743,7 @@ hctl_keybd( key )		/* This is tricky!!!	*/
 {
 	PD	*last;
 	REG PD	*p;
-	WORD	up;
+	WORD	up,plr_used;
 	
 	/* Control Shift Alternate Clr Home and Right button */
 	if ( ( key == 0xe770037L ) && ( gl_button & 0x02 ) )
@@ -735,8 +752,14 @@ hctl_keybd( key )		/* This is tricky!!!	*/
 	  return;	
 	}
 
-
+#ifdef NO_DEADLOCK
+/* this seems to cause a deadlock under some circumstances when
+ * CTRL-ALT-TAB is held down
+ */
 	waitforaes();
+#endif
+
+	last = idtopd( gl_kbid );
 
 	if ( key == 0xc0f0009L )	/* go down */
 	  up = FALSE;
@@ -744,15 +767,18 @@ hctl_keybd( key )		/* This is tricky!!!	*/
 	{
 	  if ( key == 0xe0f0009L ) 	/* go up */
 	  {
-	    last = idtopd( gl_kbid );
 	    up = TRUE;
 	  }
 	  else
 	    return;
 	}
 
-	if ( !( p = idtopd( gl_kbid )->p_thread ) )
+	if ( !( p = last->p_thread ) )
+	{
 	  p = plr;
+	  plr_used = TRUE;
+	} else
+	  plr_used = FALSE;
 
 	while( p )
 	{
@@ -768,17 +794,22 @@ hctl_keybd( key )		/* This is tricky!!!	*/
 
 	      p = last;
 	    }
+#ifdef NO_DEADLOCK
 	    releaes();
+#endif
 	    swap_prg( p );		       	
 	    return;
 	  }
 
-c1:	  if ( !( p = p->p_thread ) )
+c1:	  if ( !( p = p->p_thread ) && !plr_used )
+	  {
 	    p = plr;
-
+	    plr_used = TRUE;
+	  }
 	}
-
+#ifdef NO_DEADLOCK
 	releaes();
+#endif
 }
 
 
@@ -918,6 +949,9 @@ screenmgr( VOID )
 	cont = TRUE;
 	ctrl_shut = FALSE;
 
+	icnslots = allocIcnslots();	/* +++ 7/18/93 */
+	currIcnmax = 0;
+
 	do
 	{
 				/* wait for something to happen		*/
@@ -969,6 +1003,8 @@ screenmgr( VOID )
 	  wind_update(0);
 			
 	}while( cont );
+
+	freeIcnslots(icnslots); 	/* +++ 7/18/93 */
 
 	giveerr();		/* release critical error	*/	
 	appl_exit();		
@@ -1172,6 +1208,7 @@ l_1:
 		break;
 	      menu_bar( ( OBJECT *)p->p_pid, 0x0200 );
 	      break;
+
 	    default:
 	      break;
 	}
@@ -1212,3 +1249,113 @@ rep2_path( name, path )
 	path++;
 	strcpy( name, path ); 
 }
+#if 0
+/*
+ *	Icon Slot Manager
+ *	+++ HMK 7/18/93
+ */
+
+BYTE *allocIcnslots()
+{
+	REG BYTE *ip, *p;
+	REG WORD i;
+	WORD	 size;
+
+
+Debug1("gl_rfull.g_w="); Ndebug1((LONG)gl_rfull.g_w);
+Debug1("gl_rfull.g_h="); Ndebug1((LONG)gl_rfull.g_h);
+
+	size = (gl_rfull.g_w / WINICON_W) * (gl_rfull.g_h / WINICON_H);
+
+	ip = p = (BYTE *) dos_xalloc((LONG) size, 3);
+
+	for (i = 0; i < size; i++)
+		*p++ = 0;
+
+	return ip;
+}
+
+	VOID
+freeIcnslots(ip)
+	BYTE	*ip;
+{
+	if (ip != NULL)
+		dos_free((LONG)ip);
+}
+
+	WORD
+findIcnslot(slots, curr_icnmax, x, y, slotnr)
+	REG BYTE *slots;
+	BYTE	 *curr_icnmax;
+	WORD	 *x, *y;
+	BYTE	 *slotnr;
+{
+	REG WORD i, c, r;
+	WORD	 rows, cols;
+
+	rows = gl_rfull.g_h / WINICON_H;
+	cols = gl_rfull.g_w / WINICON_W;
+
+Debug1("find: rows="); Ndebug1((LONG) rows);
+Debug1("find: cols="); Ndebug1((LONG) cols);
+
+	do {
+		for (r = rows - 1; r >= 0; r--) {
+			for (c = 0; c < cols; c++) {
+				i = (r * cols) + c;
+				if ((slots[i] <= *curr_icnmax) && 
+				    (slots[i] < 127)) {
+					slots[i] += 1;
+					*x = c * WINICON_W;
+					*y = ((r+1) * WINICON_H) - gl_rfull.g_y;
+					*slotnr = (BYTE) i;
+Debug1("slot nr="); Ndebug1((LONG) i);
+Debug1("row="); Ndebug1((LONG) r);
+Debug1("col="); Ndebug1((LONG) c);
+Debug1("x="); Ndebug1((LONG) *x);
+Debug1("y="); Ndebug1((LONG) *y);
+Debug1("curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
+					return TRUE;
+				}
+			}
+		}
+		(*curr_icnmax)++;
+	} while (*curr_icnmax < 127);
+	
+	return FALSE;
+}
+
+	VOID
+retIcnslot(slots, slotnr, curr_icnmax)
+	BYTE	*slots;
+	BYTE	*slotnr;
+	BYTE	*curr_icnmax;
+{
+	WORD		flag;
+	REG WORD	i, n;
+	WORD		rows, cols;
+
+Debug1("ret: slotnr="); Ndebug1((LONG) *slotnr);
+
+	if (*slotnr == (BYTE) -1)
+		return;
+
+	slots[*slotnr] -= 1;
+	*slotnr = (BYTE) -1;
+
+	rows = gl_rfull.g_h / WINICON_H;
+	cols = gl_rfull.g_w / WINICON_W;
+	
+Debug1("ret: before curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
+	n = rows * cols;
+	flag = TRUE;
+	for (i = 0; i < n; i++, slots++) {
+		if (*slots >= *curr_icnmax)
+			flag = FALSE;	 
+	}
+	if (flag)
+		(*curr_icnmax)--;
+
+	Debug1("ret: after curr_icnmax="); Ndebug1((LONG) *curr_icnmax);
+}
+#endif

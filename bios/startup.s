@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/06 21:55:55 $
+* $Date: 89/02/07 13:00:59 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.32  89/02/07  13:00:59  apratt
+* made priv handler conditional on LONGFRAME, not TT
+*
 * Revision 1.31  89/02/06  21:55:55  apratt
 * Little (but frustrating!) bug fixes so TT would work.
-*
+* 
 * Revision 1.30  89/02/06  15:17:41  apratt
 * Oops - left out _termtab.
 * 
@@ -163,7 +166,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.31 $
+* $Revision: 1.32 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1609,9 +1612,9 @@ setvb2:	move.l	#reseth,swv_vec(a5)	; RESET system on monitor change
 * on ST, you'd better not change mode during a vblank; what we do
 * is call noblank1, which returns when it's sure we are NOT in a vblank.
 	clr.w	d0			; magic bit# = 0
-.ifne TT
-* TT: install a handler for privelege violation which handles move from sr:
-* it clobbers the offending instruction into a move from CCR. 
+.ifne LONGFRAME
+* LONGFRAME: install a handler for privilege violation which handles move 
+.if STPAD
 	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
 * bus error, not privelege violation... Slightly harder to debug.  
 * And doesn't work at all if the code uses the high byte of sr. Tough.
@@ -1631,7 +1634,13 @@ priv:	movem.l	d0/a0,-(sp)
 	bsr	clrcache
 .endif
 priv1:	movem.l	(sp)+,d0/a0
+.ifne TT
 	jmp	tpriv			; jmp into _termtab
+.endc
+.ifeq TT
+	move.l	(sp)+,a0		; restore A regs
+	move.l	(sp)+,a1
+.endc
 	rte
 priv2:	nop				; continue booting here
 * What's below is the same as what's above, except that a0/a1 are restored
@@ -2817,7 +2826,7 @@ _termtab:
 	bsr.s	_term		; 05: divide by zero
 	bsr.s	_term		; 06: CHK
 	bsr.s	_term		; 07: TRAPV
-tpriv:	bsr.s	_term		; 08: privilege violation (see movesr)
+tpriv:	bsr.s	_term		; 08: privilege violation (see priv above)
 	bsr.s	_term
 	bsr.s	_term
 	bsr.s	_term

@@ -3,24 +3,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/06 13:45:40 $
+* $Date: 89/02/17 11:55:46 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 1.3  89/02/17  11:55:46  apratt
+* Fixed my fat fingers in clktest.  Also shortened by a few bytes.
+*
 * Revision 1.2  89/02/06  13:45:40  apratt
 * Added handling for bus error when accessing RTC (because TT has none).
 * The handling is harmless for non-TT, so it's not conditional.
-*
+* 
 * Revision 1.1  87/11/20  14:23:42  lozben
 * Initial revision
 * 
 *
 * =======================================================================
 *
-* $Revision: 1.2 $
+* $Revision: 1.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -145,12 +148,13 @@ iclfai:	moveq	#-1,d0			; return -1L (error)
 * refers to bus errors but doesn't implement them.
 *
 clktest:
+	clr.l	a1
 	move.w	#RTCBASE,a0		; a0 -> base of clock chip
-	move.l	8,a1			; save bus error vector
+	move.l	8(a1),d2		; save bus error vector
 	move.l	sp,a2			; save stack pointer for cleaning up
-	move.l	clkerr,8		; write bus error vector
+	move.l	#clkerr,8(a1)		; write bus error vector
 	move.b	#%1001,RTMODE(a0)	; set "alarm" bank
-	move.l	a1,8			; no bus error - restore vector
+	move.l	a1,8(a1)		; no bus error - restore vector
 	move.w	#$0a05,d0		; d0 = test pattern
 	movep.w	d0,RT01MIN(a0)		; write two registers
 	movep.w	RT01MIN(a0),d1		;   and read them back
@@ -163,7 +167,7 @@ clktest:
 	rts				; return OK
 
 clkerr:	move.l	a2,sp			; clean off the stack
-	move.l	a1,8			; restore the bus error vector
+	move.l	d2,8(a1)		; restore the bus error vector
 clkfai:	or	#1,ccr			; set carry
 	rts				; return "failure"
 

@@ -4,25 +4,28 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/07/19 14:46:56 $
+* $Date: 90/08/03 13:21:50 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.23  90/08/03  13:21:50  apratt
+* TTOS FINAL RELEASE
+*
 * Revision 2.22  90/07/19  14:46:56  apratt
 * Fixed a bug in rsconf: -2 for TT MFP's port always returned rate
 * for ST MFP.  Now it is right.  Also sped up memory clearing in
 * coldboot.
-*
+* 
 * Added a thing that Insignia needs for their SoftPC product: a vector
 * BEFORE Kbdvbase() which is jmp'ed through when the BIOS has established
 * that a scan code from the keyboard is a make or break code from a key,
 * not part of a mouse or joystick packet.  By default points to "itsakey."
-*
+* 
 * Made cold-boot RAM clearing faster using a tower of four.
-*
+* 
 * Revision 2.21  90/06/18  16:36:05  apratt
 * Fixed keyclicks so caps-lock keyclick goes through kcl_hook, not the
 * built-in keyclick.
@@ -237,7 +240,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.22 $
+* $Revision: 2.23 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $

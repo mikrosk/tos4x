@@ -1,12 +1,16 @@
 /*
 ***************************     FSFS.C     ******************************
 *
-* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
+* $Revision: 2.17 $	$Source: e:/tos/gd2\RCS\fsfs.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/09 17:40:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/30 16:06:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsfs.c,v $
+* Revision 2.17  1991/05/30  16:06:06  apratt
+* Changed use of FN_TRAILOK to FN_DOTSOK, which is what
+* was really meant here (in chmod).
+*
 * Revision 2.16  1991/05/09  17:40:38  apratt
 * General stuff.
 *
@@ -187,7 +191,7 @@ int attr;			/* attribute byte */
     attr &= 0xff;
 
     /* Will match anything but a label (incl. "." or ".."); return any error */
-    if (err = fn2dir(&p,&dir,FN_TRAILOK)) return err;
+    if (err = fn2dir(&p,&dir,FN_DOTSOK)) return err;
 
     oattr = dir.dir_fcb->f_attrib;
     if (!wrt) return (ulong)oattr;	/* reading */

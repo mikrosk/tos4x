@@ -1,15 +1,19 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.11 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.12 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 91/05/21 16:54:35 $     $Locker:  $
+#  $Author: apratt $	$Date: 91/08/05 15:29:10 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.11  91/05/21  16:54:35  apratt
-#  Fixed so 'rm' doesn't rely on wildcards or globbing, and
-#  no pushd/popd, and no temp directories.
+#  Revision 2.12  91/08/05  15:29:10  apratt
+#  Added calls to biosvers to create version.s which exports date and dosdate
+#  to startup.  Added the memtest target.
 #
+# Revision 2.11  91/05/21  16:54:35  apratt
+# Fixed so 'rm' doesn't rely on wildcards or globbing, and
+# no pushd/popd, and no temp directories.
+# 
 # Revision 2.10  91/04/11  12:13:43  apratt
 # Removed pushd and popd -- they're not reliable.
 # 
@@ -92,10 +96,12 @@
 # letters free:     e  h j lm opqr   v xyz0123456789
 
 CCODE=u
-MACHINE=t
+MACHINE=p
 
 # that's all you need to set for different machines or countries.
 ############
+
+CFLAGS = 
 
 TMPDIR	=	m:
 
@@ -104,7 +110,7 @@ ASM = mas -3 -8 -S $*.s -O=$@
 # You can add "-s c:\alcyon\lib\oas68sym.dat" or whatever to the as68 line.
 
 .c.o:
-	ocp68 $*.c $*.i
+	ocp68 $(CFLAGS) $*.c $*.i
 	oc068 $*.i $*.1 $*.2 $*.3 -f
 	oc168 $*.1 $*.2 $*.s
 	optimize $*.s
@@ -116,7 +122,7 @@ ASM = mas -3 -8 -S $*.s -O=$@
 
 # SFILES are those not affected by country or machine switches
 
-SFILES	=	xinout.o clear.o
+SFILES	=	xinout.o clear.o memtest.o
 
 # CFILES are those which come from .c sources, also not affected
 # by country or machine switches.
@@ -127,7 +133,9 @@ allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o \
 			dmaread.$(MACHINE) clock.$(MACHINE) \
 			bios.$(MACHINE)$(CCODE) flop.$(MACHINE) \
 			$(CFILES) $(SFILES)
-		aln -u -u -p -w -l -o $@ $<
+		biosvers version.s
+		mac version.s
+		aln -u -u -p -w -l -o $@ $< version.o
 		cp $@ ..\build
 		@echo $@ linked.
 
@@ -137,7 +145,9 @@ allbios.$(MACHINE)a$(CCODE):	startup.$(MACHINE)a \
 			dmaread.$(MACHINE) clock.$(MACHINE) \
 			bios.$(MACHINE)$(CCODE) flop.$(MACHINE) \
 			$(CFILES) $(SFILES)
-		aln -u -u -p -w -l -o $@ $<
+		biosvers version.s
+		mac version.s
+		aln -u -u -p -w -l -o $@ $< version.o
 		cp $@ ..\build
 		@echo $@ linked.
 
@@ -149,6 +159,9 @@ xinout.o:	xinout.s
 		$(ASM)
 
 clear.o:	clear.s
+		$(ASM)
+
+memtest.o:	memtest.s
 		$(ASM)
 
 ############

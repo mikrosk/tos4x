@@ -83,7 +83,9 @@ typedef struct cblk
 
 
 EXTERN	UWORD	d_rezword;
+#ifdef OBSOLETE_CODE
 EXTERN	WORD	icn_whandle;
+#endif
 EXTERN	BYTE	*lp_mid;
 EXTERN	BYTE	*lp_start;
 EXTERN	WORD	d_exit;
@@ -301,8 +303,8 @@ d_load_fonts()			/* load GDOS fonts */
 /*
  *	Objects for the font popup menu
  */
-OBJECT  fntmn_b1 = { -1, -1, -1, G_BOX, NONE, SHADOWED, 0xFF1100L, 2, 0, 35, 0 };
-OBJECT	fntmn_b2 = { -1, -1, -1, G_STRING, NONE, NORMAL, 0L, 0,  1, 35, 1 };
+OBJECT  fntmnb1 = { -1, -1, -1, G_BOX, NONE, SHADOWED, 0xFF1100L, 2, 0, 35, 0 };
+OBJECT	fntmnb2 = { -1, -1, -1, G_STRING, NONE, NORMAL, 0L, 0,  1, 35, 1 };
 
 	WORD	
 build_fontmenu()	/* build font popup menu for "Set Color & Style" dialog" */
@@ -331,12 +333,12 @@ build_fontmenu()	/* build font popup menu for "Set Color & Style" dialog" */
 		do1_alert( FCNOMEM );
 		return FALSE;
 	}
-	LBCOPY((BYTE*) fontmn, (BYTE*) &fntmn_b1, sizeof(OBJECT));	/* outside box	*/
+	LBCOPY((BYTE*) fontmn, (BYTE*) &fntmnb1, sizeof(OBJECT));	/* outside box	*/
 	rsrc_obfix(fontmn, 0);
 
 	fontsp = d_fontlst;
 	for (i = 1; i <= d_numfonts; i++, fontsp++) {
-		LBCOPY((BYTE *)&fontmn[i], (BYTE *) &fntmn_b2, sizeof(OBJECT));
+		LBCOPY((BYTE *)&fontmn[i], (BYTE *) &fntmnb2, sizeof(OBJECT));
 		rsrc_obfix(fontmn, i);
 		objc_add(fontmn, 0, i); 
 		fontmn[i].ob_spec = (LONG) fontsp->fnt_name;
@@ -705,7 +707,9 @@ deskmain()
 #endif
 
 	doitonce = TRUE;
+#ifdef OBSOLETE_CODE
 	icn_whandle = -1;
+#endif
 	d_exit = L_NOEXIT;
 
 	ciconaddr = (CICONBLK*)0;	/* 7/10/92 */
@@ -778,8 +782,9 @@ top:
 
 	if ( getcookie( 0x46534d43L, (LONG *)&pvalue ) ) /* FSMC */
 	{
-	  if ( *pvalue == 0x5F535044L ) /* _SPD */
-	  	d_spd = 1;
+	  if ( (*pvalue++ == 0x5F535044L) && 
+	  (((WORD)(*pvalue >> 16)) == 0x0411)) /* _SPD */
+	  	d_spd = 1;    /* at least Version 4.11 */
 	} 
 
 	if (!d_load_fonts()) 	/* Load Speedo GDOS fonts	*/

@@ -37,7 +37,7 @@
 
 #include "machine.h"
 #include "dispvars.h"
-#include "aesmint.h"
+#include "mintbind.h"
 						/* in ASYNC88.C		*/
 
 EXTERN	WORD	cu_xrat, cu_yrat;

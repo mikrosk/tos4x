@@ -34,7 +34,6 @@
 
 #include "machine.h"
 #include "vdidefs.h"
-#include "aesmint.h"
 
 EXTERN LONG	trap();
 EXTERN LONG	trap13();

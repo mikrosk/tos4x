@@ -34,7 +34,7 @@
 
 #include "machine.h"
 #include "dispvars.h"
-#include "aesmint.h"
+#include "mintbind.h"
 
 EXTERN	PD	*alr;
 EXTERN	WORD	gl_multi;

@@ -36,7 +36,7 @@
 #include "objaddr.h"
 #include "rslib.h"
 #include "osbind.h"
-#include "aesmint.h"
+#include "mintbind.h"
 #include "gemusa.h"
 
 #define MAX_MSGS     5

@@ -28,7 +28,7 @@
 #include "machine.h"
 #include "objaddr.h"
 #include "osbind.h"
-#include "aesmint.h"
+#include "mintbind.h"
 #include "gemusa.h"
 
 

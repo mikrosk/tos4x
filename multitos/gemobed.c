@@ -12,7 +12,7 @@
 /*	02/23/93	cjg	Force the use of prototypes		*/
 /*	Fix at pxl_rect to use ob_offset again  2/25/93 H.M.Krober	*/
 /*	Add GDOS font support to TEDINFO	5/21/93 H.M.Krober	*/
-
+/*	Now proportional FONTS work with FTEXT	6/15/93 H.M.Krober	*/
 /*	-----------------------------------------------------------
 *	AES Version 4.0	MultiTOS version is written by Derek M. Mui
 *	Copyright (C) 1992 
@@ -55,14 +55,20 @@ EXTERN WORD	gl_hchar;
 EXTERN WORD	gl_hbox;
 EXTERN WORD	gl_width;
 EXTERN WORD	gl_height;
+EXTERN WORD	gl_wschar;
+EXTERN WORD	gl_hschar;
 EXTERN WORD	cu_wchar;
 EXTERN WORD	cu_hchar;
 
 EXTERN THEGLO	D;
 
-MLOCAL WORD	old_w;
-MLOCAL WORD	new_w;
-MLOCAL WORD	old_x;
+/*
+ *	These are needed for proportional GDOS Fonts
+ *	+++ 6/14/94 HMK
+ */
+MLOCAL WORD	old_w;		/* old width   of TEDINFO 	*/
+MLOCAL WORD	new_w;		/* new width   of TEDINFO 	*/
+MLOCAL WORD	old_x;		/* old x coord of TEDINFO 	*/
 
 	VOID
 ob_center(tree, pt)
@@ -199,7 +205,7 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 {
 	GRECT		o;
 	WORD		numchs;
-
+	WORD		wc, hc;
 	WORD		thickness;
 	WORD		type;
 	REG THEGLO	*DGLO;
@@ -221,8 +227,14 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 	ob_offset(tree, obj, &o.g_x, &o.g_y);
 	o.g_w = LWGET(OB_WIDTH(obj));
 	o.g_h = LWGET(OB_HEIGHT(obj));
-#endif
-
+#endif			
+	/*			
+	 * +++ 6/14/93 HMK 
+	 * Changed from edblk->te_tmplt to DGLO->g_fmtstr[0]
+	 * Because of proportional fonts we need	|
+	 * to know the width of the actual 		|
+	 * string					V
+	 */
 	numchs = gr_just(edblk->te_just, &DGLO->g_fmtstr[0], 
 			o.g_w, o.g_h, &o);
 
@@ -243,16 +255,13 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 	} else
 		thickness = 0;
 
-	if (edblk->te_font == GDOS_MONO) {
-		WORD	wc, hc;
-		WORD	dummy;
-		
+	if (edblk->te_font == GDOS_MONO) {	/* Monospace Font */
 		pt->g_x = o.g_x + (ch_pos * cu_wchar) - thickness;
 		pt->g_y = o.g_y;
 		pt->g_w = cu_wchar;
 		pt->g_h = cu_hchar;
 	} else if ((edblk->te_font == GDOS_PROP) || (edblk->te_font == GDOS_BITM)) {
-		WORD		wc;
+		WORD		wc;			/* Proportional Font */
 		WORD		dummy;
 		WORD		pptw = 0;
 		REG WORD	i;
@@ -269,11 +278,18 @@ pxl_rect(tree, obj, ch_pos, pt, edblk)
 		pt->g_y = o.g_y;
 		pt->g_w = wc;
 		pt->g_h = cu_hchar;
-	} else {
-		pt->g_x = o.g_x + (ch_pos * gl_wchar) - thickness;
+	} else {					/* System Font */
+		if (edblk->te_font == SMALL) {
+			wc = gl_wschar;
+			hc = gl_hschar;	
+		} else {
+			wc = gl_wchar;
+			hc = gl_hchar;	
+		}	
+		pt->g_x = o.g_x + (ch_pos * wc) - thickness;
 		pt->g_y = o.g_y;
-		pt->g_w = gl_wchar;
-		pt->g_h = gl_hchar;
+		pt->g_w = wc;
+		pt->g_h = hc;
 	}
 }
 
@@ -295,15 +311,21 @@ curfld(tree, obj, new_pos, dist, edblk)
 
 	DGLO = &D;
 	prop = FALSE;
-	if (edblk->te_font == 1) {
+	if (edblk->te_font == GDOS_MONO) {
 		wc = cu_wchar;
-	} else if (edblk->te_font == 0) {
+	} else if ((edblk->te_font == GDOS_PROP) || (edblk->te_font == GDOS_BITM)) {
 		vqt_width(((BYTE*)edblk->te_ptext)[new_pos], &wc, &dummy, &dummy);
-	} else
-		wc = gl_wchar;
+	} else {
+		if (edblk->te_font == SMALL) {
+			wc = gl_wschar;
+		} else {
+			wc = gl_wchar;
+		}	
+	}
         pxl_rect(tree, obj, new_pos, &t, edblk);
+
 	if (dist) {
-	  if (edblk->te_font == 0) {
+	  if ((edblk->te_font == GDOS_PROP) || (edblk->te_font == GDOS_BITM)) {
 		WORD		pptw = 0;
 		WORD		dummy;
 		REG WORD	i, l;
@@ -311,7 +333,7 @@ curfld(tree, obj, new_pos, dist, edblk)
 
 		s = &DGLO->g_fmtstr[new_pos];
 		l = strlen(s);
-		for (i = 0 ; i < l; i++, s++) {
+		for (i = 0 ; i < l; i++, s++) {		/* get width of str portion */
 			vqt_width(*s, &wc, &dummy, &dummy);
 			pptw += wc;
 		}
@@ -326,7 +348,7 @@ curfld(tree, obj, new_pos, dist, edblk)
 	  t.g_y -= 3;
 	  t.g_h += 6;
 	}
-						/* set the new clip rect*/
+						/* set the new clip rect */
 	gsx_gclip(&oc);
 	gsx_sclip(&t);
 						/* redraw the field	*/
@@ -340,23 +362,25 @@ curfld(tree, obj, new_pos, dist, edblk)
 		ob_offset(tree, obj, &ox, &oy);
 
 		d = 0;
-		if ((edblk->te_just == 0) && (old_w > new_w)) {
+		if (((edblk->te_just == GDOS_PROP) || (edblk->te_font == GDOS_BITM)) 
+		&& (old_w > new_w)) {
 			s.g_x = ox + new_w;
 			s.g_w = old_w - new_w;
 			s.g_y = oy;
 			s.g_h = o->ob_height;
 			d = 1;
-		} else if (edblk->te_just != 0) {
+		} else if (edblk->te_just != TE_LEFT) {
 			s.g_x = ox;
 			s.g_y = oy;
 			s.g_w = o->ob_width;
-			s.g_h = o->ob_height;
+			s.g_h = o->ob_height;		      /* compute text area */
 			gr_just(edblk->te_just, &DGLO->g_fmtstr[0], s.g_w, s.g_h, &s);
+			ox = old_x;
+			old_x = s.g_x;
 			if (old_w > new_w) {
 				s.g_w = old_w;
-				s.g_x = old_x;
-			}
-			old_x = s.g_x;
+				s.g_x = ox;
+			} 
 			d = 2;
 		}
 		if (d > 0) {
@@ -364,7 +388,7 @@ curfld(tree, obj, new_pos, dist, edblk)
 			gsx_sclip(&s);
 
 			bb_fill(MD_REPLACE, FIS_SOLID, IP_SOLID, 
-		  		s.g_x, s.g_y, s.g_w, s.g_h);
+		  		s.g_x, s.g_y, s.g_w, s.g_h);	/* clear */
 		}
 		if (d == 1)
 			gsx_sclip(&sc);
@@ -526,6 +550,7 @@ ob_edit(tree, obj, in_char, idx, kind)
 	BYTE		bin_char;
 	REG THEGLO	*DGLO;
 	TEDINFO		edblk;	
+	GRECT		s;
 
 	DGLO = &D;
 
@@ -564,12 +589,21 @@ ob_edit(tree, obj, in_char, idx, kind)
 	{
 	  case EDINIT:
 		*idx = strlen(&DGLO->g_rawstr[0]);
-		new_w = propStrWidth(&DGLO->g_fmtstr[0]);
+
+		if ((edblk.te_font == GDOS_PROP) || (edblk.te_font == GDOS_BITM)) {
+			ob_offset(tree, obj, &s.g_x, &s.g_y);	
+			s.g_w = ((OBJECT*)tree)[obj].ob_width;
+			s.g_h = ((OBJECT*)tree)[obj].ob_height;
+			/* get text area */
+			gr_just(edblk.te_just, &DGLO->g_fmtstr[0], s.g_w, s.g_h, &s);
+			new_w = s.g_w;
+			old_x = s.g_x;
+		}
 		break;
 
 	  case EDCHAR:
 		/* at this point, DGLO->g_fmtstr has already been formatted--*/
-		/*   it has both template & data. now update DGLO->g_fmtstr	*/
+		/*   it has both template & data. now update DGLO->g_fmtstr  */
 		/*   with in_char; return it; strip out junk & update	*/
 		/*   ptext string.					*/
 		no_redraw = TRUE;
@@ -663,8 +697,10 @@ ob_edit(tree, obj, in_char, idx, kind)
 		  dist = max(finish, nfinish) - start;
 
 		  if (dist) {
-		    old_w = new_w;
-		    new_w = propStrWidth(&DGLO->g_fmtstr[0]);
+			if ((edblk.te_font == GDOS_PROP) || (edblk.te_font == GDOS_BITM)) {
+			    old_w = new_w;
+			    new_w = propStrWidth(&DGLO->g_fmtstr[0]); /* get text width */
+			}
 		    curfld(tree, obj, start, dist, &edblk);
 		  }
 		} /* switch */
@@ -680,8 +716,9 @@ ob_edit(tree, obj, in_char, idx, kind)
 	return(TRUE);
 }
 
+
 	WORD
-propStrWidth(s)
+propStrWidth(s)		/* +++ HMK 6/14/93 compute width of proportinal text */
 	REG BYTE	*s;
 {
 	REG WORD pptw;

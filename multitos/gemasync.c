@@ -33,7 +33,7 @@
 
 #include "machine.h"
 #include "dispvars.h"
-#include "aesmint.h"
+#include "mintbind.h"
 						/* in OPTIMIZE.C	*/
 						/* in DSPTCH88.C	*/
 EXTERN	WORD	cu_button;

@@ -583,7 +583,9 @@ WORD divsl_asr(long,long,long);
 				500000L, PALCLK*640L*2L, 6400000L };
 #define NTSCLK	3104L /* 32.21 MHz */
     static HTIMING htv_ntsc = { NTSCLK, 460500L, 174500L, 514500L, 700000L,
-				500000L, NTSCLK*640L*2L, 6355550L };
+				500000L, NTSCLK*640L*2L, 6369520L }; /* 6357110 */
+
+/* Line length for NTSC changed from 63.5555 us for hardware reasons */
 
 	if (mode & VGA)		t = &htv_vga;
 	else if (mode & PAL)	t = &htv_pal;
@@ -1047,7 +1049,7 @@ VgetMonitor( void )
 
 #define VSS_CLOCK   0x01
 #define VSS_VSYNC   0x02
-#define VSS_HSYNC   0x03
+#define VSS_HSYNC   0x04
 
 /* void VsetSync(WORD external)					XBIOS @90
  * ======================================================================
@@ -1056,17 +1058,30 @@ VgetMonitor( void )
 GLOBAL void
 VsetSync(WORD external)
 {
+	int temp;
+
     if (external & VSS_CLOCK)
 	*SYNCMODE |= 1;
     else *SYNCMODE &=~1;
 
+	/* The temp variable is used to correct some 
+	 * stupidity in the Lattice Optimizer. The Lattice
+	 * optimizer still does bit clear and bit set on 
+	 * hardware registers that we declare as volatile.
+	 * Damn! Between Richard and HiSoft, we need to 
+	 * kill someone.
+	 */
+
+	temp = *SP_Shift;
     if (external & VSS_VSYNC)
-	*SP_Shift |= 0x20;
-    else *SP_Shift &= ~0x20;
+		temp |= 0x20;
+    else temp &= ~0x20;
 
     if (external & VSS_HSYNC)
-	*SP_Shift |= 0x40;
-    else *SP_Shift &= ~0x40;
+	temp |= 0x40;
+    else temp &= ~0x40;
+
+	*SP_Shift = temp;
 }
 
 /* long VgetSize(WORD mode) 					XBIOS @91

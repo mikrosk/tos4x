@@ -4,17 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/11/27 14:48:57 $
+* $Date: 89/11/30 11:14:27 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.8  89/11/30  11:14:27  apratt
+* Removed a little hi-density debugging code I inadvertently left in.
+*
 * Revision 2.7  89/11/27  14:48:57  apratt
 * Added support for 1.44MB floppies ifne HI_DEN.  HI_DEN is
 * set to the same value as the TT flag, for now.
-*
+* 
 * Revision 2.6  89/09/22  16:43:05  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
@@ -90,7 +93,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.7 $
+* $Revision: 2.8 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -1156,8 +1159,6 @@ unlok2:	move.l	(sp)+,d0		; restore return value
 .ifne HI_DEN
 hseek:	move.w	ctrack,d7		; dest track = 'ctrack'
 hseek1:	move.w	#e_seek,curr_err	; possible error = "seek error"
-	bfexts	denselect{14:2},d1
-	move.l	d1,([$44e])		; set first screen line for den
 .endc
 	bsr	wdiskctl
 	move.w	#$10,d6			; execute "seek" command

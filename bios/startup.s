@@ -4,13 +4,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/11/07 00:09:34 $
+* $Date: 1991/11/14 20:33:10 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.87  1991/11/14  20:33:10  apratt
+* Fixed an oops: the ROM CRC check should be done if you have NOT
+* been up for 80 seconds yet; instead it was done only if you HAVE
+* been up that long.  This version (11/14/91) is the "real" 2.06
+* (knock wood!).
+*
+* been up that long.  This version (11/14/91) is the "real" 2.06
+* (knock wood!).
+*
 * Revision 2.86  1991/11/07  00:09:34  apratt
 * Evidently not all Mega ST's are created equal.  The one I used here for
 * testing STe TOS on an ST worked with Theory 1 for noblank and theory 3 for
@@ -32,9 +41,6 @@
 * boot.  The cold-boot detection for this is the same as the hard-disk
 * timeout: if _hz_200 reads eighty seconds or more, then you don't get the
 * CRC check.  This bailout only works when not TT, because on TT it's quick
-* enough, and because without it there's no opportunity to use the ALT key to
-* go to ST LOW rez.
-*
 * enough, and because without it there's no opportunity to use the ALT key to
 * go to ST LOW rez.
 *
@@ -250,7 +256,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.86 $
+* $Revision: 2.87 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\startup.s,v $
@@ -2747,7 +2753,7 @@ gotd7:
 *
 * Added 4/24/91 by AKP because I got burned by an incorrect jumper setting.
 *
-	blo	crcdone			; skip if we've been alive a while
+* Changed 5/27/91 to turn on cache in TT so this is faster.
 *
 * Changed 11/5/91 to check only if _hz_200 < EIGHTY_SECONDS
 *   because otherwise warm boots take too long.  But not on TT because

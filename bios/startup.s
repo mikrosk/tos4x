@@ -3,19 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/07/26 19:42:08 $
+* $Date: 89/07/27 18:06:22 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.14  89/07/27  18:06:22  apratt
+* Added kcl_hook and bell_hook variables and initializations.
+* Added _SWI cookie and set bit 1 of _SND based on bit 7 of _SWI.
+*
 * Revision 2.13  89/07/26  19:42:08  apratt
 * Final BIOS for STPLUS: Added cookie jar, full-volume DMA sound,
 * added hard-disk boot delay, backed out MOVEVBL.
-*
+* 
 * Note: _longframe code is still dumb: it checks on every trap & RTE.
-*
+* 
 * Revision 2.12  89/07/20  15:36:50  apratt
 * Changed ttdelay code to use TTMFP timer A.  Also added code to catch
 * the return from Rwabs calls and clobber the cache if the operation
@@ -248,7 +252,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.13 $
+* $Revision: 2.14 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -338,7 +342,7 @@ STPLUS		=	1	; @check@
 
 LONGFRAME	=	1	; @check@
 
-systype		=	rom	; 'rom' or 'ram' @check@
+systype		=	ram	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
@@ -627,6 +631,8 @@ osconf		equ	%11001
 	.globl	_critic			; critical error handler binding for C
 	.globl	_hz_200			; 200hz raw system timer tick
 	.globl	_dskbufp		; pointer to some space for disk I/O
+	.globl	seekrate		; default floppy seek rate
+	.globl _fverify			; nonzero: verify on floppy write
 
 	.globl	kcl_hook		; hook for keyclick sound
 .if TT
@@ -706,12 +712,13 @@ osconf		equ	%11001
 	.globl	_supstk			; GEMDOS super stack
 	.globl	_diskbuf		; disk buffer
 
+	.globl	_getdsb			; return disk's state pointer
+	.globl	_boot			; load and check boot sector
 	.globl	_rwabs			; read/write on block dev
 
 	.globl	_dskinit		; disk system initialization
 	.globl	_flopvbl		; floppy vblank handler
 	.globl	_floprd			; read sector(s)
-
 	.globl	blink			; cursor blink (vblank)
 	.globl	def_bell		; default bell handler
 	.globl	def_click		; default keyclick handler
@@ -793,6 +800,12 @@ shiftmd		=	$ffff8260	; video	shift mode (resolution)
 ttcolor0	equ	$ffff8400	; TT background color reg
 .endc
 .endif
+*--- configuration switches
+.ifne STPLUS+TT
+CONF_SWITCHES	equ	$ffff9200
+TTD_CONF_SWITCHES equ	$ffff8000	; not used if not TT
+.endc
+* that the low bit of this register will always read as zero on STe,
 *--- DMA chip:
 diskctl		equ	$ffff8604	; disk controller data access
 fifo		equ	$ffff8606	; DMA mode control
@@ -979,8 +992,9 @@ memval3:	ds.l	1	; (51a)  memory validation (memval3)
 
 *--- "soft" console vectors
 xconstat:	ds.l	8	; (51e)  console status vectors
-
-*				; (5ac)
+xconin:		ds.l	8	; (53e)  console input vectors
+xcostat:	ds.l	8	; (55e)  console output-status vectors
+xconout:	ds.l	8	; (57e)  console output vectors
 
 _longframe:	ds.w	1	; (59e)  if nonzero, we're on 680[1-3]0.
 _p_cookie:	ds.l	1	; (5a0)  pointer to the Cookie Jar
@@ -996,7 +1010,7 @@ kcl_hook:	ds.l	1	; (5b0)  handler for keyclick
 *	This space reserved for		:
 *	future RAM-loaded fixes		:
 		.globl	fix_it_up
-fix_it_up:	ds.b	$800-$5ac
+fix_it_up:	ds.b	$700-$5b4
 levelA:		ds.b	$40
 levelB1:	ds.b	$40
 levelB2:	ds.b	$40
@@ -1638,6 +1652,8 @@ usem:	move.l	4(a0),end_os(a5)	; init end-of-OS pointer
 
 *--- Disk vectors:
 	move.l	#_dskinit,hdv_init.w	; initialization
+	move.l	#def_bell,bell_hook(a5)	; init def bell handler
+	move.l	#def_click,kcl_hook(a5)	; init def keyclick handler
 *--- Prtblk vectors:
  .ifne DMASND
 	clr.w	dmasndc(a5)		; reset sound chip
@@ -1737,7 +1753,54 @@ vtend:	move.w	(a0)+,d0
 	move.l	#$1,(a0)+		; GI sound only
 .endc
 .ifne DMASND
-	move.l	#$3,(a0)+		; GI sound + DMA sound
+	tst.b	ttscu1
+* there's a configuration strap which says "you've got the DMA sound chip,
+* but no audio electronics to make it come out the other end."
+* Check that here & don't set the bit if that's the case.
+
+	moveq.l	#1,d1			; GI sound always present
+
+
+*
+* This is a little tricky: the configuration bits can be in two different
+* places: one for STPLUS and new TTs, one for old TTs.  The 
+* equate to CONF_SWITCHES is set above for STPLUS and the "other" TTs,
+* and TTD_CONF_SWITCHES is the other one.  If we're on STPLUS, we just
+* read the bits.  If we're on TT, we read CONF_SWITCHES first, guarding
+* against bus error.  Bus error means the bits are found at memconf-1
+* (memconf is the odd byte). In either case, the bits are in the high byte
+* of a word where we don't care about the low byte.
+* Furthermore, the "1" state should be the default, since some STEs and TTs
+* are/were manufactured with all switches open (or missing!).
+*
+.ifne STPLUS
+	move.w	CONF_SWITCHES(a5),d0	; get configuration bits (as word!)
+.endc
+.ifne TT
+
+* must find configuration bits in either of two places: one for TTD,
+* one for all others.  Each address gives bus error on the other machine.
+
+	move.l	$8(a5),a1
+	move.l	sp,a2
+	move.l	#conf_berr,8(a5)
+	move.w	CONF_SWITCHES(a5),d0	; get conf bits from normal place
+	bra	gotem			; hey! no exception
+conf_berr:
+	move.w	TTD_CONF_SWITCHES(a5),d0
+gotem:	move.l	a1,8(a5)
+	move.l	a2,sp
+.endc
+	lsr.w	#8,d0			; get conf switches in low byte
+
+	btst.l	#$7,d0			; test high-order bit
+	sne	d2			; 1 means DMASND output present
+	and.b	#$2,d2			; mask off all but the %10 bit
+	or.b	d2,d1			; or in a 1 for present, 0 for missing
+	move.l	d1,(a0)+
+
+	move.l	#"_SWI",(a0)+
+	move.l	d0,(a0)+		; save configuration value read
 .endc
 * other values are undefined, but will eventually mean stuff like 2.88MB. 
 xfpudone:

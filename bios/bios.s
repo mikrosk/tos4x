@@ -1,19 +1,24 @@
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 88/11/02 15:22:35 $
+* $Date: 88/11/08 15:58:27 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.16  88/11/08  15:58:27  kbad
+* Modified keyboard driver so that ISO keyboards can produce correct
+* control keystrokes (previously, control was handled before alt, thus
+* rendering the alt-control keystrokes useless).
+*
 * Revision 1.15  88/11/02  15:22:35  apratt
 * Raised IPL to 7 for the duration of the centronics strobe, so
 * another interrupt can't cause the strobe to be active too long.
-*
+* 
 * Revision 1.14  88/09/06  11:32:32  kbad
 * Added DENMARK key table and driver, and fixed SWEDEN '|' on capslock.
 * 
@@ -69,7 +74,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.15 $
+* $Revision: 1.16 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -2712,15 +2717,16 @@ conin24b
 	bra	conin25
 conin24c
 	cmpi.b	#$36,d0		;convert CONTROL-6 to gsx standard
-	bne.b	conin24d
+	bne.b	conin24c
 	moveq	#$1e,d0		;change according to gsx spec
 	bra	conin25
-conin24d
-	andi.w	#$01F,d0	;CTRLize the rest of the keys
-	bra	conin25
+conin24c:
+	cmpi.b	#$2d,d0		;convert CONTROL-'-' to gsx standard
+	bne.b	conin24a
+	moveq	#$1f,d0		;change according to gsx spec
 conin24a
 	btst.b	#KBALT,kbshift(a5)	;is the alt key down?
-	beq	conin25
+* DON'T control-ize other keys just yet... wait until after the int'l munge.
 *
 	ifeq	COUNTRY-GERMANY
 * no, it wasn't ALT plus a keypad number key
@@ -2729,25 +2735,25 @@ notaltkp:
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altger1		;no...
-	bra	conin25		;process it
+	move.b	#$40,d0		;put in '@', then check the shift keys
 altger1	cmpi.b	#$27,d1		;is it a ALT-
 	beq	conin25a		;process it as unshifted
 	move.b	#$5c,d0		;put in '\', instead...it's a alt-shift umlaut!
 	move.b	kbshift(a5),d2	;grab current setting
 altger1:
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$27,d1		;is it a ALT-
 	bne.b	altger2		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 altger2	cmpi.b	#$28,d1		;is it a ALT-
 	beq	conin25a		;process it as unshifted
 	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift umlaut!
 	move.b	kbshift(a5),d2	;grab current setting
 altger2:
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	outside		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
@@ -2758,41 +2764,41 @@ altger2:
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altspa1		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift '
 	move.b	kbshift(a5),d2	;grab current setting
 altspa1:
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1b,d1		;is it a ALT-`
 	bne.b	altspa2		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift `
 	move.b	kbshift(a5),d2	;grab current setting
 altspa2:
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$2b,d1		;is it a ALT-\
 	bne.b	altspa3		;no...
-	bra	conin25		;process it
+	move.b	#$23,d0		;put in '#', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$40,d0		;put in '@', instead...it's a alt-shift \
 	move.b	kbshift(a5),d2	;grab current setting
 altspa3:
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altspa4		;no...
-	bra	conin25		;process it
+	move.b	#$81,d0		;put in ']', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	#$00,d0		;put in $00, instead...it's a alt-shift ;
-	bra	conin25		;process it
+	bra	conin25a		;process it
 altspa4:
 	endc
 	bne.b	outside		;no...
@@ -2803,33 +2809,33 @@ altspa4:
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-^?
 	bne.b	altfr1		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 altfr1	cmpi.b	#$1b,d1		;is it a ALT-$?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altfr1:	cmpi.b	#$1b,d1		;is it a ALT-$?
 	bne.b	altfr2		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 altfr2	cmpi.b	#$28,d1		;is it a ALT-
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altfr2:	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altfr3		;no...
-	bra	conin25		;process it
+	move.b	#$5c,d0		;put in '\', then check the shift keys
 altfr3	cmpi.b	#$2b,d1		;is it a ALT-#?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altfr3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
-	bra	conin25		;process it
+	move.b	#$40,d0		;put in '@', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
@@ -2841,33 +2847,33 @@ altfr3	cmpi.b	#$2b,d1		;is it a ALT-#?
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-^?
 	bne.b	altsw1		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 altsw1	cmpi.b	#$1b,d1		;is it a ALT-$?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw1:	cmpi.b	#$1b,d1		;is it a ALT-$?
 	bne.b	altsw2		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 altsw2	cmpi.b	#$28,d1		;is it a ALT-
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw2:	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altsw3		;no...
-	bra	conin25		;process it
+	move.b	#$60,d0		;put in '`', then check the shift keys
 altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
-	bra	conin25		;process it
+	move.b	#$5e,d0		;put in '^', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
@@ -2879,33 +2885,33 @@ altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-^?
 	bne.b	altsw1		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 altsw1	cmpi.b	#$1b,d1		;is it a ALT-$?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw1:	cmpi.b	#$1b,d1		;is it a ALT-$?
 	bne.b	altsw2		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 altsw2	cmpi.b	#$28,d1		;is it a ALT-
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw2:	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altsw3		;no...
-	bra	conin25		;process it
+	move.b	#$60,d0		;put in '`', then check the shift keys
 altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw3:	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
-	bra	conin25		;process it
+	move.b	#$5e,d0		;put in '^', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
@@ -2918,33 +2924,33 @@ altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
 	move.b	#$5b,d0		;put in '[', then check the shift keys
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	beq	conin25a		;process it as unshifted
 	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift ^
-	bra	conin25		;process it
+	bra	conin25a		;process it
 altsw1	cmpi.b	#$1b,d1		;is it a ALT-$?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	move.b	#$5d,d0		;put in ']', then check the shift keys
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a	;process it
-	beq	conin25		;process it as unshifted
+	beq	conin25a		;process it as unshifted
 	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift $
-	bra	conin25		;process it
+	bra	conin25a		;process it
 altsw2	cmpi.b	#$28,d1		;is it a ALT-
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	move.b	#$60,d0		;put in '`', then check the shift keys
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a	;process it
-	beq	conin25		;process it as unshifted
+	beq	conin25a		;process it as unshifted
 	move.b	#$7e,d0		;put in '~',instead...it's a alt-shift
-	bra	conin25		;process it
+	bra	conin25a		;process it
 altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	move.b	#$5e,d0		;put in '^', then check the shift keys
 	move.b	kbshift(a5),d2	;grab current setting
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
-	beq	conin25		;process it as unshifted
+	beq	conin25a		;process it as unshifted
 	move.b	#$40,d0		;put in '@', instead...it's a alt-shift #
-	bra	conin25		;process it
+	move.b	#'~',d0		;put in '~',instead...it's a alt-shift-\
 	bra	conin25a	;process it
 	endc
 	bne.b	outside		;no...
@@ -2957,37 +2963,37 @@ altsw3	cmpi.b	#$2b,d1		;is it a ALT-#?
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altsw1		;no...
-	bra	conin25		;process it
+	move.b	#$40,d0		;put in '@', then check the shift keys
 altsw1	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw1:	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	bne.b	altsw2		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 altsw2	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw2:	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	bne.b	altsw3		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 altsw3	cmpi.b	#$1b,d1		;is it a ALT-!
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	bra	conin25		;process it
+	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift umlaut!
 altsw4	cmpi.b	#$2b,d1		;is it a ALT-$?
 altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 	bne.b	altsw4		;no...
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	bne.b	outside		;no...
-	bra	conin25		;process it
+	move.b	#$7e,d0		;put in '~', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
@@ -2999,49 +3005,49 @@ altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altsw1		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 altsw1	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw1:	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	bne.b	altsw2		;no...
-	bra	conin25		;process it
+	move.b	#$23,d0		;put in '#', then check the shift keys
 altsw2	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw2:	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	bne.b	altsw3		;no...
-	bra	conin25		;process it
+	move.b	#$40,d0		;put in '@', then check the shift keys
 altsw3	cmpi.b	#$1b,d1		;is it a ALT-!
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 	bne.b	altsw4		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 altsw4	cmpi.b	#$2b,d1		;is it a ALT-$?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	bne.b	altsw5		;no...
-	bra	conin25		;process it
+	move.b	#$5c,d0		;put in '\', then check the shift keys
 altsw5	cmpi.b	#$35,d1		;is it a ALT-$?
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw5:	cmpi.b	#$35,d1		;is it a ALT-$?
 	bne.b	outside		;no...
-	bra	conin25		;process it
+	move.b	#$3c,d0		;put in '<', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
@@ -3054,37 +3060,37 @@ altsw5	cmpi.b	#$35,d1		;is it a ALT-$?
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
 	bne.b	altsw1		;no...
-	bra	conin25		;process it
+	move.b	#$40,d0		;put in '@', then check the shift keys
 altsw1	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw1:	cmpi.b	#$27,d1		;is it a ALT-O with two .. on top
 	bne.b	altsw2		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 altsw2	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw2:	cmpi.b	#$28,d1		;is it a ALT-A with two .. on top
 	bne.b	altsw3		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 altsw3	cmpi.b	#$1b,d1		;is it a ALT-!
 	andi.b	#$3,d2		;KBRSH+KBLSH bits
 	beq	conin25a		;process it as unshifted
-	bra	conin25		;process it
+	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift umlaut!
 altsw4	cmpi.b	#$2b,d1		;is it a ALT-$?
 altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 	bne.b	altsw4		;no...
 	move.b	kbshift(a5),d2	;grab current setting
 	bra	conin25a		;process it
-	beq	conin25		;process it as unshifted
+altsw4:	cmpi.b	#$2b,d1		;is it a ALT-$?
 	bne.b	outside		;no...
-	bra	conin25		;process it
+	move.b	#$7e,d0		;put in '~', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
@@ -3096,33 +3102,33 @@ altsw3:	cmpi.b	#$1b,d1		;is it a ALT-!
 
 	move.b	kbshift(a5),d2	;grab current setting
 
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1a,d1		;is it a ALT-^?
 	bne.b	altden1		;no...
-	bra	conin25		;process it
+	move.b	#$5b,d0		;put in '[', then check the shift keys
 altden1	cmpi.b	#$1b,d1		;is it a ALT-$?
 	beq	conin25a		;process it as unshifted
 	move.b	#$7b,d0		;put in '{', instead...it's a alt-shift ^
 	move.b	kbshift(a5),d2	;grab current setting
 altden1:
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$1b,d1		;is it a ALT-$?
 	bne.b	altden2		;no...
-	bra	conin25		;process it
+	move.b	#$5d,d0		;put in ']', then check the shift keys
 altden2	cmpi.b	#$28,d1		;is it a ALT-
 	beq	conin25a		;process it as unshifted
 	move.b	#$7d,d0		;put in '}', instead...it's a alt-shift $
 	move.b	kbshift(a5),d2	;grab current setting
 altden2:
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$28,d1		;is it a ALT-
 	bne.b	altden3		;no...
-	bra	conin25		;process it
+	move.b	#$5c,d0		;put in '\', then check the shift keys
 altden3	cmpi.b	#$2b,d1		;is it a ALT-#?
 	beq	conin25a		;process it as unshifted
 	move.b	#$7c,d0		;put in '|',instead...it's a alt-shift
 	move.b	kbshift(a5),d2	;grab current setting
 altden3:
-	beq	conin25		;process it as unshifted
+	cmpi.b	#$2b,d1		;is it a ALT-#?
 	bne.b	outside		;no...
-	bra	conin25		;process it
+	move.b	#$40,d0		;put in '@', then check the shift keys
 	move.b	kbshift.w,d2	;grab current setting
 	endc
 	beq	conin25a		;process it as unshifted
@@ -3177,7 +3183,9 @@ alt13:	cmpi.b	#$50,d1		;is it an down arrow?
 	move.b	#$0,d1		;x value for down arrow
 	move.b	#$8,d2		;y value for down arrow
 	move.b	kbshift.w,d0	;grab current setting
-alt14	cmpi.b	#$2,d1
+alt14	btst.b	#KBCTL,kbshift(a5) ; control key?
+	beq	keymaus
+	move.b	#$1,d2		;y value for down arrow
 	bra	keymaus
 
 alt14:	btst.b	#KBCTL,kbshift.w ; control key?
@@ -3194,6 +3202,12 @@ alt3	cmpi.b	#$61,d0		;is the key an ascii 'a' or greater?
 	bhi.b	alt3		;no...skip to check if 'a'-'z'...
 alt2:	moveq	#$0,d0
 	bra.b	conin25
+conin25a
+	btst.b	#KBCTL,kbshift(a5) ; control key?
+	cmpi.b	#$7a,d0		;is the key an ascii 'z' or less?
+conin25b
+	bra.b	alt2
+conin25a:
 conin25	asl.w	#$8,d1		;shift the scan code to the word's high byte
 conin25b:
 	andi.w	#$01F,d0	;CTRLize the key

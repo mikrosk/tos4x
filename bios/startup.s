@@ -3,16 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/07 16:29:00 $
+* $Date: 89/09/18 13:35:33 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.30  89/09/18  13:35:33  apratt
+* Removed LONGFRAME conditional assembly: now LONGFRAME is all there is.
+* Removed code which emulated STE color registers; it turns out
+* that the TT shifter's ST-compatible registers *are* like STE regs.
+* Added code to retry _dmaread if it returns a "retryable" error
+* (other than timeout).
+*
 * Revision 2.29  89/09/07  16:29:00  apratt
 * Changed date & dosdate and added 'check' to date lines.
-*
+* 
 * Revision 2.28  89/09/05  17:49:47  apratt
 * Fixed dumb bug in setpalette code for TT.  Works now.
 * 
@@ -318,7 +325,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.29 $
+* $Revision: 2.30 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -402,13 +409,7 @@ DMAINV		=	0	; @check@
 
 STPLUS		=	0	; @check@
 
-* Set LONGFRAME to 1 for code which runs on 68000 *or* 680[1-3]0.
-* Even if this is zero, the new system variable _longframe at $59e
-* is initialized.
-
-LONGFRAME	=	1	; @check@
-
-systype		=	rom	; 'rom' or 'ram' @check@
+systype		=	ram	; 'rom' or 'ram' @check@
 country		=	usa     ; 'usa', etc.... @check@
 
 **** EQUATES INSIDE CONDITIONALS must be `equ', not =.  Stoopid as68!
@@ -422,9 +423,9 @@ dosdate		equ	%0001001001111110 ; Mar 30, 1989
 
 .ifne TT
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$09071989	; TT date, $MMDDYYYY @check@
+date		equ	$09121989	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001001100100111 ; Sep 7, 1989
+dosdate		equ	%0001001100101100 ; Sep 12, 1989
 .endc
 
 ****
@@ -2126,8 +2127,7 @@ setvb2:	move.l	#reseth,swv_vec(a5)	; RESET system on monitor change
 * on ST, you'd better not change mode during a vblank; what we do
 * is call noblank1, which returns when it's sure we are NOT in a vblank.
 	clr.w	d0			; magic bit# = 0
-.ifne LONGFRAME
-* LONGFRAME: install a handler for privilege violation which handles move 
+	bsr	cartscan		; execute cartridge aps
 .if STPAD
 	bsr	cart1			; (on STPAD, scan 256KB after ROM, too)
 * bus error, not privelege violation... Slightly harder to debug.  
@@ -2174,7 +2174,6 @@ priv1:	movem.l	(sp)+,d0/a0
 	rte
 priv2:	nop				; continue booting here
 * What's below is the same as what's above, except that a0/a1 are restored
-.endc
 * from their saved values before the jsr to pspace: either might be in the 
 * dest ea of the move.
 
@@ -2555,23 +2554,38 @@ sizeikbd	equ	*-ikbreset-1
 	tst.w	d0			; any errors?
 	bne	dskb1			; (yes -- punt)
 	move.l	_dskbufp.w,a0		; a0 -> disk buffer
+	jsr	(a0)			; execute boot sector (it might return)
 .endif
+dskb1:	rts				; return status
+
+
+.if systype == rom
+
 *		checksum is $1234), then it is executed.  The search stops
 * 		fall through to continuation of bar shrinking;
 * Check the keyboard for a user aborting the timeout
 	moveq.l	#8,d4			; start with SCSI device 0
 dmab_todone:
+	move.w	#1,d1			; retry count (try twice total)
+	move.w	#13,-(sp)
+	move.l	#$00030002,-(sp)
 	move.w	d4,-(sp)		; device number
 	move.l	_dskbufp,-(sp)		; buffer
 	move.w	#1,-(sp)		; count of one
 	clr.l	-(sp)			; sector zero
 	jsr	_dmaread
 	addq.l	#6,sp
+	move.w	(sp)+,d1		; get retry count back
 dmab_skip:
-	bne	dmarfail
+
+* Begin scanning DMA devices for a bootable one.  The sequence of devices
+* you scan varies, and is described in dmarfail where the device number is
+*					; retry count not expired
+
+.if TT
 	jsr	_resetscsi		; reset the SCSI bus
 .endif
-	move.l	_dskbufp,a0
+dmaok:	move.l	_dskbufp,a0
 	clr.w	the_env			; zero our device sequencer
 
 .if TT
@@ -2579,6 +2593,8 @@ dmab_skip:
 * move boot preference into _upref: hi 5 bits of ttscu1, or
 	beq.s	dmafound		; success!
 *
+* dma failed or sector isn't bootable ($1234) or didn't change hdv_rw:
+dmaloop:
 	move.w	#DMAB_RETRIES-1,d1	; retry count (usually 2 total)
 	addq.w	#1,d4			; read failed or no exec or no boot
 	move.w	d4,d0			; try next dev
@@ -2593,9 +2609,9 @@ dmab_skip:
 	clr.l	-(sp)			;  "  sector zero	"
 	jsr	_dmaread		; read the sector
 * We get here if the _dmaread call worked and gave an executable sector.
-* We load up the registers and jump to that sector.  If it returns,
-* it will return to our caller and we'll carry on booting TOS (with
-* the AUTO folder, etc.).
+* We load up the registers and jsr to that sector.  If it returns,
+* we check hdv_rw for a change; if it changed, we rts to go on booting
+* TOS.  If it didn't change, we try the next device.
 	cmp.w	#bootmagic,d1
 	beq	dmafound		; success!
 	move.l	_dskbufp,a0
@@ -2907,14 +2923,7 @@ swmon2:	move.b	d0,sshiftmd(a5)
 	lea	ttcolor0(a5),a1		; a1 -> hardware palette base
 .endc
 	move.w	#16-1,d1		; d1 = count
-.ifeq TT
 vbl2:	move.w	(a0)+,(a1)+		; load a palette
-.endc
-.ifne TT
-vbl2:	move.w	(a0)+,d0
-	bsr	sw2hw
-	move.w	d0,(a1)+
-.endc
 * rez was low, but now there's a mono monitor! Go to high rez & bail out.
 	clr.l	colorptr(a5)		; zap colorptr
 * This code calls noblank1 to wait until vblank is over before changing
@@ -3035,7 +3044,7 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 
 
 
-* If LONGFRAME is 1, there is code to check _longframe and handle
+* There is code to check _longframe and handle
 * long frames.  I hope it's true that RTE doesn't care what the offset
 * Falls-into:	_critich
 * (screwy way to save two bytes...)
@@ -3049,12 +3058,10 @@ wvbl1:	cmp.l	_frclock,d0		; wait for clock to change
 * Loads -1 into D0 and returns.
 *
 *-
-.ifeq LONGFRAME-1
 	tst.w	_longframe		; long frames?
 	beq.s	trap_1			; nope.
 *+
-trap_1:	nop				; sorry about this...
-.endc
+* trp13h - GEMDOS BIOS trap handler (trap 13)
 * trp14h - Atari BIOS extensions (trap 14)
 * traph  - trap handler
 *
@@ -3086,12 +3093,10 @@ trap_1:	nop				; sorry about this...
 * part of the format/offset word is, because I just push a zero.
 * 
 *-
-.ifeq LONGFRAME-1
 	tst.w	_longframe
 	beq.s	b_exit1
 traph:	move.l	savptr,a1		; a1 -> register save area
-b_exit1: nop				; sorry about this...
-.endc
+	move.w	(sp)+,d0		; pop SR and save it
 	move.w	d0,-(a1)		; (need in D0 for user-mode test)
 	move.l	(sp)+,-(a1)		; save return addr
 
@@ -3522,65 +3527,29 @@ _getrez:
 .endif
 	rts				; return rez
 
+
+*+
+* _setscreen - set screen location(s), rez
+*	_setscreen(logicalLoc, physicalLoc, rez)
+*	LONG logicalLoc, physicalLoc;
+*	WORD rez;
 *
-.ifeq TT
 *-
 _setscreen:
 
 *--- set logical location:
 	lea	color0(a5),a0		; a0 -> base of palette memory
 	bmi	f5a
-.ifeq STPLUS
+.ifeq STPLUS+TT
 *--- set physical location:
 .endc
-.ifne STPLUS
-	and.w	#$0fff,d0		; STPLUS has different dirty bits 
+.ifne STPLUS+TT
+	and.w	#$0fff,d0		; STPLUS/TT have other dirty bits
 .endc
 	tst.w	6(sp)			; if new color is <0, don't set it
 	move.b	$a(sp),dbasel		; set bits 8..15 of hardware pointer
  	move.b	$b(sp),dbasell		; STPLUS set low 8 bits, too
 					; (harmless on ST)
-.endc
-
-.ifne TT
-_setcolor:
-	move.w	4(sp),d1
-	add.w	d1,d1
-	and.w	#$1ff,d1
-	lea	ttcolor0(a5),a0
-	add.w	d1,a0
-	move.w	(a0),d0
-	bsr	hw2sw
-	tst.w	6(sp)
-	bmi	_setc1
-	move.w	d0,a1
-	move.w	6(sp),d0
-	bsr	sw2hw
-	move.w	d0,(a0)
-	move.w	a1,d0
-_setc1:	rts
-
-* change d0 from RRRrGGGgBBBb to rRRRgGGGbBBB
-hw2sw:
-	move.w	d0,d2
-	lsr.w	#1,d2		; d2=00RRRrGGGgBBB
-	and.w	#$777,d2	; d2=00RRR0GGG0BBB
-	lsl.w	#3,d0		; d0=0rGGGgBBBb000
-	and.w	#$888,d0	; d0=0r000g000b000
-	or.w	d2,d0		; d0=0rRRRgGGGbBBB
-	rts
-
-* change d0 from rRRRgGGGbBBB to RRRrGGGgBBBb
-sw2hw:
-	move.w	d0,d2
-	and.w	#$777,d2	; d2=00RRR0GGG0BBB
-	lsl.w	#1,d2		; d2=0RRR0GGG0BBB0
-	and.w	#$888,d0	; d0=0r000g000b000
-	lsr.w	#3,d0		; d0=0000r000g000b
-	or.w	d2,d0		; d0=0RRRrGGGgBBBb
-	rts
-
-.endc
 
 *--- change screen resolution (clears the screen, clobbers the cursor):
 f5b:	tst.w	$c(sp)			; if(rez < 0) then ignore it

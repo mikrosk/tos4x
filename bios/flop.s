@@ -4,16 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/07/19 18:51:14 $
+* $Date: 90/08/03 13:22:58 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.17  90/08/03  13:22:58  apratt
+* TTOS FINAL RELEASE
+*
 * Revision 2.16  90/07/19  18:51:14  apratt
 * Removed some leftover debugging code.
-*
+* 
 * Revision 2.15  90/05/22  13:53:33  apratt
 * In go2track, an EQ return from flopcmds doesn't mean success, it
 * only means no timeout; you have to check the error bits in d7
@@ -137,7 +140,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.16 $
+* $Revision: 2.17 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $

@@ -4,17 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/01 13:12:28 $
+* $Date: 90/08/03 13:23:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.57  90/08/03  13:23:45  apratt
+* TTOS FINAL RELEASE
+*
 * Revision 2.56  90/08/01  13:12:28  apratt
 * Changed boot color to white, and commented out color-cycling code.
 * Changed date to 8/1/90.  This is the final TT release revision.
-*
+* 
 * Revision 2.55  90/07/27  15:08:15  apratt
 * Removed obsolete (and long-commented-out) dmaboot code.
 * 
@@ -519,7 +522,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.56 $
+* $Revision: 2.57 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $

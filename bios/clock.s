@@ -4,18 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/01 13:10:44 $
+* $Date: 90/08/03 13:21:39 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.9  90/08/03  13:21:39  apratt
+* TTOS FINAL RELEASE
+*
 * Revision 2.8  90/08/01  13:10:44  apratt
 * Fixed a bug: check didn't leave regs right when checksum was wrong,
 * even though the read operation expected to be able to do the read
 * anyway.
-*
+* 
 * Revision 2.7  90/04/30  18:43:38  apratt
 * Added NVMaccess call: see comments for details.
 * 
@@ -57,7 +60,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.8 $
+* $Revision: 2.9 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $

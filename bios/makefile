@@ -1,15 +1,18 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.5 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.6 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 90/08/03 11:28:25 $     $Locker:  $
+#  $Author: apratt $	$Date: 90/08/03 13:23:19 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.5  90/08/03  11:28:25  apratt
-#  This version has variables set for machine and country, to tell it
-#  what switches and object files to use.
+#  Revision 2.6  90/08/03  13:23:19  apratt
+#  TTOS FINAL RELEASE
 #
+# Revision 2.5  90/08/03  11:28:25  apratt
+# This version has variables set for machine and country, to tell it
+# what switches and object files to use.
+# 
 # Revision 2.4  89/09/22  16:54:54  apratt
 # THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 # No functional changes from previous revision, which is the last to

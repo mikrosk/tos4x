@@ -1,18 +1,22 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/09/06 11:32:32 $
+* $Date: 88/11/02 15:22:35 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 1.15  88/11/02  15:22:35  apratt
+* Raised IPL to 7 for the duration of the centronics strobe, so
+* another interrupt can't cause the strobe to be active too long.
+*
 * Revision 1.14  88/09/06  11:32:32  kbad
 * Added DENMARK key table and driver, and fixed SWEDEN '|' on capslock.
-*
+* 
 * Revision 1.13  88/08/08  17:56:44  apratt
 * Removed 32K limit on serial input/output buffers.  Limit
 * is now 64K (actually 64K-1 for AUX, MIDI and 64K-4 for KB).
@@ -65,7 +69,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.14 $
+* $Revision: 1.15 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -1051,9 +1055,14 @@ lperr:	moveq	#$0,d0		; return value of 0 indicates timeout
 	bsr	gientry
 	move.w	d3,sr		;restore status register
 
+	move.w	6(sp),d0	;retrieve byte to be sent and...
+	move.b	#portb+$80,d1	;write out byte to parallel port ;;q
+	bsr	gientry
+
 * go to IPL 7 for duration of strobe, so vblank (etc) can't make it too long.
 * added 11/2/88 AKP
 	move.w	sr,-(sp)
+	or.w	#$700,sr
 	moveq	#$-1,d0		;set d0=-1 for good transfer status
 lexit	rts
 *				;timing requirements of some off brand printer

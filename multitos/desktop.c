@@ -549,7 +549,7 @@ m_2:	  desknoerr();
 	}
 
 	Debug1( "Menu_register\r\n" );
-	menu_register( desk_id, "  \016\017 DESKTOP" );
+	menu_register( desk_id, get_fstring(DESKNAME) );
 
 	Debug1( "Open def\r\n" );
 	open_def();			/* open default windows	*/

@@ -68,7 +68,7 @@ apbuf_init()
 	  appfree = app;
 
 	if ( appnode )
-	  Mfree( appnode );
+	  free( appnode );
 
 	appnode = app;			/* new app buffer		*/
 

@@ -270,7 +270,9 @@ up_win( win, mediac )
 	  {
 	    strcpy( wilds, &win->w_path[2] );
 	    return( open_subdir( win, 0, FALSE, FALSE, TRUE ) );
-	  }
+	  } else {
+	    return( FALSE );
+	  }	    
 	}
 
 	return( TRUE );

@@ -674,7 +674,7 @@ main( )
 	  gsx_mon();
 	}
 
-				/* preget the critcial error object */
+				/* preget the critical error object */
 	for( i = 0; i < MAXERR; i++ )
 	  rs_gaddr( ad_sysglo, R_TREE, ml_alrt[i], &critobj[i] );
 

@@ -11,13 +11,7 @@ PATH=i:\bin,c:\mint\bin
 
 #### Country definitions
 
-COUNTRY = usa
-
-## NOTE: When making UK AES, set COUNTRY to usa and CDEF to UK.
-##       This will build a ttaesusa.o which must then be manually
-##	 renamed to ttaesuk.o.
-##	The same goes for SWISSGER and SWISSFRA -- use grm and fre,
-##	and manually rename the ttaesxxx.o file that gets built.
+C = usa
 
 ##
 #### Default actions:
@@ -49,17 +43,10 @@ COUNTRY = usa
 #### Default dependencies & object equates
 ##
 
-STDESK.H =	portab.h deskobde.h deskdefi.h deskwin.h desk$(COUNTRY).h
+STDESK.H =	portab.h deskobde.h deskdefi.h deskwin.h deskusa.h
 STGEM.H =	compiler.h machine.h gemusa.h
 GEMPD.H =	pdstruct.h dispvars.h
 GEMOLIB.H =	obdefs.h gemlib.h
-
-RSC1 =		glue.usa
-RSC2 =		glue.grm 
-RSC3 =		glue.fre
-RSC4 =		glue.ita 
-#RSC5 =		glue.swe
-RSC6 = 		glue.spa
 
 AB = 		gemctrl.oo ctrlbind.oo mn_event.oo mn_mbar.oo mn_popup.oo\
 		mn_tools.oo mn_index.oo mn_menu.oo mn_submn.oo
@@ -88,23 +75,18 @@ DESKOBJ = 	deskstart.o deskact.o deskapp.o deskvdi.o deskbutt.o \
 ## -l generates too many symbols, so we use -s instead
 ##		aln -w -l -k gemstart -q -o $@
 
-gem.sys:	$(STARTUP) $(AB) $(AESOBJ) $(DESKOBJ) $(RSC1) $(RSC2) $(RSC3)\
-		$(RSC4) $(RSC5) $(RSC6)
+gem.sys:	$(STARTUP) $(AESOBJ) ab.o $(DESKOBJ) glue.$(C)
+		aln -u -s -o gem.sys $(STARTUP) $(AESOBJ) ab.o $(DESKOBJ)\
+		-i glue.$(C) _USARSC
+		prgflags 7 7 gem.sys
+		@echo 'gem.sys made.'
+
+ab.o:	$(AB)
 		aln -u -u -q -k _iscrmgr -k _mn_hdo -k _mn_popup\
 		-k _mn_attach -k _mn_istart -k _mn_settings\
 		-k _mn_free -k _mn_new -k _mn_init -k _ArrowScroll\
 		-k _PushArrowTe -o ab.o $(AB)
 
-#		aln -u -s -o gem.sys $(STARTUP) $(AESOBJ) ab.o $(DESKOBJ)\
-#		-i $(RSC1) _USARSC -i $(RSC2) _GRMRSC -i $(RSC3) _FRERSC\
-#		-i $(RSC4) _ITARSC -i $(RSC6) _SPARSC
-
-		aln -u -s -o gem.sys $(STARTUP) $(AESOBJ) ab.o $(DESKOBJ)\
-		-i $(RSC1) _USARSC
-
-		prgflags 7 7 gem.sys
-#		copy gem.sys c:\gem.sys				
-		@echo 'gem.sys made.'
 ##
 #### Desktop dependencies
 ##

@@ -2,11 +2,14 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 2.2 $	$Source: /u2/MRS/osrevisions/aes/machine.h,v $
+*  $Revision: 1.1 $	$Source: f:\multitos/RCS/machine.h,v $
 * =======================================================================
-*  $Author: mui $	$Date: 89/04/26 18:29:04 $	$Locker: kbad $
+*  $Author: ersmith $	$Date: 1993/02/24 23:52:46 $	$Locker:  $
 * =======================================================================
-*  $Log:	machine.h,v $
+*  $Log: machine.h,v $
+*  Revision 1.1  1993/02/24  23:52:46  ersmith
+*  1 meg floppy MultiTOS
+*
 * Revision 2.2  89/04/26  18:29:04  mui
 * TT
 * 

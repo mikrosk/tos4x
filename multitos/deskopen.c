@@ -734,7 +734,7 @@ open_wfile( win, item, tail, swin, sitem )
 	  bptr = put_name( win, dir->d_name );	
 	  if ( win == swin )
 	  {
-	    i = strlen( bptr );
+	    i = strlen( bptr ) + 1;	/* +1 for trailing 0 */
 	    if ( addr = malloc( (LONG)i ) )
 	      strcpy( bptr, addr );
 	    else

@@ -236,7 +236,7 @@ fc_2:	  if ( obj[FCHIGH].ob_state & SELECTED )
 	  ret = FCFORMAT;
 	}
 
-#if 0
+#ifdef WINDOWED_DIALOGS
 	d_handle = dr_dial_w( ADFORMAT, TRUE, MOVE|NAME );
 #else
 	d_handle = dr_dial_w( ADFORMAT, FALSE, 0 );

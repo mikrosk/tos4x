@@ -4,11 +4,14 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 2.2 $	$Source: /u2/MRS/osrevisions/aes/funcdef.h,v $
+*  $Revision: 1.1 $	$Source: f:\multitos/RCS/vdidefs.h,v $
 * =======================================================================
-*  $Author: mui $	$Date: 89/04/26 18:20:13 $	$Locker: kbad $
+*  $Author: ersmith $	$Date: 1993/02/24 23:52:46 $	$Locker:  $
 * =======================================================================
-*  $Log:	funcdef.h,v $
+*  $Log: vdidefs.h,v $
+*  Revision 1.1  1993/02/24  23:52:46  ersmith
+*  1 meg floppy MultiTOS
+*
 * Revision 2.2  89/04/26  18:20:13  mui
 * TT
 * 

@@ -1,6 +1,9 @@
 /* kballoc.c - fast allocator for LC5 based on AKP's nalloc2.c
  * ===========================================================================
- * $Log$
+ * $Log: kballoc.c,v $
+ * Revision 1.1  1993/02/24  23:52:46  ersmith
+ * 1 meg floppy MultiTOS
+ *
  * 911025 kbad added mavail(), mheap()
  * 910508 kbad
  */

@@ -836,13 +836,13 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 		   if ( newaddr )
 		     dos_free( newaddr );
 		   newaddr = dptr;
-		   ad_shtail = newaddr;
 		   if ( changed )
 		   {
 		     dos_free( envrn );
 		     envrn = ad_envrn;
 		     changed = FALSE;
 		   }
+		   LBCOPY( ad_shcmd, cptr, CMDLEN );
 #endif
 		   if ( !changed )
 		   {
@@ -861,11 +861,6 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 		     }
 		   }
 
-#if 0
-/*		   ad_shtail[0] = strlen( ad_shcmd );	
-		   strcpy( ad_shcmd, &ad_shtail[1] );
-*/
-#endif
 	           ret = sh_fork( cptr, ad_shtail, envrn );
 		   if ( !ret )
 		     Debug1( "Shel fork fails\r\n" );

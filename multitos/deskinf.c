@@ -681,6 +681,7 @@ save_inf( todisk, path )
 	LONG		size;
 	BYTE		buf1[2];
 
+	afile = 0;
 	if ( size = malloc( 0x5000L ) )	/* get 20K memory	*/
 	{
 	  buf = pcurr = size;
@@ -962,7 +963,7 @@ if_1:
 	*pcurr = 0;		/* end of string mark */
 
 	len = strlen( buf );
-	free( afile );	
+	if (afile) free(afile);
 	afile = malloc( (LONG)((UWORD)len) );
 	bfill( len, 0, afile );		/* clean up buffer	*/
 	shel_put( buf, len );		/* copy to aes buffer	*/
@@ -1006,6 +1007,7 @@ if_3:					/* create a file, read & write	*/
 	
 if_2:
 	free( buf );
+	if (afile) free(afile);
 
 	if ( todisk )
 	  up_allwin( path, FALSE ); /* rebuild any window on the INF drive */

@@ -400,8 +400,11 @@ file_op( dest, mode )
 
 					/* draw the box		*/
 
+#ifdef WINDOWED_DIALOGS
 	handle = dr_dial_w( CPBOX, TRUE, MOVE|NAME|CLOSE );	
-
+#else
+	handle = dr_dial_w( CPBOX, FALSE, 0);
+#endif
 	if ( d_display )
 	  item = form_do( obj, 0 ) & 0x7FFF;
 	else
@@ -419,9 +422,12 @@ file_op( dest, mode )
 	}
 
 	obj[item].ob_state = NORMAL;
-/*	do_finish( CPBOX );	*/
-	wind_close( handle );
-	wind_delete( handle );	/* ++ERS 1/08/93 */
+	if (handle < 0)
+		do_finish( CPBOX );
+	else {
+		wind_close( handle );
+		wind_delete( handle );	/* ++ERS 1/08/93 */
+	}
 
 	if ( ( item == OKCP ) && ( ret ) )
 	{

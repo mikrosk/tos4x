@@ -81,13 +81,11 @@ EXTERN	WORD	gl_button;
 OBJECT	*critobj[MAXERR];		/* critical error objects	*/
 
 GLOBAL 	BYTE	gl_nils[6] = {0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF};
-GLOBAL	WORD	ml_alrt[] = 
-		{ALRT00CRT,ALRT01CRT,ALRT02CRT,ALRT03CRT,ALRT04CRT,
-			ALRT05CRT, ALRTDSWAP};
-MLOCAL	WORD	ml_pwlv[] = 
-		{0x0102,0x0102,0x0102,0x0101,0x0002,0x0001,0x0101};
 
-MLOCAL	WORD	ml_ted[] = { A00,A01,A02,A03,-1,-1,A06 };
+GLOBAL	WORD	ml_alrt[MAXERR] = 
+		{ALRT00CRT,ALRT01CRT,ALRT02CRT,ALRT03CRT,ALRT04CRT,
+			ALRT05CRT, ALRTDSWAP, ALRTINSS };
+MLOCAL	WORD	ml_ted[MAXERR] = { A00,A01,A02,A03,-1,-1,A06,-1 };
 
 GLOBAL	WORD	tmpmoff;
 GLOBAL	WORD	tmpmon;
@@ -486,6 +484,17 @@ eralert( n, d )
 	drive_let = ( d + 'A' ) << 8;	/* make it a 2 char string!	*/
 
 	gsx_gclip( &t );
+
+/*
+ * Kludge for MultiTOS on single floppy, no hard drive systems;
+ * if the error alert is the "Please insert disk B: into drive A:"
+ * one, and it's not for a floppy, then we change it to
+ * "Please insert system disk into drive A:".
+ */
+	if (n == MAXERR-2 && d > 1)
+	  {
+		n = MAXERR-1;
+	  }
 	obj = critobj[n];
 
 	if ( ml_ted[n] != -1 )		/* set the drive name */

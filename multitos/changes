@@ -1,3 +1,81 @@
+Changes made 2/24/93:
+
+gemctrl.c:
+	Moved the clearing of the checkmark. This seems to correct the
+	"menu bar" bug.
+
+Changes made 2/23/93:
+
+gemfre.rsc:
+	Added the French translation of the "Please insert system disk"
+	dialog.
+deskwin.c:
+	Hans-Martin fixed a bug in the desktop window code: if you hit ^A
+	to change a window to drive A:, and drive A: is not responding, the
+	old window contents are still displayed, but the desktop tries to
+	use A: as the drive letter when copying files out of the window.
+gemctrl.c:
+	Changed the screen manager's "sleep time" to a much lower value
+	when resolution changes are in progress; this makes the resolution
+	change happen much sooner, and avoids possible user confusion.
+
+Changes made 2/18/93:
+
+deskmenu.c, desk*.rsc:
+	Changed the name of the desktop's "iconified" icon from WINICON
+	to SMILEY, because WINICON was already in use with a completely
+	different meaning.
+deskact.c,deskmem.c:
+	Fixed some Mfree's that accidentally got left in during
+	the change to kballoc().
+deskopen.c:
+	Fixed a memory allocation problem (strlen(s) isn't enough
+	room for "s"; you need to add 1 for the trailing 0).
+
+Changes made 2/17/93:
+
+desktop.c,desk*.rsc:
+	Moved the "DESKTOP" string which is used for menu_register
+	into the resource, and translated it to "Bureau GEM" in the
+	French resource.
+deskmn.c:
+	Fixed the Set Video dialog so that if the resolution change
+	fails, the dialog doesn't have that resolution selected next
+	time it comes up.
+deskmenu.c:
+	Took out the code for changing resolutions with ALT+number;
+	this isn't implemented for Falcon, and was causing strange
+	error messages if users tried to "change" to the current
+	resolution.
+deskact.c:
+	Made the "Copy files" and "Delete files" dialogs back into
+	dialogs instead of being hybrid dialog/windows; this should
+	at least prevent the many bug reports about incorrect redraws,
+	inability to move the "windows" at certain times, etc.
+gemstart.s:
+	Removed the code that changed exec_os, since MiNT already sets this
+	up correctly (and since the code was broken :-( ).
+
+Changes made 2/11/93:
+
+gempd.c:
+	Added checks for names that exceed the hardcoded 8.3 assumptions
+	(this matters even on GEMDOS only systems, because users can type
+	such long names at the "Open Application" dialog on the desktop,
+	and this used to crash the system!)
+deskshel.c:
+	Simplified the launch_pref code so that if the user enters
+	"..\foo\bar" into the "Open Application" dialog, it's still
+	searched for relative to the current window path.
+
+Changes made 2/2/93:
+
+desk*.c,utility.c:
+	Changed the desktop to use Allan & Ken's malloc() code instead
+	of calling the OS Malloc function directoy, in hopes of saving
+	some memory. So far, only 8K has been saved :-(, but perhaps
+	tuning will help.
+
 Changes made 1/25/93:
 
 gemgrm.rsc,deskgrm.rsc:

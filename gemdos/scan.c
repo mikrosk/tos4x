@@ -1,12 +1,16 @@
 /*
 ***************************    SCAN.C     ********************************
 *
-* $Revision: 1.15 $	$Source: e:/tos/gd2\RCS\scan.c,v $
+* $Revision: 1.16 $	$Source: e:/tos/gd2\RCS\scan.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 17:18:56 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/25 11:51:48 $    $Locker:  $
 * =======================================================================
 *
 * $Log: scan.c,v $
+* Revision 1.16  1991/06/25  11:51:48  apratt
+* Dsetpath(".") in root didn't work before, and neither did \\ as an arg.
+* Now they do, but it's a crock, and I'm trying to improve it.
+*
 * Revision 1.15  1991/06/20  17:18:56  apratt
 * Fixed a bug: ANDing recno with clrm is only valid when recno
 * is relative to the start of a cluster (e.g. cluster 2).
@@ -96,11 +100,14 @@ dotsok), any component is an invalid file name.  Also a component like
 "..abc" or other unparsable.
 
 Call with (flags | FN_DOTSOK) to enable finding . and .. in the last
-component; call with FN_TRAILOK to allow a trailing slash (old GEMDOS
-Dsetpath allows this); call with FN_EARLY to return E_OK before searching
-in the last dir for the last component.  FN_DOTSOK is used in Dsetpath to
-enable Dsetpath(".."), and also in Fattrib (same reason), and FN_TRAILOK 
-is used in Dsetpath to enable Dsetpath("foo\") which some programs do.
+component; call with FN_TRAILOK to allow one or more trailing slashes (old
+GEMDOS Dsetpath allows this); call with FN_EARLY to return E_OK before
+searching in the last dir for the last component.  FN_DOTSOK is used in
+Dsetpath to enable Dsetpath(".."), and also in Fattrib (same reason). If
+you encounter dot or dot-dot in the root, the result is the root. If this
+is the last component of the path name, you get EBADRQ, unless FN_DOTSOK,
+in which case you get EROOT.  FN_TRAILOK is used in Dsetpath to enable
+Dsetpath("foo\") which some programs do.
 
 If the file doesn't exist, but you got all the way to the last directory,
 then EFILNF is returned and that directory's dev and cluster are valid.
@@ -132,7 +139,7 @@ DIR *dir;
 DMD *dmd;
 
 Initializes (valid, stale) dir to the first slot in the dir specified
-in the dev and cl fields.  On zero return dir is fresh.  Returns errors.
+in the dev and clust fields.  On zero return dir is fresh.  Returns errors.
 
 long
 dirnext(dir,dmd)
@@ -216,6 +223,7 @@ int flags;
     long err;
     FCB fcb, *pfcb;
     int dotsok, earlyflag, trailok, tslash;
+    int rootflag;
 
     /* just because these are bitmapped doesn't mean they combine well */
     dotsok = (flags & FN_DOTSOK);
@@ -264,6 +272,7 @@ int flags;
 	/*
 	 * Empty component? Return file not found (!) for compatibility.
 	 * I'd rather return EBADRQ because it will never succeed.
+	 * The dir has to be fresh when we return EFILNF.
 	 */
 
 	if (end == name) {
@@ -277,7 +286,7 @@ int flags;
 	 * gemdos\\dossys will cd you to gemdos.  I don't care about the
 	 * second case, but the first case has to work.  So set tslash as a
 	 * flag; if there's nothing but slashes from here to the end of the
-	 * name, p is true.  We only bother scanning if trailok.
+	 * name, tslash is true.  We only bother scanning if trailok.
 	 */
 
 	if (trailok && *end == SLASH) {
@@ -325,8 +334,10 @@ int flags;
 	if (cl == 0 && isdots(name)) {
 	    DBCMD(0x20,"print dot or dot-dot in root dir: dotmatch;_c");
 	    attr = FA_SUBDIR;   /* fake attrib of matched "file" */
+	    rootflag = TRUE;
 	    goto dotmatch;
 	}
+	rootflag = FALSE;
 
         if (haswild) return EBADRQ;	/* no wildcards at this point */
 
@@ -392,7 +403,7 @@ dotmatch:
 
     DBCMD(0x20,"print fn2dir returns, dir:;dirf (lpeek (`a6 + c));_c");
     *pname = oname;
-    return E_OK;
+    return (rootflag ? EROOT : E_OK);
 }
 
 long

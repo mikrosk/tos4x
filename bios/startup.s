@@ -3,17 +3,21 @@
 * $Author: kbad $
 * =======================================================================
 *
-* $Date: 89/08/28 19:03:23 $
+* $Date: 89/08/28 21:01:16 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.24  89/08/28  21:01:16  kbad
+* Changed mushroom code to get rid of the LUT for initial screen offset,
+* since there are only two of them (and TT res offsets are > word length)
+*
 * Revision 2.23  89/08/28  19:03:23  kbad
 * Fixed(?) bomb handler for all resolutions.  Also fixed a couple of
 * fatfingers at dmaboot. (_diskbufp != _dskbufp !!!)
-*
+* 
 * Revision 2.22  89/08/25  18:46:04  lozben
 * Fixed a bug in EsetShift().
 * 
@@ -295,7 +299,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.23 $
+* $Revision: 2.24 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -3644,9 +3648,14 @@ savp_2:	move.l	(sp)+,proc_pc.w		; save bogus PC + exception number
 	move.b	dbasell(a5),d0
 .endc
 	movem.l	d0-d7/a0-a7,proc_regs
-	add.w	mindex(pc,d7.w),a0	; a0 -> base of mem to draw at
+	move.l	2(sp),proc_pc.w		; save the PC
+	move.w	6(sp),d0		; get addr of bsr instruction
+	and.w	#$fff,d0
+	asr.w	#2,d0
+	move.b	d0,proc_pc.w		; write ex # in hi byte of proc_pc
+.endif
 	move.l	usp,a0			; save USP
-	lea	mushroom,a1		; a1 -> source form
+	move.l	a0,proc_usp.w
 	moveq	#15,d0			; save 16 words off top of
 	lea	proc_stk.w,a0		; the stack (enough for
 	move.l	sp,a1			; any possible 68000 exception)
@@ -3669,8 +3678,9 @@ savp_1:	move.w	(a1)+,(a0)+		; save a word
 
 *+
 * do_shroom - draw little mushroom clouds on the screen
-mindex:
-dc.w    100*160,  100*160,  200*80,   0, 240*320,  0, 480*160,   100*320
+*  Passed:	d1.w = #shrooms to draw (DBRA count)
+*  Returns:	some shrooms on display
+*  Uses:	d0-d7/a0-a2
 *
 *  Discussion:	The graphics ain't all that great.  And this is silly.
 *

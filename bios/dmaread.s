@@ -4,13 +4,16 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/11/06 22:42:16 $
+* $Date: 1992/02/12 01:32:14 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.28  1992/02/12  01:32:14  apratt
+* Much Sparrow stuff. Also fixed a bug in slow ACSI devices.
+*
 * Revision 1.27  1991/11/06  22:42:16  apratt
 * Fixed a BIG OOPS: at qd0 the label 'sdelay' was wrong so that
 * the add of _hz_200 to d0 was INSIDE the loop.  Oops.  Fixed.
@@ -129,10 +132,10 @@
 *
 * =======================================================================
 *
-* $Revision: 1.27 $
+* $Revision: 1.28 $
 * =======================================================================
 *
-* $Source: e:/tos/bios\RCS\dmaread.s,v $
+* $Source: d:/tos/bios\rcs\dmaread.s,v $
 * =======================================================================
 *
 *************************************************************************
@@ -153,6 +156,8 @@
 
 SCSI		=	TT
 IDE_AT		=	1	; Always! (AKP 9/91)
+
+SPSCSI		=	SPARROW	; 1: Sparrow SCSI
 
 ;+
 ; DMAREAD(), DMAWRITE() - 
@@ -281,6 +286,10 @@ IDE_AT		=	1	; Always! (AKP 9/91)
 ;			drive parameters.  Conner CP2024's current drive
 ;			parameters are not stored in the _identify() data.
 ;			
+; Nov-06-1991	ml.	Big OOPS!!!  When delay was added in to take care of
+;			slow ACSI devices, the label "sdelay" for the branch
+;			accidentally includes the "add" instruction.  So, it
+;			takes a long time before we exit the loop.
 ;-
 
 .globl	_dmaread
@@ -370,7 +379,7 @@ dmarw:
 .if IDE_AT
 	cmpi.w	#MAXIDE,$e(sp)		; unit# > IDE-AT unit# 16?
 .else
-.if SCSI
+.if SCSI|SPSCSI
 	cmpi.w	#MAXSCSI,$e(sp)		; unit# > SCSI unit# 8-15?
 .else
 	cmpi.w	#MAXACSI,$e(sp)		; unit# > ACSI unit# 0-7?
@@ -499,7 +508,13 @@ _dorcmd:
 	bls.b	rcacsi			; if not, it's an ACSI device
 	bsr	_rcvscsi		; else, it's a SCSI device
 	rts
+.else
+.if SPSCSI
+	bsr	_rcvspscsi
+	rts
 .endif
+.endif
+
 rcacsi:	bsr	_rcvacsi		; it's an ACSI device
 	rts
 
@@ -518,6 +533,11 @@ _dowcmd:
 	bls.b	wracsi			; if not, it's an ACSI device
 	bsr	_wrtscsi		; else, it's a SCSI device
 	rts
+.else
+.if SPSCSI
+	bsr	_wrtspscsi
+	rts
+.endif
 .endif
 wracsi:	bsr	_wrtacsi		; it's an ACSI device
 	rts
@@ -1124,6 +1144,395 @@ rst0:	cmp.l	(a0),d1
 rst1:	cmp.l	(a0),d1
 	bhi.b	rst1
 	move.b	SCSIREI,d1	; clear potential interrupt
+	rts
+
+
+;+
+; setscstmout - set up a time-out count for the SCSI for SCSTMOUT ticks
+;
+; Returns:
+;	a0.l = address of _hz_200 clock
+;	d1.l = expiration time
+;-
+setscstmout:
+	movea.l	#_hz_200,a0	; a0 -> 200 hz clock
+	move.l	#SCSTMOUT,d1	; d0 = SCSTMOUT _hz_200 clicks
+	add.l	(a0),d1		; d0 = curr time + # clicks to wait
+	rts
+
+
+;+
+; setscltmout - set up a time-out count for the SCSI for SCLTMOUT long
+;
+; Returns:
+;	a0.l = address of _hz_200 clock
+;	d1.l = expiration time
+;-
+setscltmout:
+	movea.l	#_hz_200,a0	; a0 -> 200 hz clock
+	move.l	#SCLTMOUT,d1	; d0 = SCLTMOUT _hz_200 clicks
+	add.l	(a0),d1		; d0 = curr time + # clicks to wait
+	rts
+
+.endif
+
+
+
+.if	SPSCSI
+
+;+++++++++++++++++++++++++++++++;
+;				;
+;	SPARROW specific	;
+;				;
+;+++++++++++++++++++++++++++++++;
+
+.globl	_resetspscsi
+
+bSPSCSI		equ	$88	; base of SCSI bus
+
+; SCSI Interface (NCR 5380) for READ operations
+SPSCSIDB	equ	bSPSCSI+0	; SCSI data bus
+SPSCSIICR	equ	bSPSCSI+1	; initiator command register
+SPSCSIMR	equ	bSPSCSI+2	; mode register
+SPSCSITCR	equ	bSPSCSI+3	; target command register
+SPSCSICR	equ	bSPSCSI+4	; current SCSI control register
+SPSCSIDSR	equ	bSPSCSI+5	; DMA status register
+SPSCSIIDR	equ	bSPSCSI+6	; input data register
+SPSCSIREI	equ	bSPSCSI+7	; reset error / interrupt
+
+
+; SCSI Interface (NCR 5380) for WRITE operations
+SPSCSIODR	equ	bSPSCSI+0	; output data register
+;SPSCSIICR	equ	bSPSCSI+1	; initiator command register
+;SPSCSIMR	equ	bSPSCSI+2	; mode register
+;SPSCSITCR	equ	bSPSCSI+3	; target command register
+SPSCSIISR	equ	bSPSCSI+4	; ID select register
+SPSCSIDS	equ	bSPSCSI+5	; start DMA send
+SPSCSIDTR	equ	bSPSCSI+6	; start DMA target receive
+SPSCSIDIR	equ	bSPSCSI+7	; start DMA initiator receive
+
+
+; Macros to talk to the NCR5380 through the ACSI DMA chip
+
+.macro	RSCSI	srcreg,dst	; read from specified register
+	move.w	srcreg,WDL
+	move.w	WDC,dst
+.endm
+
+.macro	WSCSI	val,dstreg	; write to specified register
+	move.w	dstreg,WDL
+	move.w	val,WDC
+.endm
+
+;+
+; Tunable (delay) values (in number of _hz_200 ticks) for SCSI
+;-
+SCLTMOUT	equ	301		; long time-out (at least 1.5 s)
+SCSTMOUT	equ	51		; short time-out (at least 250 ms)
+
+;+
+; rcvspscsi() - send a SCSI command which receives data back.
+;
+; Passed:
+;	d0.w = physical unit number
+;	d1.l = transfer length (in bytes)
+;	d2.w = command length (NCMD or LCMD)
+;	a0.l = buffer address
+;-
+	.globl	_rcvspscsi
+_rcvspscsi:
+	st	flock			; lock FIFO
+	andi.w	#7,d0			; mask off the flags to get unit num
+	movem.l	d1-d2/a0,-(sp)		; save buffer address and cmd length
+	bsr	sblkspscsi		; send command block
+	movem.l	(sp)+,d1-d2/a0		; restore buffer address and cmd len
+	tst.w	d0			; successful?
+	bmi	rspend			; if not successful, return
+
+	WSCSI	#0,#SPSCSIICR		; deassert the data bus
+	WSCSI	#1,#SPSCSITCR		; set data in phase
+	RSCSI	#SPSCSIREI,d0		; clear potential interrupt
+
+rpio:	movea.l	a0,a1			; a1 -> buffer to read into
+rnxtb:	bsr	setscstmout
+	bsr	w4spreq			; wait for REQ for data to come
+	bmi	rspend			; if timed out, returns
+	RSCSI	#SPSCSIDSR,d0		; still in data in phase?
+	btst	#3,d0			
+	beq	rstat			; if not, go get status
+	RSCSI	#bSPSCSI,d0		; else read the next data byte
+	move.b	d0,(a1)+	
+	bsr	dospack
+	bra	rnxtb			; do next byte
+rstat:	bsr	w4spstat		; go get status byte
+rspend:	RSCSI	#SPSCSIREI,d1		; clear potential interrupt
+	bra	_hdone			; go clean up
+
+
+
+;+
+; wrtspscsi() - send a SCSI command which will write data to the target
+;
+; Passed:
+;	d0.w = physical unit number
+;	d1.l = transfer length (in bytes)
+;	d2.w = command length (NCMD or LCMD)
+;	a0.l = buffer address
+;
+; Comments: 
+; 12/04/89 ml
+;	Bus error occurs when doing a write to the disk that ends at top
+; of memory.  The DMA counter is decremented when the bytes are written 
+; from the ping pong buffers to the device, not when bytes are grapped 
+; from RAM to the ping pong buffers.  Well, AFTER the last 8 bytes are 
+; read into the ping pong buffers and BEFORE they are written to the 
+; device, the chip will attempt to read the NEXT 8 bytes into the ping 
+; pong buffers which results in a bus error because it will be reading 
+; pass top of memory.  To get around this HARDWARE BUG, the code will 
+; ALWAYS handshake the last 8 bytes over instead of DMAing them.
+;
+; 01/23/90 ml
+;	A. Pratt said he's willing to move the screen down and sacrifice
+; 16 bytes of memory.  So, code added on 12/04/89 is commented out.
+;-
+	.globl	_wrtspscsi
+_wrtspscsi:
+	st	flock			; lock FIFO
+	andi.w	#7,d0			; mask off the flags to get unit num
+
+	movem.l	d1-d2/a0,-(sp)		; save beginning buffer address
+	bsr	sblkspscsi		; send command block
+	movem.l	(sp)+,d1-d2/a0		; a0 = where DMA ends
+	tst.w	d0			; successful?
+	bmi	wspend			; if not, go clean up
+
+	WSCSI	#0,#SPSCSITCR		; set data out phase
+	RSCSI	#SPSCSIREI,d0		; clear potential interrupt
+					; hand shake data over the bus
+wpio:	movea.l	a0,a1			; a1 -> buffer to write from
+wnxtb:	bsr	setscstmout
+	bsr	w4spreq			; wait for REQ for data to come
+	bmi	wspend			; if timed out, returns
+	RSCSI	#SPSCSIDSR,d0
+	btst	#3,d0			; still in data out phase?
+	beq	wstat			; if not, go get status
+	moveq	#0,d0
+	move.b	(a1)+,d0		; write the next data byte
+	WSCSI	d0,#bSPSCSI
+	bsr	dospack
+	bra	wnxtb			; do next byte
+wstat:	bsr	w4spstat		; get status byte
+wspend:	RSCSI	#SPSCSIREI,d1		; clear potential interrupt
+	bra	_hdone			; go clean up
+
+
+
+;+
+; sblkspscsi() - set DMA pointer and count and send command block
+;
+; Passed:
+;	d0.w = physical unit number
+;	d1.l = transfer length (in bytes)
+;	d2.w = command length (NCMD or LCMD)
+;	a0.l = buffer address
+;
+; Returns:
+;	d0.l =  0 if successful
+;	d0.l = -1 if timeout
+;-
+sblkspscsi:
+	movem.l	d1-d2/a0,-(sp)		; preserve d1, d2 and a0
+	move.w	d0,-(sp)		; physical unit #
+	bsr	selspscsi		; select the unit
+	addq.l	#2,sp			; clean up stack
+	movem.l	(sp)+,d1-d2/a0		; restore d1, d2 and a0
+	tst.w	d0			; selection successful?
+	bmi	sbspend			; if timed out, return
+					; else proceed
+	WSCSI	#2,#SPSCSITCR		; assert C/D
+	WSCSI	#1,#SPSCSIICR		; assert data bus
+
+	bsr	setscltmout		; set up timeout for sending cmdblk
+	lea	_cmdblk,a1		; a1 -> command block
+	subq.w	#1,d2			; dbra likes one less
+sbsp0:	move.b	(a1)+,d0		; d0.b = byte to be sent
+	bsr	sphshake		; write that byte
+	tst.w	d0
+	bmi	sbspend			; if timed-out, returns
+	dbra	d2,sbsp0		; until whole command block is sent
+	moveq	#0,d0			; all operations successful
+sbspend: rts				; heading home
+
+
+;+
+; BOOLEAN selspscsi(SCSIUnit) 
+; WORD SCSIUnit;
+;-
+selspscsi:
+	bsr	setscstmout		; set up a short timeout
+selsp0:	RSCSI	#SPSCSICR,d0
+	btst	#6,d0			; STILL busy from last time?
+	beq	selsp1			; if not, it's available
+	cmp.l	(a0),d1			; timeout?
+	bhi	selsp0			; not yet, wait some more
+	bra	selsp3			; else, return error
+
+selsp1:	WSCSI	#0,#SPSCSITCR		; data out phase
+	WSCSI	#0,#SPSCSIISR		; no interrupt from selection
+	WSCSI	#$0c,#SPSCSIICR		; assert BSY and SEL
+; set dest SCSI IDs
+	clr.w	d0
+	move.w	4(sp),d1		; get the SCSI unit desired
+	bset	d1,d0			; set the appropriate bit
+	WSCSI	d0,#SPSCSIODR		; (real code would set ours too)
+
+;	WSCSI	#$0d,#SPSCSIICR		; assert BUSY, SEL and data bus
+	WSCSI	#$05,#SPSCSIICR		; assert SEL and data bus
+	RSCSI	#SPSCSIMR,d0		; read Mode Register
+	andi.b	#$FE,d0			; clear arbitrate bit
+	WSCSI	d0,#SPSCSIMR
+	RSCSI	#SPSCSIICR,d0		; read Initiator Command Register
+	andi.b	#$F7,d0			; clear BUSY
+	WSCSI	d0,#SPSCSIICR
+	nop				; 2 deskew delays
+	nop
+
+	bsr	setscstmout		; set up for timeout
+selsp2:	RSCSI	#SPSCSICR,d0		; wait for bus to be busy
+	btst	#6,d0
+	bne	selsp4
+	cmp.l	(a0),d1
+	bhi	selsp2
+
+selsp3:	moveq	#-1,d0			; time out
+	bra	selsp5
+	
+selsp4:	clr.w	d0			; selection successful
+selsp5:	WSCSI	#0,#SPSCSIICR		; clear SEL and data bus assertion
+	rts
+
+
+*+
+* VOID resetspscsi();
+*-
+	.globl	_resetspscsi
+_resetspscsi:
+	WSCSI	#$80,#SPSCSIICR	; assert RST
+	bsr	setscstmout	; wait (at least) 250 ms
+rstsp0:	cmp.l	(a0),d1
+	bhi	rstsp0
+	WSCSI	#0,#SPSCSIICR
+	bsr	setscltmout	; wait (at least) 1000 ms
+rstsp1:	cmp.l	(a0),d1
+	bhi	rstsp1
+	RSCSI	#SPSCSIREI,d0		; clear potential interrupt
+	rts
+
+
+;+
+; w4spstat - wait for status byte and message byte.
+;
+; Returns:
+;	d0.l = returned status or timeout error
+;-
+w4spstat:
+	bsr	setscstmout		; set up time-out for REQ and ACK
+	WSCSI	#3,#SPSCSITCR		; status in phase
+	RSCSI	#SPSCSIREI,d0		; clear potential interrupt
+
+	bsr	w4spreq			; wait for status byte
+	bmi	w4spend			; if timed-out, returns
+gspstat:
+	RSCSI	#SPSCSIDB,d0		; get the status byte
+	andi.w	#$ff,d0
+	move.l	d0,-(sp)		; save the status byte
+	bsr	setscstmout		; set up time-out for REQ and ACK
+	bsr	dospack			; signal that status byte is here
+	tst.w	d0			; timed-out?
+	beq	gsp1			; if not, wait for message byte
+
+gsp0:	addq.l	#4,sp			; else clean up stack
+	bra	w4spend			; and return
+
+gsp1:	bsr	setscstmout		; set up timeout for REQ and ACK
+	bsr	w4spreq			; wait for message byte
+	bmi	gsp0			; if timed-out, returns
+
+	RSCSI	#SPSCSIDB,d0		; get and ignore message byte
+	bsr	dospack			; signal that message byte is here
+	tst.w	d0			; timed-out?
+	bmi	gsp0			; if so, return timeout
+	move.l	(sp)+,d0		; recall the status byte
+w4spend:
+	rts				; return
+
+
+;+
+; w4spreq() - wait for REQ to come during hand shake of non-data bytes
+;
+; Passed:
+;	d1.l = expiration time
+;	a0.l = address of _hz_200
+;
+; Returns:
+;	 0 - if successful
+;	-1 - times out
+;-
+w4spreq:
+w4sp0:	RSCSI	#SPSCSICR,d0		; read Control Register
+	btst	#5,d0			; waiting for REQ to come
+	bne	w4sp1			; if REQ comes, done
+	cmp.l	(a0),d1			; time's up?
+	bhi	w4sp0			; if not, wait some more
+	moveq	#-1,d0			; else, returns timed out
+	bra	w4sprend
+w4sp1:	moveq	#0,d0			; returns successful
+w4sprend:
+	rts
+
+
+;+
+; dospack() - assert ACK
+;
+; Passed:
+;	d1.l = expiration time
+;	a0.l = address of _hz_200
+;
+; Returns:
+;	 0 - if successful
+;	-1 - times out
+;-
+dospack:	
+	RSCSI	#SPSCSIICR,d0		; read Initiator Command Register
+	ori.b	#$11,d0			; assert ACK (and data bus)
+	WSCSI	d0,#SPSCSIICR
+	andi.b	#$ef,d0			; clear ACK
+	WSCSI	d0,#SPSCSIICR
+	moveq	#0,d0
+	rts
+
+
+;+
+; sphshake() - hand shake a byte over to the controller
+;
+; Passed:
+;	d0.b = byte to be handed over
+;	d1.l = expiration time
+;	a0.l = address of _hz_200
+;
+; Returns:
+;	Whatever w4spreq() or dospack() returns, which is:
+;		 0 - if successful
+;		-1 - times out
+;-
+sphshake:
+	move.w	d0,-(sp)		; preserve d0.w
+	bsr	w4spreq			; wait for REQ to come
+	bmi	hspend			; if timed out, returns
+	move.w	0(sp),d0
+	WSCSI	d0,#SPSCSIDB		; write a byte out to data bus
+	bsr	dospack			; assert ACK
+hspend:	addq.l	#2,sp			; clean up stack
 	rts
 
 

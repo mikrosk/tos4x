@@ -35,7 +35,6 @@
 #include "dispvars.h"
 #include "objaddr.h"
 
-#define USE_OB_GCLIP	1
 
 #define ADJOUTLPIX 	3
 #define ADJSHADPIX 	SHADOW
@@ -60,6 +59,7 @@ EXTERN LONG	gl_mntree;
 EXTERN WORD	mn_fontid;
 EXTERN WORD	mn_fsize;
 
+EXTERN GRECT	gl_rzero;
 
 /* This is the color table of RGB values that VDI expects in pixel-
  * packed mode (This whole table can be moved to a separate file).
@@ -337,9 +337,9 @@ WORD	    icol;	/* interior color */
     gsx_1code(15, 7);
     gsx_1code(113, -1);			/* solid line style */
 
-    if (clip)
+    if (clip) {
 	gsx_sclip(prect);
-
+    }
     rc_copy( ( WORD *)prect, ( WORD *)&r);
 
     if (th > 0) {			/* if border is inside,	    */
@@ -693,9 +693,8 @@ just_draw(tree, obj, sx, sy)
 		    }
 		    else icol = xor16(icol);
 		  }
-
-		  gr_rect(icol, ipat, pt);
-		  gr_inside(pt, -tmpth);
+		   gr_rect(icol, ipat, pt);
+		   gr_inside(pt, -tmpth);
 
 		}
 		break;
@@ -739,10 +738,10 @@ just_draw(tree, obj, sx, sy)
  		    pt->g_w -= (ADJ3DPIX << 1);
 		    if (!(state & SELECTED) && mvtxt) {
 			pt->g_x -= 1;
-			pt->g_y -= 1; 
+			pt->g_y -= 1;
 			gr_gtext(edblk.te_just, edblk.te_ptext, pt, tmode);
 			pt->g_x += 1;
-			pt->g_y += 1;
+			pt->g_y += 1; 
 		    } else {
 			gr_gtext(edblk.te_just, edblk.te_ptext, pt, tmode);
 		    }
@@ -1035,7 +1034,7 @@ doobfind(tree, currobj, depth, mx, my, just_inside)
 	  if (!just_inside)
 	  {
 	    state = LWGET(OB_STATE(currobj));
-
+#if 0
 	    if ( state & SHADOWED )
 	    {	
 	      ob_relxywh(tree, currobj, pt);
@@ -1043,6 +1042,7 @@ doobfind(tree, currobj, depth, mx, my, just_inside)
 	      pt->g_y += o.g_y;
 	    }
 	    else
+#endif
 	      ob_gclip( tree, currobj, &dummy, &dummy, &pt->g_x, &pt->g_y,
 		      &pt->g_w, &pt->g_h );
 	  }

@@ -16,6 +16,9 @@
 *******************************************************************************
 */
 
+#ifndef _FONTDEF_H_
+#define _FONTDEF_H_
+
 /* fh_flags   */
 #define	DEFAULT 1	/* this is the default font (face and size) */
 #define	HORZ_OFF  2	/* there are left and right offset tables */
@@ -60,3 +63,5 @@ typedef struct font_head {	/* descibes a font */
     struct font_head *next_font;/* pointer to next font */
     UWORD font_seg;
 } FONT_HEAD;
+
+#endif

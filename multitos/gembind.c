@@ -353,6 +353,10 @@ crysbind( pcrys_blk )
 		ret = fm_button(FM_FORM, FM_OBJ, FM_CLKS, &FM_ONXTOB);
 		break;
 				/* Graphics Manager			*/
+	  case GRAF_RWIN:
+		Debug7( "graf_rubbox\r\n" ); 
+		gr_rubwin(GR_I1, GR_I2, GR_I3, GR_I4, (GRECT *)&GR_I5, &GR_O1, &GR_O2);
+		break;
 	  case GRAF_RUBBOX:
 		Debug7( "graf_rubbox\r\n" ); 
 		gr_rubbox(GR_I1, GR_I2, GR_I3, GR_I4, &GR_O1, &GR_O2);

@@ -35,11 +35,13 @@
 	.text
 
 fail_ret:	moveq	#0,d0		; exit if not byte bnd or clip required
+		movem.l	(sp)+,d2-d7/a2-a6
 		rts			; 0 indicates failure
 
 *  Entry point here..
 
-_MONO8XH:	move.l  _lineAVar,a1		; a1 -> linea var struct
+_MONO8XH:	movem.l	d2-d7/a2-a6,-(sp)
+		move.l  _lineAVar,a1		; a1 -> linea var struct
 		move.w	_DESTX(a1),d0		; d0 <- dst X
 		move.w	d0,d2			; d2 <- dst X
 		and.w	#$0007,d2		; this routine is only for
@@ -48,7 +50,8 @@ _MONO8XH:	move.l  _lineAVar,a1		; a1 -> linea var struct
 on_bounds:	move.w	_DESTY(a1),d1		; d1 <- dst Y
 		move.w	_DELY(a1),d3		; d3 <- dY
 
-		move.l	_CONTRL(a1),a0		; a0 -> CONTRL array
+		move.l	_pblock,a0
+		move.l	PB_CONTRL(a0),a0		; a0 -> CONTRL array
 		move.w	  6(a0),d2		; d2 <- # chars in string
 
 		tst.w	_CLIP(a1)
@@ -85,6 +88,8 @@ on_bounds:	move.w	_DESTY(a1),d1		; d1 <- dst Y
 
 no_clip:	move.l	V_ROUTINES(a1),a0	; a1 -> routines vector list
 		move.l	V_MONO(a0),a0		; a1 -> version of mono
-		jmp	(a0)
+		jsr	(a0)
+		movem.l	(sp)+,d2-d7/a2-a6
+		rts
 
 	end

@@ -474,7 +474,7 @@ VOID	print_file(VOID);
 VOID	launch_pref(VOID);
 WORD	set_dir(BYTE *);
 VOID	exec_file(BYTE *, WINDOW *, WORD, BYTE *);
-VOID	run_it(BYTE *, BYTE *, WORD, WORD, WORD, LONG);
+WORD	run_it(BYTE *, BYTE *, WORD, WORD, WORD, LONG);
 VOID 	hide_windows( WORD flag );
 
 /*	----------------------------------------------------------

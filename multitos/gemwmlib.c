@@ -297,8 +297,8 @@ wm_init()
     REG	WORD	i;	/* counter */
     WORD numcolors;
 
-    numcolors = (gl_nplanes < 2) ? 2 : 16;
- 
+    numcolors = (gl_nplanes < 4) ? 2 : 16;
+
     for (i = 0; i < MAXOBJ; i++) {
     	if (numcolors < 16)
 		wtcolor[i] = wbcolor[i] = 0x1101;
@@ -1091,7 +1091,7 @@ wg_1:
 		wp->fxywh = wp->nxywh = ( RLIST *)NULLPTR;
 	    }
 	    /* generate new list */
-	    if (wp->fxywh = genrlist(handle, WF_WORKXYWH)) {
+	    if (wp->fxywh = genrlist(handle, area)) {
 	    	wp->nxywh = (wp->fxywh)->rnext;
 		*r = (wp->fxywh)->rect;
 	    } else {
@@ -1338,7 +1338,13 @@ currxywh:
 			   * of the toolbar.
 			   */
 			   if( rect1.g_w > rect.g_w ) {
+			      WORD x, y;
+#if 0
 			      ob_actxywh( ( LONG )wp->ad_tools, ROOT, &trect );
+#else
+			      ob_gclip((LONG)wp->ad_tools, ROOT, &x, &y,
+				&trect.g_x, &trect.g_y, &trect.g_w, &trect.g_h); 
+#endif
 
 			      trect.g_w = ( rect1.g_w - rect.g_w + SHADOW +
 					  (( trect.g_x - rect.g_x ) << 2 ));
@@ -1816,7 +1822,13 @@ wm_min( wp, ow, oh )
      * cjg 05/27/93
      */
     if( wp->ad_tools && !wp->iconflag ) {
+      WORD x, y;
+#if 0
       ob_actxywh( ( LONG )wp->ad_tools, ROOT, &rclip );
+#else
+      ob_gclip((LONG)wp->ad_tools, ROOT, &x, &y,
+	&rclip.g_x, &rclip.g_y, &rclip.g_w, &rclip.g_h);
+#endif
       h1 += rclip.g_h;
     }
 

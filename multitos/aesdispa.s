@@ -18,6 +18,8 @@
 	.globl	_chkmsg
 	.globl	_cli
 	.globl	_sti
+	.globl	_spl7
+	.globl	_spl
 	.globl	_disp
 	.globl	_runaes
 	.globl	_runacc
@@ -36,17 +38,31 @@
 	
 *****************************************
 * disable interrupts and save state	*
+* _cli is the old way to do this, using *
+*   a global variable			*
+* _spl7 is the new way, and returns	*
+*   the old status register		*
 *****************************************
 _cli:
 	move	sr,savsr	; save the status word 
 	or	#$700,sr	; Interupt level 7 
 	rts
-
+_spl7:
+	move	sr,d0
+	or	#$700,sr
+	rts
+	
 *****************************************
 * enable interrupts and restore state	*
+* _sti takes the state from a global	*
+*    variable				*
+* _spl takes it from the stack		*
 *****************************************
 _sti:
 	move	savsr,sr	
+	rts
+_spl:
+	move	4(a7),sr
 	rts
 
 *****************************************

@@ -90,7 +90,6 @@ open_subdir( win, icon, opendisk, init, redraw )
 {
 	WORD	handle; 
 	WORD	status;
-	BYTE	*path;
 
 	desk_mice( HOURGLASS );
 	status = FALSE;
@@ -98,7 +97,6 @@ open_subdir( win, icon, opendisk, init, redraw )
 	if ( !c_path_alloc( win->w_path ) )	/* check the path length*/
 	  goto sub_1;
 
-	path = win->w_path;
 	handle = win->w_id;
 
 	if ( read_files( win, 0x16 ) )
@@ -216,11 +214,12 @@ sh_sitems( )
 ss_1:	    for ( ; curri <= limit; curri++ )
 	    {
 	      if ( background[curri].ob_state & SELECTED )
-		goto ss_2;
+		break;
 	    }
-	    goto ss_5;
+	    if (curri > limit)
+	      goto get_out;
 
-ss_2:	
+
 	    subtype = backid[curri].i_type;
 	    file = backid[curri].i_path;
 
@@ -241,7 +240,7 @@ ss_2:
 	        if ( sh_disk( buffer ) )
 	          goto ss_1;
 		else
-		  goto ss_5;
+		  goto get_out;
 	    }			
 	
 	    curri++;
@@ -265,25 +264,33 @@ ss_2:
 	  }
 	  else					/* window icon	*/
 	  {
+
 	    for( ; curri < limit; curri++ )
 	    {
 	      if ( dir2[curri].d_state & SELECTED ) {
-		goto ss_3;
+		break;
 	      }
 	    }
-	    goto ss_5;
-ss_3:	    
+	    if (curri >= limit)
+	      goto get_out;
+
 	    dir1 = dir2[curri];
+
 	    if (!x_win->w_iconified)
 		    file = put_name( x_win, dir2[curri].d_name );
 	    else
 		    file = put_name( x_win, NULL); /* just get rid of '*.*' */
+
 	    curri++;
 
 	    if ( *file == 'c' )
 	    {
 	      do1_alert( CARTNOSH );
+#ifdef OUR_OPTIMIZER_WORKS
 	      goto ss_1;
+#else
+	      goto get_out;
+#endif
 	    }
 	  }
 
@@ -300,7 +307,7 @@ ss_3:
 	      newstr = 0;
 	    }
 	    do1_alert( FCNOMEM );
-	    goto ss_5;
+	    goto get_out;
 	  }
 
 	  strcpy( file, oldstr );
@@ -332,7 +339,7 @@ ss_3:
 	      f_str( obj, FISIZE, nsize );
 	    }
 	    else {
-	      goto ss_5;
+	      goto get_out;
 	    }
 	
 	    *r_slash( newstr ) = 0; 	
@@ -455,7 +462,7 @@ ss_6:
 	    break;
 	}
 
-ss_5:
+get_out:
 	if ( opened )
 	  do_finish( ADFILEIN );
 
@@ -1041,3 +1048,4 @@ winsmall( WINDOW *win, WORD x, WORD y )
 	do_redraw( 0, &full, i );
 	return 1;
 }
+

@@ -10,6 +10,11 @@
 *******************************************************************************
 */
 
+#ifndef _SCRNDEV_H_
+#define _SCRNDEV_H_
+
+#include 	"fontdef.h"
+
 typedef struct screendef {
     BYTE	*name;		    /* device identification (name)	     */
     WORD	devId;		    /* device id number			     */
@@ -59,3 +64,5 @@ typedef struct screendef {
 #define STANDARD	1	    /* flag for standard format		    */
 #define INTERLEAVED	2	    /* flag for interlieved planes	    */
 #define PIXPACKED	3	    /* flag for pixel packed		    */
+
+#endif

@@ -45,6 +45,7 @@
 */
 
 
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -62,8 +63,10 @@
 EXTERN  char *trap();
 
 /* EXTENDED INQUIRE */
-vq_extnd()
+VOID
+vq_extnd( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD i;
 	REG WORD *dp, *sp;
 
@@ -84,10 +87,10 @@ vq_extnd()
 	}
 
 	else {
-	    *dp++ = XMN_CLIP;	/* PTSOUT[0] */
-	    *dp++ = YMN_CLIP;	/* PTSOUT[1] */
-	    *dp++ = XMX_CLIP;	/* PTSOUT[2] */
-	    *dp++ = YMX_CLIP;	/* PTSOUT[3] */
+	    *dp++ = cur_work->xmn_clip;	/* PTSOUT[0] */
+	    *dp++ = cur_work->ymn_clip;	/* PTSOUT[1] */
+	    *dp++ = cur_work->xmx_clip;	/* PTSOUT[2] */
+	    *dp++ = cur_work->ymx_clip;	/* PTSOUT[3] */
 
 	    for (i=4; i<12; i++)
 		*dp++ = 0;
@@ -109,11 +112,12 @@ vq_extnd()
 
 }
 /* CLOSE_WORKSTATION: */
-v_clswk()
+VOID
+v_clswk( VOID )
 {
     ATTRIBUTE	*next_work;
 
-    if (virt_work.next_work != NULLPTR) {	/* Are there VWs to close */
+    if (virt_work.next_work != NULL) {	/* Are there VWs to close */
 	cur_work = virt_work.next_work;
 	do {
 	    next_work = cur_work->next_work;
@@ -125,8 +129,10 @@ v_clswk()
 }
 
 /* POLYLINE: */
-v_pline()
+VOID
+v_pline( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	    l;
     REG ATTRIBUTE   *work_ptr;
 
@@ -134,22 +140,41 @@ v_pline()
     l = work_ptr->line_index;
     LN_MASK = (l < 6) ? LINE_STYLE[l] : work_ptr->ud_ls;
 
+    if ((CLIP = work_ptr->clip)) {
+	XMN_CLIP = work_ptr->xmn_clip;
+	YMN_CLIP = work_ptr->ymn_clip;
+	XMX_CLIP = work_ptr->xmx_clip;
+	YMX_CLIP = work_ptr->ymx_clip;
+    }
+    WRT_MODE = work_ptr->wrt_mode;
+
     FG_B_PLANES = work_ptr->line_color;
 
     if (work_ptr->line_width == 1) {
 	pline();
 	work_ptr = cur_work;
-	if ( (work_ptr->line_beg | work_ptr->line_end ) & ARROWED )
+	if ( (work_ptr->line_beg | work_ptr->line_end ) & ARROWED ) {
+	    if (*CONTRL == 6)
+		cpy_pts();
 	    do_arrow();
+	    if (*CONTRL == 6)
+		rst_pts();
+	}
     }
-    else
+    else {
+	if (*CONTRL == 6)
+	    cpy_pts();
 	wline();
+	if (*CONTRL == 6)
+	    rst_pts();
+    }
 }
 
 /* POLYMARKER: */
-
-v_pmarker()
+VOID
+v_pmarker( VOID )
 {
+	REG VDIVARS	*la = LA;
   WORD		i, j, num_lines, num_vert, x_center, y_center, sav_points[10];
   WORD		sav_index, sav_color, sav_width, sav_beg, sav_end;
   WORD		*mrk_ptr, *old_ptsin, scale, num_points, *src_ptr;
@@ -231,15 +256,35 @@ v_pmarker()
 }
 
 /* FILLED_AREA: */
-
-v_fillarea()
+VOID
+v_fillarea( VOID )
 {
+	REG VDIVARS	*la = LA;
+  REG ATTRIBUTE *work_ptr;
+
+  cpy_pts();
+  work_ptr = cur_work;
+  CLIP = work_ptr->clip;
+  XMN_CLIP = work_ptr->xmn_clip;
+  YMN_CLIP = work_ptr->ymn_clip;
+  XMX_CLIP = work_ptr->xmx_clip;
+  YMX_CLIP = work_ptr->ymx_clip;
+  WRT_MODE = work_ptr->wrt_mode;
+  PATPTR = work_ptr->patptr;
+  PATMSK = work_ptr->patmsk;
+  if (work_ptr->fill_style == 4)
+      MULTIFILL = work_ptr->multifill;
+  else
+      MULTIFILL = 0;
   plygn();
+  rst_pts();
 }
 
 /*  GDP: */
-v_gdp()
+VOID 
+v_gdp( VOID )
 {
+	REG VDIVARS	*la = LA;
     WORD	    i, ltmp_end, rtmp_end;
     REG WORD	    *xy_pointer;
     REG ATTRIBUTE   *work_ptr;
@@ -247,10 +292,28 @@ v_gdp()
     i = *(CONTRL+5);
     xy_pointer = PTSIN;
     work_ptr = cur_work;
+    CLIP = work_ptr->clip;
+    XMN_CLIP = work_ptr->xmn_clip;
+    YMN_CLIP = work_ptr->ymn_clip;
+    XMX_CLIP = work_ptr->xmx_clip;
+    YMX_CLIP = work_ptr->ymx_clip;
+    WRT_MODE = work_ptr->wrt_mode;
 
     if (( i > 0 ) && ( i < 11 )) 
     {  
 	i--;
+	if (i == 9) {		/* justified text does its own setup */
+	    d_justified();
+	    return;
+	}
+	PATPTR = work_ptr->patptr;
+	PATMSK = work_ptr->patmsk;
+	if (work_ptr->fill_style == 4)
+	    MULTIFILL = work_ptr->multifill;
+	else
+	    MULTIFILL = 0;
+	cpy_pts();
+
 	switch ( i )
 	{
 	    case 0:	/* GDP BAR - converted to alpha 2 RJG 12-1-84 */
@@ -325,11 +388,13 @@ v_gdp()
 	      d_justified();
               break;
 	    }
+	rst_pts();
 	}
 }    	
 
 /* INQUIRE CURRENT POLYLINE ATTRIBUTES */
-vql_attr()
+VOID
+vql_attr( VOID )
 {
     REG WORD	    *pointer;
     REG ATTRIBUTE   *work_ptr;
@@ -338,7 +403,7 @@ vql_attr()
     work_ptr = cur_work;
     *pointer++ = work_ptr->line_index + 1;
     *pointer++ = REV_MAP_COL[ work_ptr->line_color ];
-    *pointer = WRT_MODE + 1;
+    *pointer = work_ptr->wrt_mode + 1;
 
     pointer = PTSOUT;
     *pointer++ = work_ptr->line_width;
@@ -350,7 +415,8 @@ vql_attr()
 }
 
 /* INQUIRE CURRENT Polymarker ATTRIBUTES */
-vqm_attr()
+VOID
+vqm_attr( VOID )
 {
     REG WORD	    *pointer;
     REG ATTRIBUTE   *work_ptr;
@@ -359,7 +425,7 @@ vqm_attr()
     work_ptr = cur_work;
     *pointer++ = work_ptr->mark_index;
     *pointer++ = REV_MAP_COL[ work_ptr->mark_color ];
-    *pointer = WRT_MODE + 1;
+    *pointer = work_ptr->wrt_mode + 1;
 
     pointer = PTSOUT;
     *pointer++ = 0;
@@ -372,7 +438,8 @@ vqm_attr()
 }
 
 /* INQUIRE CURRENT Fill Area ATTRIBUTES */
-vqf_attr()
+VOID
+vqf_attr( VOID )
 {
     REG WORD	    *pointer;
     REG ATTRIBUTE   *work_ptr;
@@ -382,14 +449,16 @@ vqf_attr()
     *pointer++ = work_ptr->fill_style;
     *pointer++ = REV_MAP_COL[ work_ptr->fill_color ];
     *pointer++ = work_ptr->fill_index + 1;
-    *pointer++ = WRT_MODE + 1;
+    *pointer++ = work_ptr->wrt_mode + 1;
     *pointer = work_ptr->fill_per;
 
     *(CONTRL+4) = 5;
 }	
 
-pline()
+VOID
+pline( VOID )
 {
+	REG VDIVARS	*la = LA;
 	WORD	i, *old_pointer;
 	REG WORD *pointer;
 
@@ -414,11 +483,41 @@ pline()
 	}				
 }
 
-WORD clip_line()
+WORD 
+clip_line( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD    _deltaX, _deltaY;
     REG WORD    x1y1_clip_flag, x2y2_clip_flag, line_clip_flag;
     REG WORD    *x,*y;
+
+    if (Y1 == Y2) {			/* horizontal line */
+	if (Y1 < YMN_CLIP || Y1 > YMX_CLIP)
+	    return(FALSE);
+	if (X1 < XMN_CLIP)
+	    X1 = XMN_CLIP;
+	else if (X1 > XMX_CLIP)
+	    X1 = XMX_CLIP;
+	if (X2 < XMN_CLIP)
+	    X2 = XMN_CLIP;
+	else if (X2 > XMX_CLIP)
+	    X2 = XMX_CLIP;
+	return(TRUE);
+    }
+
+    if (X1 == X2) {			/* vertical line */
+	if (X1 < XMN_CLIP || X1 > XMX_CLIP)
+	    return(FALSE);
+	if (Y1 < YMN_CLIP)
+	    Y1 = YMN_CLIP;
+	else if (Y1 > YMX_CLIP)
+	    Y1 = YMX_CLIP;
+	if (Y2 < YMN_CLIP)
+	    Y2 = YMN_CLIP;
+	else if (Y2 > YMX_CLIP)
+	    Y2 = YMX_CLIP;
+	return(TRUE);
+    }
 
     while ((x1y1_clip_flag = code(X1,Y1)) | (x2y2_clip_flag = code(X2,Y2))) {
 
@@ -460,6 +559,7 @@ WORD clip_line()
 WORD code( x, y )
 WORD x,y;
 {
+	REG VDIVARS	*la = LA;
     WORD	clip_flag;
 
     clip_flag = 0;
@@ -476,8 +576,10 @@ WORD x,y;
     return (clip_flag);
 }
 
-plygn()	
+VOID
+plygn( VOID )	
 {
+	REG VDIVARS	*la = LA;
 	REG WORD *pointer, i, k;
 
 	FG_B_PLANES = cur_work->fill_color;
@@ -533,17 +635,18 @@ plygn()
 	}
 }
 
-	VOID
-gdp_rbox()
+VOID
+gdp_rbox( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD	i, j;
 	WORD		rdeltax, rdeltay;
 	REG WORD	*pointer;
 	REG ATTRIBUTE	*work_ptr;
 
+	pointer = PTSIN;
         arb_corner(pointer, LLUR);
 
-	pointer = PTSIN;
 	X1 = *pointer++;
 	Y1 = *pointer++;
 	X2 = *pointer++;
@@ -630,10 +733,10 @@ gdp_rbox()
 	return;
 }
 	
-	VOID
-
-gdp_arc()
+VOID
+gdp_arc( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD *pointer;
 
 	pointer = INTIN;
@@ -661,8 +764,10 @@ gdp_arc()
 	return;
 }
 
-clc_nsteps()
+VOID
+clc_nsteps( VOID )
 {
+	REG VDIVARS	*la = LA;
 	if ( xrad > yrad )
 	    n_steps = xrad;
 	else
@@ -678,8 +783,10 @@ clc_nsteps()
 	return;
 }
 
-gdp_ell()
+VOID
+gdp_ell( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD *pointer;
 
 	pointer = INTIN;
@@ -708,9 +815,10 @@ gdp_ell()
 	return;
 }
 
-	VOID
-clc_arc()
+VOID
+clc_arc( VOID )
 {
+	REG VDIVARS	*la = LA;
 	WORD	i,j;
 	REG WORD *cntl_ptr, *xy_ptr;
 
@@ -757,10 +865,11 @@ clc_arc()
 	  plygn();
 }
 
-	VOID
-Calc_pts(j) 
+VOID
+Calc_pts( j ) 
 	WORD	j;
 {
+	REG VDIVARS	*la = LA;
 	WORD	k;
 	REG WORD *pointer;
 
@@ -771,8 +880,10 @@ Calc_pts(j)
     	*(pointer+j+1) = k;
 }
 
-st_fl_ptr()
+VOID
+st_fl_ptr( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	    fi, pm, *pp;
     REG ATTRIBUTE   *work_ptr;
 
@@ -813,14 +924,15 @@ st_fl_ptr()
 	    pp = &work_ptr->ud_patrn[0];
 	    break;
 	}
-    work_ptr->patptr = pp;
-    work_ptr->patmsk = pm;
+    PATPTR = work_ptr->patptr = pp;
+    PATMSK = work_ptr->patmsk = pm;
 }
 
 /* Moved the circle DDA code that was in vsl_width() here. */
-
-cir_dda()
+VOID 
+cir_dda( VOID )
 {
+	REG VDIVARS	*la = LA;
     WORD i, j;
 
     REG WORD *xptr, *yptr, x, y, d;
@@ -897,8 +1009,10 @@ cir_dda()
     }
 }
 
-wline()
+VOID
+wline( VOID )
 {
+	REG VDIVARS	*la = LA;
   WORD		    i, k, box[10];	/* box two high to close polygon */
   WORD		    numpts, wx1, wy1, wx2, wy2, vx, vy;
   WORD		    *old_ptsin, *src_ptr;
@@ -1024,10 +1138,11 @@ wline()
   r_fa_attr();
 }  /* End "wline". */
 
-
+VOID
 perp_off(px, py)
 WORD *px, *py;
 {
+	REG VDIVARS	*la = LA;
   REG WORD *vx, *vy, *pcircle, u, v;
   WORD x, y, quad, magnitude, min_val, x_val, y_val;
 
@@ -1095,7 +1210,7 @@ WORD *px, *py;
   quad_xform(quad, x_val, y_val, vx, vy);
 }  /* End "perp_off". */
 
-
+VOID
 quad_xform(quad, x, y, tx, ty)
 int quad, x, y, *tx, *ty;
 {
@@ -1126,10 +1241,11 @@ int quad, x, y, *tx, *ty;
   }  /* End switch. */
 }  /* End "quad_xform". */
 
-
+VOID
 do_circ(cx, cy)
 WORD cx, cy;
 {
+	REG VDIVARS	*la = LA;
   WORD k;
   REG WORD *pointer;
 
@@ -1166,9 +1282,10 @@ WORD cx, cy;
   }  /* End if:  circle has positive radius. */
 }  /* End "do_circ". */
 
-
-s_fa_attr()
+VOID
+s_fa_attr( VOID )
 {
+	REG VDIVARS	*la = LA;
   REG ATTRIBUTE	    *work_ptr;
 
   /* Set up the fill area attribute environment. */
@@ -1191,8 +1308,10 @@ s_fa_attr()
 }  /* End "s_fa_attr". */
 
 
-r_fa_attr()
+VOID 
+r_fa_attr( VOID )
 {
+	REG VDIVARS	*la = LA;
   REG ATTRIBUTE	    *work_ptr;
 
   /* Restore the fill area attribute environment. */
@@ -1205,8 +1324,10 @@ r_fa_attr()
   work_ptr->line_end = s_endsty;
 }  /* End "r_fa_attr". */
 
-do_arrow()
+VOID
+do_arrow( VOID )
 {
+	REG VDIVARS	*la = LA;
   WORD	    x_start, y_start, new_x_start, new_y_start;
   REG WORD  *pts_in;
 
@@ -1244,9 +1365,11 @@ do_arrow()
   r_fa_attr();
 }  /* End "do_arrow". */
 
+VOID
 arrow(xy, inc)
 WORD *xy, inc;
 {
+	REG VDIVARS	*la = LA;
   WORD arrow_len, arrow_wid, line_len;
   WORD *xybeg, sav_contrl, triangle[8];	/* triangle 2 high to close polygon */
   WORD dx, dy;
@@ -1348,8 +1471,10 @@ WORD *xy, inc;
   }  /* End while. */
 }  /* End "arrow". */
 
-init_wk()
+VOID
+init_wk( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	    l;
     REG WORD	    *pointer, *src_ptr;
     REG ATTRIBUTE   *work_ptr;
@@ -1420,10 +1545,10 @@ init_wk()
 
     work_ptr->cur_font = def_font;
 
-    work_ptr->loaded_fonts = NULLPTR;
+    work_ptr->loaded_fonts = NULL;
 
-    work_ptr->scrpt2 = scrtsiz;
-    work_ptr->scrtchp = deftxbu;
+    SCRPT2 = work_ptr->scrpt2 = scrtsiz;
+    SCRTCHP = work_ptr->scrtchp = deftxbu;
 
     work_ptr->num_fonts = ini_font_count;
 
@@ -1463,7 +1588,8 @@ init_wk()
     FLIP_Y = 1;
 }
 
-d_opnvwk()
+VOID
+d_opnvwk( VOID )
 {
     REG WORD	    handle;
     REG ATTRIBUTE   *new_work, *work_ptr;
@@ -1472,7 +1598,7 @@ d_opnvwk()
 
     new_work = (ATTRIBUTE *) trap(X_MALLOC, (LONG) (sizeof(ATTRIBUTE)) );
 
-    if( new_work == NULLPTR) {		/* No work available */
+    if( new_work == NULL) {		/* No work available */
 	CONTRL[6] = 0;
 	return;
     }
@@ -1497,7 +1623,8 @@ d_opnvwk()
     init_wk();
 }
 
-d_clsvwk()
+VOID
+d_clsvwk( VOID )
 {
     REG ATTRIBUTE   *work_ptr;
     REG WORD	    handle;
@@ -1517,8 +1644,10 @@ d_clsvwk()
     trap(X_MFREE, cur_work);
 }
 
-dsf_udpat()
+VOID
+dsf_udpat( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	    *sp, *dp, i, count;
     REG UWORD	    red, green, blue;
     REG ATTRIBUTE   *work_ptr;
@@ -1593,15 +1722,19 @@ dsf_udpat()
 /*
  * go to the proper inquire color routine
  */
-vq_color()
+VOID
+vq_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     (*V_ROUTINES[V_VQCOLOR])();
 }
 
 /*
  * go to the proper set color routine
  */
-vs_color()
+VOID
+vs_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     (*V_ROUTINES[V_VSCOLOR])();
 }

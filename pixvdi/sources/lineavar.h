@@ -16,6 +16,9 @@
 ******************************************************************************
 */
 
+#ifndef _LINEAVAR_H_
+#define _LINEAVAR_H_
+
 typedef struct vdiVars {
 
     WORD        _angle;
@@ -254,3 +257,5 @@ typedef struct vdiVars {
     LONG	palMap[256];	    /* either a maping of reg's or true val */
     WORD	(*primitives[40])();	/* space to copy vectors into	    */
 } VDIVARS;
+
+#endif

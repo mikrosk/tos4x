@@ -31,6 +31,8 @@
 * 
 *******************************************************************************
 */
+#ifndef _GSXDEF_H_
+#define _GSXDEF_H_
 
 #define	MAX_PAL		4096	/* @check@ palette size                     */
 #define BLTPRFRM	5000	/* @check@ blit performance	            */
@@ -79,3 +81,5 @@ typedef struct fdb {
     WORD    planes;			/* # of color bit planes	    */
     WORD    reserved[3];		/* reserved for future use	    */
 } FDB;
+
+#endif

@@ -136,8 +136,9 @@ takeoff( e )
 {
 	REG LONG	c;
 /*	LONG		old;*/
+	REG WORD	oldsr;
 
-	cli();
+	oldsr = spl7();
 
 	if ( !e->e_pred )
 	  *(e->e_head) = e->e_link;
@@ -158,7 +159,7 @@ takeoff( e )
 
 	e->e_mask = 0;
 
-	sti();
+	spl(oldsr);
 }
 
 
@@ -222,6 +223,7 @@ iasync( afunc, aparm )
 	MOBLK		mob;
 /*	LONG		old;*/
 	WORD		ret,mask;
+	WORD		oldsr;
 	
 	if ( !( e = get_evb( currpd ) ) ) {
 	  Debug7("iasync: no evb\r\n");
@@ -279,7 +281,7 @@ i_3:
 		  return( (EVSPEC)0 );
 		}
 		
-		cli();
+		oldsr = spl7();
 
 		if ( tel )
 		  tel->e_parm = CMP_TICK;
@@ -314,7 +316,7 @@ i_3:
 		CMP_TICK = tel->e_parm;
 		NUM_TICK = 0x0L;
 
-		sti();
+		spl(oldsr);
 		break;
 
 			

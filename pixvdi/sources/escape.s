@@ -148,7 +148,8 @@ F_SVPOS		equ	    5	;				1:true
 _CHK_ESC:
 	move.l  _lineAVar,a4		; a4 -> linea var struct
 
-	move.l	_CONTRL(a4),a0		; a0 -> CONTRL array.
+	move.l	_pblock,a0
+	move.l	PB_CONTRL(a0),a0		; a0 -> CONTRL array.
 	move.w	10(a0),d0		; d0 <- ID.
 	cmp.w	#ldri_escape,d0 	; compare with DRI limit.
 	bhi	ce_more			; if ID > last DRI escape, branch.
@@ -195,7 +196,8 @@ ce_more:
 escfn101:
 
 	bsr	hide_cursor		; INTIN+00 = Y displacement on cursor
-	move.l	_INTIN(a4),a0
+	move.l	_pblock,a0
+	move.l	PB_INTIN(a0),a0
 	move.w	(a0),d0
 	mulu	_v_lin_wr(a4),d0
 	move.w	d0,v_cur_off(a4)	; d0 <- additional cursor y offset.
@@ -462,10 +464,12 @@ b2w_tbl:
 **		   Inquire Addressable Alpha Character Cells.		     **
 *******************************************************************************
 
-escfn1:		move.l	_CONTRL(a4),a0		; a0 -> CONTRL array.
+escfn1:		move.l	_pblock,a0
+		move.l	PB_CONTRL(a0),a0		; a0 -> CONTRL array.
 		move.w	#2,8(a0)		; 2 integers are returned.
 
-		move.l	_INTOUT(a4),a0		; a0 -> INTOUT array.
+		move.l	_pblock,a0
+		move.l	PB_INTOUT(a0),a0		; a0 -> INTOUT array.
 		move.w	v_cel_mx(a4),d0		; d0 <- cell Xmax (zero based)
 		addq.w	#1,d0			; d0 <- number of columns
 		move.w	d0,2(a0)
@@ -643,7 +647,8 @@ escfn10:	move.w	v_cur_cx(a4),d0		; d0 <- current cursor X
 
 escfn11:
 
-	move.l	_INTIN(a4),a0		; a0 -> INTIN array
+	move.l	_pblock,a0
+	move.l	PB_INTIN(a0),a0		; a0 -> INTIN array
 	move.w	(a0),d1			; d1 <- row number
 	subq.w	#1,d1			; d1 <- Y (zero origin)
 	move.w	2(a0),d0		; d0 <- column number
@@ -658,9 +663,11 @@ escfn11:
 
 escfn12:
 
-	move.l	_CONTRL(a4),a0		; a0 -> CONTRL array.
+	move.l	_pblock,a0
+	move.l	PB_CONTRL(a0),a0		; a0 -> CONTRL array.
 	move.w	6(a0),d0		; d0 <- character count.
-	move.l	_INTIN(a4),a0		; a0 -> character array.
+	move.l	_pblock,a0
+	move.l	PB_INTIN(a0),a0		; a0 -> character array.
 	bra	ef12_lend
 
 ef12_loop:
@@ -706,9 +713,11 @@ escfn14:	bclr.b	#F_REVID,v_stat_0(a4)		; clr reverse bit in v_stat_0
 
 escfn15:
 
-	move.l	_CONTRL(a4),a0		; a0 -> CONTRL array.
+	move.l	_pblock,a0
+	move.l	PB_CONTRL(a0),a0		; a0 -> CONTRL array.
 	move.w	#2,8(a0)		; 2 integers are returned.
-	move.l	_INTOUT(a4),a0		; a0 -> INTOUT array.
+	move.l	_pblock,a0
+	move.l	PB_INTOUT(a0),a0		; a0 -> INTOUT array.
 	move.w	v_cur_cy(a4),d0		; d0 <- cell Y (zero based)
 	addq.w	#1,d0			; d0 <- row number
 	move.w	d0,(a0)+		; return row number.
@@ -726,9 +735,11 @@ escfn15:
 escfn16:
 
 	moveq.l	#1,d0
-	move.l	_CONTRL(a4),a0		; a0 -> CONTRL array.
+	move.l	_pblock,a0
+	move.l	PB_CONTRL(a0),a0		; a0 -> CONTRL array.
 	move.w	d0,8(a0)		; 1 integer is returned.
-	move.l	_INTOUT(a4),a0		; a0 -> INTOUT array.
+	move.l	_pblock,a0
+	move.l	PB_INTOUT(a0),a0		; a0 -> INTOUT array.
 	move.w	d0,(a0)			; 1 => there is a mouse.
 	rts
 
@@ -740,7 +751,8 @@ escfn16:
 
 escfn18:
 
-	movea.l	_INTIN(a4),a0		; a0 -> INTIN array.
+	movea.l	_pblock,a0
+	movea.l	PB_INTIN(a0),a0		; a0 -> INTIN array.
 	clr.w	(a0)			; INTIN(0)<- 0 =>  show regardless.
 	jmp	_v_show_c		; show graphic cursor.
 
@@ -1530,7 +1542,8 @@ neg_byte:	not.b	(a2)
 **		          Install User Defined Font			     **
 *******************************************************************************
 
-escfn102:	move.l	_INTIN(a4),a0
+escfn102:	move.l	_pblock,a0
+		move.l	PB_INTIN(a0),a0
 		move.l	(a0),a0			; a0 -> font header.
 
 * fall through to inialization sequence

@@ -109,18 +109,11 @@ spx_hline:
 	move.l	(a4,d3.w),d3		; d3 <- desired foreground col
 	move.l	pal_map(a4),d4		; d4 <- desired background col
 	
+	cmp.w	#-1,d2			; solid line ?
+	beq	spxsolid		; then no line style mask
+
 	cmp.w	#16,_v_planes(a4)	; see how many bits per pixel
-	beq	spx16Tab		; do 16 bits per pixel case
-	blt	spx8Tab			; do 8 bits per pixel case
-	lea	HLine32Tab,a2		; a2 -> table of 32 bit routines
-	bra	tab_set
-
-spx16Tab:
 	lea	HLine16Tab,a2		; a2 -> table of 16 bit routines
-	bra	tab_set
-
-spx8Tab:	
-	lea	HLine8Tab,a2		; a2 -> table of 8 bit routines
 
 tab_set:
 	move.w	_WRT_MODE(a4),d5	; clear for later use
@@ -128,9 +121,17 @@ tab_set:
 	move.l	(a2,d5.w),a2		; a2 -> desired routine
 	jmp	(a2)			; go to the desired routine
 
-HLine8Tab:	dc.l	H8M1Line,H8M2Line,H8M3Line,H8M4Line
 HLine16Tab:	dc.l	H16M1Line,H16M2Line,H16M3Line,H16M4Line
-HLine32Tab:	dc.l	H32M1Line,H32M2Line,H32M3Line,H32M4Line
+
+spxsolid:
+	cmp.w	#16,_v_planes(a4)	; see how many bits per pixel
+	lea	HSol16Tab,a2		; a2 -> table of 16 bit solid routines
+	move.w	_WRT_MODE(a4),d5
+	lsl.w	#2,d5			; d5 <- offset into the table
+	move.l	(a2,d5.w),a2		; a2 -> desired routine
+	jmp	(a2)			; go to the desired routine
+
+HSol16Tab:	dc.l	S16M1Line,S16M1Line,S16M3Line,S16M4Line
 
 *+
 *	d0	contains $ffffffff
@@ -141,69 +142,6 @@ HLine32Tab:	dc.l	H32M1Line,H32M2Line,H32M3Line,H32M4Line
 *
 *	a1	points to the first pixel
 *-
-
-******************************************************************************
-******************************* 32 bit HLINE CASE ****************************
-******************************************************************************
-*+
-* Replace mode (1)
-*-
-H32M1Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H32M1FG			; if cary is set set to foreground
-	move.l	d4,(a1)+		; set to background
-	dbra	d6,H32M1Line		; do next pixel
-	rts
-
-H32M1FG:
-	move.l	d3,(a1)+		; set to foreground
-	dbra	d6,H32M1Line		; do next pixel
-	rts
-
-*+
-* Transparant mode (2)
-*-
-H32M2Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H32M2FG			; if cary is set set to foreground
-	addq.w	#4,a1			; point to next pixel
-	dbra	d6,H32M2Line		; do next pixel
-	rts
-
-H32M2FG:
-	move.l	d3,(a1)+		; set to foreground
-	dbra	d6,H32M2Line		; do next pixel
-	rts
-
-*+
-* XOR mode (3)
-*-
-H32M3Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H32M3FG			; if cary is set set to foreground
-	addq.w	#4,a1			; point to next pixel
-	dbra	d6,H32M3Line		; do next pixel
-	rts
-
-H32M3FG:
-	eor.l	d0,(a1)+		; set to foreground
-	dbra	d6,H32M3Line		; do next pixel
-	rts
-
-*+
-* Reverse Transparent mode (4)
-*-
-H32M4Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H32M4FG			; if cary is set set to foreground
-	move.l	d3,(a1)+		; set to foreground
-	dbra	d6,H32M4Line		; do next pixel
-	rts
-
-H32M4FG:
-	addq.w	#4,a1			; point to next pixel
-	dbra	d6,H32M4Line		; do next pixel
-	rts
 
 ******************************************************************************
 ******************************* 16 bit HLINE CASE ****************************
@@ -269,69 +207,6 @@ H16M4FG:
 	rts
 
 ******************************************************************************
-*******************************  8 bit HLINE CASE ****************************
-******************************************************************************
-*+
-* Replace mode (1)
-*-
-H8M1Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H8M1FG			; if cary is set set to foreground
-	move.b	d4,(a1)+		; set to background
-	dbra	d6,H8M1Line		; do next pixel
-	rts
-
-H8M1FG:
-	move.b	d3,(a1)+		; set to foreground
-	dbra	d6,H8M1Line		; do next pixel
-	rts
-
-*+
-* Transparant mode (2)
-*-
-H8M2Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H8M2FG			; if cary is set set to foreground
-	addq.w	#1,a1			; point to next pixel
-	dbra	d6,H8M2Line		; do next pixel
-	rts
-
-H8M2FG:
-	move.b	d3,(a1)+		; set to foreground
-	dbra	d6,H8M2Line		; do next pixel
-	rts
-
-*+
-* XOR mode (3)
-*-
-H8M3Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H8M3FG			; if cary is set set to foreground
-	addq.w	#1,a1			; point to next pixel
-	dbra	d6,H8M3Line		; do next pixel
-	rts
-
-H8M3FG:
-	eor.b	d0,(a1)+		; set to foreground
-	dbra	d6,H8M3Line		; do next pixel
-	rts
-
-*+
-* Reverse Transparent mode (4)
-*-
-H8M4Line:
-	rol.w	d2			; rotate the line style mask
-	bcs	H8M4FG			; if cary is set set to foreground
-	move.b	d3,(a1)+		; set to foreground
-	dbra	d6,H8M4Line		; do next pixel
-	rts
-
-H8M4FG:
-	addq.w	#1,a1			; point to next pixel
-	dbra	d6,H8M4Line		; do next pixel
-	rts
-
-******************************************************************************
 ************************  MULTIPLANE PATTERN HLINE CASE **********************
 ******************************************************************************
 
@@ -357,8 +232,6 @@ multiFill:
 	neg.w	d5			; d5 <- 15 - mod 16 count
 
 	cmp.w	#16,_v_planes(a4)	; see how many bits per pixel
-	beq	M16MFill		; do 16 bits per pixel case
-	blt	M8MFill			; do 8 bits per pixel case
 
 *+
 *	d0	contains the number 15
@@ -369,19 +242,6 @@ multiFill:
 *	a1	points to the first pixel
 *	a2	points to pattern line
 *-
-
-M32MFill:
-	move.l	(a0)+,(a1)+
-	subq.w	#1,d6			; decremnts # of pixels
-	bmi	M32MLeave		; if finished then leave
-	dbra	d5,M32MFill		; check to see if doing new 16 pix
-	move.w	d0,d5			; start new 16 pixel counter
-	movea.l	a2,a0			; start new pattern line
-	bra	M32MFill		; loop back to do more of same line
-
-M32MLeave:
-	rts
-
 
 M16MFill:
 	move.w	(a0)+,(a1)+
@@ -396,14 +256,56 @@ M16MLeave:
 	rts
 
 
-M8MFill:
-	move.b	(a0)+,(a1)+
-	subq.w	#1,d6			; decremnts # of pixels
-	bmi	M8MLeave		; if finished then leave
-	dbra	d5,M8MFill		; check to see if doing new 16 pix
-	move.w	d0,d5			; start new 16 pixel counter
-	movea.l	a2,a0			; start new pattern line
-	bra	M8MFill			; loop back to do more of same line
 
-M8MLeave:
+******************************************************************************
+*************************** 16 bit solid HLINE CASE **************************
+******************************************************************************
+*+
+* Replace and Transparent mode (1, 2): two pixels per long
+*-
+S16M1Line:
+	move.w	d3,d4
+	swap	d3
+	move.w	d4,d3			; d3 <- foreground in both words
+	addq.w	#1,d6			; d6 <- # of pixels to plot
+	move.w	d6,d2
+	and.w	#1,d2			; d2 <- odd pixel left over
+	asr.w	#1,d6			; d6 <- # of pixel pairs
+	beq	s16m1odd
+	subq.w	#1,d6
+s16m1loop:
+	move.l	d3,(a1)+		; set to foreground
+	dbra	d6,s16m1loop		; do next pixel pair
+s16m1odd:
+	tst.b	d2
+	beq	s16m1done
+	move.w	d3,(a1)+		; set the last pixel
+s16m1done:
 	rts
+
+*+
+* XOR mode (3)
+*-
+S16M3Line:
+	addq.w	#1,d6			; d6 <- # of pixels to plot
+	move.w	d6,d2
+	and.w	#1,d2			; d2 <- odd pixel left over
+	asr.w	#1,d6			; d6 <- # of pixel pairs
+	beq	s16m3odd
+	subq.w	#1,d6
+s16m3loop:
+	eor.l	d0,(a1)+		; XOR with -1
+	dbra	d6,s16m3loop		; do next pixel pair
+s16m3odd:
+	tst.b	d2
+	beq	s16m3done
+	eor.w	d0,(a1)+		; XOR the last pixel
+s16m3done:
+	rts
+
+*+
+* Reverse Transparent mode (4)
+*-
+S16M4Line:
+	rts
+

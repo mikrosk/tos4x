@@ -31,8 +31,24 @@
 *******************************************************************************
 */
 
+#ifndef _GSXEXTRN_H_
+#define _GSXEXTRN_H_
+
 /* line_a variable structure */
-extern	VDIVARS	*la;
+extern	VDIVARS	*LA;
+
+/* parameter block of the current call (contrl, intin, ptsin, intout, ptsout) */
+typedef struct {
+    WORD	*contrl, *intin, *ptsin, *intout, *ptsout;
+} VDIPB;
+extern	VDIPB	*pblock;
+
+/* attribute area of the current call */
+extern	ATTRIBUTE *curWork;
+
+/* local copy of PTSIN for the functions that change it (entry.s) */
+VOID	cpy_pts( VOID );
+VOID	rst_pts( VOID );
 
 /* Virtual workstation attributes   */
 extern	ATTRIBUTE virt_work;
@@ -109,7 +125,7 @@ extern  VOID    HIDE_CU(),  GLOC_KEY(), GCHR_KEY();
 extern  VOID    XFM_CRFM(), XFM_UNDL(), COPY_RFM();
 extern  VOID    VEX_BUTV(), VEX_MOTV(), RECTFILL();
 extern  VOID    TEXT_BLT(), VEX_CURV();
-extern	LONG	get_pix();
+extern	WORD	get_pix();
 
 /* C Support routines */
 extern	WORD 	isin();
@@ -126,3 +142,5 @@ extern	VOID (**PixHardList)();	    /* pixel packed routines		    */
 extern	VOID (**PixSoftList)();	    /* pixel packed routines		    */
 extern	VOID (**SPPixSoftList)();   /* pixel packed routines		    */
 extern	VOID (**SPPixHardList)();   /* SPARROW routines (hard blit)	    */
+
+#endif

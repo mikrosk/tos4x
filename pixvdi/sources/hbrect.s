@@ -151,10 +151,10 @@ hb_rect:
 	lsl.w	#8,d4			; d4[11:08] <- initial pattern index
 	or.w	#BM_GO,d4		; d4 <- SKEW word
 
+        move.l  _FG_B_PLANES(a2),d5	; d5 <- color index
+
 	tst.w	_multifill(a2)		; handle multi-plane fill seperately
 	bne	rf_multi
-
-        move.l  _FG_B_PLANES(a2),d5	; d5 <- color index
 
 *
 *  CASE I:  Standard monoplane patterns ( mask: 0, 1, 3, 7, 15 )

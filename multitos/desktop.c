@@ -274,7 +274,7 @@ d_load_fonts()			/* load GDOS fonts */
 	REG WORD	i;
 	REG FNTLST	*fontsp;
 
-	if (d_spd)		/* Is Speedo GDOS there? */
+	if (d_spd && !ctldown)	/* Is Speedo GDOS there? */
 		d_numfonts = d_v_load_fonts();
 	else
 		d_numfonts = 1; /* only system font available */
@@ -294,8 +294,6 @@ d_load_fonts()			/* load GDOS fonts */
 		fontsp->fnt_name[35] = '\0';
 		Debug1( fontsp->fnt_name);
 	}
-	win_font = 0;	/* system font */	
-	win_fsize = 10; /* 10 points */
 
 	return( TRUE );
 }
@@ -529,13 +527,12 @@ ini_rsc()
 	trap14(0x26, gettosvers);	/* Supexec(gettosvers) */
 
 /* if MiNT is not present, don't show the MiNT copyright box */
-/* also, if the TOS version is < 5.00, then show "MultiTOS" instead
- * of "TOS"
+/* also, show "MultiTOS" instead of "TOS"
  */
 	if (!d_multi) {
 		obj[MINTCBOX].ob_flags |= HIDETREE;
-	} else if (tosvers < 0x0500) {
-		tosvers = mintvers;
+	} else {
+		tosvers = (WORD)mintvers;
 		verstring = get_string(MTOSVERS);
 		ted->te_ptext = verstring;
 	}
@@ -705,6 +702,7 @@ deskmain()
 	gl_ncols = ( ptr[0] + 1 )/ gl_wchar;	/* get # of columns */
 	gl_nrows = ( ptr[1] + 1 )/ gl_hchar;	/* get # of rows    */
 #endif
+	d_maxcolor = ptr[13];		/* vdi max number of color	*/
 
 	doitonce = TRUE;
 #ifdef OBSOLETE_CODE
@@ -764,6 +762,11 @@ deskmain()
 	}
 top:
 	
+#if !DESKPRG			/* Do this only with the ROM version */
+	Debug1( "Desktop does deskerr\r\n" );
+
+	deskerr();
+#endif
 #if SOFTLOAD
 	deskrsc();		/* read desktop resource */
 #else
@@ -773,11 +776,6 @@ top:
 	rom_ram( 1, (LONG)deskptr );	/* read in desktop resource	*/
 #endif
 
-#if !DESKPRG			/* Do this only with the ROM version */
-	Debug1( "Desktop does deskerr\r\n" );
-
-	deskerr();
-#endif
 	ret = TRUE;		/* assume everything is OK	*/
 
 	if ( getcookie( 0x46534d43L, (LONG *)&pvalue ) ) /* FSMC */
@@ -786,6 +784,9 @@ top:
 	  (((WORD)(*pvalue >> 16)) == 0x0411)) /* _SPD */
 	  	d_spd = 1;    /* at least Version 4.11 */
 	} 
+
+	win_font = 0;	/* system font */	
+	win_fsize = (gl_hchar <= 10) ? 9 : 10; /* font size in points */
 
 	if (!d_load_fonts()) 	/* Load Speedo GDOS fonts	*/
 		goto m_2;			
@@ -824,8 +825,6 @@ m_2:
 	Debug1( "Ini_window\r\n" );
 	ini_windows( );	 
 
-	d_maxcolor = ptr[13];		/* vdi max number of color	*/
-
 	if ( doitonce )			/* do it once only	*/
 	  adjobjects();			/* adjust object positions      */
 		
@@ -839,10 +838,16 @@ m_2:
 	desknoerr();
 #endif
 					/* Get the real res mode for FALCON	*/
-	if ( ( gl_vdo & HIGHWORD ) == FALCON ) 
+	if ( ( gl_vdo & HIGHWORD ) == FALCON )
+	{
 	  d_rezword = setmode(-1);
+	  pref_save = mode2res(d_rezword);
+	}
 	else
+	{
 	  pref_save = res_type(Getrez()+2);
+	  d_rezword = res2mode(pref_save);
+	}
 
 					/* change the menu bar		*/
 	do_view( ( s_view == S_ICON ) ? ICONITEM : TEXTITEM );
@@ -1023,6 +1028,7 @@ ch_machine()
 	}
 }
 
+#ifdef OLD_WAY
 
 #pragma inline asm1() { "4e7a"; "0002"; }
 
@@ -1045,7 +1051,6 @@ inq_cache( data )
 	  old = (BYTE *) Super( 0x0L );
 		asm1();
 	  /*asm( ".dc.w $4e7a,$0002" );*/ /* movec.l cacr,d0		*/
-
 	  if ( data != -1 )
 		asm2();
 	    /*asm( ".dc.w $4e7b,$7002" );*/ /* movec.l d7,cacr		*/
@@ -1057,9 +1062,38 @@ inq_cache( data )
 
 	asm4();
 	/*asm( ".dc.w $2007" );*/
-
 }
+#endif /* OLD_WAY */
 
+LONG getcacr( void );
+void putcacr( LONG cacr );
+
+#pragma inline d0=getcacr() { "4e7a"; "0002"; }	/* movec.l cacr,d0 */
+#pragma inline putcacr(d0) { "4e7b"; "0002"; }  /* movec.l d0,cacr */
+
+	LONG
+inq_cache( data )
+	REG LONG	data;
+{
+	BYTE	*oldssp;
+	WORD	super;
+	LONG	oldcacr;
+
+	super = (WORD) Super( 0x1L );
+	
+	if ( !super )
+	  oldssp = (BYTE *) Super( 0x0L );
+
+	if ( data != -1 ) {
+		putcacr( data );
+	}
+	oldcacr = getcacr();
+
+	if ( !super )
+	  Super( oldssp );
+
+	return oldcacr;
+}
 
 
 /*	Turn on the cache or bitblt 	*/

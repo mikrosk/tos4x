@@ -141,7 +141,7 @@ WORD  ROM_INQ_TAB[45] = {
   	1,		/*  11 text alignment flag		*/
   	0,		/*  12 Inking capability		*/
   	0,		/*  13 rubber banding			*/
-  	MAX_VERT,	/*  14 maximum vertices			*/
+  	1024,		/*  14 maximum vertices			*/
   	-1,		/*  15 maximum intin			*/
   	2,		/*  16 number of buttons on MOUSE	*/
   	0,		/*  17 styles for wide lines            */

@@ -37,7 +37,7 @@
 
 EXTERN  struct  font_head  f8x8;
 EXTERN UWORD   off_8x8[],dat_8x8[];
-
+EXTERN FONT_HEAD ram8x16[];
 
 
 struct font_head f8x8 ={

@@ -130,9 +130,7 @@ OUTLINE		equ	4
 SHADOW		equ	5
 
 
-	.globl	pos32Tab
 	.globl	pos16Tab
-	.globl	pos8Tab
 	.globl	 lf_tab
 	.globl	 concat
 	.globl	_v_bas_ad
@@ -870,18 +868,8 @@ skip3:	add.w	d7,d7			; d7 <- blit span in bytes
 
 	movem.l	a5-a6,-(sp)		; save registers
 	cmp.w	#16,_v_planes(a6)	; see how many bit per pixel
-	beq	spx16PTab		; do 16 bits per pixel case
-	blt	spx8PTab		; do 8 bits per pixel case
-	lea	pos32Tab,a5		; a5 -> table of 32 bit routines
-	bra	tab_set0
-
 spx16PTab:	
 	lea	pos16Tab,a5		; a5 -> table of 16 bit routines
-	bra	tab_set0
-
-spx8PTab:
-	lea	pos8Tab,a5		; a5 -> table of 8 bit routines
-
 tab_set0:
 	moveq.l	#0,d2			; clear for later use
 	move.w	_WRT_MODE(a6),d2	; d2 <- writing mode
@@ -953,7 +941,6 @@ ck270:		add.w	d1,_DESTY(a6)		; move down by DELX
 
 
 blt_done:	unlk	a5
-		movem.l	(sp)+,a5-a6		; restore pre-saved registers
 leave:		rts				; return to "C"
 
 
@@ -2540,7 +2527,6 @@ clipDone:
 
 	cmp.w	#16,_v_planes(a0)	; see how many bit per pixel
 	beq	Nxt16Line		; wipe out the region (16 bits/pix)
-	blt	Nxt8Line		; wipe out the region (8 bits/pix)
 
 *+
 *	wipe out a region with the text background color
@@ -2552,16 +2538,6 @@ clipDone:
 *
 *		a1.l		point to the X,Y position
 *-
-
-Nxt32Line:
-	move.l	a1,a2			; a2 -> current line
-	move.w	d0,d3			; d3 <- delta X - 1
-
-Line32Loop:
-	move.l	d7,(a2)+		; splat text background
-	dbra	d3,Line32Loop		; do next pixel
-	add.w	d2,a1			; a1 -> to next line	
-	dbra	d1,Nxt32Line		; do next line
 
 cheat_leave:
 	movem.l	(sp)+,d3/d7		; restore registers
@@ -2576,18 +2552,6 @@ Line16Loop:
 	dbra	d3,Line16Loop		; do next pixel
 	add.w	d2,a1			; a1 -> to next line	
 	dbra	d1,Nxt16Line		; do next line
-	movem.l	(sp)+,d3/d7		; restore registers
-	rts
-
-Nxt8Line:
-	move.l	a1,a2			; a2 -> current line
-	move.w	d0,d3			; d3 <- delta X - 1
-
-Line8Loop:
-	move.b	d7,(a2)+		; splat text background
-	dbra	d3,Line8Loop		; do next pixel
-	add.w	d2,a1			; a1 -> to next line	
-	dbra	d1,Nxt8Line		; do next line
 	movem.l	(sp)+,d3/d7		; restore registers
 	rts
 

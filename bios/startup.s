@@ -422,7 +422,7 @@ ONLY_LONGFRAME	equ	TT
 
 .if SPARROW
 vershi		equ	$04
-verslo		equ	$04
+verslo		equ	$92
 .else
 
 .if TT
@@ -2287,10 +2287,16 @@ ill_1:	move.l	a1,a7		; restore old ssp
 	move.l	#$00010001,(a0)+	; machine is STe w/minor 01
 .else
 .if SPARROW
+	move.l	#$00030000,d0
+	move.b	$ff9201,d1
+	btst	#4,d1
+	bne	sparcook
+	or.w	#1,d0			; minor 1 when bit 4 of $ff9201 is clear
+sparcook:
 	move.l	#"_VDO",(a0)+
-	move.l	#$00030000,(a0)+	; Sparrow video
+	move.l	d0,(a0)+		; Sparrow video
 	move.l	#"_MCH",(a0)+
-	move.l	#$00030000,(a0)+	; Sparrow machine
+	move.l	d0,(a0)+		; Sparrow machine
 .else
 * else decide what kind of ST/STPLUS we are: ST, STe, Mega STe, and STe-PLUS.
 	tst.b	_iamanst

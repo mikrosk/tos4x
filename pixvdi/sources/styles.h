@@ -23,6 +23,9 @@
 * 
 *******************************************************************************
 */
+#ifndef _STYLES_H_
+#define _STYLES_H_
+
 /* styles.h */
 
 /* the six predefined line styles */
@@ -129,3 +132,5 @@ WORD HATCH1[96] = {
 
 WORD HOLLOW = 0;
 WORD SOLID = 0xFFFF;
+
+#endif

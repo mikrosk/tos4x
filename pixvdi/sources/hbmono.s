@@ -85,7 +85,8 @@ hb_mono:
 	move.w	-86(a5),d7	    ;12	 d7 <- dst form width	 ( _v_lin_wr )
 	move.w	d7,B_D_WRAP(a4)	    ;20	 load dst form width
 	muls	-90(a5),d1	    ;79> d1 <- offset to dst Ymin( _bytes_lin)
-	move.l	-80(a5),a2	    ;12	 a2 -> ascii char string ( _INTIN    )
+	move.l	_pblock,a2
+	move.l	4(a2),a2	    ;12	 a2 -> ascii char string ( _INTIN    )
 	move.w	-52(a5),d4	    ;12	 d4 <- writing mode      ( _WRT_MOD  )
 	move.w	-88(a5),d5	    ;12	 d5 <- number of planes  ( _v_planes )
 	subq.w	#1,d5		    ; 4	 d5 <- dbra plane counter

@@ -155,6 +155,14 @@ _PTSIN		=	12	; ptr to the PTSIN array.
 _INTOUT		=	16	; ptr to the INTOUT array.
 _PTSOUT		=	20	; ptr to the PTSOUT array.
 
+* offsets in the parameter block _pblock points to
+
+PB_CONTRL	=	0	; ptr to the CONTRL array.
+PB_INTIN	=	4	; ptr to the INTIN array.
+PB_PTSIN	=	8	; ptr to the PTSIN array.
+PB_INTOUT	=	12	; ptr to the INTOUT array.
+PB_PTSOUT	=	16	; ptr to the PTSOUT array.
+
 _FG_BP_1	=	24	; foreground bit_plane #1 value.
 _FG_BP_2	=	26	; foreground bit_plane #2 value.
 _FG_BP_3	=	28	; foreground bit_plane #3 value.

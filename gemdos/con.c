@@ -555,6 +555,13 @@ char *buf;
     int initcol = 0;
 #endif
 
+    if (maxlen == 1) {
+	ch = conin(dev,NOECHO);
+	conout(dev,ch,RAW);
+	*buf = ch;
+	return 1;
+    }
+
     for (retlen = 0; retlen < maxlen; ) {
 	switch(ch = conin(dev,COOKED|NOECHO)) {
 	    case cr:

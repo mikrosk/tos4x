@@ -27,6 +27,7 @@
 EXTERN	VOID 	gsx2( VOID );
 
 EXTERN	WORD	min();
+EXTERN	WORD	ctldown;
 EXTERN	BYTE	AE_PNTSIZE[];
 EXTERN	BYTE	AE_FONTID[];
 
@@ -116,6 +117,9 @@ GLOBAL WORD	cu_prop;	/* current font uses 		*/
 
 WORD	bitstmap;		/* TRUE = use Bitstream char map*/
 				/* FALSE = use ATARI char map   */
+
+WORD	gl_bitstmap;
+
 
 /*
  *	Bitstream character mapping table
@@ -559,7 +563,7 @@ gsx_start()
 	if ( aescookie( 0x46534d43L, (LONG *)&l ) )	/* FSMC */
 	{
 	  if ( (*l++ == 0x5F535044L) && 
-	  (((WORD)(*l >> 16)) >= 0x0411) ) { /* _SPD */
+	  (((WORD)(*l >> 16L)) >= 0x0411) && !ctldown) { /* _SPD */
 	    	gl_spd = 1; /* at least Version 4.11 */
 	  }
 	}
@@ -644,6 +648,7 @@ gsx_start()
 	/* Set up current font information, +++ HMK 05/18/93  */
 	cu_font		= IBM;
 	cu_fntid	= gl_fid;
+	gl_bitstmap = bitstmap = (cu_fntid > 1);	
 	cu_wchar	= gl_wchar;
 	cu_hchar	= gl_hchar;
 	cu_space	= gl_space;
@@ -760,6 +765,7 @@ WORD	size;
 			goto GO_IBM;
 		cu_font = font;
 		cu_fntid = font_id;
+		bitstmap = TRUE;
 		cu_prop = FALSE;
 		cu_spd = TRUE;
 		if (size == -1)
@@ -779,6 +785,7 @@ WORD	size;
 		cu_font = font;
 		cu_prop = TRUE;
 		cu_fntid = font_id;
+		bitstmap = (font == GDOS_PROP);
 		if (size == -1)
 			size = (gl_size) ? gl_size : 10;
 		if (gl_spd && (font == GDOS_PROP)) {
@@ -810,6 +817,8 @@ GO_IBM:
 			}
 		}
 		cu_fntid = gl_fid;
+		bitstmap = gl_bitstmap;
+
 		cu_wchar = gl_wchar;
 		cu_hchar = gl_hchar;
 		cu_space = gl_space;
@@ -820,6 +829,7 @@ GO_IBM:
 	case SMALL:		/* small system font */
 		cu_font = font;
 		cu_fntid = 1;
+		bitstmap = FALSE;
 		cu_wchar = gl_wschar;
 		cu_hchar = gl_hschar;
 		cu_space = gl_wschar;
@@ -986,15 +996,14 @@ REG	UBYTE *s;
 
 	ip = (WORD *) ad_intin;
 
-	if ((cu_fntid > 1)) {
-		bitstmap = TRUE ;
+	if (bitstmap) {
+		Debug7("Bitstream charset: "); Debug7(s); Debug7("\r\n");
 		t = ATable;
 		for (i = 0; *s; i++) {
 			*ip++ = t[*s++];
 		} 
-
 	} else {
-		bitstmap = FALSE;
+		Debug7("ATARI charset: "); Debug7(s); Debug7("\r\n");
 		i = LBWMOV((BYTE *)ip, (BYTE *)s); 
 	}
 	return i;

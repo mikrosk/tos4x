@@ -1,0 +1,665 @@
+# DESK.PRG (the desktop as a program) from multitos/makedesk, run by C:\AUTO\RUNNER.PRG at boot
+# (commands: build/src/runner.c). S: is the repository, D: the work copy. aesbin73 and the glue as in
+# GEMSYS.JOB, apstart.oo from apstart.s (AS68), then makedesk with Lattice 5.52, one make call per object.
+echo copy the sources to D:
+rmtree D:\
+cptree S:\MULTITOS D:\MULTITOS
+setenv PATH=C:\UTIL;C:\LC\BIN;C:\SLAV
+echo AES binding library aesbin73: Alcyon C (cp68, c068 -f, c168) and MadMac 1.05 (mac -6) per member;
+echo the lost assembler of the original members made addq/moveq of these add/move forms (subst)
+cd D:\MULTITOS\AESBIND
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ header.c header.i
+x C:\BIN\C068.TTP header.i header.1 header.2 header.3 -f
+x C:\BIN\C168.TTP header.1 header.2 header.s
+subst header.s add\s#1, addq\s#1,
+subst header.s add.l\s#1, addq.l\s#1,
+subst header.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 header.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apexit.c apexit.i
+x C:\BIN\C068.TTP apexit.i apexit.1 apexit.2 apexit.3 -f
+x C:\BIN\C168.TTP apexit.1 apexit.2 apexit.s
+subst apexit.s add\s#1, addq\s#1,
+subst apexit.s add.l\s#1, addq.l\s#1,
+subst apexit.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apexit.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ aptplay.c aptplay.i
+x C:\BIN\C068.TTP aptplay.i aptplay.1 aptplay.2 aptplay.3 -f
+x C:\BIN\C168.TTP aptplay.1 aptplay.2 aptplay.s
+subst aptplay.s add\s#1, addq\s#1,
+subst aptplay.s add.l\s#1, addq.l\s#1,
+subst aptplay.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 aptplay.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apfind.c apfind.i
+x C:\BIN\C068.TTP apfind.i apfind.1 apfind.2 apfind.3 -f
+x C:\BIN\C168.TTP apfind.1 apfind.2 apfind.s
+subst apfind.s add\s#1, addq\s#1,
+subst apfind.s add.l\s#1, addq.l\s#1,
+subst apfind.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apfind.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apread.c apread.i
+x C:\BIN\C068.TTP apread.i apread.1 apread.2 apread.3 -f
+x C:\BIN\C168.TTP apread.1 apread.2 apread.s
+subst apread.s add\s#1, addq\s#1,
+subst apread.s add.l\s#1, addq.l\s#1,
+subst apread.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apread.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ aptreco.c aptreco.i
+x C:\BIN\C068.TTP aptreco.i aptreco.1 aptreco.2 aptreco.3 -f
+x C:\BIN\C168.TTP aptreco.1 aptreco.2 aptreco.s
+subst aptreco.s add\s#1, addq\s#1,
+subst aptreco.s add.l\s#1, addq.l\s#1,
+subst aptreco.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 aptreco.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apwrite.c apwrite.i
+x C:\BIN\C068.TTP apwrite.i apwrite.1 apwrite.2 apwrite.3 -f
+x C:\BIN\C168.TTP apwrite.1 apwrite.2 apwrite.s
+subst apwrite.s add\s#1, addq\s#1,
+subst apwrite.s add.l\s#1, addq.l\s#1,
+subst apwrite.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apwrite.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evbutto.c evbutto.i
+x C:\BIN\C068.TTP evbutto.i evbutto.1 evbutto.2 evbutto.3 -f
+x C:\BIN\C168.TTP evbutto.1 evbutto.2 evbutto.s
+subst evbutto.s add\s#1, addq\s#1,
+subst evbutto.s add.l\s#1, addq.l\s#1,
+subst evbutto.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evbutto.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evdclic.c evdclic.i
+x C:\BIN\C068.TTP evdclic.i evdclic.1 evdclic.2 evdclic.3 -f
+x C:\BIN\C168.TTP evdclic.1 evdclic.2 evdclic.s
+subst evdclic.s add\s#1, addq\s#1,
+subst evdclic.s add.l\s#1, addq.l\s#1,
+subst evdclic.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evdclic.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evkeybd.c evkeybd.i
+x C:\BIN\C068.TTP evkeybd.i evkeybd.1 evkeybd.2 evkeybd.3 -f
+x C:\BIN\C168.TTP evkeybd.1 evkeybd.2 evkeybd.s
+subst evkeybd.s add\s#1, addq\s#1,
+subst evkeybd.s add.l\s#1, addq.l\s#1,
+subst evkeybd.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evkeybd.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evmesag.c evmesag.i
+x C:\BIN\C068.TTP evmesag.i evmesag.1 evmesag.2 evmesag.3 -f
+x C:\BIN\C168.TTP evmesag.1 evmesag.2 evmesag.s
+subst evmesag.s add\s#1, addq\s#1,
+subst evmesag.s add.l\s#1, addq.l\s#1,
+subst evmesag.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evmesag.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evmouse.c evmouse.i
+x C:\BIN\C068.TTP evmouse.i evmouse.1 evmouse.2 evmouse.3 -f
+x C:\BIN\C168.TTP evmouse.1 evmouse.2 evmouse.s
+subst evmouse.s add\s#1, addq\s#1,
+subst evmouse.s add.l\s#1, addq.l\s#1,
+subst evmouse.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evmouse.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evmulti.c evmulti.i
+x C:\BIN\C068.TTP evmulti.i evmulti.1 evmulti.2 evmulti.3 -f
+x C:\BIN\C168.TTP evmulti.1 evmulti.2 evmulti.s
+subst evmulti.s add\s#1, addq\s#1,
+subst evmulti.s add.l\s#1, addq.l\s#1,
+subst evmulti.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evmulti.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ evtimer.c evtimer.i
+x C:\BIN\C068.TTP evtimer.i evtimer.1 evtimer.2 evtimer.3 -f
+x C:\BIN\C168.TTP evtimer.1 evtimer.2 evtimer.s
+subst evtimer.s add\s#1, addq\s#1,
+subst evtimer.s add.l\s#1, addq.l\s#1,
+subst evtimer.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 evtimer.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmalert.c fmalert.i
+x C:\BIN\C068.TTP fmalert.i fmalert.1 fmalert.2 fmalert.3 -f
+x C:\BIN\C168.TTP fmalert.1 fmalert.2 fmalert.s
+subst fmalert.s add\s#1, addq\s#1,
+subst fmalert.s add.l\s#1, addq.l\s#1,
+subst fmalert.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmalert.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmbutton.c fmbutton.i
+x C:\BIN\C068.TTP fmbutton.i fmbutton.1 fmbutton.2 fmbutton.3 -f
+x C:\BIN\C168.TTP fmbutton.1 fmbutton.2 fmbutton.s
+subst fmbutton.s add\s#1, addq\s#1,
+subst fmbutton.s add.l\s#1, addq.l\s#1,
+subst fmbutton.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmbutton.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmcente.c fmcente.i
+x C:\BIN\C068.TTP fmcente.i fmcente.1 fmcente.2 fmcente.3 -f
+x C:\BIN\C168.TTP fmcente.1 fmcente.2 fmcente.s
+subst fmcente.s add\s#1, addq\s#1,
+subst fmcente.s add.l\s#1, addq.l\s#1,
+subst fmcente.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmcente.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmdial.c fmdial.i
+x C:\BIN\C068.TTP fmdial.i fmdial.1 fmdial.2 fmdial.3 -f
+x C:\BIN\C168.TTP fmdial.1 fmdial.2 fmdial.s
+subst fmdial.s add\s#1, addq\s#1,
+subst fmdial.s add.l\s#1, addq.l\s#1,
+subst fmdial.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmdial.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmdo.c fmdo.i
+x C:\BIN\C068.TTP fmdo.i fmdo.1 fmdo.2 fmdo.3 -f
+x C:\BIN\C168.TTP fmdo.1 fmdo.2 fmdo.s
+subst fmdo.s add\s#1, addq\s#1,
+subst fmdo.s add.l\s#1, addq.l\s#1,
+subst fmdo.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmdo.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmerror.c fmerror.i
+x C:\BIN\C068.TTP fmerror.i fmerror.1 fmerror.2 fmerror.3 -f
+x C:\BIN\C168.TTP fmerror.1 fmerror.2 fmerror.s
+subst fmerror.s add\s#1, addq\s#1,
+subst fmerror.s add.l\s#1, addq.l\s#1,
+subst fmerror.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmerror.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fmkeybd.c fmkeybd.i
+x C:\BIN\C068.TTP fmkeybd.i fmkeybd.1 fmkeybd.2 fmkeybd.3 -f
+x C:\BIN\C168.TTP fmkeybd.1 fmkeybd.2 fmkeybd.s
+subst fmkeybd.s add\s#1, addq\s#1,
+subst fmkeybd.s add.l\s#1, addq.l\s#1,
+subst fmkeybd.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fmkeybd.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fsinput.c fsinput.i
+x C:\BIN\C068.TTP fsinput.i fsinput.1 fsinput.2 fsinput.3 -f
+x C:\BIN\C168.TTP fsinput.1 fsinput.2 fsinput.s
+subst fsinput.s add\s#1, addq\s#1,
+subst fsinput.s add.l\s#1, addq.l\s#1,
+subst fsinput.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fsinput.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ fsexinpu.c fsexinpu.i
+x C:\BIN\C068.TTP fsexinpu.i fsexinpu.1 fsexinpu.2 fsexinpu.3 -f
+x C:\BIN\C168.TTP fsexinpu.1 fsexinpu.2 fsexinpu.s
+subst fsexinpu.s add\s#1, addq\s#1,
+subst fsexinpu.s add.l\s#1, addq.l\s#1,
+subst fsexinpu.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 fsexinpu.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grdragb.c grdragb.i
+x C:\BIN\C068.TTP grdragb.i grdragb.1 grdragb.2 grdragb.3 -f
+x C:\BIN\C168.TTP grdragb.1 grdragb.2 grdragb.s
+subst grdragb.s add\s#1, addq\s#1,
+subst grdragb.s add.l\s#1, addq.l\s#1,
+subst grdragb.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grdragb.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grgrowb.c grgrowb.i
+x C:\BIN\C068.TTP grgrowb.i grgrowb.1 grgrowb.2 grgrowb.3 -f
+x C:\BIN\C168.TTP grgrowb.1 grgrowb.2 grgrowb.s
+subst grgrowb.s add\s#1, addq\s#1,
+subst grgrowb.s add.l\s#1, addq.l\s#1,
+subst grgrowb.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grgrowb.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grhandl.c grhandl.i
+x C:\BIN\C068.TTP grhandl.i grhandl.1 grhandl.2 grhandl.3 -f
+x C:\BIN\C168.TTP grhandl.1 grhandl.2 grhandl.s
+subst grhandl.s add\s#1, addq\s#1,
+subst grhandl.s add.l\s#1, addq.l\s#1,
+subst grhandl.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grhandl.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grmbox.c grmbox.i
+x C:\BIN\C068.TTP grmbox.i grmbox.1 grmbox.2 grmbox.3 -f
+x C:\BIN\C168.TTP grmbox.1 grmbox.2 grmbox.s
+subst grmbox.s add\s#1, addq\s#1,
+subst grmbox.s add.l\s#1, addq.l\s#1,
+subst grmbox.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grmbox.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grmksta.c grmksta.i
+x C:\BIN\C068.TTP grmksta.i grmksta.1 grmksta.2 grmksta.3 -f
+x C:\BIN\C168.TTP grmksta.1 grmksta.2 grmksta.s
+subst grmksta.s add\s#1, addq\s#1,
+subst grmksta.s add.l\s#1, addq.l\s#1,
+subst grmksta.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grmksta.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grmouse.c grmouse.i
+x C:\BIN\C068.TTP grmouse.i grmouse.1 grmouse.2 grmouse.3 -f
+x C:\BIN\C168.TTP grmouse.1 grmouse.2 grmouse.s
+subst grmouse.s add\s#1, addq\s#1,
+subst grmouse.s add.l\s#1, addq.l\s#1,
+subst grmouse.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grmouse.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grrubbo.c grrubbo.i
+x C:\BIN\C068.TTP grrubbo.i grrubbo.1 grrubbo.2 grrubbo.3 -f
+x C:\BIN\C168.TTP grrubbo.1 grrubbo.2 grrubbo.s
+subst grrubbo.s add\s#1, addq\s#1,
+subst grrubbo.s add.l\s#1, addq.l\s#1,
+subst grrubbo.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grrubbo.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grshrin.c grshrin.i
+x C:\BIN\C068.TTP grshrin.i grshrin.1 grshrin.2 grshrin.3 -f
+x C:\BIN\C168.TTP grshrin.1 grshrin.2 grshrin.s
+subst grshrin.s add\s#1, addq\s#1,
+subst grshrin.s add.l\s#1, addq.l\s#1,
+subst grshrin.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grshrin.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grslide.c grslide.i
+x C:\BIN\C068.TTP grslide.i grslide.1 grslide.2 grslide.3 -f
+x C:\BIN\C168.TTP grslide.1 grslide.2 grslide.s
+subst grslide.s add\s#1, addq\s#1,
+subst grslide.s add.l\s#1, addq.l\s#1,
+subst grslide.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grslide.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ grwatch.c grwatch.i
+x C:\BIN\C068.TTP grwatch.i grwatch.1 grwatch.2 grwatch.3 -f
+x C:\BIN\C168.TTP grwatch.1 grwatch.2 grwatch.s
+subst grwatch.s add\s#1, addq\s#1,
+subst grwatch.s add.l\s#1, addq.l\s#1,
+subst grwatch.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 grwatch.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnbar.c mnbar.i
+x C:\BIN\C068.TTP mnbar.i mnbar.1 mnbar.2 mnbar.3 -f
+x C:\BIN\C168.TTP mnbar.1 mnbar.2 mnbar.s
+subst mnbar.s add\s#1, addq\s#1,
+subst mnbar.s add.l\s#1, addq.l\s#1,
+subst mnbar.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnbar.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnichec.c mnichec.i
+x C:\BIN\C068.TTP mnichec.i mnichec.1 mnichec.2 mnichec.3 -f
+x C:\BIN\C168.TTP mnichec.1 mnichec.2 mnichec.s
+subst mnichec.s add\s#1, addq\s#1,
+subst mnichec.s add.l\s#1, addq.l\s#1,
+subst mnichec.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnichec.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnienab.c mnienab.i
+x C:\BIN\C068.TTP mnienab.i mnienab.1 mnienab.2 mnienab.3 -f
+x C:\BIN\C168.TTP mnienab.1 mnienab.2 mnienab.s
+subst mnienab.s add\s#1, addq\s#1,
+subst mnienab.s add.l\s#1, addq.l\s#1,
+subst mnienab.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnienab.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnregis.c mnregis.i
+x C:\BIN\C068.TTP mnregis.i mnregis.1 mnregis.2 mnregis.3 -f
+x C:\BIN\C168.TTP mnregis.1 mnregis.2 mnregis.s
+subst mnregis.s add\s#1, addq\s#1,
+subst mnregis.s add.l\s#1, addq.l\s#1,
+subst mnregis.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnregis.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mntext.c mntext.i
+x C:\BIN\C068.TTP mntext.i mntext.1 mntext.2 mntext.3 -f
+x C:\BIN\C168.TTP mntext.1 mntext.2 mntext.s
+subst mntext.s add\s#1, addq\s#1,
+subst mntext.s add.l\s#1, addq.l\s#1,
+subst mntext.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mntext.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnattach.c mnattach.i
+x C:\BIN\C068.TTP mnattach.i mnattach.1 mnattach.2 mnattach.3 -f
+x C:\BIN\C168.TTP mnattach.1 mnattach.2 mnattach.s
+subst mnattach.s add\s#1, addq\s#1,
+subst mnattach.s add.l\s#1, addq.l\s#1,
+subst mnattach.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnattach.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnpopup.c mnpopup.i
+x C:\BIN\C068.TTP mnpopup.i mnpopup.1 mnpopup.2 mnpopup.3 -f
+x C:\BIN\C168.TTP mnpopup.1 mnpopup.2 mnpopup.s
+subst mnpopup.s add\s#1, addq\s#1,
+subst mnpopup.s add.l\s#1, addq.l\s#1,
+subst mnpopup.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnpopup.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnistart.c mnistart.i
+x C:\BIN\C068.TTP mnistart.i mnistart.1 mnistart.2 mnistart.3 -f
+x C:\BIN\C168.TTP mnistart.1 mnistart.2 mnistart.s
+subst mnistart.s add\s#1, addq\s#1,
+subst mnistart.s add.l\s#1, addq.l\s#1,
+subst mnistart.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnistart.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mnsetting.c mnsetting.i
+x C:\BIN\C068.TTP mnsetting.i mnsetting.1 mnsetting.2 mnsetting.3 -f
+x C:\BIN\C168.TTP mnsetting.1 mnsetting.2 mnsetting.s
+subst mnsetting.s add\s#1, addq\s#1,
+subst mnsetting.s add.l\s#1, addq.l\s#1,
+subst mnsetting.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mnsetting.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ mntnorm.c mntnorm.i
+x C:\BIN\C068.TTP mntnorm.i mntnorm.1 mntnorm.2 mntnorm.3 -f
+x C:\BIN\C168.TTP mntnorm.1 mntnorm.2 mntnorm.s
+subst mntnorm.s add\s#1, addq\s#1,
+subst mntnorm.s add.l\s#1, addq.l\s#1,
+subst mntnorm.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 mntnorm.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obadd.c obadd.i
+x C:\BIN\C068.TTP obadd.i obadd.1 obadd.2 obadd.3 -f
+x C:\BIN\C168.TTP obadd.1 obadd.2 obadd.s
+subst obadd.s add\s#1, addq\s#1,
+subst obadd.s add.l\s#1, addq.l\s#1,
+subst obadd.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obadd.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obchang.c obchang.i
+x C:\BIN\C068.TTP obchang.i obchang.1 obchang.2 obchang.3 -f
+x C:\BIN\C168.TTP obchang.1 obchang.2 obchang.s
+subst obchang.s add\s#1, addq\s#1,
+subst obchang.s add.l\s#1, addq.l\s#1,
+subst obchang.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obchang.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obdelet.c obdelet.i
+x C:\BIN\C068.TTP obdelet.i obdelet.1 obdelet.2 obdelet.3 -f
+x C:\BIN\C168.TTP obdelet.1 obdelet.2 obdelet.s
+subst obdelet.s add\s#1, addq\s#1,
+subst obdelet.s add.l\s#1, addq.l\s#1,
+subst obdelet.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obdelet.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obdraw.c obdraw.i
+x C:\BIN\C068.TTP obdraw.i obdraw.1 obdraw.2 obdraw.3 -f
+x C:\BIN\C168.TTP obdraw.1 obdraw.2 obdraw.s
+subst obdraw.s add\s#1, addq\s#1,
+subst obdraw.s add.l\s#1, addq.l\s#1,
+subst obdraw.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obdraw.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obedit.c obedit.i
+x C:\BIN\C068.TTP obedit.i obedit.1 obedit.2 obedit.3 -f
+x C:\BIN\C168.TTP obedit.1 obedit.2 obedit.s
+subst obedit.s add\s#1, addq\s#1,
+subst obedit.s add.l\s#1, addq.l\s#1,
+subst obedit.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obedit.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obsysvar.c obsysvar.i
+x C:\BIN\C068.TTP obsysvar.i obsysvar.1 obsysvar.2 obsysvar.3 -f
+x C:\BIN\C168.TTP obsysvar.1 obsysvar.2 obsysvar.s
+subst obsysvar.s add\s#1, addq\s#1,
+subst obsysvar.s add.l\s#1, addq.l\s#1,
+subst obsysvar.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obsysvar.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obfind.c obfind.i
+x C:\BIN\C068.TTP obfind.i obfind.1 obfind.2 obfind.3 -f
+x C:\BIN\C168.TTP obfind.1 obfind.2 obfind.s
+subst obfind.s add\s#1, addq\s#1,
+subst obfind.s add.l\s#1, addq.l\s#1,
+subst obfind.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obfind.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ oboffse.c oboffse.i
+x C:\BIN\C068.TTP oboffse.i oboffse.1 oboffse.2 oboffse.3 -f
+x C:\BIN\C168.TTP oboffse.1 oboffse.2 oboffse.s
+subst oboffse.s add\s#1, addq\s#1,
+subst oboffse.s add.l\s#1, addq.l\s#1,
+subst oboffse.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 oboffse.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ oborder.c oborder.i
+x C:\BIN\C068.TTP oborder.i oborder.1 oborder.2 oborder.3 -f
+x C:\BIN\C168.TTP oborder.1 oborder.2 oborder.s
+subst oborder.s add\s#1, addq\s#1,
+subst oborder.s add.l\s#1, addq.l\s#1,
+subst oborder.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 oborder.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rccopy.c rccopy.i
+x C:\BIN\C068.TTP rccopy.i rccopy.1 rccopy.2 rccopy.3 -f
+x C:\BIN\C168.TTP rccopy.1 rccopy.2 rccopy.s
+subst rccopy.s add\s#1, addq\s#1,
+subst rccopy.s add.l\s#1, addq.l\s#1,
+subst rccopy.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rccopy.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rcequal.c rcequal.i
+x C:\BIN\C068.TTP rcequal.i rcequal.1 rcequal.2 rcequal.3 -f
+x C:\BIN\C168.TTP rcequal.1 rcequal.2 rcequal.s
+subst rcequal.s add\s#1, addq\s#1,
+subst rcequal.s add.l\s#1, addq.l\s#1,
+subst rcequal.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rcequal.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rcinter.c rcinter.i
+x C:\BIN\C068.TTP rcinter.i rcinter.1 rcinter.2 rcinter.3 -f
+x C:\BIN\C168.TTP rcinter.1 rcinter.2 rcinter.s
+subst rcinter.s add\s#1, addq\s#1,
+subst rcinter.s add.l\s#1, addq.l\s#1,
+subst rcinter.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rcinter.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rcunion.c rcunion.i
+x C:\BIN\C068.TTP rcunion.i rcunion.1 rcunion.2 rcunion.3 -f
+x C:\BIN\C168.TTP rcunion.1 rcunion.2 rcunion.s
+subst rcunion.s add\s#1, addq\s#1,
+subst rcunion.s add.l\s#1, addq.l\s#1,
+subst rcunion.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rcunion.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsfree.c rsfree.i
+x C:\BIN\C068.TTP rsfree.i rsfree.1 rsfree.2 rsfree.3 -f
+x C:\BIN\C168.TTP rsfree.1 rsfree.2 rsfree.s
+subst rsfree.s add\s#1, addq\s#1,
+subst rsfree.s add.l\s#1, addq.l\s#1,
+subst rsfree.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsfree.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsgaddr.c rsgaddr.i
+x C:\BIN\C068.TTP rsgaddr.i rsgaddr.1 rsgaddr.2 rsgaddr.3 -f
+x C:\BIN\C168.TTP rsgaddr.1 rsgaddr.2 rsgaddr.s
+subst rsgaddr.s add\s#1, addq\s#1,
+subst rsgaddr.s add.l\s#1, addq.l\s#1,
+subst rsgaddr.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsgaddr.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsload.c rsload.i
+x C:\BIN\C068.TTP rsload.i rsload.1 rsload.2 rsload.3 -f
+x C:\BIN\C168.TTP rsload.1 rsload.2 rsload.s
+subst rsload.s add\s#1, addq\s#1,
+subst rsload.s add.l\s#1, addq.l\s#1,
+subst rsload.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsload.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsobfix.c rsobfix.i
+x C:\BIN\C068.TTP rsobfix.i rsobfix.1 rsobfix.2 rsobfix.3 -f
+x C:\BIN\C168.TTP rsobfix.1 rsobfix.2 rsobfix.s
+subst rsobfix.s add\s#1, addq\s#1,
+subst rsobfix.s add.l\s#1, addq.l\s#1,
+subst rsobfix.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsobfix.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rssaddr.c rssaddr.i
+x C:\BIN\C068.TTP rssaddr.i rssaddr.1 rssaddr.2 rssaddr.3 -f
+x C:\BIN\C168.TTP rssaddr.1 rssaddr.2 rssaddr.s
+subst rssaddr.s add\s#1, addq\s#1,
+subst rssaddr.s add.l\s#1, addq.l\s#1,
+subst rssaddr.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rssaddr.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ scread.c scread.i
+x C:\BIN\C068.TTP scread.i scread.1 scread.2 scread.3 -f
+x C:\BIN\C168.TTP scread.1 scread.2 scread.s
+subst scread.s add\s#1, addq\s#1,
+subst scread.s add.l\s#1, addq.l\s#1,
+subst scread.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 scread.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ scwrite.c scwrite.i
+x C:\BIN\C068.TTP scwrite.i scwrite.1 scwrite.2 scwrite.3 -f
+x C:\BIN\C168.TTP scwrite.1 scwrite.2 scwrite.s
+subst scwrite.s add\s#1, addq\s#1,
+subst scwrite.s add.l\s#1, addq.l\s#1,
+subst scwrite.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 scwrite.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shenvrn.c shenvrn.i
+x C:\BIN\C068.TTP shenvrn.i shenvrn.1 shenvrn.2 shenvrn.3 -f
+x C:\BIN\C168.TTP shenvrn.1 shenvrn.2 shenvrn.s
+subst shenvrn.s add\s#1, addq\s#1,
+subst shenvrn.s add.l\s#1, addq.l\s#1,
+subst shenvrn.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shenvrn.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shfind.c shfind.i
+x C:\BIN\C068.TTP shfind.i shfind.1 shfind.2 shfind.3 -f
+x C:\BIN\C168.TTP shfind.1 shfind.2 shfind.s
+subst shfind.s add\s#1, addq\s#1,
+subst shfind.s add.l\s#1, addq.l\s#1,
+subst shfind.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shfind.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shget.c shget.i
+x C:\BIN\C068.TTP shget.i shget.1 shget.2 shget.3 -f
+x C:\BIN\C168.TTP shget.1 shget.2 shget.s
+subst shget.s add\s#1, addq\s#1,
+subst shget.s add.l\s#1, addq.l\s#1,
+subst shget.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shget.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shput.c shput.i
+x C:\BIN\C068.TTP shput.i shput.1 shput.2 shput.3 -f
+x C:\BIN\C168.TTP shput.1 shput.2 shput.s
+subst shput.s add\s#1, addq\s#1,
+subst shput.s add.l\s#1, addq.l\s#1,
+subst shput.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shput.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shread.c shread.i
+x C:\BIN\C068.TTP shread.i shread.1 shread.2 shread.3 -f
+x C:\BIN\C168.TTP shread.1 shread.2 shread.s
+subst shread.s add\s#1, addq\s#1,
+subst shread.s add.l\s#1, addq.l\s#1,
+subst shread.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shread.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ shwrite.c shwrite.i
+x C:\BIN\C068.TTP shwrite.i shwrite.1 shwrite.2 shwrite.3 -f
+x C:\BIN\C168.TTP shwrite.1 shwrite.2 shwrite.s
+subst shwrite.s add\s#1, addq\s#1,
+subst shwrite.s add.l\s#1, addq.l\s#1,
+subst shwrite.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 shwrite.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wncalc.c wncalc.i
+x C:\BIN\C068.TTP wncalc.i wncalc.1 wncalc.2 wncalc.3 -f
+x C:\BIN\C168.TTP wncalc.1 wncalc.2 wncalc.s
+subst wncalc.s add\s#1, addq\s#1,
+subst wncalc.s add.l\s#1, addq.l\s#1,
+subst wncalc.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wncalc.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnclose.c wnclose.i
+x C:\BIN\C068.TTP wnclose.i wnclose.1 wnclose.2 wnclose.3 -f
+x C:\BIN\C168.TTP wnclose.1 wnclose.2 wnclose.s
+subst wnclose.s add\s#1, addq\s#1,
+subst wnclose.s add.l\s#1, addq.l\s#1,
+subst wnclose.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnclose.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wncreat.c wncreat.i
+x C:\BIN\C068.TTP wncreat.i wncreat.1 wncreat.2 wncreat.3 -f
+x C:\BIN\C168.TTP wncreat.1 wncreat.2 wncreat.s
+subst wncreat.s add\s#1, addq\s#1,
+subst wncreat.s add.l\s#1, addq.l\s#1,
+subst wncreat.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wncreat.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wndelet.c wndelet.i
+x C:\BIN\C068.TTP wndelet.i wndelet.1 wndelet.2 wndelet.3 -f
+x C:\BIN\C168.TTP wndelet.1 wndelet.2 wndelet.s
+subst wndelet.s add\s#1, addq\s#1,
+subst wndelet.s add.l\s#1, addq.l\s#1,
+subst wndelet.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wndelet.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnfind.c wnfind.i
+x C:\BIN\C068.TTP wnfind.i wnfind.1 wnfind.2 wnfind.3 -f
+x C:\BIN\C168.TTP wnfind.1 wnfind.2 wnfind.s
+subst wnfind.s add\s#1, addq\s#1,
+subst wnfind.s add.l\s#1, addq.l\s#1,
+subst wnfind.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnfind.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnget.c wnget.i
+x C:\BIN\C068.TTP wnget.i wnget.1 wnget.2 wnget.3 -f
+x C:\BIN\C168.TTP wnget.1 wnget.2 wnget.s
+subst wnget.s add\s#1, addq\s#1,
+subst wnget.s add.l\s#1, addq.l\s#1,
+subst wnget.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnget.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnopen.c wnopen.i
+x C:\BIN\C068.TTP wnopen.i wnopen.1 wnopen.2 wnopen.3 -f
+x C:\BIN\C168.TTP wnopen.1 wnopen.2 wnopen.s
+subst wnopen.s add\s#1, addq\s#1,
+subst wnopen.s add.l\s#1, addq.l\s#1,
+subst wnopen.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnopen.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnset.c wnset.i
+x C:\BIN\C068.TTP wnset.i wnset.1 wnset.2 wnset.3 -f
+x C:\BIN\C168.TTP wnset.1 wnset.2 wnset.s
+subst wnset.s add\s#1, addq\s#1,
+subst wnset.s add.l\s#1, addq.l\s#1,
+subst wnset.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnset.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wnupdat.c wnupdat.i
+x C:\BIN\C068.TTP wnupdat.i wnupdat.1 wnupdat.2 wnupdat.3 -f
+x C:\BIN\C168.TTP wnupdat.1 wnupdat.2 wnupdat.s
+subst wnupdat.s add\s#1, addq\s#1,
+subst wnupdat.s add.l\s#1, addq.l\s#1,
+subst wnupdat.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wnupdat.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ wmnew.c wmnew.i
+x C:\BIN\C068.TTP wmnew.i wmnew.1 wmnew.2 wmnew.3 -f
+x C:\BIN\C168.TTP wmnew.1 wmnew.2 wmnew.s
+subst wmnew.s add\s#1, addq\s#1,
+subst wmnew.s add.l\s#1, addq.l\s#1,
+subst wmnew.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 wmnew.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apterm.c apterm.i
+x C:\BIN\C068.TTP apterm.i apterm.1 apterm.2 apterm.3 -f
+x C:\BIN\C168.TTP apterm.1 apterm.2 apterm.s
+subst apterm.s add\s#1, addq\s#1,
+subst apterm.s add.l\s#1, addq.l\s#1,
+subst apterm.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apterm.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ apsearch.c apsearch.i
+x C:\BIN\C068.TTP apsearch.i apsearch.1 apsearch.2 apsearch.3 -f
+x C:\BIN\C168.TTP apsearch.1 apsearch.2 apsearch.s
+subst apsearch.s add\s#1, addq\s#1,
+subst apsearch.s add.l\s#1, addq.l\s#1,
+subst apsearch.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 apsearch.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ rsfixit.c rsfixit.i
+x C:\BIN\C068.TTP rsfixit.i rsfixit.1 rsfixit.2 rsfixit.3 -f
+x C:\BIN\C168.TTP rsfixit.1 rsfixit.2 rsfixit.s
+subst rsfixit.s add\s#1, addq\s#1,
+subst rsfixit.s add.l\s#1, addq.l\s#1,
+subst rsfixit.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 rsfixit.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ min.c min.i
+x C:\BIN\C068.TTP min.i min.1 min.2 min.3 -f
+x C:\BIN\C168.TTP min.1 min.2 min.s
+subst min.s add\s#1, addq\s#1,
+subst min.s add.l\s#1, addq.l\s#1,
+subst min.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 min.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ max.c max.i
+x C:\BIN\C068.TTP max.i max.1 max.2 max.3 -f
+x C:\BIN\C168.TTP max.1 max.2 max.s
+subst max.s add\s#1, addq\s#1,
+subst max.s add.l\s#1, addq.l\s#1,
+subst max.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 max.s
+x C:\BIN\CP68.TTP -I D:\MULTITOS\AESBIND\ obgclip.c obgclip.i
+x C:\BIN\C068.TTP obgclip.i obgclip.1 obgclip.2 obgclip.3 -f
+x C:\BIN\C168.TTP obgclip.1 obgclip.2 obgclip.s
+subst obgclip.s add\s#1, addq\s#1,
+subst obgclip.s add.l\s#1, addq.l\s#1,
+subst obgclip.s move\s#1,R0 moveq\s#1,R0
+x C:\SLAV\MAC.PRG -6 obgclip.s
+x C:\BIN\AR68.PRG r aesbin73 header.o apexit.o aptplay.o apfind.o apread.o aptreco.o apwrite.o evbutto.o evdclic.o evkeybd.o
+x C:\BIN\AR68.PRG r aesbin73 evmesag.o evmouse.o evmulti.o evtimer.o fmalert.o fmbutton.o fmcente.o fmdial.o fmdo.o fmerror.o
+x C:\BIN\AR68.PRG r aesbin73 fmkeybd.o fsinput.o fsexinpu.o grdragb.o grgrowb.o grhandl.o grmbox.o grmksta.o grmouse.o grrubbo.o
+x C:\BIN\AR68.PRG r aesbin73 grshrin.o grslide.o grwatch.o mnbar.o mnichec.o mnienab.o mnregis.o mntext.o mnattach.o mnpopup.o
+x C:\BIN\AR68.PRG r aesbin73 mnistart.o mnsetting.o mntnorm.o obadd.o obchang.o obdelet.o obdraw.o obedit.o obsysvar.o obfind.o
+x C:\BIN\AR68.PRG r aesbin73 oboffse.o oborder.o rccopy.o rcequal.o rcinter.o rcunion.o rsfree.o rsgaddr.o rsload.o rsobfix.o
+x C:\BIN\AR68.PRG r aesbin73 rssaddr.o scread.o scwrite.o shenvrn.o shfind.o shget.o shput.o shread.o shwrite.o wncalc.o
+x C:\BIN\AR68.PRG r aesbin73 wnclose.o wncreat.o wndelet.o wnfind.o wnget.o wnopen.o wnset.o wnupdat.o wmnew.o apterm.o
+x C:\BIN\AR68.PRG r aesbin73 apsearch.o rsfixit.o min.o max.o obgclip.o
+x C:\SLAV\DOINDEX.PRG aesbin73
+copy aesbin73 D:\MULTITOS\AESBIN73
+copy aesbin73.ndx D:\MULTITOS\AESBIN73.NDX
+cd D:\MULTITOS
+x C:\MTOS\SUPERGLU.PRG -c usa
+x C:\MTOS\SUPERGLU.PRG -c grm
+x C:\MTOS\SUPERGLU.PRG -c fre
+x C:\MTOS\SUPERGLU.PRG -c ita
+x C:\MTOS\SUPERGLU.PRG -c spa
+echo apstart.oo: apstart.s with AS68
+copy C:\SLAV\AS68SYMB.DAT D:\MULTITOS\AS68SYMB.DAT
+x >D:\MULTITOS\APSTART.LOG C:\BIN\AS68.TTP -l -u apstart.s
+copy apstart.o apstart.oo
+echo makedesk: its default target first touches the DESKPRG files; there is no touch, so per object
+x >D:\MULTITOS\DESKTOP.LOG make -f makedesk desktop.o
+x >D:\MULTITOS\DESKACT.LOG make -f makedesk deskact.o
+x >D:\MULTITOS\DESKAPP.LOG make -f makedesk deskapp.o
+x >D:\MULTITOS\DESKVDI.LOG make -f makedesk deskvdi.o
+x >D:\MULTITOS\DESKBUTT.LOG make -f makedesk deskbutt.o
+x >D:\MULTITOS\DESKDIR.LOG make -f makedesk deskdir.o
+x >D:\MULTITOS\DESKDISK.LOG make -f makedesk deskdisk.o
+x >D:\MULTITOS\DESKFILE.LOG make -f makedesk deskfile.o
+x >D:\MULTITOS\DESKINF.LOG make -f makedesk deskinf.o
+x >D:\MULTITOS\DESKINS.LOG make -f makedesk deskins.o
+x >D:\MULTITOS\DESKMENU.LOG make -f makedesk deskmenu.o
+x >D:\MULTITOS\DESKMISC.LOG make -f makedesk deskmisc.o
+x >D:\MULTITOS\DESKMN.LOG make -f makedesk deskmn.o
+x >D:\MULTITOS\DESKOPEN.LOG make -f makedesk deskopen.o
+x >D:\MULTITOS\DESKPREF.LOG make -f makedesk deskpref.o
+x >D:\MULTITOS\DESKSELE.LOG make -f makedesk desksele.o
+x >D:\MULTITOS\DESKSHEL.LOG make -f makedesk deskshel.o
+x >D:\MULTITOS\DESKSHOW.LOG make -f makedesk deskshow.o
+x >D:\MULTITOS\DESKVARI.LOG make -f makedesk deskvari.o
+x >D:\MULTITOS\DESKUPDA.LOG make -f makedesk deskupda.o
+x >D:\MULTITOS\DESKSEAR.LOG make -f makedesk desksear.o
+x >D:\MULTITOS\KBALLOC.LOG make -f makedesk kballoc.o
+x >D:\MULTITOS\DESKSTAR.LOG make -f makedesk deskstar.o
+x >D:\MULTITOS\DESKMEM.LOG make -f makedesk deskmem.o
+x >D:\MULTITOS\DESKWIN.LOG make -f makedesk deskwin.o
+x >D:\MULTITOS\DESKROM.LOG make -f makedesk deskrom.o
+x >D:\MULTITOS\DESKBOTH.LOG make -f makedesk deskboth.o
+x >D:\MULTITOS\CTRLBIND.LOG make -f makedesk ctrlbind.o
+x >D:\MULTITOS\TRAPS.LOG make -f makedesk traps.o
+x >D:\MULTITOS\DOSBIND.LOG make -f makedesk dosbind.o
+x >D:\MULTITOS\UTILITY.LOG make -f makedesk utility.o
+x >D:\MULTITOS\LARGE.LOG make -f makedesk large.o
+x >D:\MULTITOS\ROMCART.LOG make -f makedesk romcart.o
+echo prgflags waits for Return when it is done
+key
+x >D:\MULTITOS\DESK.LOG make -f makedesk desk.prg
+check C:\EXPECT.LST

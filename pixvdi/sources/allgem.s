@@ -174,7 +174,8 @@ clr4:		movem.l	(sp)+,d3-d7/a3	; restore registers
 *
 *******************************************************************************
 
-_INIT_G:	move.l  _lineAVar,a1		; a1 -> linea var struct
+_INIT_G:	movem.l	d2-d7/a2-a6,-(sp)
+		move.l  _lineAVar,a1		; a1 -> linea var struct
 		move.l	#return,tim_addr(a1)	; Tick points to rts
 
 		move	SR,-(sp)		; Disable interrupts
@@ -193,7 +194,9 @@ _INIT_G:	move.l  _lineAVar,a1		; a1 -> linea var struct
 		bsr	mouse_init		; Init the mouse
 		jsr	escf			; hide alpha cursor
 
-		bra	_CLEARMEM
+		bsr	_CLEARMEM
+		movem.l	(sp)+,d2-d7/a2-a6
+		rts
 
 
 *******************************************************************************
@@ -204,11 +207,12 @@ _INIT_G:	move.l  _lineAVar,a1		; a1 -> linea var struct
 *
 *******************************************************************************
 
-_EX_TIMV:	move.l  _lineAVar,a1		; a1 -> linea var struct
-		move.l	_CONTRL(a1),a0
+_EX_TIMV:	move.l  _pblock,a0
+		move.l	PB_CONTRL(a0),a0
 
 		move	SR,-(sp)		; Disable interrupts
 		ori.w	#$0700,SR		; THIS IS PARANOID !
+		move.l  _lineAVar,a1		; a1 -> linea var struct
 		move.l	tim_addr(a1),18(a0)
 		move.l	14(a0),tim_addr(a1)
 		move	(sp)+,SR
@@ -217,8 +221,8 @@ _EX_TIMV:	move.l  _lineAVar,a1		; a1 -> linea var struct
 		trap	#BIOS
 		addq.l	#2,sp
 
-		move.l  _lineAVar,a1		; a1 -> linea var struct
-		move.l	_INTOUT(a1),a0
+		move.l  _pblock,a0
+		move.l	PB_INTOUT(a0),a0
 		move.w	d0,(a0)
 
 		rts
@@ -251,7 +255,8 @@ tick_int:	subq.l  #4,sp			; leave some room on the stack
 *
 *******************************************************************************
 
-_DINIT_G:	move.l  _lineAVar,a1		; a1 -> linea var struct
+_DINIT_G:	movem.l	d2-d7/a2-a6,-(sp)
+		move.l  _lineAVar,a1		; a1 -> linea var struct
 		move.l	tim_chain(a1),-(sp)	; reset timer vector
 		move.w	#$100,-(sp)
 		move.w	#SETEXC,-(sp)
@@ -260,7 +265,9 @@ _DINIT_G:	move.l  _lineAVar,a1		; a1 -> linea var struct
 
 		bsr	dinit_mouse
 		bsr	_CLEARMEM
-		jmp	esce			; Show the alpha cursor. return
+		jsr	esce			; Show the alpha cursor.
+		movem.l	(sp)+,d2-d7/a2-a6
+		rts
 
 
 
@@ -413,13 +420,14 @@ mouse_init:	move.l  _lineAVar,a1		; a1 -> linea var struct
 
 * Initialize the default mouse form (presently the arrow)
 
-		lea	_INTIN(a1),a0		; a0 -> pointer to INTIN array
+		move.l	_pblock,a0
+		lea	PB_INTIN(a0),a0		; a0 -> pointer to INTIN array
 		move.l	(a0),-(sp)		; Save the intin pointer and
 		move.l	#arrow_cdb,(a0)		; make it point to the arrow
 		bsr	_XFM_CRFM		; a1 gets clobered here
+		move.l	_pblock,a0
+		move.l	(sp)+,PB_INTIN(a0)	; Restore INTIN pointer
 		move.l  _lineAVar,a1		; a1 -> linea var struct
-
-		move.l	(sp)+,_INTIN(a1)	; Restore INTIN pointer
 
 * initialize mouse/draw status and semaphores
 

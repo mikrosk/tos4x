@@ -76,6 +76,8 @@
 #include "gemusa.h"
 #include "gemdos.h"
 #include "softload.h"
+#include "vdomode.h"
+
 /*
  *	Set the SOFTLOAD flag to implement softloaded GEM AES resources.
  *	The AES will then try to read its resource file from
@@ -117,6 +119,7 @@ BYTE	*scan2_2( REG BYTE *pcurr, REG UWORD *pwd );
 BYTE	*save2_2( REG BYTE *pcurr, UWORD wd );
 WORD	hex2_dig( REG BYTE achar );
 BYTE	uhex2_dig( REG WORD wd);
+VOID	bi_opendev( VOID );
 
 #define CACHE_ON	0x00003919L
 #define CACHE_OFF	0x00000808L
@@ -190,8 +193,6 @@ EXTERN	WORD	_inaes;
 
 GLOBAL	LONG	aesAKP;
 GLOBAL	USERBLK	*aesDDD;
-GLOBAL	BYTE	*aesOBD;
-GLOBAL	BYTE	*aesTR2;
 
 GLOBAL	WORD	gl_doitonce;
 GLOBAL	WORD	gl_restype;	
@@ -303,7 +304,6 @@ aescookie( cookie, p_value )
 
 	return( status );
 }
-
 
 /*	Check to see if MiNT is there 	*/
 
@@ -639,10 +639,6 @@ main( VOID )
 	  Ndebug1( aesDDD );
 	}
 
-	aesOBD = 0;		  
-	aescookie( 0x5F4F4244, ( LONG *)&aesOBD ); 	/* _OBD	*/
-	aesTR2 = 0;
-	aescookie( 0x5F545232, ( LONG *)&aesTR2 );	/* _TR2	*/
 
 	/* Read the GEM.CNF and extract any usual variables	*/
 	/* Do this before the rsc_read()			*/
@@ -1044,7 +1040,6 @@ pred_dinf( VOID )
 	BYTE		*pbuf;
 	REG BYTE	*temp;
 	WORD		defdrv;
-/*	BYTE		*chrptr;*/
 
 	gl_vdo = 0x0L;
 				/* _VDO */		/* 7/17/92 */
@@ -1058,18 +1053,10 @@ pred_dinf( VOID )
 	  return( 0 );
 	}
 
-#if 0
-	change = FALSE;
-#else
 	change = TRUE;			/* changed 1/7/93 ++ERS */
-#endif
 	sh_get( pbuf, bsize );
 
-#if 0
-        rom_ram( 3, ( LONG )pbuf );		/* res is default from ROM	*/
-#else
 	fh = -1;		/* no .inf file read in yet */
-#endif
 
 /* set up defaults */
  	adeskp[0] = 0x41;	/* 4 = dithered, 1 = black */
@@ -1096,8 +1083,9 @@ pred_dinf( VOID )
 	      {
 	        do_cdir( 2, "\\" );
 	        fh = dos_open( "NEWDESK.INF", 0x0 );
-		if ( fh < 0 )		/* failed to open	*/
+		if ( fh < 0 ) {		/* failed to open	*/
 	          fh = dos_open( infdata, 0x0 );
+		}
 	      }
 	      else
 	        goto p_1;
@@ -1183,17 +1171,29 @@ p_1:
 		      save2_2( temp, a_rezword );	
 		    }
 		    else
-		    {	
-		      if ( *(temp+14) != 0xD )
+		    {
+		      if ( *(temp+8) == 0xD || *(temp+14) == 0xD )
+		      {
+			temp += 5;
+			scan2_2(temp, &res);
+			a_rezword = res2mode(res & 0x0F);
+		      }
+		      else
 		      {
 		        temp += 14;
 		        temp = scan2_2( temp, &res );
 		        a_rezword = res << 8;
 		        temp = scan2_2( temp, &res ); 	
-		        a_rezword |= res;  	
+		        a_rezword |= res;
+	/* VGA monitors can't display 80 column true color modes */
+			if (mon_type() == 2 &&	/* VGA monitor */
+			    (a_rezword & NUMCOLS) == BPS16 &&
+			    (a_rezword & COL80) )
+			{
+			  a_rezword &= ~NUMCOLS;
+			  a_rezword |= BPS8;
+			}
 		      }
-		      else
-		        break;
 		    }
 		  }	/* regular mode */
 	 	  else
@@ -1208,6 +1208,7 @@ p_1:
 		      res &= 0xF;
 		      gl_rschange = FALSE;
 		      pref_save = res;	/* Set the desktop res number 	*/
+		      a_rezword = res2mode(res);
 		      if ( !sys_reschange( res_handle( res ) ) )
 		        change = FALSE;	/* NO no res change		*/
 		    }

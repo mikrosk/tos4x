@@ -36,6 +36,7 @@
  *
  * 02/11/93  cjg   - Convert to Lattice C 5.51
  * 02/19/93  cjg   - Force the use of prototypes
+ * 06/25/93  cjg   - AdjustMenuPosition() - Set SkipFlag to FALSE.
  */
 
 
@@ -621,7 +622,7 @@ GRECT		*rect;		/* rect of the button        */
      if( INDEX_FLAGSCROLL( IndexPtr ) )
          CheckMenuHeight( MenuPtr );			/* check height*/
 
-     AdjustMenuPosition( MenuPtr, xpos, ypos, rect, TRUE, TRUE );
+     AdjustMenuPosition( MenuPtr, xpos, ypos, rect, TRUE, TRUE, FALSE );
 
      /* Pop_Blit relies that the ROOT of the tree is already fixed up
       * and in its proper position on the screen.

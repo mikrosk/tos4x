@@ -26,6 +26,10 @@
  * 02/11/93  cjg   - Converted to Lattice 5.51
  * 02/19/93  cjg   - Force the use of prototypes
  * 05/14/93  cjg   - Modified menu_popup() for drop down lists
+ * 06/24/93  cjg   - If the DropDown List exceeds the bottom,
+ *		     kick it up till it fits.
+ * 06/25/93  cjg   - AdjustMenuPosition() - Set SkipFlag to FALSE
+ *		     for the Popups, and TRUE for the DropDownList.
  */
 
 
@@ -159,7 +163,7 @@ MENU	*MData;			/* the output menu structure	 */
                CheckMenuHeight( MenuPtr );
 
 	   /* Adjust the x and y position of the popup */
-           AdjustMenuPosition( MenuPtr, xpos, ypos, &rect, FALSE, TRUE );
+           AdjustMenuPosition( MenuPtr, xpos, ypos, &rect, FALSE, TRUE, FALSE );
         }
  	else
 	{
@@ -177,6 +181,10 @@ MENU	*MData;			/* the output menu structure	 */
 	   /* Adjust the x and y position of the Drop Down List */
 	   ObX( MPARENT( MenuPtr ) ) = MXPOS( MenuPtr ) = xpos;
 	   ObY( MPARENT( MenuPtr ) ) = MYPOS( MenuPtr ) = ypos;
+
+	   /* Adjust the x and y position of the popup cjg 06/24/93 */
+           AdjustMenuPosition( MenuPtr, xpos, ypos, &rect, FALSE, TRUE, TRUE );
+
 
 	   /* If there are fewer than MAX_LIST_HEIGHT menu items,
 	    * then just display as a popup in the drop down list spot.

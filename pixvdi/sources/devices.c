@@ -54,7 +54,7 @@ static SCREENDEF   dev512x400x32  = {
 			    "MATRIX", 12, 32, 2048, 512,
 			    400, 278, 278, PIXPACKED, &ram8x16,
 			    256, 1, 0, 0, &PixSoftList,
-			    &PixHardList, &PixSoftList, 0xFEC00800L
+			    &PixHardList, &PixSoftList, (BYTE *)0xFEC00800L
 			};
 
 static SCREENDEF   dev640x480x16  = {

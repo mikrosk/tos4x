@@ -18,11 +18,11 @@
 
 #include "machine.h"
 #include "objaddr.h"
-
+#include "vdomode.h"
 
 EXTERN WORD	gl_wchar;
 EXTERN WORD	gl_hchar;
-
+EXTERN WORD	gl_vdo;
 
 
 
@@ -842,3 +842,102 @@ wildcmp(pwild, ptest)
 	*dest++ = 0;
 	return( dest );
 }
+
+
+/*
+ * convert from an ST resolution to a Falcon mode word
+ */
+
+WORD
+res2mode( WORD res )
+{
+    WORD monitor_type;	/* 0: ST mono monitor, 1,3: color monitor or TV,
+			   2: VGA monitor
+			 */
+    WORD modecode;
+    WORD oldmode;
+    WORD rowlow;	/* OR with this to get a 200 pixel screen */
+    WORD rowhi;		/* OR with this to get a 400 pixel screen */
+
+    if ((gl_vdo & HIGHWORD) == FALCON)
+    {
+        monitor_type = mon_type();
+        oldmode = setmode(-1);
+    } else {
+	monitor_type = 2;	/* assume VGA */
+	oldmode = 0;
+    }
+    modecode = oldmode & PAL;
+
+    if (!monitor_type) {
+	return oldmode;
+    } else if (monitor_type == 2) {
+	rowlow = VERTFLAG;
+	rowhi = 0;
+	modecode |= VGA;
+    } else {
+	rowlow = 0;
+	rowhi = VERTFLAG;
+    }
+
+    switch(res) {
+    case 1: /* ST low */
+	modecode |= STMODES|BPS4|COL40|rowlow;
+	break;
+    case 2: /* ST medium */
+	modecode |= STMODES|BPS2|COL80|rowlow;
+	break;
+    case 3: /* ST high */
+	modecode |= STMODES|BPS1|COL80|rowhi;
+	break;
+    case 4: /* TT medium */
+	modecode |= BPS4|COL80|rowhi;
+	break;
+    case 5: /* TT high */
+	modecode |= BPS1|COL80|rowhi;
+	break;
+    case 6: /* TT low */
+	modecode |= BPS8|COL40|rowlow;
+	break;
+    default:
+	modecode = oldmode;
+	break;
+    }
+    return modecode;
+}
+
+/*
+ * try to guess the resolution closest to the Falcon video mode
+ * given to us
+ */
+
+WORD
+mode2res( WORD mode )
+{
+    WORD bps;
+    WORD columns;
+
+    bps = mode & NUMCOLS;
+    columns = (mode & COL80);
+
+    if (mode & STMODES) {
+	switch(bps) {
+	    case BPS1:
+	        return 3;	/* ST high */
+	    case BPS2:
+		return 2;	/* ST medium */
+	    default:
+		return 1;	/* ST low */
+	}
+    }
+    if (bps == 1)
+	return (columns == COL80) ? 5 : 1;	/* TT high */
+    if (bps == 2)
+	return (columns == COL80) ? 2 : 1;
+    if (bps == 4)
+	return (columns == COL80) ? 4 : 1;
+    if (bps == 8)
+	return 6;	/* TT LOW */
+    return 1;
+}
+

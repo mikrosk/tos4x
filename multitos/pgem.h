@@ -1070,7 +1070,7 @@ VOID	RestoreMenu( REG MENU_PTR MenuPtr );
 
 VOID 	AdjustMenuPosition( REG MENU_PTR MenuPtr, WORD xpos, WORD ypos,
 			    GRECT *rect, BOOLEAN Horizontal_Flag,
-			    BOOLEAN Vertical_Flag );
+			    BOOLEAN Vertical_Flag, BOOLEAN SkipFlag );
 
 VOID	MenuScrollAdjust( REG MENU_PTR MenuPtr, WORD start_obj );
 

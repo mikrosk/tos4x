@@ -433,7 +433,7 @@ hx_1:	  strcpy( wildext, buffer );
 	  }
 	}
 
-	if ( win )			/* there is a window	*/
+	if ( win && !win->w_iconified)		/* there is a window	*/
 	{
 	  if ( loop_find( key, arrowtab, &i ) )
 	  {

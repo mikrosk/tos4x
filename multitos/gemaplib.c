@@ -112,7 +112,7 @@ ap_search( mode, name, type, paesid )
 
 
 
-#define AESVERSION	0x0400FFFFL
+#define AESVERSION	0x0410FFFFL
 
 
 /*	Check for AES id make sure there is no critcial		 	*/
@@ -248,28 +248,27 @@ ap_getinfo( mode, out1, out2, out3, out4 )
 	    *out4 = 1;		/* wind_update check and set allowed */
 	    break;
 	  case AI_MSG:
-	    *out1 = 0x07be;  /* messages supported
+	    *out1 = 0x03fe;  /* messages supported
 				bit 0: WM_NEWTOP message meaningful
 				bit 1: WM_UNTOPPED message sent
 				bit 2: WM_ONTOP message sent
 				bit 3: AP_TERM message sent
 				bit 4: MultiTOS shutdown and resolution change
 				       messages supported
-				bit 5: desktop sends AP_DRAGDROP
-				bit 6: desktop understands AP_DRAGDROP
-				bit 7: desktop understands SH_WDRAW
-				bit 8: AES sends CH_EXIT
-				bit 9: WM_ICONIFIED message sent
-				bit 10: WM_UNICONIFIED message sent
+				bit 5: AES sends CH_EXIT
+				bit 6: WM_BOTTOM message sent
+				bit 7: WM_ICONIFY message sent
+				bit 8: WM_UNICONIFY message sent
+				bit 9: WM_ALLICONIFY message sent
 			      */
 	    *out2 = 0;		/* more messages */
-	    *out3 = 1;		/* WM_ICONIFIED message gives coordinates */
+	    *out3 = 1;		/* WM_ICONIFY message gives coordinates */
 	    *out4 = 0;
 	    break;
 	  case AI_OBJ:
 	    *out1 = 1;		/* 3D gadgets use objc_flags */
 	    *out2 = 1;		/* objc_sysvar version */
-	    *out3 = 0;		/* reserved */
+	    *out3 = 1;		/* Speedo fonts in TEDINFO */
 	    *out4 = 0;		/* reserved for Mag!X */
 	    break;
 	  case AI_FORM:
@@ -656,27 +655,28 @@ ap_trecd(pbuff, length)
 {
 	REG WORD		i;
 	REG LONG		code;
-	    BYTE		*trash;	
+	    BYTE		*trash;
+	REG WORD		oldsr;
 						/* start recording in	*/
 						/*   forker()		*/
-	cli();
+	oldsr = spl7();
 	gl_recd = TRUE;
 	gl_rlen = length;
 	gl_rbuf = pbuff;
-	sti();
+	spl(oldsr);
 	  					/* 1/10 of a second	*/
 						/*   sample rate	*/
 	while( gl_recd )
 	  ev_timer(100L);
 						/* done recording so	*/
 						/*   figure out length	*/
-	cli();
+	oldsr = spl7();
 	gl_recd = FALSE;
 	length = length - gl_rlen;		/* Fixed 4/5/90		*/
 	gl_rlen = 0;
 /*	length = ((WORD)(gl_rbuf - pbuff)) / sizeof(FPD);	*/
 	gl_rbuf = 0x0L;
-	sti();
+	spl(oldsr);
 						/* convert to machine	*/
 						/*   independent 	*/
 						/*   recording		*/

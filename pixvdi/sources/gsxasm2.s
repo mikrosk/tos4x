@@ -149,8 +149,9 @@ _put_pix:	move.l  _lineAVar,a1		; a1 -> linea var struct
 		move.l	V_PUTPIX(a1),a1		; vec to put pix routine
 		jmp	(a1)
 
-PX_PUTPIX:	move.l  _lineAVar,a1		; a1 -> linea var struct
-		move.l	_PTSIN(a1),a0		; a0 -> PTSIN array
+PX_PUTPIX:	move.l  _lineAVar,a4		; a4 -> linea var struct
+		move.l	_pblock,a0
+		move.l	PB_PTSIN(a0),a0		; a0 -> PTSIN array
 		move.w	(a0)+,d0		; d0 <- X coordinate
 		move.w	(a0),d1			; d1 <- Y coordinate
 		mulu	_v_lin_wr(a4),d1	; d1 <- y portion of offset
@@ -159,7 +160,7 @@ PX_PUTPIX:	move.l  _lineAVar,a1		; a1 -> linea var struct
 		move.l	_v_bas_ad,a0		; a0 -> base of screen
 		add.l	d1,a0			; a0 -> (x,y)
 		moveq.l	#0,d0			; d0 to be used as ret val
-		move.l	_INTIN(a1),a2		; a0 -> INITIN array
+		move.l	PB_INTIN(a1),a2		; a0 -> INITIN array
 		cmp.w	#16,_v_planes(a4)	; see how many bits per pixel
 		beq	PXPTP16			; do 16 bit case
 		blt	PXPTP8			; do 8 bit case
@@ -174,7 +175,8 @@ PXPTP8:		move.b	2(a2),(a0)		; splat pixel
 
 
 ST_PUTPIX:	move.l  _lineAVar,a2	; a2 -> linea var struct
-		move.l	_PTSIN(a2),a0	; a0 -> PTSIN array
+		move.l	_pblock,a0
+		move.l	PB_PTSIN(a0),a0	; a0 -> PTSIN array
 		move.w	 (a0),d0	; d0 <- X coordinate
 		move.w	2(a0),d1	; d1 <- Y coordinate
 		bsr	concat		; get physical offset
@@ -189,7 +191,8 @@ ST_PUTPIX:	move.l  _lineAVar,a2	; a2 -> linea var struct
 
 		move.w	_v_planes(a2),d2	; d2 <- planes
 		subq.w	#1,d2			; d2 <- dbra plane counter
-		move.l	_INTIN(a2),a0		; a0 -> INTIN array
+		move.l	_pblock,a0
+		move.l	PB_INTIN(a0),a0		; a0 -> INTIN array
 		move.w	(a0),d3			; d3 <- pixel value
 
 ppx_loop:	ror.w	#1,d3		; rotate pixel bit and put in carry.
@@ -221,13 +224,17 @@ ppx_clr:	and.w	d0,(a1)+	; clear the bit.
 *******************************************************************************
 *******************************************************************************
 
-_get_pix:	move.l  _lineAVar,a1		; a1 -> linea var struct
+_get_pix:	movem.l	d2-d7/a2-a6,-(sp)
+		move.l  _lineAVar,a1		; a1 -> linea var struct
 		move.l	V_ROUTINES(a1),a1	; load vect list of primitives
 		move.l	V_GETPIX(a1),a1		; vec to get pix routine
-		jmp	(a1)
+		jsr	(a1)
+		movem.l	(sp)+,d2-d7/a2-a6
+		rts
 
 PX_GETPIX:	move.l  _lineAVar,a1		; a1 -> linea var struct
-		move.l	_PTSIN(a1),a0		; a0 -> PTSIN array
+		move.l	_pblock,a0
+		move.l	PB_PTSIN(a0),a0		; a0 -> PTSIN array
 		move.w	(a0)+,d0		; d0 <- X coordinate
 		move.w	(a0),d1			; d1 <- Y coordinate
 		mulu	_v_lin_wr(a1),d1	; d1 <- y portion of offset
@@ -248,9 +255,9 @@ PXGTP16:	move.w	(a0),d0			; d0 <- pixel value
 PXGTP8:		move.b	(a0),d0
 		rts
 
-ST_GETPIX:	move.l  _lineAVar,a1	; a1 -> linea var struct
+ST_GETPIX:	move.l  _pblock,a0
 		move.l	d3,-(sp)	; save register for "c"
-		move.l	_PTSIN(a1),a0	; a0 -> PTSIN array
+		move.l	PB_PTSIN(a0),a0	; a0 -> PTSIN array
 		moveq.l	#0,d0		; return value is a long so clear upper
 		move.w	(a0)+,d0	; d0 <- X coordinate
 		move.w	(a0),d1		; d1 <- Y coordinate
@@ -262,6 +269,7 @@ ST_GETPIX:	move.l  _lineAVar,a1	; a1 -> linea var struct
 		clr.w	d1
 		bset.l	d0,d1		; d1 <- pixel mask corresponding to X
 
+		move.l  _lineAVar,a1	; a1 -> linea var struct
 		move.w	_v_planes(a1),d2	; d2 <- planes
 		move.w	d2,d0
 		add.w	d0,d0			; d0 <- off to nxt wrd in plane
@@ -378,8 +386,6 @@ end_pix_pts:	move.l	44(sp),a0		; a0 -> Xleft
 
 
 		cmp.w	#16,_v_planes(a6)	; see how many bits per pixel
-		beq	check16Left		; do 16 bits per pixel case
-		blt	check8Left		; do 8 bits per pixel case
 
 *+
 *	a0	points to Xleft
@@ -388,38 +394,6 @@ end_pix_pts:	move.l	44(sp),a0		; a0 -> Xleft
 *
 *	d4.w	X coordinate
 *-
-
-*+
-* 32 bit case
-*-
-check32Left:	move.l	(a2),d1			; d1 <- value of current pix
-		move.w	d4,d2			; d2 <- x position
-		move.w	_XMN_CLIP(a6),d3	; d3 <- x minimum position
-		move.l	a2,a3			; a3 -> current X position
-		addq.l	#4,a3			; adjust for predecrement
-
-left32Loop:	cmp.l	-(a3),d1		; see if color matches
-		beq	l32lSkip		; if so then skip
-		addq.w	#1,d2			; d2 <- end X left
-		move.w	d2,(a0)			; store end Xleft
-		bra	check32Right		; go right no
-l32lSkip:	subq.w	#1,d2			; move one pixel left
-		cmp.w	d2,d3			; see if we reached endpoint
-		ble	left32Loop		; if not the loop back
-
-check32Right:	move.w	d4,d2			; d2 <- x position
-		move.w	_XMX_CLIP(a6),d3	; d3 <- x maximum position
-		move.l	a2,a3			; a3 -> current X position
-
-right32Loop:	cmp.l	(a3)+,d1		; see if color matches
-		beq	r32lSkip		; if so then skip
-		subq.w	#1,d2			; d2 <- end X right
-		move.w	d2,(a1)			; store end Xright
-		bra	epp_ret1		; found end point and skip
-r32lSkip:	addq.w	#1,d2			; advance x position
-		cmp.w	d2,d3			; see if we reached end point
-		bge	right32Loop		; if so then leave
-		bra	epp_ret1		; done with search now leave
 
 *+
 * 16 bit case
@@ -453,42 +427,9 @@ right16Loop:	cmp.w	(a3)+,d1		; see if color matches
 r16lSkip:	addq.w	#1,d2			; advance x position
 		cmp.w	d2,d3			; see if we reached end point
 		bge	right16Loop		; if so then leave
-		bra	epp_ret1		; done with search now leave
-
-*+
-* 8 bit case
-*-
-check8Left:	moveq.l	#0,d1			; clear upper bits of long var
-		move.b	(a2),d1			; d1 <- value of current pix
-		move.w	d4,d2			; d2 <- x position
-		move.w	_XMN_CLIP(a6),d3	; d3 <- x minimum position
-		move.l	a2,a3			; a3 -> current X position
-		addq.l	#4,a3			; adjust for predecrement
-
-left8Loop:	cmp.b	-(a3),d1		; see if color matches
-		beq	l8lSkip			; if so then skip
-		addq.w	#1,d2			; d2 <- end X left
-		move.w	d2,(a0)			; store end Xleft
-		bra	check8Right		; go right no
-l8lSkip:	subq.w	#1,d2			; move one pixel left
-		cmp.w	d2,d3			; see if we reached endpoint
-		ble	left8Loop		; if not the loop back
-
-check8Right:	move.w	d4,d2			; d2 <- x position
-		move.w	_XMX_CLIP(a6),d3	; d3 <- x maximum position
-		move.l	a2,a3			; a3 -> current X position
-
-right8Loop:	cmp.b	(a3)+,d1		; see if color matches
-		beq	r8lSkip			; if so then skip
-		subq.w	#1,d2			; d2 <- end X right
-		move.w	d2,(a1)			; store end Xright
-		bra	epp_ret1		; found end point and skip
-r8lSkip:	addq.w	#1,d2			; advance x position
-		cmp.w	d2,d3			; see if we reached end point
-		bge	right8Loop		; if so then leave
-		and.l	#$FF,d1			; clear unused bits
 
 epp_ret1:	move.w	_seed_type,d0
+		and.l	#$FFFF,d1		; clear unused bits
 		cmp.l	_search_color,d1
 		beq	epp_ret0		; ret seg is of search color
 
@@ -705,10 +646,13 @@ ep_ret0:	moveq.l	#0,d0		; return(0). (failure)
 *******************************************************************************
 
 _RECTFILL:
+	movem.l	d2-d7/a2-a6,-(sp)
 	move.l  _lineAVar,a2		; a2 -> linea var struct
 	move.l	V_ROUTINES(a2),a5	; load vectored list of primitives
 	move.l	V_RECTFILL(a5),a5	; vec to rectangle filler
-	jmp	(a5)
+	jsr	(a5)
+	movem.l	(sp)+,d2-d7/a2-a6
+	rts
 
 
 rf_null:

@@ -25,6 +25,7 @@
 
 EXTERN	UWORD	off_8x8[];
 
+EXTERN	FONT_HEAD ram16x32[];
 
 UWORD dat_8x16[2048] =
 

@@ -1504,7 +1504,9 @@ enddialog1:
 	  if ( ( gl_vdo & HIGHWORD ) == FALCON )
 	  {
 	    mode_code = (WORD)trap14( 95, mode_code );
-	    ret = desk_chres( mode_code, 1 );	    		
+	    ret = desk_chres( mode_code, 1 );
+	    if (ret)
+	      pref_save = mode2res(d_rezword);	
 	  }
 	  else
 	  {		/* ST compatability mode */

@@ -1,4 +1,4 @@
-/*	GEMCLI.C		2/21/91			D.Mui		*/
+ /*	GEMCLI.C		2/21/91			D.Mui		*/
 /*	Crunch at ldaccs	3/18/88			D.Mui		*/
 /*	Take out sysacc define		2/11/88		D.Mui		*/
 /*	Fix at ldaccs .. load accessory from root  10/23/85 D.Mui	*/
@@ -37,12 +37,14 @@
 #include "aesmint.h"
 
 EXTERN	PD	*alr;
+EXTERN	WORD	gl_multi;
 EXTERN	BYTE	*runacc;
 EXTERN	WORD	mn_maxitem;
 EXTERN	BYTE	*ad_shcmd;
 EXTERN	THEGLO	D;
 EXTERN	BYTE	*ad_envrn;
 
+GLOBAL	WORD	used_acc;
 GLOBAL	BYTE	STACCFULL[] = "C:\\*.ACC";
 GLOBAL	BYTE	STACC[] = "*.ACC";
 GLOBAL	BYTE	ACCPATH[] = "ACCPATH=";
@@ -82,6 +84,10 @@ ps_rename( id, name, special )
 	LONG	flags;
 	BYTE	ext[4];
 	BYTE	ext2[4];
+
+
+	if (!gl_multi)
+		return;
 
 	lbintoasc( (LONG)id, ext );
 	strcpy( "000", ext2 );
@@ -147,16 +153,26 @@ ps_rename( id, name, special )
 	    if ( pgmld( ad_shcmd, &ldaddr, tail, envrn ) != -1 )	
 	    {
 /*	      p->p_state = PS_ALLRUN;*/	/* run until event wait		*/
-	      p->p_textaddr = ( BYTE *)ldaddr[2];/* real text segment		*/
 	      p->p_baseaddr = ( BYTE *)ldaddr;
-	      ldaddr[2] = ( LONG )runacc;
-	      if ( ( p->p_sysid = dos_pexec( 106, 0x0L, ( BYTE *)ldaddr, 0x0L ) ) >= 0 )
-	      {				/* converts X.??? number into name.id */
-		Psetpgrp( p->p_sysid, p->p_sysid );
-		ps_rename( p->p_sysid, name, 0 );
-		strcpy( pfilespec, p->p_where );
-		strcpy( tail, p->p_wtail );
-	        return( p );
+	      if (gl_multi) {
+	        p->p_textaddr = ( BYTE *)ldaddr[2];/* real text segment		*/
+	        ldaddr[2] = ( LONG )runacc;
+	        if ( ( p->p_sysid = dos_pexec( 106, 0x0L, ( BYTE *)ldaddr, 0x0L ) ) >= 0 )
+	        {				/* converts X.??? number into name.id */
+		  Psetpgrp( p->p_sysid, p->p_sysid );
+		  ps_rename( p->p_sysid, name, 0 );
+		  strcpy( pfilespec, p->p_where );
+		  strcpy( tail, p->p_wtail );
+	          return( p );
+	        } 
+	      } else {
+	
+  		  pstart(p, runacc, (BYTE *) ldaddr);
+		  ps_rename( p->p_sysid, name, 0 );
+		  strcpy( pfilespec, p->p_where );
+		  strcpy( tail, p->p_wtail );
+		  used_acc++;
+	          return( p );
 	      }
 	    }
 	  }
@@ -271,13 +287,70 @@ free_accs( VOID )
 
 	while( p )
 	{
+	  if ( p->p_type & AESACC )
+		free_pd(p);
 	  if ( ptr = ( LONG *)p->p_baseaddr )
 	  {				
 	    if ( ptr[11] )		/* free envr string	*/
 	      dos_free( ptr[11] );
 	    dos_free( ( LONG )p->p_baseaddr );	/* free progra, space	*/	
 	  }
-
 	  p = p->p_thread;
 	}
+}
+
+
+/*	Give everyone a chance to run, at least once	*/
+
+all_run()
+{
+	WORD		i;
+	PD		*p;
+
+	p = rlr; 
+	i = used_acc;
+	while (p) {
+		i++;
+		p = p->p_link;
+	}
+	for(; i ; i-- )
+	  yieldcpu();
+						/* then get in the wait	*/
+						/*   line		*/
+	wm_update(TRUE);
+	wm_update(FALSE);	
+}
+
+accwait()
+{
+	PD	*p;
+	WORD	flag;
+
+	Debug1("Enter accwait\r\n");
+	do {
+		flag = FALSE;
+		for (p = plr; p; p = p->p_thread) {
+			if ((p->p_type & AESACC) && (p != currpd)) {
+				if (p->p_qindex > 0) {
+					Debug1(p->p_name);
+					Debug1(": has message\r\n");
+					flag = TRUE;
+					ev_timer(20); /* kick AES */
+					break;
+				}				
+			}
+		}
+	} while (flag);
+	Debug1("Exit accwait\r\n");
+
+}
+
+WORD	scanq(p)
+PD	*p;
+{
+	if (p->p_qindex > 0)
+		return TRUE;
+	else
+		return FALSE;
+
 }

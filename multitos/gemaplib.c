@@ -1,4 +1,4 @@
-/*	GEMAPLIB.C			10/31/90	D.Mui		*/
+ /*	GEMAPLIB.C			10/31/90	D.Mui		*/
 /*	Fix the ap_tplay, so after it finished, it stay where it is	*/
 /*	4/17/86			Derek Mui				*/ 
 /*	Fix at ap_tplay	4/8/86			Derek Mui		*/
@@ -135,8 +135,10 @@ ap_search( mode, name, type, paesid )
 
 	if ( l1[0] == AESVERSION )	/* check for AES signature */
 	  p = idtopd( w1[2] );
-	else
+	else if (gl_multi)
 	  p = systopd( (WORD)Pgetpid() );
+	else
+	  p = currpd;
 
 	if ( p )
 	{		/* Check to see if the new process is ready to run or	*/
@@ -208,6 +210,8 @@ ap_init( pglobal )
 	Debug1( " Comtail is " );
 	Debug1( currpd->p_wtail );
 	Debug1( "\r\n" );
+	Debug1( "PID is=" ); Ndebug1(currpd->p_pid); 
+	Debug1( "\r\n" );
 
 	if ( currpd->p_state == PS_ZOMBIE )
 	  currpd->p_state = PS_RUN;
@@ -227,9 +231,11 @@ ap_init( pglobal )
 	if ( ( currpd->p_type & AESAPP ) && ( currpd != scr_pd ) )
 	{				/* Just in case some app may	*/
 					/* does appl_init several times	*/	
+	 
 	  wm_update(1);
 	  if ( w_tophandle( currpd ) == -1 )
 	  {
+	    Debug1("appl_init() doing openphanwin\r\n");
 	    openphanwind( currpd );
 	    send_ctrl( currpd, 4 );
 	  }
@@ -251,12 +257,17 @@ ap_exit( p, pcrys_blk )
 
 	if ( p->p_pid == cpdid )	/* release critical control */
 	  cpdid = -1;
+	if (!gl_multi)
+		close_accs();
 
+	wm_update(1);			/* swap_next can change windows */
 	swap_next( p, FALSE );	
+	wm_update(0);
 
 	l1 =(LONG *) pcrys_blk->cb_pglobal;
 	
 	l1[0] = 0x0L;	/* erase aes signature */
+Debug1("End of appl_exit()\r\n");
 	return( TRUE );
 }
 
@@ -392,10 +403,15 @@ a_1:
 	      mwait( msk );	/* wait for event	*/
 	      aret( msk );
 	      return( TRUE );
+	    } else {
+	      Debug1("msk == 0\r\n");
 	    }
+	  } else {
+	    Debug1("idtopd failed\r\n");
 	  }
 	}
 
+	Debug1("ap_rdwr returns FALSE\r\n");
 	return( FALSE );		/* something is wrong	*/
 }	
 
@@ -481,7 +497,7 @@ ap_tplay(pbuff, length, scale)
 
 	ad_f = (LONG)(&f);
 
-	Syield();			/* dispatch everybody	*/
+	yieldcpu();				/* dispatch everybody	*/
 
 	gl_play = FALSE;
 
@@ -526,7 +542,8 @@ ap_tplay(pbuff, length, scale)
 
 						/*  let someone else	  */
 						/*  hear it and respond   */
-	  Syield();
+	   yieldcpu();
+
 	}
 
 	if (gl_play)				/* connect back the mouse */

@@ -91,6 +91,7 @@ EXTERN	CBLK	c;
 EXTERN	WORD	ctldown;
 EXTERN	WORD	st_lang;
 
+GLOBAL	WORD	d_multi;		/* flag for multitasking mode (MiNT) */
 GLOBAL	WORD	v_handle;
 GLOBAL	WORD	desk_id;
 GLOBAL	WORD	m_st;		/* machine type flag	*/	
@@ -145,6 +146,15 @@ from ROM.][ OK ]";
 
 GLOBAL WORD	romdesk;
 #endif
+
+	WORD
+desk_cMiNT( VOID )
+{
+	LONG	value;
+
+	return( d_multi = getcookie( 0x4D694E54L, &value ) );
+}
+
 
 /*	Catch desktop terminate signal */
 
@@ -556,6 +566,7 @@ deskmain()
 	LONG		*lptr;
 #endif
 
+
 	catchsignal( SIGTERM );	/* Redirect all the Signals	*/
 				/* Catch only the terminate signal */	
 	Psignal( SIGTERM, desk_term );
@@ -591,6 +602,8 @@ deskmain()
 	ciconaddr = (CICONBLK*)0;	/* 7/10/92 */
 
 	Debug1( "Desktop checks cookie\r\n" );
+
+	desk_cMiNT();	/* check to see if we are multitasking */
 
 	if ( getcookie( 0x5F414B50L, &value ) )	/* get _AKP cookie */
 	{

@@ -32,7 +32,7 @@
 	.globl	_systopd
 	.globl	_Nostr
 	.globl	_waitforaes
-
+	.globl	_gl_multi
 	
 *****************************************
 * disable interrupts and save state	*
@@ -110,7 +110,9 @@ _savestate:
 	move.l	_currpd,a0	; get the current process
 	move.l	8(a0),a0	; get the UDA
 	lea	66(a0),a0
+
 	movem.l	d0-d7/a1-a7,-(a0)
+
 t_2:
 	clr.l	_currpd
 	jsr	_releaes
@@ -131,6 +133,7 @@ _switchto:
 	move.l	8(a0),a0	; get the UDA
 	lea.l	6(a0),a0	; get the saved A7
 	movem.l	(a0)+,d0-d7/a1-a7
+
 	move.l	(sp)+,a0
 	rts
 
@@ -166,22 +169,130 @@ _runaes:
 	trap	#1
 	add.l	#12,sp
 
-	move.l	(sp),a1			; get the basepage again
+	move.l	(sp)+,a1		; get the basepage again
 	move.l	a1,d0
-	move.l	12(sp),$8(a1)		; set the text segment of process	
+	move.l	8(sp),$8(a1)		; set the text segment of process	
 	add.l	#1800,d0
 	move.l	d0,$4(a1)		; set the high TPA so that the USP will
 					; point to here after executed
+	tst.w	_gl_multi
+	bne	multitsk
+
+	move.l	4(sp),a0		; get PD
+	move.w	34(a0),d1		; get PD->pid
+	move.l	tempstack,sp		; set up a temporary stack
 	clr.l	-(sp)			; No environment string
 	move.l	a1,-(sp)		; Process's basepage
 	clr.l	-(sp)			; File Name
+	
+	move.w	#6,-(sp)		; just go (single tasking)
+	move.w	#$4b,-(sp)
+	lea	-128(sp),a1		; leave space for gemdos on stack
+	move.l	a1, tempstack
+	trap	#1
+	move.l	tempstack,sp
+	add.l	#16+128,sp
+	move.l	sp,tempstack
+* (undocumented GEMDOS feature; all regs are preserved by Pexec)
+	swap	d1			; d1 still has PD->pid
+	move.w	d0,d1			; put return code in low word
+	move.l	d1,-(sp)		; push Pwait style code
+	pea	_pdterm
+	jsr	_forkq			; register term event
+
+	clr.l	_currpd
+	move.l	dispstack,sp
+	jmp	_disp
+
+multitsk:
+	clr.l	-(sp)			; No environment string
+	move.l	a1,-(sp)		; Process's basepage
+	clr.l	-(sp)			; File Name
+	
 	move.w	#106,-(sp)		; Just go !!!!!!
 	move.w	#$4b,-(sp)
 	trap	#1
-	add.l	#20,sp			
+	add.l	#16,sp			
 r_exit:
 	rts
 
+
+*****************************************************************
+*								*
+*	Load an AES external process				*
+*								*
+*	Called by sh_write to load applications when in single	*
+*	tasking mode (in multitasking mode this is handled	*
+*	by Pexec 106). We must use this function because	*
+*	Falcon GEMDOS mucks up the stack			*
+*								*
+*	long loadBP(char *fname, char *cmdtail, char *env)	*
+*****************************************************************
+
+	.globl	_loadBP
+_loadBP:
+	move.l	12(sp),d1		; get environment
+	move.l	8(sp),d0		; get command line
+	move.l	4(sp),a1		; get file name
+
+	move.l	sp,loadsav		; save stack pointer
+	move.l	tempstack,sp		; set up a temporary stack
+
+	move.l	d1,-(sp)		; environment string
+	move.l	d0,-(sp)		; command line
+	move.l	a1,-(sp)		; File Name
+	move.w	#3,-(sp)		; just load (single tasking)
+	move.w	#$4b,-(sp)
+	lea	-128(sp),a1		; leave space for gemdos on stack
+	move.l	a1, tempstack
+	trap	#1
+	move.l	tempstack,sp
+	add.l	#16+128,sp
+	move.l	sp,tempstack
+	move.l	loadsav,sp		; restore stack pointer
+	rts
+
+*****************************************************************
+*								*
+*	Exec an AES external process				*
+*								*
+*	Called by sh_write to run applications when in single	*
+*	tasking mode (in multitasking mode this is handled	*
+*	by Pexec 106).
+*	After Pexec, the USP will point to TPA			*
+*	The super stack comes from the GEMDOS, and will be the 	*
+*	same for everyone					*
+*	execBP( PD *p, BYTE *basepage )				*
+*****************************************************************
+
+	.globl	_execBP
+_execBP:
+	move.l	8(sp),a1		; get basepage
+	move.l	4(sp),a0		; get PD
+	move.w	34(a0),d1		; get PD->pid
+	move.l	tempstack,sp		; set up a temporary stack
+
+	clr.l	-(sp)			; No environment string
+	move.l	a1,-(sp)		; Process's basepage
+	clr.l	-(sp)			; File Name
+	move.w	#6,-(sp)		; just go (single tasking)
+	move.w	#$4b,-(sp)
+	lea	-128(sp),a1		; leave space for gemdos on stack
+	move.l	a1, tempstack
+	trap	#1
+	move.l	tempstack,sp
+	add.l	#16+128,sp
+	move.l	sp,tempstack
+* (undocumented GEMDOS feature; all regs are preserved by Pexec)
+	swap	d1			; d1 still has PD->pid
+	move.w	d0,d1			; put return code in low word
+	move.l	d1,-(sp)		; push Pwait style code
+	pea	_pdterm
+	jsr	_forkq			; register term event
+	jsr	_close_accs		; tell ACCs to close themselves
+	clr.l	_currpd
+	move.l	dispstack,sp
+	jmp	_disp
 
 
 *****************************************************************
@@ -204,12 +315,31 @@ r_exit:
 * the code won't be position-independent.			*
 *								*
 * The Mxalloc call won't work without MiNT (old TOS bombs when	*
-* the 'mode' argument isn't 0-3), but then, you don't need to	*
-* do any of this without MiNT!					*
+* the 'mode' argument isn't 0-3), so we just go directly;	*
+* there's no memory protection if there's no MiNT!		*
 *								*
 *****************************************************************
 
 _accexec:
+	tst.w	_gl_multi	; if no MiNT, just use currpd
+	bne	ac_mtsk
+	move.w	sr,d1		; save SR
+	ori.w	#$700,sr	; turn off interrupts
+	move.l	8(sp),a0	; get basepage
+	clr.l	$24(a0)		; clear the parent basepage
+	move.l	_currpd,a1	; get PD
+	move.l	4(a0),a2	; get user stack from basepage
+	move.l	a2,usp		; 
+	tst.w	longframe
+	bne	ac_short
+	clr.w	-(sp)		; fake frame format
+ac_short:
+	move.l	8(a0),-(sp)	; push text address
+	move.w	d1,-(sp)	; push status register
+	eor	#$2000,(sp)	; put into user mode
+	rte			; start it
+
+ac_mtsk:
 	clr.l	-(sp)
 	move.w	#$20,-(sp)
 	trap	#1		; d7 = Super(0L);
@@ -254,6 +384,12 @@ endacc:
 *************************************************
 
 _setrunacc:
+	tst.w	_gl_multi
+	bne	s_mtsk
+	move.l	#_accexec,_runacc
+	moveq.l	#1,d0			; everything is OK
+	rts
+s_mtsk:
 	movem.l	d6-d7,-(sp)
 	move.l	#endacc,d7
 	sub.l	#_accexec,d7		; calculate the size
@@ -282,8 +418,14 @@ s_out:
 
 	.bss
 	.even
+loadsav:	.ds.l	1
 dispstack:	.ds.l	1
 savsr:		.ds.l	1		; for _cli and _si
 _runacc:	.ds.l	1		; acc exec code address
-
+psetsr:		.ds.w	1		; for psetup and process switching
+		.ds.b	4096		; temporary stack area
+topstack:	.ds.l	1		; top of stack
+	.data
+		.even
+tempstack:	.dc.l	topstack
 	.end

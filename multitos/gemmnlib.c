@@ -48,6 +48,7 @@ EXTERN 	PD	*scr_pd;
 EXTERN 	PD	*plr;
 EXTERN	OBJECT	*gl_newdesk;
 EXTERN	WORD	gl_newroot;
+EXTERN	WORD	gl_multi;
 
 GLOBAL	WORD	gl_mnpid;	/* menu owner id		*/
 GLOBAL  MOBLK	gl_ctwait;
@@ -163,7 +164,7 @@ mn_bar( tree, showit )
 	  }
 	  else
 	    return (FALSE);
-
+	  Debug1("mn_bar() does send_ctrl(8)\r\n");
 	  send_ctrl( currpd, 8 );
 	  return( TRUE );			
 	}
@@ -176,8 +177,12 @@ mn_bar( tree, showit )
 
 	if ( showit & 0x0200 )	/* update the current menu */
 	{
-	  if ( !gl_mnpid ) 
+	  Debug1("showit & 200 \r\n");
+	  if ( !gl_mnpid ) {
+		
+	     Debug1("showit & 200 returns false \r\n");
 	    return( FALSE );
+	  }
 	  p1 = idtopd( gl_mnpid );
 	  tree = ( LONG )p1->p_mnaddr;		
 	  showit &= ~0x0200;	
@@ -185,6 +190,7 @@ mn_bar( tree, showit )
 
 	if ( showit & 0x0100 )	/* set a new menu bar	*/
 	{
+	  Debug1("showit & 100 \r\n");
 	  p1 = (PD*)tree;
 	  tree = ( LONG )p1->p_mnaddr;
 	  showit &= ~0x0100;
@@ -250,31 +256,36 @@ mn_bar( tree, showit )
 
 	  addline = FALSE;
 
-	  p1 = plr;			/* Look for all the programs	*/
+	 
+	    p1 = plr;			/* Look for all the programs	*/
 
-	  while ( p1 )			/* and stuff it into the menu	*/
-	  {
-	    if ( p1->p_state != PS_DEAD )
+	    while ( p1 )			/* and stuff it into the menu	*/
 	    {
-	      if ( p1->p_type & (AESAPP|AESSHELL) )
+	      if ( p1->p_state != PS_DEAD )
 	      {
-		if ( !addline )
-		{
-		  addline = TRUE;
-	  	  i = mn_iadd( ( BYTE *)temp[gl_cdabox+2].ob_spec, DISABLED );
-	  	  obj[i].ob_type = temp[gl_cdabox+2].ob_type;
+	        if ( (p1->p_type & (AESAPP|AESSHELL)) )
+	        {
+		  if ( !addline )
+		  {
+		    addline = TRUE;
+	  	    i = mn_iadd( ( BYTE *)temp[gl_cdabox+2].ob_spec, DISABLED );
+	  	    obj[i].ob_type = temp[gl_cdabox+2].ob_type;
+	          }
+		  if (gl_multi || ( p1->p_pid == gl_kbid ))
+		          p1->p_mobj = mn_iadd( p1->p_prgname, NORMAL );
+		  else
+			  p1->p_mobj = -1;
 	        }
-	        p1->p_mobj = mn_iadd( p1->p_prgname, NORMAL );
+
+		  /* check the app name who owns the menu */
+
+	        if ( ( p1->p_pid == gl_kbid ) && ( p1->p_mobj != -1 ) )
+		  obj[p1->p_mobj].ob_state |= CHECKED;
 	      }
-
-		/* check the app name who owns the menu */
-
-	      if ( ( p1->p_pid == gl_kbid ) && ( p1->p_mobj != -1 ) )
-		obj[p1->p_mobj].ob_state |= CHECKED;
-	    }
  
-	    p1 = p1->p_thread;		    
-	  }
+	      p1 = p1->p_thread;		    
+	    } /* while (p1) */
+	 
 
 	  gsx_sclip( &gl_rmenu );
 	  ob_draw( tree, THEBAR, MAX_DEPTH );

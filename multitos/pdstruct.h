@@ -31,7 +31,8 @@
 typedef UWORD	EVSPEC;
 
 #define KBD_SIZE 	16		/* keyboard size		*/
-#define QUEUE_SIZE 	256		/* message queue size		*/
+#define QUEUE_SIZE 	512		/* message queue size		*/
+					/* was 256, changed 4/8/93 hmk  */
 #define NFORKS 		128		/* incoming events block number	*/
 
 #define MSG_SIZE	8		/* message buffer size in word	*/

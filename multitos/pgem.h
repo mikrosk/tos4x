@@ -87,7 +87,7 @@ VOID	pdterm( LONG ret );
 
 VOID	sigchld( VOID );
 
-WORD	dsptch( PD *p );
+WORD	dsptch( VOID );
 
 VOID	send_ctrl( REG PD *p, WORD type );
 
@@ -117,7 +117,7 @@ VOID	disp( VOID );
 
 VOID	ps_term( PD *p );
 
-
+VOID	yieldcpu( VOID );
 
 
 
@@ -734,6 +734,8 @@ VOID	sc_write( LONG pscrap );
 /* FILE: GEMSHLIB.C
  * --------------------------------------------------------------------
  */
+VOID	close_accs( VOID );
+
 UWORD	sh_len( REG BYTE *path );
 
 BYTE	*sh_argv( BYTE *file, BYTE *tail );

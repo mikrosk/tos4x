@@ -309,7 +309,7 @@ aescookie( cookie, p_value )
 /*	Check to see if MiNT is there 	*/
 
 	WORD
-cMiNt( VOID )
+cMiNT( VOID )
 {
 	LONG	value;
 
@@ -412,9 +412,6 @@ ldaes( inbuffer )
 	sh_draw( " " );
 }
 
-
-
-
 /*	Set up the initial stuff, do it only once */
 
 	BYTE
@@ -425,7 +422,10 @@ ldaes( inbuffer )
 	BYTE	*bptr;
 	UWORD	size;
 
-	id = ( WORD )Pgetpid();
+	if (gl_multi)
+		id = ( WORD )Pgetpid();
+	else
+		id = 0;
 	ps_rename( id, "AESSYS.", TRUE );
 	rlr = plr = (PD*)0;
 	gl_curpid = 0;
@@ -578,15 +578,17 @@ main( VOID )
 	shel_magic = 0x0L;			/* shell magic number	*/
 				/* This is the trap2 AES semaphore */
 					/* ("_MUI") */
-	Psemaphore( 0, 0x5F4D5549L, 0x0L );
+	if (gl_multi) {
+	  Psemaphore( 0, 0x5F4D5549L, 0x0L );
 
 /*
  * ERS: create a semaphore (_SCP) which applications can use to control
  * access to the scrap directory. The AES itself doesn't actually need
  * this semaphore for anything, so we free it right away. - 12/8/92
  */
-	Psemaphore( 0, 0x5F534350L, 0x0L );
-	Psemaphore( 3, 0x5F534350L, 0x0L );
+	  Psemaphore( 0, 0x5F534350L, 0x0L );
+	  Psemaphore( 3, 0x5F534350L, 0x0L );
+	}
 
 	cli();					/* no ticks during init	*/
 	takecpm();				/* take the trap2 vector*/
@@ -703,7 +705,10 @@ main( VOID )
 	  rs_gaddr( ad_sysglo, R_TREE, STARTUP, &tree );
 	  ob_center( tree, ( GRECT *)&buffer[0] );
 	  ob_draw( tree, 0, MAX_DEPTH );
-	  Fselect( 2000, 0x0L, 0x0L, 0x0L );
+	  if (gl_multi)
+	    Fselect( 2000, 0x0L, 0x0L, 0x0L );
+	  else {
+	  }
 	  ob_draw( ad_stdesk, 0, MAX_DEPTH );	/* clear the box	*/
 	  gl_doitonce = FALSE;
 	  gsx_mon();
@@ -752,7 +757,7 @@ main( VOID )
 					/* get the AES menu		*/
 	rs_gaddr( ad_sysglo, R_TREE, AESMENU, ( LONG *)&scr_pd->p_mnaddr );
 	set_desk( scr_pd );	/* set the background window to screen */
-					
+
 	if ( !idesk(1) )	/* allocate a desktop process	*/
 	{
 	  bailout( "Failed to create a desktop process!\r\n" );
@@ -772,10 +777,12 @@ main( VOID )
 	  errpd->p_sysid = -1;
 	}
 
+	
 	if ( !ctldown )
 	{
 	  ldaccs();			/* load in accessory	*/
-	  s_aescnf( RUN, (WORD(*)())&ldaes );	/* load in files from autoaes */
+  	  if (gl_multi)		/* for TESTING only */
+	    s_aescnf( RUN, (WORD(*)())&ldaes );	/* load in files from autoaes */
 	}
 
 	if ( ad_aescnf )
@@ -795,7 +802,8 @@ main( VOID )
 	gr_arrow( aesid );
 	
 	rundisp();			/* run dsptch forever	*/
-
+	Debug1("Main: Return from rundisp()\r\n");
+	
 	a_rezword = b_rezword;
  
 	currpd = idtopd( aesid );
@@ -821,8 +829,10 @@ i_6:
 	Debug6( "Free blt memory\r\n" );
 
 	dos_free( ( LONG )mn_addr );		/* menu bar address	*/		
-/*	free_accs(); 	*/		/* free up the acc's	*/
-/*	freepds();	*/		/* free the PD memory	*/
+
+	/* free_accs(); */			/* free up the acc's	*/
+	
+	/* freepds(); */			/* free the PD memory	*/
 
 	Debug6( "Free window library memory\r\n" );
 
@@ -841,9 +851,9 @@ i_6:
 i_7:
 	cli();			
  	gl_ticktime = gsx_tick( tiksav, &tiksav );
-	Debug6( "Returns trap 2\r\n" );
+/*	Debug6( "Returns trap 2\r\n" ); */
 	givecpm();			/* return trap2 vector	*/
-	Debug6( "Free runacc memory\r\n" );
+/*	Debug6( "Free runacc memory\r\n" ); */
 	dos_free( ( LONG )runacc );
 	sti();
 

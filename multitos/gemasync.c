@@ -223,8 +223,11 @@ iasync( afunc, aparm )
 /*	LONG		old;*/
 	WORD		ret,mask;
 	
-	if ( !( e = get_evb( currpd ) ) )
+	if ( !( e = get_evb( currpd ) ) )	
+	{
+	  Debug1("iasync couldn't get evb\r\n");
 	  return( (EVSPEC)FALSE );
+	}
 	  
 	e->e_nextp = currpd->p_evlist;		/* link the EVB to the	*/
 	currpd->p_evlist = e;			/* PD evlist		*/
@@ -235,8 +238,10 @@ iasync( afunc, aparm )
 	for (e->e_mask=1; currpd->p_evbits & e->e_mask ; e->e_mask <<= 1);
 
 	if ( !e->e_mask )
+	{
+	  Debug1("iasync: e_mask == 0\r\n");
 	  return( (EVSPEC) 0 );
-
+	}
 	mask = e->e_mask;
 	currpd->p_evbits |= e->e_mask;
 
@@ -261,6 +266,7 @@ i_3:
 		  currpd->p_evbits ^= mask;
 		  currpd->p_evlist = e->e_nextp;
 		  e->e_mask = 0;
+		  Debug1("aqueue failed\r\n");
 		  return( (EVSPEC)0 );
 		}
 

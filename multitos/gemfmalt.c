@@ -326,11 +326,10 @@ fm_alert( defbut, palstr )
 
 	bheight = LWGET( OB_HEIGHT(BUT_OFF) );
 
-	LWSET( OB_FLAGS( 0 ), TOUCHEXIT | IS3DACT);	/* 8/28/90	*/
+	LWSET( OB_FLAGS( 0 ), TOUCHEXIT | IS3DACT);
 	LWSET( OB_TYPE( 1 ), G_IMAGE );
 	rs_gaddr( ad_sysglo, R_BIPDATA, NOTEBB, &plong );
 	LLSET( OB_SPEC( 1 ), plong );	
-	LWSET( OB_FLAGS( 1 ), TOUCHEXIT );
 
 	LWSET(OB_STATE(ROOT), OUTLINED);
 	fm_parse(tree, palstr, &inm, &nummsg, &mlenmsg, &numbut, &mlenbut);
@@ -349,7 +348,11 @@ fm_alert( defbut, palstr )
 	}
 						/* convert to pixels	*/
 	for(i=0; i<NUM_ALOBJS; i++)
+	{
+	  if (i > 0 && i < BUT_OFF)	/* object 0's is made TOUCHEXIT above */
+	    LWSET( OB_FLAGS(i), TOUCHEXIT );
 	  rs_obfix(tree, i);
+	}
 
 	/* LWSET(OB_WIDTH(1), 32);	*/
 	/* LWSET(OB_HEIGHT(1), 32);	*/
@@ -384,7 +387,7 @@ fm_alert( defbut, palstr )
 	}
 						/* save screen under-	*/
 						/*   neath the alert	*/
-/*	wm_update( 1 );	*/
+	wm_update( 1 );	/* This was commented out: why? */
 
 
 
@@ -409,7 +412,7 @@ fm_alert( defbut, palstr )
         for(;;)
 	{
 	  i = fm_do( tree, 0 ) & 0x7fff;
-	  if (i != 0 && i != 1) break;
+	  if (i >= BUT_OFF ) break;
 	  gr_dragbox( m.g_w, m.g_h, m.g_x, m.g_y, &f, &x, &y );
 
 	  if ( ( m.g_x == x ) && ( m.g_y == y ) )
@@ -437,7 +440,7 @@ fm_alert( defbut, palstr )
 
 	ctlmouse ( 0 );				/* back to the way it was */	
 
-/*	wm_update( 0 );	*/
+	wm_update( 0 );	/* This was commented out: why? */
 
 	if ( moved )
 	{

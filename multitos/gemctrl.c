@@ -52,6 +52,7 @@ VOID	rep2_path( BYTE *name, BYTE *path );
 #define BELL 		0x07	
 
 
+EXTERN	WORD	gl_multi;
 EXTERN	PD	*shellpd;
 EXTERN	WORD	cpdid;
 EXTERN	BYTE	*loadapp;
@@ -203,8 +204,8 @@ ct_wmsgup(message, owner, wh, m1, m2, m3, m4)
 {
 	if ( message )
 	{
-	  while( gl_button & 0x01 ); 
-	  ct_msgup( message, owner, wh, m1, m2, m3, m4 );
+		while (gl_button & 0x01) ;
+	  	ct_msgup( message, owner, wh, m1, m2, m3, m4 );
 	}
 }
 
@@ -413,7 +414,7 @@ h_2:	      if ( w_handle != gl_topw )
 	        p->p_message[5] = x;
 	      }
 
-	      kickaes();		/* force a dsptch		*/
+              kickaes();		/* force a dsptch		*/
 
 					/* Delay for half current double*/
 					/* click time: allow button to	*/
@@ -501,7 +502,7 @@ hctl_rect( mx, my )
 	    xdo_chg( obj, i, CHECKED, FALSE, FALSE, TRUE  );
 #endif
 
-	  if ( idtopd( gl_kbid )->p_mobj != -1 )
+	  if (idtopd( gl_kbid )->p_mobj != -1)
  	  {
  	    /* clean up all the check mark in the menu */
  	    for( i = 0; i <= obj[0].ob_tail; i++ )
@@ -529,7 +530,7 @@ hctl_rect( mx, my )
 		  {
 	            xdo_chg( gl_mntree, title, SELECTED, FALSE, TRUE, TRUE );
 					/* process is dead		*/
-		    if ( Pkill( p->p_sysid, 0 ) )
+		    if ( gl_multi && Pkill( p->p_sysid, 0 ) )
 		    {
 		      appl_term( p->p_pid );
 		      goto h_exit;
@@ -539,12 +540,14 @@ hctl_rect( mx, my )
 
 		    if ( p->p_type & AESACC )	/* open accessories	*/
 		    {
-		      if ( ( kill ) && ( p != scr_pd ) )
+		      Debug1("Open Accessories, pid="); Ndebug1((LONG)owner);
+		      if ( ( kill ) && ( p != scr_pd ) && gl_multi )
 			Pkill( p->p_sysid, SIGTERM );
 		      else
 		      {
 	                mesag = AC_OPEN;
 	                item = p->p_accid;
+			Debug1("Open Accessories, accid="); Ndebug1((LONG)item);
 		        break;
 		      }
 		    }				/* swap programs	*/
@@ -557,9 +560,9 @@ hctl_rect( mx, my )
 			else
 			  Pkill( p->p_sysid, SIGTERM );
 		      }
-		      else
+		      else /* if (gl_multi) */
 		        swap_prg( p );
-		    }
+ 		    }
   	
 		    goto h_exit;
 		  }
@@ -697,7 +700,7 @@ hctl_timer( VOID )
 
 	while(TRUE)
 	{
-	  if ( appl_search( mode, name, &type, &id ) )
+	  if ( gl_multi && appl_search( mode, name, &type, &id ) )
 	  {
 	    mode = 1;		/* search next	*/
 
@@ -740,11 +743,13 @@ hctl_timer( VOID )
 	    p = plr;
 	    while( p )
 	    {
-	      if (!(p->p_type & AESSYSTEM))
+	      if (gl_multi && !(p->p_type & AESSYSTEM))
 	      {
 	        Pkill( p->p_sysid, SIGKILL );
 		ret = FALSE;
-	      } 
+	      } else if (!(p->p_type & AESSYSTEM)) {
+			forkq((WORD(*)())pdterm, ((LONG) p->p_sysid << 16L));
+	      }
 	      p = p->p_thread;	 	
 	    } 		    	
 	  }
@@ -937,8 +942,10 @@ hctl_mesag( msgbuff )
 			/* or application just open a window	*/	
 	      gl_kbid = p->p_pid;	/* force the mouse ownership	*/
 
-	      if ( ( p->p_mnaddr ) && ( p->p_pid != gl_mnpid ) )
+	      if ( ( p->p_mnaddr ) && ( p->p_pid != gl_mnpid ) ) {
+		Debug1("hctl_msg(): select menu to swap prg\r\n");	     
 		menu_bar( ( OBJECT *)p, TRUE|0x0100 );
+	     }
 
 	      break;
 
@@ -999,8 +1006,8 @@ l_1:
 
 		     			/* If already did, then let it fall 	*/
  					/* through				*/
-	    case 5:			
-	      menu_bar( (OBJECT*)0, TRUE|0x0200 );
+	    case 5:
+		menu_bar( (OBJECT*)0, TRUE|0x0200 );
 	      break;
 					/* someone did a menu register	*/
 					/* update the menu, please	*/
@@ -1014,6 +1021,7 @@ l_1:
 	      break;
 
 	    case 8:			/* update the menu bar */
+	      Debug1("hctl_msg(): Update menu bar\r\n");
 	      menu_bar( ( OBJECT *)p, TRUE|0x0100 );
 	      break;
 

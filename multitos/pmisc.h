@@ -105,7 +105,7 @@ WORD 	wind_update(WORD mode);
  */
 WORD	isdrive( VOID );
 
-WORD	dos_pexec( WORD mode, BYTE *name, BYTE *tail, BYTE *envr );
+LONG	dos_pexec( WORD mode, BYTE *name, BYTE *tail, BYTE *envr );
 
 WORD	pgmld( BYTE *pname, LONG **ldaddr, BYTE *tail, BYTE *envrn );
 
@@ -345,7 +345,7 @@ VOID	dispret( VOID );
 VOID	toaes( LONG, LONG, WORD );
 VOID	savestate( VOID );
 VOID	switchto( LONG );
-WORD	runaes( VOID );
+WORD	runaes( BYTE *, BYTE * );
 WORD	setrunacc( VOID );
 
 #endif

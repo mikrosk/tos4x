@@ -2,14 +2,17 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.4 $	$Source: f:\multitos/RCS/gemfslib.c,v $
+*  $Revision: 1.5 $	$Source: f:\multitos/RCS/gemfslib.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/03/12 19:51:12 $	$Locker:  $
+*  $Author: ersmith $	$Date: 93/04/14 22:19:54 $	$Locker:  $
 * =======================================================================
 *  $Log: gemfslib.c,v $
-*  Revision 1.4  1993/03/12  19:51:12  ersmith
-*  Merged HMK's loadable resource stuff
+*  Revision 1.5  93/04/14  22:19:54  ersmith
+*  Incorporated more single/multitasking changes.
 *
+ * Revision 1.4  1993/03/12  19:51:12  ersmith
+ * Merged HMK's loadable resource stuff
+ *
  * Revision 1.3  1993/03/10  20:12:42  ersmith
  * Lattice port
  *
@@ -146,7 +149,7 @@ EXTERN  GRECT	gl_rcenter;
 EXTERN  LONG	ad_sysglo;
 EXTERN	PD	*currpd;
 EXTERN	WORD	gl_button;
-
+EXTERN	WORD	gl_multi;
 GLOBAL  GRECT	gl_rfs;
 
 GLOBAL LONG	ad_fstree;
@@ -448,6 +451,11 @@ sfiles:
 
 	      r_sfiles( fs_topptr, value );
 
+#if 0
+              if (!gl_multi)
+                        dsptch();
+#endif
+
 	      if( gl_button )
 		  goto cg_1;
 	      
@@ -540,6 +548,11 @@ rdir5:		strcpy( pathcopy, ad_fpath );
 	          gsx_sclip( &gl_rfs );
 		  break;
 	        }
+
+#if 0
+                if (!gl_multi)
+                        dsptch();
+#endif
 
 		if( !gl_button )
 		{
@@ -1012,6 +1025,10 @@ FXWait( VOID )
 {
     do
     {
+#if 0
+        if (!gl_multi)
+                dsptch();
+#endif
     }while( gl_button );
 }
 

@@ -22,6 +22,7 @@
 #include "pdesk.h"
 #include "pmisc.h"
 
+EXTERN	WORD	d_multi;
 EXTERN	WORD	d_exit;
 
 EXTERN	WORD	s_defdir;
@@ -509,6 +510,46 @@ run_it( file, tail, graphic, setdir, code )
 	ptrs[0] = (LONG) file;		/* file name */
 	ptrs[3] = (LONG) g_buffer;	/* default directory */
 
+	if (!d_multi) {
+		hide_windows(TRUE);
+		wind_update(0);		/* make sure screen is free */
+	}
 	if ( !shel_write( code, graphic, 1,(LONG)&ptrs[0],(LONG)tail ) )
 	  fill_string( file, FTOLAUNC ); /* was FTOLAUNCH, changed for LC */
+
+	if (!d_multi)
+		hide_windows(FALSE);
 }
+
+/*
+ *	added 3/29/93 hmk for single tasking mode of MultiTOS
+ *	flag = TRUE:	close desktop's windows
+ *	flag = FALSE:	open desktop's windows
+ */
+
+VOID hide_windows(flag)
+WORD flag;
+{
+	REG WINDOW *wp = winhead;
+
+	if (flag) {
+		while (wp) {
+			wind_close(wp->w_id);
+			wp = (WINDOW *)wp->w_next;
+		}
+	} else {
+		show_windows(wp);
+	}
+}
+
+VOID	show_windows(wp)	/* recursive fct., so windows open in	*/
+WINDOW	*wp;			/* right order				*/
+{
+	if (wp != NULL) {
+		show_windows((WINDOW *)wp->w_next);
+		if (wp->w_id != -1)
+			open_window(wp->w_id);		
+	}
+	return;
+}
+		

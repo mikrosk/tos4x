@@ -4,246 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/08/03 15:18:09 $
+* $Date: 90/08/21 17:18:59 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.25  90/08/21  17:18:59  apratt
+* Mega STe support added.
+*
+* Bconmap is no longer conditional.
+*
+* Osconf is now an EQU exported from here to startup.s, so that file
+* isn't country-dependent any more.
+*
 * Revision 2.24  90/08/03  15:18:09  apratt
 * Fixed an oops in Norway's keyboard table: REAL TTOS FINAL RELEASE!
-*
+* 
 * Revision 2.23  90/08/03  13:21:50  apratt
 * TTOS FINAL RELEASE
 * 
-* Revision 2.22  90/07/19  14:46:56  apratt
-* Fixed a bug in rsconf: -2 for TT MFP's port always returned rate
-* for ST MFP.  Now it is right.  Also sped up memory clearing in
-* coldboot.
-* 
-* Added a thing that Insignia needs for their SoftPC product: a vector
-* BEFORE Kbdvbase() which is jmp'ed through when the BIOS has established
-* that a scan code from the keyboard is a make or break code from a key,
-* not part of a mouse or joystick packet.  By default points to "itsakey."
-* 
-* Made cold-boot RAM clearing faster using a tower of four.
-* 
-* Revision 2.21  90/06/18  16:36:05  apratt
-* Fixed keyclicks so caps-lock keyclick goes through kcl_hook, not the
-* built-in keyclick.
-* 
-* 
-* Revision 2.20  90/05/09  16:46:58  apratt
-* Fixed scc tx int code so it works (oops).
-* 
-* Documented a feature of dosound that's always been true: it returns
-* the current sound-routine pointer, or zero if none.
-* If the new pointer you pass in is negative, it doesn't change it.
-* 
-* Revision 2.19  90/05/02  16:29:03  apratt
-* Fixed rsconf so when changing rsmode (flow-control mode): if txoff,
-* causes a bsr to sender (to wake up the transmission if anything's
-* buffered), and if rxoff, causes XON or raising RTS.  This didn't work
-* before.
-* 
-* Changed sender and scc_sender to allow sending the byte at sendnow even
-* if txoff is set, so you can tell the host to XOFF even if he has told
-* you to XOFF.
-* 
-* Revision 2.18  90/04/30  18:39:36  apratt
-* Changed some things in MFP serial port code.  Made kickstart, rsconf
-* more common to the two MFP's.
-* 
-* When changing rsmode, always clears xoff state and sends XON 
-* or raises CTS if necessary.
-* 
-* Also fixed rsconf for SCC ports, bits-per-word emulation was wrong.
-* 
-* Revision 2.17  90/03/20  13:33:54  apratt
-* Bug in Bconmap causes it to fail to detect devno values which are
-* out of range (higher than maptabsize+6), fixed.
-* 
-* Revision 2.16  90/03/19  16:00:42  apratt
-* Added comments at Rsconf to the effect that it's always been broken.
-* No code change for that because it's mostly harmless.
-* 
-* Fixed Bconmap range-check to be (devno >= maxdev) not (devno > maxdev).
-* Pre-cleared d0 in ttmfp Rsconf when returning baud rate (bug fix).
-* 
-* Added move.l d7,d0 at the end of Rsconf for SCC (bug fix).
-* 
-* Increased Iorec initialization table for SCC to include initial 
-* baud rate of 1 (9600).
-* 
-* Revision 2.15  90/03/06  15:22:27  apratt
-* Fixed a fatfinger: if you get a bus error while initting SCC,
-* the code is supposed to return safely.  Now it does.
-* 
-* Revision 2.14  90/03/02  10:47:58  apratt
-* Added initialization of ST MFP Timer B to something other than 1.
-* See startup.s, at the label noblank, for why this is necessary
-* and not sufficient (!).
-* 
-* Revision 2.13  90/03/01  15:33:46  apratt
-* Made dowait global; changed delay in ikput to use STMFP Timer C rather
-* than instructions.  Made bus error during SCC init just return.
-* Changed some ttwait calls to dowait.
-* 
-* Revision 2.11  90/02/16  16:43:07  apratt
-* Added SCC serial-port code to the bconmap section.  All works.
-* 
-* Added initializing registers 9 and 10 to zero in the keyclick-sound
-* data list, in the hopes that this would fix it: some sounds cause
-* subsequent keyclicks to come out wrong.  Don't know if this fixes
-* it or not, because my TT has no speaker!
-* 
-* Revision 2.10  90/02/02  13:37:53  apratt
-* Added conmap code, and TTMFP serial port code.  The conmap code
-* should really be dependent on a separate conditional, not TT
-* as it is now, because it will go in new STe's.  SCC serial-port
-* driver doesn't exist here yet.
-* 
-* Also changed coldboot to clobber fast RAM, too, again up to
-* a bus error.
-* 
-* Revision 2.9  89/12/08  15:46:16  apratt
-* Changed rsconf so it enables & disables tx and rx just by
-* changing the one bit, not by setting and clearing the whole
-* tsr/rsr.  This preserves the $5 mode set previously,
-* so reset & baud-rate changes don't cause spurious chars to be sent.
-* 
-* Revision 2.8  89/10/03  10:03:02  apratt
-* Changed initialization of MFP's TSR to make the output state
-* "High" not "Hi-Z" (open collector) when the transmitter is idle.
-* This finally gets rid of the spurious $ff character transmitted
-* when you reset an ST.  Also added code to initialize TTMFP's serial
-* port and set it to 9600 baud.  (No other non-ST serial support yet.)
-* 
-* Revision 2.7  89/09/22  16:39:12  apratt
-* THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
-* No functional changes from previous revision, which is the last to
-* require Alcyon's AS68 assembler.
-* 
-* Revision 2.6  89/09/12  12:57:08  apratt
-* Fixed bad initialization of serial port; added dummy read of TSR
-* at end of txerror as 68901 book suggests; changed use of bclr
-* when clearing ISR into move with all bits 1 except the one to clear:
-* this is also required by the 68901 book.
-* 
-* Revision 2.5  89/07/27  18:01:56  apratt
-* Added kcl_hook and bell_hook usage here (usu. they're def_click
-* and def_bell).
-* 
-* Revision 2.4  89/07/20  15:45:17  apratt
-* Added code to initialize TTMFP (to totally disabled) and make
-* its interrupt vectors start at $140, right after STMFP.
-* 
-* Revision 2.3  89/07/19  14:15:55  apratt
-* Added TT flag, added call to ttwait in ikbdws, moved ringbel
-* so VDI's bsr to there is closer.  (VDI should really jsr.)
-* 
-* Revision 2.2  89/07/11  11:27:27  apratt
-* I broke Rsconf in rev 2.1 (or possibly before).  Now it's fixed.
-* Previously you couldn't ever set RTS/CTS flow control, now you can.
-* Both RTS/CTS and XON/XOFF is documented, but not useful, and Mega ROMs
-* (and possibly earlier) didn't allow it.  See the comments near auxc0.
-* 
-* Revision 2.1  89/02/27  18:13:55  kbad
-* *** TOS 1.4  FINAL RELEASE VERSION ***
-* 
-* Revision 1.22  89/02/27  18:09:50  kbad
-* Added ITALY keyboard code for new Italian keyboard
-* 
-* Revision 1.21  89/02/13  12:03:37  apratt
-* Check for reboot used to include ASCII part of the key code, so if you
-* redefined the keyboard it wouldn't reboot.  Now just the
-* scan code and kbshift bits are checked.  This will be trouble
-* if any keyboard doesn't have delete on the same scan code ($53).
-* 
-* Revision 1.20  89/02/06  12:20:25  apratt
-* Added a timeout to Gettime ... if time doesn't arrive in 1 sec, return 0.
-* 
-* Revision 1.19  88/12/21  12:15:42  apratt
-* Added comments around the ctl-alt-delete reset code, and saved 1 word
-* nearby.  Big deal.
-* 
-* Revision 1.18  88/12/13  16:12:13  apratt
-* Added .w to lots of otherwise-long accesses, both to low RAM and
-* high I/O space.
-* 
-* Revision 1.17  88/11/18  11:04:15  apratt
-* Documented with comments the fact that kstate is now officially
-* fixed just after ikbdsys (which is to say, after the end of
-* the vector list returned by Kbdvbase).  This has always been
-* true; now it's official.  See the comment with "11/18/88" in it
-* for details.
-* 
-* Revision 1.16  88/11/08  15:58:27  kbad
-* Modified keyboard driver so that ISO keyboards can produce correct
-* control keystrokes (previously, control was handled before alt, thus
-* rendering the alt-control keystrokes useless).
-* 
-* Revision 1.15  88/11/02  15:22:35  apratt
-* Raised IPL to 7 for the duration of the centronics strobe, so
-* another interrupt can't cause the strobe to be active too long.
-* 
-* Revision 1.14  88/09/06  11:32:32  kbad
-* Added DENMARK key table and driver, and fixed SWEDEN '|' on capslock.
-* 
-* Revision 1.13  88/08/08  17:56:44  apratt
-* Removed 32K limit on serial input/output buffers.  Limit
-* is now 64K (actually 64K-1 for AUX, MIDI and 64K-4 for KB).
-* 
-* Revision 1.12  88/07/25  18:21:00  apratt
-* Got rid of the damn '.w' after 8 in coldboot code.  Gremlins.
-* 
-* Revision 1.11  88/07/21  12:17:34  apratt
-* Fixed fatfinger in reboot code: adding wrong offset to KBCL
-* (was adding 16 bits, but 24 bits is right) meant you could
-* never reboot.
-* 
-* Revision 1.10  88/06/28  16:35:29  apratt
-* Inexplicably, no revision actually had the rsconf(-2) code in it.
-* Now it's there.
-* 
-* Revision 1.9  88/05/12  11:33:07  apratt
-* Fixed reboot sequences to ignore caps-lock state.
-* 
-* Revision 1.8  88/05/05  13:42:55  apratt
-* Added ctl-alt-rshft-delete cold boot code.
-* 
-* Revision 1.7  88/04/20  15:05:32  apratt
-* Changed the comments around Rsconf; no code changes.
-* 
-* Revision 1.6  88/04/12  18:22:34  apratt
-* Added baudrate variable in BSS (just forgot this...)
-* 
-* Revision 1.5  88/04/08  17:41:07  apratt
-* Added baud-rate interrogation code: Rsconf(-2) will return old baud
-* rate index (0-15).
-* 
-* Also changed key repeat code so it doesn't stop repeating when you
-* hit a new key: the new key restarts the cdelay1/cdelay2 cycle, and
-* doesn't stop until the repeating key comes up.
-* 
-* Revision 1.4  88/04/05  17:42:30  apratt
-* Fixed ctl-alt-delete sensing.  Produces a warm boot.
-* 
-* Revision 1.3  88/02/25  17:25:33  apratt
-* Added keyboard reset on CONTROL-ALT-DELETE
-* 
-* Revision 1.2  87/11/25  18:19:12  lozben
-* Added flags for new countries: Turkey, Finland, and Norway. Also added
-* new keyboard scan codes for Turkey and Norway
-* 
-* Revision 1.1  87/11/20  14:22:53  lozben
-* Initial revision
-* 
-*
 * =======================================================================
 *
-* $Revision: 2.24 $
+* $Revision: 2.25 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -258,37 +42,11 @@
 *		copyright 1984,1985,1986 ATARI Corp.			*
 *		all rights reserved					*
 *									*
-* updates: 								*
-*	08/06/87 Changed parts of keyboard translation table		*
-*		 Warninng put tabs in front of directives.		*
-* 	02/18/87 Conform to old spec where we put at tail and pull	*
-*		 from the head. The tail points to the LAST char to	*
-*		 enter the buffer. (rework rs232 buffer control)  RMS	*
-*	02/10/87 Delay 1/100 of a sec in ikbd put char before sending   *
-*		 next char. RMS						*
-*	01/17/87 Moved software ikbd reset to startup.s RMS		*
-*	12/18/86 Bug in binbcd repaired RMS				*
-*	08/14/87 Changed some keyboard translations for swissger & fra  *
-*	09/23/87 Added keyboard translation tables for TURKEY.          * 
-*									*
 *************************************************************************
 *									*
 *		general equates for the rbp system rom			*
 *									*
 *************************************************************************
-usa		equ	0 ***DON'T  CHANGE***
-uk		equ	1 ***DON'T  CHANGE***
-germany		equ	2 ***DON'T  CHANGE***
-france		equ	3 ***DON'T  CHANGE***
-spain		equ	4 ***DON'T  CHANGE***
-italy		equ	6 ***DON'T  CHANGE***
-sweden		equ	5 ***DON'T  CHANGE***
-swissfra	equ	7 ***DON'T  CHANGE*** French text swiss/fra keyboard
-swissger	equ	8 ***DON'T  CHANGE*** german text swis/ger keyboard
-turkey		equ     9 ***DON'T  CHANGE***
-finland		equ     5 ***DON'T  CHANGE*** same as swedish keyboard
-norway		equ    11 ***DON'T  CHANGE***
-denmark		equ    12
 
 *
 * TT and country equates moved to switches.s, which is normally a 
@@ -297,16 +55,72 @@ denmark		equ    12
 
 .include "switches.s"
 
+* SPARROW and TT are both M68030.
 
-*	Revision B Upgrades:
+*M68030		equ	(SPARROW | TT)	; normallly, but see below:
+.include "m68030.s"
+
 *******************************************************************************
-*		Combined various sources into single large BIOS.S file.
+*+
+*  Country-specific configuration word (os_conf).  This equate is exported
+*  to STARTUP.S, but placed here so that file doesn't have any country
 *  dependency and this one does.
-*		RS-232 handshake and flow-control corrected. Entire RS-232
-*		I/O interrupt-handler re-written as original was unredeemable.
-*
 *
 *			%cccccp
+*			      p = pal/ntsc (0 = ntsc, 1 = pal)
+*			     cc = country (0 = usa, ...)
+ ifeq country-usa
+*-
+.endc
+.globl osconf
+ ifeq country-germany
+.if country == usa
+.endc
+.endif
+ ifeq country-france
+.if country == germany
+.endc
+.endif
+ ifeq country-uk
+.if country == france
+.endc
+.endif
+ ifeq country-spain
+osconf		equ	%01000 + PAL
+.endc
+.endif
+ ifeq country-italy
+.if country == spain
+.endc
+.endif
+ ifeq country-sweden
+.if country == italy
+.endc
+.endif
+ ifeq country-swissfra
+.if country == sweden
+.endc
+.endif
+ ifeq country-swissger
+.if country == swissfra
+.endc
+.endif
+ ifeq country-turkey
+.if country == swissger
+.endc
+.endif
+ ifeq country-finland
+.if country == turkey
+.endc
+.endif
+ ifeq country-norway
+.if country == finland
+.endc
+.endif
+ ifeq country-denmark
+.if country == norway
+.endc
+.endif
 
 .if country == denmark
 osconf		equ	%11001
@@ -324,9 +138,6 @@ osconf		equ	%11001
 	.globl	_dumpflg		;flag to signal a screen dump(alt-HELP)
 .endc
 	.globl	kcl_hook		;hook for keyclick handling
-.ifne TT
-	.globl	ttmfpvectr		;interrupt handlers (from ttmfp.s)
-.endc
 
 .if TT
 	.globl	ttwait			;wait for some time
@@ -334,11 +145,10 @@ osconf		equ	%11001
 	.globl	dowait			;wait (usable only at boot time)
 
 *+ (dbg)
-.ifne TT
 * Exports:
 *
-.endc
 	.globl	kbshift
+	.globl	pconfig
 	.globl	maptab			; startup.s uses these in Bcon*
 	.globl	maptabsize
 	.globl	coldboot		; used for bombs during the boot
@@ -444,8 +254,8 @@ porta	equ	14
 *	port a  - outputs all!
 *
 *	d0 - side select
-*	d6 - general purpose output
-*	d7 - unassigned output
+*	d1 - drive select 0
+*	d2 - drive select 1
 *	d3 - rts for rs-232
 *	d4 - dtr for rs-232
 *	d5 - centronics	strobe
@@ -1716,8 +1526,10 @@ ttmfp	equ	$fffffa81
 .if TT
 	lea.l	ttmfp,a0
 	move.w	#1,(brate+ttribufptr).w	; save in ttmfp's iorec
+.endc
 
-	bsr	_setupscc
+.ifne TT+STPLUS
+	move.b	#1,(brate+ttribufptr).w	; save in ttmfp's iorec
 .endc
 
 	tst.b	_iamanst		; if you're an ST don't do this
@@ -1774,10 +1586,8 @@ ttmfp	equ	$fffffa81
 	move.b	#%00000111,conterm.w	;enable keyclick,repeat key,bell functions, disable the KBSHIFT concatenation.
 
 	move.l	#jdostime,clkintvec.w
-.ifne TT
 	move.l	#genrts,d0	;generalized rts for ikbd subsystems
 	move.l	d0,statintvec.w
-.endc
 	move.l	d0,msintvec.w	;init user mouse interrupt adr to rts
 	move.l	d0,joyintvec.w
 
@@ -2644,15 +2454,13 @@ devtab:
 *
 * For TT, to accomodate Bconmap, rsconf is a stub which dispatches to
 * the function pointer in maprsconf.  For the STMFP port (default),
+* this points to auxrsconf.  For not TT, the main routine
 * is called rsconf.
 *
-.ifne TT
-	.globl	maprsconf
-
 
 	.globl	rsconf
+	.globl	maprsconf
 
-.endc
 rsconf:
 	move.l	maprsconf.w,a0
 	jmp	(a0)
@@ -2787,11 +2595,9 @@ bauddata:
 	dc.b	d2400,d2000,d1800,d1200
 	dc.b	d600,d300,d200,d150
 	dc.b	d134,d110,d75,d50
-.ifne TT
 
 
-
-* new console device routines
+.even
 .text
 
 **********************************************************************
@@ -2802,6 +2608,9 @@ bauddata:
 *
 *     devno	meaning
 *
+*	6	ST-compatible serial port (default).
+*	7	SCC Channel B (port 2 on the back of a TT).
+*	8	TTMFP serial port (3-wire, not normally wired).
 *	9	SCC Channel A (full handshake, not normally wired).
 *
 * (On Mega STe, 8 is SCC Channel A, and there is no 9.  On other 
@@ -2918,6 +2727,8 @@ defmaptab:	ds.l	$18 * deftabsize
 * Rsconf calls.
 *
 * The last entry here is not a routine pointer, it's an iorec pointer.
+* It gets stuffed into the variable mapiorec, and that variable is returned
+.ifne TT
 *
 
 .text
@@ -2927,6 +2738,26 @@ imapvecs:
 	dc.l	auxistat,auxin,_auxostat,_auxout,auxrsconf,ribufptr
 	dc.l	bistat,bin,bostat,bout,brsconf,chbibufptr
 	dc.l	ttistat,ttin,_ttostat,_ttout,ttrsconf,ttribufptr
+	dc.l	aistat,ain,aostat,aout,arsconf,chaibufptr
+.ifne STPLUS
+deftabsize	equ	4	; number of lines in imapvecs
+defmap		equ	0	; index into imapvecs of ROM-default map
+
+.else
+* These are all used for STe; ST uses only the first row.
+imapvecs:
+	dc.l	auxistat,auxin,_auxostat,_auxout,auxrsconf,ribufptr
+.else
+imapvecs:
+	dc.l	auxistat,auxin,_auxostat,_auxout,auxrsconf,ribufptr
+
+deftabsize	equ	1
+defmap		equ	0
+; end ifne STPLUS
+.endc
+; end ifne TT
+.endc
+	dc.l	aistat,ain,aostat,aout,arsconf,chaibufptr
 
 deftabsize	equ	3
 defmap		equ	0
@@ -3003,6 +2834,25 @@ mapend:	rts
 * This (re-)initializes xconstat etc. for device 1 (the mappable one).
 *
 
+.ifne STPLUS
+* We have to check now: if you're really an STPLUS, not a Mega STe,
+	move.l	a0,maptab.w
+	move.w	#deftabsize,maptabsize.w
+
+.if (TT == 0)
+* We have to check now: if you're really an ST or STPLUS, not a Mega STe,
+* we have to set maptabsize to 1, not 3.  We let everything else
+* proceed apace.
+
+ttscu1		equ	$ffff8e09
+
+	moveq	#1,d0			; pre-load d0 for STPLUS
+	move.l	sp,a1
+	move.l	$8,a2
+	move.l	#mapierr,$8
+	tst.b	ttscu1
+.endc
+mapierr:
 	move.l	a1,sp
 	move.l	a2,$8
 	move.w	d0,maptabsize.w		; set maptabsize to the right value
@@ -3021,7 +2871,6 @@ mapend:	rts
 	move.l	(a1)+,(a0)
 	move.l	(a1)+,$20(a0)
 	move.l	(a1)+,$40(a0)
-.endc
 	move.l	(a1)+,$60(a0)
 .ifne TT
 	move.l	(a1)+,mapiorec.w
@@ -3200,7 +3049,7 @@ ttrirsmode:	ds.b	1		* Bit 0 = Flow Control (0=Disabled)
 ttrisendnow:	ds.b	1
 .endc
 ttmask:		ds.b	1		; not used
-.ifne TT
+.ifne TT+STPLUS
 
 
 .even
@@ -3208,6 +3057,9 @@ ttmask:		ds.b	1		; not used
 * the Bconmap structure.  It should also be enabled for STe		*
 * when it gets 8530's.							*
 *************************************************************************
+* It's short-circuited if we're actually on an STPLUS, not Mega STe,	*
+* This section contains the code to hook the TT SCC ports into		*
+* the Bconmap structure.  It should also be enabled because of STe's	*
 * 8530's.  You'd better not call this when you're on ST.		*
 *									*
 * It's short-circuited if we're actually on a ST or STPLUS,		*
@@ -3335,6 +3187,7 @@ nolan:
 
 **********************************************************************
 *
+* _setupscc: entry point to set everything up.
 *
 * On TT's with no SCC DMA chip, even talking to the SCC chip will
 * cause a bus error.  This code catches that error and returns,
@@ -3344,15 +3197,25 @@ nolan:
 
 .globl _setupscc
 
-	clr.w	sccctl		; disable DMA
+_setupscc:
+	move.l	$8,a0		; catch bus error
+	move.l	sp,a1
 	move.l	#sccberr,$8
-* capability (e.g. no SCC DMA chip), and on STe's, but works fine
 
+* the next instruction causes a bus error on TT's that have no SCC
+* capability (e.g. no SCC DMA chip), and on STe's, but works fine
 * on real TT's and Mega STe's.
 
 	tst.b	sccad		; read from data byte
 
 	move.l	a0,$8		; un-catch bus error
+	lea	sccvecbase,a0	; write interrupt vectors
+.ifne TT
+	moveq	#$f,d0
+vloop:	move.l	(a1)+,(a0)+
+	dbra	d0,vloop
+
+.endc
 * the next instruction (clear sccctl) disables SCC DMA on TT, but
 * can't be executed on (Mega-) STe because there's no SCC DMA chip.
 

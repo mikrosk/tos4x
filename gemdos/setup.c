@@ -1,12 +1,16 @@
 /*
 ***************************    SETUP.C     ******************************
 *
-* $Revision: 2.8 $	$Source: e:/tos/gd2\rcs\setup.c,v $
+* $Revision: 2.9 $	$Source: e:/tos/gd2\RCS\setup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/12 18:25:26 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/03/13 17:51:44 $    $Locker:  $
 * =======================================================================
 *
 * $Log: setup.c,v $
+* Revision 2.9  1991/03/13  17:51:44  apratt
+* Added a define for default buffer size, and made it big.
+* This is for testing; in production it should be 512.
+*
 * Revision 2.8  1991/03/12  18:25:26  apratt
 * Making gtest.prg works and lets you test functions in this version
 *
@@ -36,7 +40,8 @@
  */
 
 #define NBUFS 4		/* MUST BE AT LEAST FOUR! See FSCL for why. */
-char secbuf[NBUFS][512];			/* sector buffers */
+#define DEFBUFSIZ 8192	/* outrageously large sectors by default */
+char secbuf[NBUFS][DEFBUFSIZ];			/* sector buffers */
 BCB bcbx[NBUFS];				/* bcb for each buffer */
 
 extern void tikhnd(), (*otime)(), ntrap2(), (*obdos)(), enter();

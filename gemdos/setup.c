@@ -1,12 +1,15 @@
 /*
 ***************************    SETUP.C     ******************************
 *
-* $Revision: 2.10 $	$Source: e:/tos/gd2\rcs\setup.c,v $
+* $Revision: 2.11 $	$Source: e:/tos/gd2\rcs\setup.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/03/28 17:39:36 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/04/05 18:40:12 $    $Locker:  $
 * =======================================================================
 *
 * $Log: setup.c,v $
+* Revision 2.11  1991/04/05  18:40:12  apratt
+* Misc fixes to make it work
+*
 * Revision 2.10  1991/03/28  17:39:36  apratt
 * THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
 *
@@ -60,8 +63,8 @@ osi()
 	ulong datime;
 
 	datime = gettime();
-	xsettime((uint)(datime & 0xffff));
-	xsetdate((uint)(datime >> 16));
+	realdate = (datime >> 16);
+	realtime = (datime & 0xffff);
 
 	/*
 	 * Setup sector buffers (NBUFS of 'em)
@@ -87,11 +90,13 @@ osi()
 	 * Initialize OS, login boot device:
 	 */
 
+#if !UNREAL
 	otime = setexc(0x100,-1);
 	(void)setexc(0x100,tikhnd);
 
 	obdos = setexc(0x22,ntrap2);
 	(void)setexc(0x21,enter);
+#endif
 
 	/* set rootpd and fill it with important stuff */
 	run = &rootpd;

@@ -3,18 +3,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/12/21 11:01:45 $
+* $Date: 88/12/30 11:42:22 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.25  88/12/30  11:42:22  apratt
+* Change for STPLUS only: dbasell was defined as the address of the
+* register as a WORD, but was being used as a byte.  Now it's the
+* address as a byte.  Also, D.RENN assures me that the register's low-
+* order bit will always read as zero, so I don't need to mask it out.
+*
 * Revision 1.24  88/12/21  11:01:45  apratt
 * Fixed two places where (a5) was used when a5 wasn't clear.
 * Oops.  Also updated some comments before 'reset2' with cleverer
 * reset-handler instructions (just comment change here).
-*
+* 
 * Revision 1.23  88/12/13  16:35:41  apratt
 * Added lots of (a5)'s for otherwise-long addresses, both low RAM
 * and high I/O space.
@@ -134,7 +140,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.24 $
+* $Revision: 1.25 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -636,7 +642,9 @@ shiftmd		equ	$ffff8260	; video	shift mode (resolution)
 SPAR_VMC	equ	$ffff82c0	; video master control
 .ifne STPLUS
 *--- ST PLUS shifter
-dbasell		equ	$ffff820c
+shiftmd		=	$ffff8260	; video	shift mode (resolution)
+* that the low bit of this register will always read as zero.
+ttcolor0	equ	$ffff8400	; TT background color reg
 .endc
 .endif
 *--- DMA chip:

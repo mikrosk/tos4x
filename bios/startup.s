@@ -4,25 +4,31 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/05/21 16:57:58 $
+* $Date: 91/05/22 14:53:27 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.70  91/05/22  14:53:27  apratt
+* Changed date to today.  This is 3.06c.  3.06b had a bug
+* in flop.s: some QD debug code was left in, so seeks happened
+* at 6ms/step and write precompensation was turned off (both
+* only in high density mode).
+*
+* at 6ms/step and write precompensation was turned off (both
+* only in high density mode).
+* 
 * Revision 2.69  91/05/21  16:57:58  apratt
 * Reset the ACSI chip and leave it in the read state VERY EARLY in the boot,
 * between the CPU reset and the reset instruction at the top of the code. 
 * Changed the _FDC cookie to match the new def'n.  Set nospindelay (from
 * flop.s) if the switch is thrown.
-*
+* 
 * Made TT's boot up in TT MED so they don't look like game machines.  Fixed
 * icon-drawing code appropriately.  Hold down ALT to go back to ST LOW so
 * autoboot games get what they expect.
-*
-* Fixed CRC message so it identifies the chip just like on the board.
-*
 * 
 * Fixed CRC message so it identifies the chip just like on the board.
 * 
@@ -110,7 +116,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.69 $
+* $Revision: 2.70 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -175,22 +181,23 @@ DMASND		equ	0
 DMASND		equ	0
 .endc
 * have a short-frame processor (68000).  Currently that's only TT.
+ONLY_LONGFRAME	equ	TT
 .ifne STPLUS
 version		equ	$0206		; version number
-date		equ	$04251991	; STPLUS date, $MMDDYYYY @check@
+date		equ	$05221991	; date MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010011001 ; Apr 25, 1991
+dosdate		equ	%0001011010110110 ; Mar 22, 1991
 .else
 .ifne TT
 version		equ	$0306		; version number (need not be even)
-date		equ	$04251991	; TT date, $MMDDYYYY @check@
+date		equ	$05221991	; date MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010011001 ; Apr 25, 1991
+dosdate		equ	%0001011010110110 ; Mar 22, 1991
 * variable instead: _hasdmasnd.  If it's true, then MONOMON is XORed with
 version		equ	$0146
-date		equ	$04251991
+date		equ	$05221991	; date MMDDYYYY
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001011010011001 ; Apr 25, 1991
+dosdate		equ	%0001011010110110 ; Mar 22, 1991
 .endc
 .endc
 

@@ -1,16 +1,19 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: unknown $
+* $Author: kbad $
 * =======================================================================
 *
-* $Date: 1992/05/20 22:10:16 $
+* $Date: 1992/07/01 21:47:00 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.50  1992/07/01  21:47:00  kbad
+* last akp revision
+*
 * Revision 2.49  1992/05/20  22:10:16  unknown
 * Added some comments to the keyboard BIOS
 *
@@ -145,7 +148,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.49 $
+* $Revision: 2.50 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\RCS\bios.s,v $
@@ -177,6 +180,12 @@
 
 M68030		equ	(SPARROW | TT)
 
+* All keyboards in one ROM? Set ALLKBS.  This also influences OSCONF.
+* You better have NVRAM and the NVMaccess call if you set this!
+* Also check startup.s for osconf interactions with pal/ntsc.
+
+ALLKBS		equ	(SPARROW | TT)
+
 *******************************************************************************
 *+
 *  Country-specific configuration word (os_conf).  This equate is exported
@@ -187,9 +196,19 @@ M68030		equ	(SPARROW | TT)
 *			      p = pal/ntsc (0 = ntsc, 1 = pal)
 *			     cc = country (0 = usa, ...)
 *
+* NEW as of 5/92: the special value $ff means "all countries in one ROM."
+* You get the keyboard preference from NVRAM byte 2 and language preference
+* from NVRAM byte 3.  The pal/ntsc preference comes from, uh, I dunno.
+*
 *-
 
 .globl osconf
+
+.if ALLKBS
+
+osconf		equ	$ff
+
+.else
 
 .if country == usa
 osconf		equ	%00000
@@ -241,6 +260,8 @@ osconf		equ	%10111
 
 .if country == denmark
 osconf		equ	%11001
+.endif
+
 .endif
 
 *+ (lmd)
@@ -764,6 +785,19 @@ initsize	equ	kbshift-kstate-1	;area to be inited to zero!
 skeytran:	ds.l	1	;contains address for unshifted key translation
 skeyshif:	ds.l	1	;contains address for shifted key translation
 skeycl:		ds.l	1	;contains address for caps-lock key translation
+
+.if ALLKBS
+********************
+* Three new KB tables as of 5/92 in the international version (i.e. all
+* countries in one ROM).  These point to associative tables, which is to
+* say two-byte entries: if the scan code matches the first byte then the
+* ASCII code comes from the second byte.  The table ends with a null scan
+* code.  These three pointers must immediately follow skeycl.
+
+salttran:	ds.l	1	;NEW 5/92: address for unshifted alt-key
+saltshif:	ds.l	1	;NEW 5/92: address for shifted alt-key
+saltcl:		ds.l	1	;NEW 5/92: address for caps-lock alt-key
+.endif
 
 *	mouse init transfer string buffer
 
@@ -4570,6 +4604,113 @@ altkp1:
 
 notaltkp:
 
+********************
+*
+* New code as of 5/92: in the all-countries cases (TT, SPARROW) we use
+* the new variables salttran/saltshif/saltcl as associative lookup tables
+* instead of doing the alt-key translation job in code.
+*
+
+.if ALLKBS
+	move.l	salttran,a0	; pre-load the unshifted case
+	move.b	kbshift.w,d2
+	and.b	#3,d2		; either shift key?
+	beq	anoshift
+	move.l	saltshif,a0	; yes - use alt-shift table
+	bra	agottab
+anoshift:
+	btst.b	#KBCL,kbshift.w	; caps lock?
+	beq	agottab		; no - use unshifted case
+	move.l	saltcl,a0
+agottab:
+	tst.b	(a0)		; end of table?
+	beq	outside		; yes - stop trying
+	cmp.b	(a0),d1		; scan code match?
+	adda.w	#2,a0		; (does not affect CCR; must not be addq)
+	bne	agottab		; loop if it didn't match
+* get here if it matched
+	move.b	-(a0),d0	; MATCH: load up ASCII code
+	bra	conin25a	; and win.
+
+* The null table, for usa, uk, etc.
+
+nullatran:
+	dc.b	0
+
+grmatran:
+	dc.b	$1a,'@',  $27,'[',  $28,']',  0
+grmashif:
+	dc.b	$1a,$5c,  $27,'{',  $28,'}',  0	; 5c is '\'
+grmacl:
+	dc.b	$1a,'@',  $27,'[',  $28,']',  0
+
+spaatran:
+	dc.b	$1a,'[',  $1b,']',  $2b,'#',  $28,$81,  $27,$00,  0
+spaashif:
+	dc.b	$1a,'{',  $1b,'}',  $2b,'@',  $28,$00,  $27,$00,  0
+spaacl:
+	dc.b	$1a,'[',  $1b,']',  $2b,'#',  $28,$81,  $27,$00,  0
+
+freatran:
+	dc.b	$1a,'[',  $1b,']',  $28,$5c,  $2b,'@',  0
+freashif:
+	dc.b	$1a,'{',  $1b,'}',  $28,$00,  $2b,'~',  0
+freacl:
+	dc.b	$1a,'[',  $1b,']',  $28,$5c,  $2b,'@',  0
+
+sweatran:
+	dc.b	$1a,'[',  $1b,']',  $28,'`',  $2b,'^',  0
+sweashif:
+	dc.b	$1a,'{',  $1b,'}',  $28,'~',  $2b,'@',  0
+sweacl:
+	dc.b	$1a,'[',  $1b,']',  $28,'`',  $2b,'^',  0
+
+itaatran:
+	dc.b	$1a,'[',  $1b,']',  $2b,$f8,  $60,'`',  0
+itaashif:
+	dc.b	$1a,'{',  $1b,'}',  $2b,'~',  $60,'`',  0
+itaacl:
+	dc.b	$1a,'[',  $1b,']',  $2b,$f8,  $60,'`',  0
+
+* This table is used for Swiss keyboards; both Swiss-German & Swiss-French.
+
+swiatran:
+	dc.b	$1a,'@',  $27,'[',  $28,']',  $1b,'#', $2b,'~', 0
+swiashif:
+	dc.b	$1a,$5c,  $27,'{',  $28,'}',  $1b,'#', $2b,'|', 0
+swiacl:
+	dc.b	$1a,'@',  $27,'[',  $28,']',  $1b,'#', $2b,'~', 0
+.even
+
+********************
+*
+* The table of tables.  The country preference code indexes a row in
+* this table; those six longs are moved into the corresponding
+* keyboard table pointer variables as seen here and in the Keytrans call.
+*
+
+kbtabtab:
+	dc.l	usatran, usashif, usacl, nullatran, nullatran, nullatran
+	dc.l	grmtran, grmshif, grmcl, grmatran, grmashif, grmacl
+	dc.l	fretran, freshif, frecl, freatran, freashif, freacl
+	dc.l	uktran,  ukshif,  ukcl,  nullatran, nullatran, nullatran
+	dc.l	spatran, spashif, spacl, spaatran, spaashif, spaacl
+	dc.l	itatran, itashif, itacl, itaatran, itaashif, itaacl
+	dc.l	swetran, sweshif, swecl, sweatran, sweashif, sweacl
+	dc.l	swftran, swfshif, swfcl, swiatran, swiashif, swiacl
+	dc.l	swgtran, swgshif, swgcl, swiatran, swiashif, swiacl
+
+* This variable needs to be the number of entries in the table above.
+* If the preference value is this value or larger, the zero table is used.
+
+NKBDS	equ	9
+
+.else
+********************
+*
+* Old code for translating alt keys into ASCII codes
+*
+
 .if country == germany
 
 	cmpi.b	#$1a,d1		;is it a ALT-umlaut?
@@ -4972,6 +5113,12 @@ altden3:
 	beq	conin25a		;process it as unshifted
 	move.b	#$27,d0		;put in <'>, instead...it's a alt-shift #
 	bra	conin25a		;process it
+
+.endif
+
+********************
+* Below is the endif for alt-key translation in tables or in code
+********************
 
 .endif
 
@@ -5593,6 +5740,13 @@ xbtim:	dc.b	$d,$8,$5,$4
 *		unshifted,shifted,caps-locked				*
 *		Note:  buffer space for each table should $80!!		*
 *									*
+* New info:								*
+*	The returned longword points to SIX table pointers; the first	*
+* 	three are as above, the next three are ALT-key tables.  The	*
+*	alt-key tables consist of scan-code/ASCII-code pairs for	*
+*	the unshift, shift, and caps-lock cases.  Each table		*
+*	ends with a null scan code.					*
+*									*
 *************************************************************************
 
 	.globl	keytrans
@@ -5618,16 +5772,144 @@ kt3:	move.l	#skeytran,d0
 *									*
 *	void	bioskeys()						*
 *									*
+* This code got a lot worse with internationalization, becuase each	*
+* country's table has its own name.  For the one-country case, we	*
+* select the names at compile-time; for the many-country case, we	*
+* check preferences (NVRAM) now.					*
+*									*
+* New call: Bioskset(code) does what Bioskeys() does, but for a given	*
+* country code.  Returns 0 for success, -1 for error (unknown code).	*
+* If you don't have ALLKBS set, always returns -1.			*
+*									*
 *************************************************************************
 
 	.globl	bioskeys
+	.globl	bioskset
+
+.if ALLKBS
+
+.globl NVMaccess
 
 bioskeys:
-	move.l	#keytran,skeytran.w
-	move.l	#keyshif,skeyshif.w
-	move.l	#keycl,skeycl.w
+	subq.l	#2,sp		; get space on stack
+	move.l	sp,a0
+	pea	1(a0)		; push buffer address
+	move.w	#1,-(sp)	; count of one
+	move.w	#2,-(sp)	; start address of two
+	move.w	#0,-(sp)	; read operation
+	bsr	NVMaccess
+	add.w	#10,sp
+	move.w	(sp)+,d1	; get value read from NVRAM (only d1.b)
+	tst.w	d0
+	bne	nvinvalid
+
+* value in NVRAM was valid, but if it's larger than the number of countries
+* we know about then we use zero
+
+	cmp.b	#NKBDS,d1
+	blo	nvok
+nvinvalid:
+	moveq.l	#0,d1		; invalid: use zero
+	bra	nvok
+
+* entry point for the Bioskset(code) call
+
+bioskset:
+	move.w	4(sp),d1
+	cmp.b	#NKBDS,d1
+	blo	nvok
+	move.l	#-1,d0
+	rts
+
+* continuation point: d1 is a country code, known to be in range.
+
+nvok:
+	ext.w	d1
+	add.w	d1,d1
+	move.w	d1,d0
+	add.w	d1,d1
+	add.w	d1,d0
+	add.w	d0,d0
+	add.w	d0,d0		; d0 is now d1*6*4
+
+	move.l	#kbtabtab,a0
+	add.w	d0,a0
+	move.l	(a0)+,skeytran.w
+	move.l	(a0)+,skeyshif.w
+	move.l	(a0)+,skeycl.w
+	move.l	(a0)+,salttran.w
+	move.l	(a0)+,saltshif.w
+	move.l	(a0)+,saltcl.w
+	moveq.l	#0,d0		; return zero for success
+
+	clr.b	keyrep.w	; also nuke key repeat
+	rts
+.else
+
+* Non-ALLKBS case: bioskset returns -1 always.
+
+bioskset:
+	moveq.l	#-1,d0
+	rts
+
+bioskeys:
+.if (country == usa)
+	move.l	#usatran,skeytran.w
+	move.l	#usashif,skeyshif.w
+	move.l	#usacl,skeycl.w
+.endif
+
+.if (country == uk)
+	move.l	#uktran,skeytran.w
+	move.l	#ukshif,skeyshif.w
+	move.l	#ukcl,skeycl.w
+.endif
+
+.if (country == germany)
+	move.l	#grmtran,skeytran.w
+	move.l	#grmshif,skeyshif.w
+	move.l	#grmcl,skeycl.w
+.endif
+
+.if (country == france)
+	move.l	#fretran,skeytran.w
+	move.l	#freshif,skeyshif.w
+	move.l	#frecl,skeycl.w
+.endif
+
+.if (country == swissfra)
+	move.l	#swftran,skeytran.w
+	move.l	#swfshif,skeyshif.w
+	move.l	#swfcl,skeycl.w
+.endif
+
+.if (country == swissger)
+	move.l	#swgtran,skeytran.w
+	move.l	#swgshif,skeyshif.w
+	move.l	#swgcl,skeycl.w
+.endif
+
+.if (country == italy)
+	move.l	#itatran,skeytran.w
+	move.l	#itashif,skeyshif.w
+	move.l	#itacl,skeycl.w
+.endif
+
+.if (country == spain)
+	move.l	#spatran,skeytran.w
+	move.l	#spashif,skeyshif.w
+	move.l	#spacl,skeycl.w
+.endif
+
+.if (country == sweden)
+	move.l	#swetran,skeytran.w
+	move.l	#sweshif,skeyshif.w
+	move.l	#swecl,skeycl.w
+.endif
+
 	clr.b	keyrep.w		; also nuke key repeat
 	rts
+.endif
 
 *************************************************************************
 *									*
@@ -5924,14 +6206,19 @@ rgbel:
 *									*
 *	Keyboard translation tables					*
 *									*
+* New as of 5/92: I just duplicated these tables, gave them new		*
+* labels, and put them all in the same ROM if ALLKBS.  In that case,	*
+* all countries are in one ROM, and you select at run time (in NVRAM)	*
+* what keyboard you want to boot with.					*
+*									*
 *************************************************************************
 
 	.even
 	.data
 
-.if country == usa
+.if ((country == usa) | ALLKBS)
 
-keytran:
+usatran:
 	dc.b	$00,$1b,'1','2','3','4','5','6'
 	dc.b	'7','8','9','0','-','=',$08,$09
 	dc.b	'q','w','e','r','t','y','u','i'
@@ -5950,7 +6237,7 @@ keytran:
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
-keyshif:
+usashif:
 	dc.b	$00,$1b,'!','@','#','$','%','^'
 	dc.b	'&','*','(',')','_','+',$08,$09
 	dc.b	'Q','W','E','R','T','Y','U','I'
@@ -5969,7 +6256,7 @@ keyshif:
 	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
 	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
 
-keycl:
+usacl:
 	dc.b	$00,$1b,'1','2','3','4','5','6'
 	dc.b	'7','8','9','0','-','=',$08,$09
 	dc.b	'Q','W','E','R','T','Y','U','I'
@@ -5990,6 +6277,388 @@ keycl:
 
 .endif
 
+
+.if ((country == uk) | ALLKBS)
+
+uktran:
+	dc.b	$00,$1b,'1','2','3','4','5','6'
+	dc.b	'7','8','9','0','-','=',$08,$09
+	dc.b	'q','w','e','r','t','y','u','i'
+	dc.b	'o','p','[',']',$0D,$00,'a','s'
+	dc.b	'd','f','g','h','j','k','l',';'
+	dc.b	$27,'`',$00,'#','z','x','c','v'
+	dc.b	'b','n','m',',','.','/',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'\',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+ukshif:
+	dc.b	$00,$1b,'!','"',$9c,'$','%','^'
+	dc.b	'&','*','(',')','_','+',$08,$09
+	dc.b	'Q','W','E','R','T','Y','U','I'
+	dc.b	'O','P','{','}',$0D,$00,'A','S'
+	dc.b	'D','F','G','H','J','K','L',':'
+	dc.b	'@',$ff,$00,'~','Z','X','C','V'
+	dc.b	'B','N','M','<','>','?',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
+	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
+	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'|',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+ukcl:
+	dc.b	$00,$1b,'1','2','3','4','5','6'
+	dc.b	'7','8','9','0','-','=',$08,$09
+	dc.b	'Q','W','E','R','T','Y','U','I'
+	dc.b	'O','P','[',']',$0d,$00,'A','S'
+	dc.b	'D','F','G','H','J','K','L',';'
+	dc.b	$27,'`',$00,'#','Z','X','C','V'
+	dc.b	'B','N','M',',','.','/',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'\',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+
+.endif
+
+
+.if ((country == germany) | ALLKBS)
+
+grmtran:
+	dc.b	$00,$1b,'1','2','3','4','5','6'
+	dc.b	'7','8','9','0',$9e,$27,$08,$09
+	dc.b	'q','w','e','r','t','z','u','i'
+	dc.b	'o','p',$81,'+',$0D,$00,'a','s'
+	dc.b	'd','f','g','h','j','k','l',$94
+	dc.b	$84,'#',$00,'~','y','x','c','v'
+	dc.b	'b','n','m',',','.','-',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'<',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+grmshif:
+	dc.b	$00,$1b,'!','"',$dd,'$','%','&'
+	dc.b	'/','(',')','=','?','`',$08,$09
+	dc.b	'Q','W','E','R','T','Z','U','I'
+	dc.b	'O','P',$9a,'*',$0D,$00,'A','S'
+	dc.b	'D','F','G','H','J','K','L',$99
+	dc.b	$8e,'^',$00,'|','Y','X','C','V'
+	dc.b	'B','N','M',';',':','_',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
+	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
+	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'>',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+grmcl:
+	dc.b	$00,$1b,'1','2','3','4','5','6'
+	dc.b	'7','8','9','0',$9e,$27,$08,$09
+	dc.b	'Q','W','E','R','T','Z','U','I'
+	dc.b	'O','P',$9a,'+',$0D,$00,'A','S'
+	dc.b	'D','F','G','H','J','K','L',$99
+	dc.b	$8e,'#',$00,'~','Y','X','C','V'
+	dc.b	'B','N','M',',','.','-',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'<',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+.endif
+
+.if ((country == spain) | ALLKBS)
+
+spatran:
+	dc.b	$00,$1b,'1','2','3','4','5','6'
+	dc.b	'7','8','9','0','-','=',$08,$09
+	dc.b	'q','w','e','r','t','y','u','i'
+	dc.b	'o','p',$27,$60,$0D,$00,'a','s'
+	dc.b	'd','f','g','h','j','k','l',$a4
+	dc.b	';',$87,$00,'\','z','x','c','v'
+	dc.b	'b','n','m',',','.',$f8,$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'<',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+spashif:
+	dc.b	$00,$1b,$ad,$a8,$9c,'$','%','/'
+	dc.b	'&','*','(',')','_','+',$08,$09
+	dc.b	'Q','W','E','R','T','Y','U','I'
+	dc.b	'O','P','"','^',$0D,$00,'A','S'
+	dc.b	'D','F','G','H','J','K','L',$a5
+	dc.b	':','~',$00,'|','Z','X','C','V'
+	dc.b	'B','N','M','?','!',$dd,$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
+	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
+	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'>',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+spacl:
+	dc.b	$00,$1b,'1','2','3','4','5','6'
+	dc.b	'7','8','9','0','-','=',$08,$09
+	dc.b	'Q','W','E','R','T','Y','U','I'
+	dc.b	'O','P',$27,$60,$0D,$00,'A','S'
+	dc.b	'D','F','G','H','J','K','L',$a5
+	dc.b	';',$87,$00,'\','Z','X','C','V'
+	dc.b	'B','N','M',',','.',$f8,$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'<',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+.endif
+
+
+.if ((country == france) | ALLKBS)
+
+fretran:
+	dc.b	$00,$1b,'&',$82,'"',$27,'(',$dd
+	dc.b	$8a,'!',$87,$85,')','-',$08,$09	;changed $80 to $87 dbg 8/29/85
+	dc.b	'a','z','e','r','t','y','u','i'
+	dc.b	'o','p','^','$',$0D,$00,'q','s'
+	dc.b	'd','f','g','h','j','k','l','m'
+	dc.b	$97,'`',$00,'#','w','x','c','v'
+	dc.b	'b','n',',',';',':','=',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'<',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+freshif:
+	dc.b	$00,$1b,'1','2','3','4','5','6'
+	dc.b	'7','8','9','0',$f8,'_',$08,$09
+	dc.b	'A','Z','E','R','T','Y','U','I'
+	dc.b	'O','P',$b9,'*',$0D,$00,'Q','S'
+	dc.b	'D','F','G','H','J','K','L','M'
+	dc.b	'%',$9c,$00,'|','W','X','C','V'
+	dc.b	'B','N','?','.','/','+',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
+	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
+	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'>',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+frecl:
+	dc.b	$00,$1b,'&',$90,'"',$27,'(',$dd	;changed $82 to $90 dbg 8/29/85
+	dc.b	$8a,'!',$80,$B6,')','-',$08,$09	;changed $85 to $B6 dbg 8/29/85
+	dc.b	'A','Z','E','R','T','Y','U','I'
+	dc.b	'O','P','^','$',$0D,$00,'Q','S'
+	dc.b	'D','F','G','H','J','K','L','M'
+	dc.b	$97,'`',$00,'#','W','X','C','V'
+	dc.b	'B','N',',',';',':','=',$00,$00
+	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
+
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
+	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+	dc.b	'<',$00,$00,'(',')','/','*','7'
+	dc.b	'8','9','4','5','6','1','2','3'
+	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
+	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
+
+.endif
+
+.if ((country == sweden) | ALLKBS)
+
+swetran:
+	.dc.b   0,esc,"1234567890+",$82,bs,tab,'qwertyuiop',$86,$81,cr,0
+	.dc.b	"asdfghjkl",$94,$84,"'",0,$5c,'zxcvbnm,.-',0,0,0,space,0
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'<',0,0,'()/*7894561230.',cr
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+
+sweshif:
+	.dc.b	0,esc,'!"#$%&/()=?',$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
+	.dc.b	'ASDFGHJKL',$99,$8e,'*',0,'|ZXCVBNM;:_',0,0,0,space,0
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,$37,$38,0
+	.dc.b	'-',$34,0,$36,'+',0,$32,0,$30,del
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'>',0,0,'()/*7894561230.',cr
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+
+swecl:
+	.dc.b	0,esc,"1234567890+",$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
+	.dc.b	"ASDFGHJKL",$99,$8e,"'",0,$5c,'ZXCVBNM,.-',0,0,0,space,0
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'-',0,0,0,'+',0,0,0,0,del
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
+	.dc.b	'<',0,0,'()/*7894561230.',cr
+	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
+
+.endif
+
+
+.if ((country == italy) | ALLKBS)
+
+itatran:
+	dc.b	0,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
+	dc.b	'q','w','e','r','t','y','u','i','o','p',$8a,'+', cr,0,'a','s'
+	dc.b	'd','f','g','h','j','k','l',$95,$85,$97,0,'\','z','x','c','v'
+	dc.b	'b','n','m',',','.','-',0,0,0,' ',0,0,0,0,0,0
+	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
+	dc.b	0,0,0,del,0,0,0,0,0,0,0,0,0,0,0,0
+	dc.b	'<',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
+	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+itashif:
+	dc.b	0,esc,'!','"',$9c,'$','%','&','/','(',')','=','?','^', bs,tab
+	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$82,'*', cr,0,'A','S'
+	dc.b	'D','F','G','H','J','K','L','@','#',$dd,0,'|','Z','X','C','V'
+	dc.b	'B','N','M',';',':','_',0,0,0,' ',0,0,0,0,0,0
+	dc.b	0,0,0,0,0,0,0,$37,$38,0,'-',$34,0,$36,'+',0
+	dc.b	$32,0,$30,del,0,0,0,0,0,0,0,0,0,0,0,0
+	dc.b	'>',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
+	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+itacl:
+	dc.b	0,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
+	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$8a,'+', cr,0,'A','S'
+	dc.b	'D','F','G','H','J','K','L',$95,$85,$97,0,'\','Z','X','C','V'
+	dc.b	'B','N','M',',','.','-',0,0,0,' ',0,0,0,0,0,0
+	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
+	dc.b	0,0,0,del,0,0,0,0,0,0,0,0,0,0,0,0
+	dc.b	'<',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
+	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
+
+.endif
+
+
+.if ((country == swissger) | ALLKBS)
+
+swgtran:
+        dc.b    0,esc,'1234567890',"'",'^',bs,tab,'qwertzuiop',$81,$B9,cr,0
+        dc.b    "asdfghjkl",$94,$84,$DD,0,"$yxcvbnm,.-",0,0,0,space,0
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '-',0,0,0,'+',0,0,0,0,del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '<',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+swgshif:
+        dc.b    0,esc,'+"*',$87,'%&/()=?`',bs,tab,'QWERTZUIOP',$8a,'!',cr,0
+        dc.b    'ASDFGHJKL',$82,$85,$f8,0,$9c,'YXCVBNM;:_',0,0,0,space,0
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '78',0,'-4',0,'6+',0,'2',0,'0',del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '>',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+swgcl:
+        dc.b   0,esc,'1234567890',"'",'^',bs,tab,'QWERTZUIOP',$9a,$B9,cr,0
+        dc.b    'ASDFGHJKL',$99,$8E,$DD,0,'$YXCVBNM,.-',0,0,0,space,0
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '-',0,0,0,'+',0,0,0,0,del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '<',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+.endif
+
+
+.if ((country == swissfra) | ALLKBS)
+
+swftran:
+        dc.b    0,esc,'1234567890',"'",'^',bs,tab,'qwertzuiop',$8a,$B9,cr,0
+        dc.b    "asdfghjkl",$82,$85,$DD,0,"$yxcvbnm,.-",0,0,0,space,0
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '-',0,0,0,'+',0,0,0,0,del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '<',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+swfshif:
+        dc.b    0,esc,'+"*',$87,'%&/()=?`',bs,tab,'QWERTZUIOP',$81,'!',cr,0
+        dc.b    'ASDFGHJKL',$94,$84,$f8,0,$9c,'YXCVBNM;:_',0,0,0,space,0
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '78',0,'-4',0,'6+',0,'2',0,'0',del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '>',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+swfcl:
+        dc.b   0,esc,'1234567890',"'",'^',bs,tab,'QWERTZUIOP',$8a,$B9,cr,0
+        dc.b    'ASDFGHJKL',$82,$85,$DD,0,'$YXCVBNM,.-',0,0,0,space,0
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '-',0,0,0,'+',0,0,0,0,del
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
+        dc.b    '<',0,0,'()/*7894561230.',cr
+        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
+
+.endif
+
+********************
+* These tables are never used because these countries don't get their own
+* ROM any more: turkey, denmark, norway.
+********************
 
 .if country == turkey
 
@@ -6054,285 +6723,6 @@ keycl:
 
 
 
-.if country == uk
-
-keytran:
-	dc.b	$00,$1b,'1','2','3','4','5','6'
-	dc.b	'7','8','9','0','-','=',$08,$09
-	dc.b	'q','w','e','r','t','y','u','i'
-	dc.b	'o','p','[',']',$0D,$00,'a','s'
-	dc.b	'd','f','g','h','j','k','l',';'
-	dc.b	$27,'`',$00,'#','z','x','c','v'
-	dc.b	'b','n','m',',','.','/',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
-	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'\',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-keyshif:
-	dc.b	$00,$1b,'!','"',$9c,'$','%','^'
-	dc.b	'&','*','(',')','_','+',$08,$09
-	dc.b	'Q','W','E','R','T','Y','U','I'
-	dc.b	'O','P','{','}',$0D,$00,'A','S'
-	dc.b	'D','F','G','H','J','K','L',':'
-	dc.b	'@',$ff,$00,'~','Z','X','C','V'
-	dc.b	'B','N','M','<','>','?',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
-	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
-	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'|',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-keycl:
-	dc.b	$00,$1b,'1','2','3','4','5','6'
-	dc.b	'7','8','9','0','-','=',$08,$09
-	dc.b	'Q','W','E','R','T','Y','U','I'
-	dc.b	'O','P','[',']',$0d,$00,'A','S'
-	dc.b	'D','F','G','H','J','K','L',';'
-	dc.b	$27,'`',$00,'#','Z','X','C','V'
-	dc.b	'B','N','M',',','.','/',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
-	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'\',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-
-.endif
-
-
-.if country == germany
-
-keytran:
-	dc.b	$00,$1b,'1','2','3','4','5','6'
-	dc.b	'7','8','9','0',$9e,$27,$08,$09
-	dc.b	'q','w','e','r','t','z','u','i'
-	dc.b	'o','p',$81,'+',$0D,$00,'a','s'
-	dc.b	'd','f','g','h','j','k','l',$94
-	dc.b	$84,'#',$00,'~','y','x','c','v'
-	dc.b	'b','n','m',',','.','-',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
-	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'<',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-keyshif:
-	dc.b	$00,$1b,'!','"',$dd,'$','%','&'
-	dc.b	'/','(',')','=','?','`',$08,$09
-	dc.b	'Q','W','E','R','T','Z','U','I'
-	dc.b	'O','P',$9a,'*',$0D,$00,'A','S'
-	dc.b	'D','F','G','H','J','K','L',$99
-	dc.b	$8e,'^',$00,'|','Y','X','C','V'
-	dc.b	'B','N','M',';',':','_',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
-	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
-	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'>',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-keycl:
-	dc.b	$00,$1b,'1','2','3','4','5','6'
-	dc.b	'7','8','9','0',$9e,$27,$08,$09
-	dc.b	'Q','W','E','R','T','Z','U','I'
-	dc.b	'O','P',$9a,'+',$0D,$00,'A','S'
-	dc.b	'D','F','G','H','J','K','L',$99
-	dc.b	$8e,'#',$00,'~','Y','X','C','V'
-	dc.b	'B','N','M',',','.','-',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
-	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'<',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-.endif
-
-.if country == spain
-
-keytran:
-	dc.b	$00,$1b,'1','2','3','4','5','6'
-	dc.b	'7','8','9','0','-','=',$08,$09
-	dc.b	'q','w','e','r','t','y','u','i'
-	dc.b	'o','p',$27,$60,$0D,$00,'a','s'
-	dc.b	'd','f','g','h','j','k','l',$a4
-	dc.b	';',$87,$00,'\','z','x','c','v'
-	dc.b	'b','n','m',',','.',$f8,$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
-	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'<',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-keyshif:
-	dc.b	$00,$1b,$ad,$a8,$9c,'$','%','/'
-	dc.b	'&','*','(',')','_','+',$08,$09
-	dc.b	'Q','W','E','R','T','Y','U','I'
-	dc.b	'O','P','"','^',$0D,$00,'A','S'
-	dc.b	'D','F','G','H','J','K','L',$a5
-	dc.b	':','~',$00,'|','Z','X','C','V'
-	dc.b	'B','N','M','?','!',$dd,$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
-	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
-	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'>',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-keycl:
-	dc.b	$00,$1b,'1','2','3','4','5','6'
-	dc.b	'7','8','9','0','-','=',$08,$09
-	dc.b	'Q','W','E','R','T','Y','U','I'
-	dc.b	'O','P',$27,$60,$0D,$00,'A','S'
-	dc.b	'D','F','G','H','J','K','L',$a5
-	dc.b	';',$87,$00,'\','Z','X','C','V'
-	dc.b	'B','N','M',',','.',$f8,$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
-	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'<',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-.endif
-
-
-.if country == france
-
-keytran:
-	dc.b	$00,$1b,'&',$82,'"',$27,'(',$dd
-	dc.b	$8a,'!',$87,$85,')','-',$08,$09	;changed $80 to $87 dbg 8/29/85
-	dc.b	'a','z','e','r','t','y','u','i'
-	dc.b	'o','p','^','$',$0D,$00,'q','s'
-	dc.b	'd','f','g','h','j','k','l','m'
-	dc.b	$97,'`',$00,'#','w','x','c','v'
-	dc.b	'b','n',',',';',':','=',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
-	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'<',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-keyshif:
-	dc.b	$00,$1b,'1','2','3','4','5','6'
-	dc.b	'7','8','9','0',$f8,'_',$08,$09
-	dc.b	'A','Z','E','R','T','Y','U','I'
-	dc.b	'O','P',$b9,'*',$0D,$00,'Q','S'
-	dc.b	'D','F','G','H','J','K','L','M'
-	dc.b	'%',$9c,$00,'|','W','X','C','V'
-	dc.b	'B','N','?','.','/','+',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$37
-	dc.b	$38,$00,'-',$34,$00,$36,'+',$00
-	dc.b	$32,$00,$30,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'>',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-keycl:
-	dc.b	$00,$1b,'&',$90,'"',$27,'(',$dd	;changed $82 to $90 dbg 8/29/85
-	dc.b	$8a,'!',$80,$B6,')','-',$08,$09	;changed $85 to $B6 dbg 8/29/85
-	dc.b	'A','Z','E','R','T','Y','U','I'
-	dc.b	'O','P','^','$',$0D,$00,'Q','S'
-	dc.b	'D','F','G','H','J','K','L','M'
-	dc.b	$97,'`',$00,'#','W','X','C','V'
-	dc.b	'B','N',',',';',':','=',$00,$00
-	dc.b	$00,$20,$00,$00,$00,$00,$00,$00
-
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	$00,$00,'-',$00,$00,$00,'+',$00
-	dc.b	$00,$00,$00,$7f,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-	dc.b	'<',$00,$00,'(',')','/','*','7'
-	dc.b	'8','9','4','5','6','1','2','3'
-	dc.b	'0','.',$0D,$00,$00,$00,$00,$00
-	dc.b	$00,$00,$00,$00,$00,$00,$00,$00
-
-.endif
-
-.if country == sweden
-
-keytran:
-	.dc.b   0,esc,"1234567890+",$82,bs,tab,'qwertyuiop',$86,$81,cr,0
-	.dc.b	"asdfghjkl",$94,$84,"'",0,$5c,'zxcvbnm,.-',0,0,0,space,0
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'-',0,0,0,'+',0,0,0,0,del
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'<',0,0,'()/*7894561230.',cr
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
-
-keyshif:
-	.dc.b	0,esc,'!"#$%&/()=?',$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
-	.dc.b	'ASDFGHJKL',$99,$8e,'*',0,'|ZXCVBNM;:_',0,0,0,space,0
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,$37,$38,0
-	.dc.b	'-',$34,0,$36,'+',0,$32,0,$30,del
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'>',0,0,'()/*7894561230.',cr
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
-
-keycl:
-	.dc.b	0,esc,"1234567890+",$90,bs,tab,'QWERTYUIOP',$8f,$9a,cr,0
-	.dc.b	"ASDFGHJKL",$99,$8e,"'",0,$5c,'ZXCVBNM,.-',0,0,0,space,0
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'-',0,0,0,'+',0,0,0,0,del
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0
-	.dc.b	'<',0,0,'()/*7894561230.',cr
-	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
-
-.endif
-
-
 .if country == norway
 
 keytran:
@@ -6365,105 +6755,6 @@ keycl:
 .endif
 
 
-.if country == italy
-
-*		 0,  1,  2,  3,  4,  5,  6,  7,  8,  9,  a,  b,  c,  d,  e,  f
-keytran:
-	dc.b	0,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
-	dc.b	'q','w','e','r','t','y','u','i','o','p',$8a,'+', cr,0,'a','s'
-	dc.b	'd','f','g','h','j','k','l',$95,$85,$97,0,'\','z','x','c','v'
-	dc.b	'b','n','m',',','.','-',0,0,0,' ',0,0,0,0,0,0
-	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
-	dc.b	0,0,0,del,0,0,0,0,0,0,0,0,0,0,0,0
-	dc.b	'<',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
-	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
-
-keyshif:
-	dc.b	0,esc,'!','"',$9c,'$','%','&','/','(',')','=','?','^', bs,tab
-	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$82,'*', cr,0,'A','S'
-	dc.b	'D','F','G','H','J','K','L','@','#',$dd,0,'|','Z','X','C','V'
-	dc.b	'B','N','M',';',':','_',0,0,0,' ',0,0,0,0,0,0
-	dc.b	0,0,0,0,0,0,0,$37,$38,0,'-',$34,0,$36,'+',0
-	dc.b	$32,0,$30,del,0,0,0,0,0,0,0,0,0,0,0,0
-	dc.b	'>',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
-	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
-
-keycl:
-	dc.b	0,esc,'1','2','3','4','5','6','7','8','9','0',"'",$8d, bs,tab
-	dc.b	'Q','W','E','R','T','Y','U','I','O','P',$8a,'+', cr,0,'A','S'
-	dc.b	'D','F','G','H','J','K','L',$95,$85,$97,0,'\','Z','X','C','V'
-	dc.b	'B','N','M',',','.','-',0,0,0,' ',0,0,0,0,0,0
-	dc.b	0,0,0,0,0,0,0,0,0,0,'-',0,0,0,'+',0
-	dc.b	0,0,0,del,0,0,0,0,0,0,0,0,0,0,0,0
-	dc.b	'<',0,0,'(',')','/','*','7','8','9','4','5','6','1','2','3'
-	dc.b	'0','.', cr,0,0,0,0,0,0,0,0,0,0,0,0,0
-
-.endif
-
-
-.if country == swissger
-
-keytran:
-        dc.b    0,esc,'1234567890',"'",'^',bs,tab,'qwertzuiop',$81,$B9,cr,0
-        dc.b    "asdfghjkl",$94,$84,$DD,0,"$yxcvbnm,.-",0,0,0,space,0
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '-',0,0,0,'+',0,0,0,0,del
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '<',0,0,'()/*7894561230.',cr
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
-
-keyshif:
-        dc.b    0,esc,'+"*',$87,'%&/()=?`',bs,tab,'QWERTZUIOP',$8a,'!',cr,0
-        dc.b    'ASDFGHJKL',$82,$85,$f8,0,$9c,'YXCVBNM;:_',0,0,0,space,0
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '78',0,'-4',0,'6+',0,'2',0,'0',del
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '>',0,0,'()/*7894561230.',cr
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
-
-keycl:
-        dc.b   0,esc,'1234567890',"'",'^',bs,tab,'QWERTZUIOP',$9a,$B9,cr,0
-        dc.b    'ASDFGHJKL',$99,$8E,$DD,0,'$YXCVBNM,.-',0,0,0,space,0
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '-',0,0,0,'+',0,0,0,0,del
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '<',0,0,'()/*7894561230.',cr
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
-
-.endif
-
-
-.if country == swissfra
-
-keytran:
-        dc.b    0,esc,'1234567890',"'",'^',bs,tab,'qwertzuiop',$8a,$B9,cr,0
-        dc.b    "asdfghjkl",$82,$85,$DD,0,"$yxcvbnm,.-",0,0,0,space,0
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '-',0,0,0,'+',0,0,0,0,del
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '<',0,0,'()/*7894561230.',cr
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
-
-keyshif:
-        dc.b    0,esc,'+"*',$87,'%&/()=?`',bs,tab,'QWERTZUIOP',$81,'!',cr,0
-        dc.b    'ASDFGHJKL',$94,$84,$f8,0,$9c,'YXCVBNM;:_',0,0,0,space,0
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '78',0,'-4',0,'6+',0,'2',0,'0',del
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '>',0,0,'()/*7894561230.',cr
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
-
-keycl:
-        dc.b   0,esc,'1234567890',"'",'^',bs,tab,'QWERTZUIOP',$8a,$B9,cr,0
-        dc.b    'ASDFGHJKL',$82,$85,$DD,0,'$YXCVBNM,.-',0,0,0,space,0
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '-',0,0,0,'+',0,0,0,0,del
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0
-        dc.b    '<',0,0,'()/*7894561230.',cr
-        dc.b     0,0,0,0,0,0,0,0,0,0,0,0,0
-
-.endif
-
 .if country == denmark
 
 keytran:
@@ -6494,7 +6785,6 @@ keycl:
 	.dc.b	0,0,0,0,0,0,0,0,0,0,0,0,0
 
 .endif
-
 
 *
 *

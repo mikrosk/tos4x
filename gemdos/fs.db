@@ -369,10 +369,10 @@ procedure alldmds
     local dmd dmdend mask
     (mask = 1)
     (dmd = .drvtbl)
-    (dmdend = .drvtbl + #30*#16)
+    (dmdend = .drvtbl + @30*@16)
 #:loop
       if (wpeek(.drvsel) & `mask) "dmd `dmd;print"
-      (dmd += #30)
+      (dmd += @30)
       (mask <<= 1)
       if (`dmd < `dmdend) goto loop
 .

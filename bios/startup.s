@@ -4,17 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/05/21 12:16:46 $
+* $Date: 90/06/18 16:36:11 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.50  90/06/18  16:36:11  apratt
+* Changed date to 6/16/90, boot color to dark blue  (n.b. was a sky blue
+* before; "blue" isn't descriptive enough).
+*
+* Fixed a BIG BUG: ttwait/ttdelay used STMFP timer A, not TTMFP timer A
+* as intended.
+*
+* Clobbering code now clobbers PMMU, cache, VBR, and FPU with frestore of
+* null state.
+*
+* Hit a key to stop the boot delay, then do a warm boot within 90 sec:
+* now you don't wait again.
+*
 * Revision 2.49  90/05/21  12:16:46  apratt
 * Moved some conditionals around, changed boot color to green.
 * This rev (cross your fingers) could be sent to developers, etc.
-*
+* 
 * Revision 2.48  90/05/16  11:54:21  apratt
 * Added some ifne TT conditionals, so it compiles for not-TT.
 * Also changed boot color to dark blue, because light blue was taken.
@@ -454,7 +467,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.49 $
+* $Revision: 2.50 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -543,9 +556,9 @@ date		equ	$03301989	; not-TT date, $MMDDYYYY @check@
 dosdate		equ	%0001001001111110 ; Mar 30, 1989
 .else
 version		equ	$0300		; version number *MUST BE EVEN*
-date		equ	$05221990	; TT date, $MMDDYYYY @check@
+date		equ	$06161990	; TT date, $MMDDYYYY @check@
 *			 YYYYYYYMMMMDDDDD
-dosdate		equ	%0001010010110110 ; May 22, 1990
+dosdate		equ	%0001010011010000 ; Jun 16, 1990
 .endc
 
 *******************************************************************************
@@ -1041,32 +1054,32 @@ tcdcr	equ	mfp+$1d			; timer C & D control
 tadr	equ	mfp+$1f			; timer A data
 tbdr	equ	mfp+$21			; timer B data
 tcdr	equ	mfp+$23			; timer C data
-ttmfp	equ	$fffffa81
+tddr	equ	mfp+$25			; timer D data
 scr	equ	mfp+$27			; sync char
-ttgpip	equ	mfp+1			; general purpose I/O
-ttaer	equ	mfp+3			; active edge reg
-ttddr	equ	mfp+5			; data direction reg
-ttiera	equ	mfp+7			; interrupt enable A & B
-ttierb	equ	mfp+9
-ttipra	equ	mfp+$b			; interrupt pending A & B
-ttiprb	equ	mfp+$d
-ttisra	equ	mfp+$f			; interrupt inService A & B
-ttisrb	equ	mfp+$11
-ttimra	equ	mfp+$13			; interrupt mask A & B
-ttimrb	equ	mfp+$15
-ttvr	equ	mfp+$17			; interrupt vector base
-tttacr	equ	mfp+$19			; timer A control
-tttbcr	equ	mfp+$1b			; timer B control
-tttcdcr	equ	mfp+$1d			; timer C & D control
-tttadr	equ	mfp+$1f			; timer A data
-tttbdr	equ	mfp+$21			; timer B data
-tttcdr	equ	mfp+$23			; timer C data
-tttddr	equ	mfp+$25			; timer D data
-ttscr	equ	mfp+$27			; sync char
-ttucr	equ	mfp+$29			; USART control reg
-ttrsr	equ	mfp+$2b			; receiver status
-tttsr	equ	mfp+$2d			; transmit status
-ttudr	equ	mfp+$2f			; USART data
+ucr	equ	mfp+$29			; USART control reg
+rsr	equ	mfp+$2b			; receiver status
+tsr	equ	mfp+$2d			; transmit status
+udr	equ	mfp+$2f			; USART data
+
+*--- TTMFP 68901
+ttmfp	equ	$fffffa80
+
+ttgpip	equ	ttmfp+1			; general purpose I/O
+ttaer	equ	ttmfp+3			; active edge reg
+ttddr	equ	ttmfp+5			; data direction reg
+ttiera	equ	ttmfp+7			; interrupt enable A & B
+ttierb	equ	ttmfp+9
+ttipra	equ	ttmfp+$b		; interrupt pending A & B
+ttiprb	equ	ttmfp+$d
+ttisra	equ	ttmfp+$f		; interrupt inService A & B
+ttisrb	equ	ttmfp+$11
+ttimra	equ	ttmfp+$13		; interrupt mask A & B
+ttimrb	equ	ttmfp+$15
+ttvr	equ	ttmfp+$17		; interrupt vector base
+tttacr	equ	ttmfp+$19		; timer A control
+tttbcr	equ	ttmfp+$1b		; timer B control
+tttcdcr	equ	ttmfp+$1d		; timer C & D control
+tttadr	equ	ttmfp+$1f		; timer A data
 tttbdr	equ	ttmfp+$21		; timer B data
 tttcdr	equ	ttmfp+$23		; timer C data
 tttddr	equ	ttmfp+$25		; timer D data
@@ -1346,9 +1359,12 @@ sizeof_hdr = *-ostext			; = size of OS header
 	lsl.b	#6,d1		; d1=bf000000
 	and.b	#$80,d1		; d1=b0000000
 	lsr.b	#6,d0		; d0=000000vv
-*  Clobber the PMMU and cache
+	or.b	d0,d1		; d1=b00000vv
 	move.w	d1,SPAR_VMC	; write to VMC.
 .ifne TT
+.mc68881
+	frestore tdis			; causes a restore of the NULL state
+
 .endif
 
 *+
@@ -2814,7 +2830,9 @@ dskb1:	rts				; return status
 .if systype == rom
 
 * Before doing anything, dmaboot waits until 90 seconds after 200Hz 
-* started ticking. If you hit a key, it falls into the dmaboot code.
+* started ticking. If you hit a key, it falls into the dmaboot code,
+* but writes "90 seconds" into 200Hz so a quick warm boot won't
+* wait again.
 *
 *		checksum is $1234), then it is executed.  The search stops
 * 		set next_bar_time to bar_interval;	(d6)
@@ -2828,13 +2846,14 @@ dmab_to:
 * not be on an N-column display, where the cursor is ALREADY on the
 * Nth one.  Sigh.
 	move.l	#$00010002,-(sp)
-	trap	#$d			; Bconstat(2)
+	trap	#$d			; poll for char: Bconstat(2)
 	addq.l	#4,sp
 
 * we jump here when we're counting time and the memory test is done.
-	move.l	#$00020002,-(sp)	; Bconin(2)
+
 nomt:
 
+	move.l	d7,_hz_200		; you broke out: write 90 sec
 * if (mt_done && _hz_200 >= d6)
 	trap	#$d
 * this is the end of the memory-test/shrinking bar sequence.  We check
@@ -2994,7 +3013,7 @@ _rts:	rts
 .ifeq TT
 	dc.w	$fff			; 0 white
 .else
-	dc.w	$0f0			; 0 green - 5/21/90 version
+	dc.w	$88f			; 0 blue - 6/16/90 version
 .endc
 *	Passed:		d1.l = offset
 *			a0 = base of pattern ($1f8 bytes long)

@@ -1,12 +1,17 @@
 /*
 ***************************    FSHAND.C    ******************************
 *
-* $Revision: 2.15 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
+* $Revision: 2.16 $	$Source: e:/tos/gd2\RCS\fshand.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/05/28 15:10:00 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/05/30 16:06:06 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fshand.c,v $
+* Revision 2.16  1991/05/30  16:06:06  apratt
+* Cash uftsize to signed when comparing against a handle
+* coming from the user, which could be a (negative) character
+* device number.
+*
 * Revision 2.15  1991/05/28  15:10:00  apratt
 * Fixed again - the special case where currec points past curcl
 * can have happened before a call to ixlseek, so you have to
@@ -95,7 +100,8 @@ OFD
 *syshnd(h)
 int h;
 {
-	if (h <= -NUMBIOS || h >= run->p_uftsize) {
+	/* we cast uftsize to signed because h is signed */
+	if (h <= -NUMBIOS || h >= (signed)run->p_uftsize) {
 	    DBCMD(8,"print syshnd (wpeek (`a6 + 8)) >> NULL;_c");
 	    return NULL;			/* too small/big */
 	}

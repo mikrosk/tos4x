@@ -1,12 +1,15 @@
 /*
 ***************************    FSPROC.C    ******************************
 *
-* $Revision: 2.19 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
+* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\fsproc.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/18 17:52:02 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 17:12:50 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fsproc.c,v $
+* Revision 2.20  1991/06/20  17:12:50  apratt
+* updates for new DB
+*
 * Revision 2.19  1991/06/18  17:52:02  apratt
 * Updated to DB release 3 (new print)
 *
@@ -250,8 +253,8 @@ char *v;		/* enviroment string (0, 3, 5, 7) */
 	long fastmax, slowmax, minfast;
 	OFD **uftstart;
 
-	DBCMD(1,"_dopexec -x (wpeek (`a6 + 8)) -x (lpeek (`a6 + a)) "
-		   "-x (lpeek (`a6 + e)) -x (lpeek (`a6 + 12)) ;_c");
+	DBCMD(1,"_dopexec (wpeek (`a6 + 8)) (lpeek (`a6 + a)) "
+		   "(lpeek (`a6 + e)) (lpeek (`a6 + 12)) ;_c");
 
 	v_pdp = NULPTR;
 	v_env = NULPTR;

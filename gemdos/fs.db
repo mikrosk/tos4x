@@ -1,4 +1,6 @@
 # link ........ bufdrv . buftyp . bufrec .... dirty . dmd ........ bufr ........
+# The count argument is the number of bytes of each buffer to display.
+# If zero or missing you get none, else you get that many.
 
 procedure bcb a count
   print -n link -x lpeek(`a);(a += 4)
@@ -7,18 +9,21 @@ procedure bcb a count
   print -n bufrec -x wpeek(`a);(a += 2)
   print -n dirty -x wpeek(`a);(a += 2)
   print -n dmd -x lpeek(`a);(a += 4)
-  print bufr -x lpeek(`a);(a += 4)
+  print bufr -x lpeek(`a)
   if count 'd (lpeek(`a))[count] ; print'
 .
 
 # This global is used in fscl.c; if nonzero you see that many bytes of each
-# buffer that's read or written.
+# buffer that's read or written.  It's initialized to zero, and we don't set
+# it to zero here because re-loading this file shouldn't reset the value.
 
-global bufdump ; (bufdump = 0)
+global bufdump
 
 # the 'count' argument is how many buffers in each list to show; without it, 
 # you get 10; with it, you get that many.  -1 is unreasonably large and will
-# show all the buffers (unsigned compare).
+# show all the buffers (unsigned compare).  The bytecount argument is how
+# many bytes of each buffer to display; if zero or missing you get none, 
+# else you get that many.  It's just passed to "bcb."
 
 procedure allbcbs count bytecount
   local buf
@@ -28,7 +33,7 @@ procedure allbcbs count bytecount
   print LIST 0: -x `buf
   (lcount = count)
 #:loop0
-    bcb `buf
+    bcb `buf bytecount
     (buf = lpeek(`buf))
     (lcount -= 1)
   if (buf && lcount) goto loop0
@@ -37,32 +42,10 @@ procedure allbcbs count bytecount
   print LIST 1: -x `buf
   (lcount = count)
 #:loop1
-    bcb `buf
+    bcb `buf bytecount
     (buf = lpeek(`buf))
     (lcount -= 1)
   if (buf && lcount) goto loop1
-.
-
-procedure mostbcbs
-  local buf
-  local count
-  (buf = lpeek(.bufl))
-  (count = 10)
-  print LIST 0: -x `buf
-#:loop0
-    bcb `buf
-    (buf = lpeek(buf))
-    (count -= 1)
-  if (`buf && `count) goto loop0
-  echo
-  (buf = lpeek(.bufl+4))
-  (count = 10)
-  print LIST 1: -x `buf
-#:loop1
-    bcb `buf
-    (buf = lpeek(`buf))
-    (count -= 1)
-  if (`buf && `count) goto loop1
 .
 
 alias _bcbs "if `t0 'bcb `t0;xt0 lpeek(`t0);_bcbs'"
@@ -95,8 +78,8 @@ procedure dfd a
   print -n strtcl -x wpeek(`a);(a += 2)
   print fileln -x lpeek(`a);(a += 4)
 
-  print -n attrib -x peek(`a));x a (`a+1)
-  print -n dirty -x peek(`a));x a (`a+1)
+  print -n attrib -x peek(`a);x a (`a+1)
+  print -n dirty -x peek(`a);x a (`a+1)
   print -n dev -x wpeek(`a);(a += 2)
   print -n dircl -x wpeek(`a);(a += 2)
   print -n dirrec -x wpeek(`a);(a += 2)
@@ -156,13 +139,13 @@ procedure dmd a
 
 procedure dta a
   print -n dta_sname -sb `a;x a (`a+b)
-  print -n dta_attr -x (peek(`a));x a (`a+1)
+  print -n dta_attr -x peek(`a);x a (`a+1)
   print -n dta_clust -x wpeek(`a);(a += 2)
   print dta_curcl -x wpeek(`a);(a += 2)
   print -n dta_recno -x wpeek(`a);(a += 2)
   print -n dta_recoffs -x wpeek(`a);(a += 2)
-  print dta_dev -x (peek(`a));x a (`a+1)
-  print -n fattrib -x (peek(`a));x a (`a+1)
+  print dta_dev -x peek(`a);x a (`a+1)
+  print -n fattrib -x peek(`a);x a (`a+1)
   print -n ftime -x wpeek(`a);(a += 2)
   print -n fdate -x wpeek(`a);(a += 2)
   print -n flength -x lpeek(`a);(a += 4)
@@ -174,7 +157,7 @@ procedure dta a
 
 procedure fcb a
   print -n name -sb `a;(a += b)
-  print -n attrib -x (peek(`a));(a += 1)
+  print -n attrib -x peek(`a);(a += 1)
   (a += 0a)
   print -n time -x wpeek(`a);(a += 2)
   print -n date -x wpeek(`a);(a += 2)
@@ -248,27 +231,27 @@ procedure pd a
   print -n p_parent -x lpeek(`a);(a += 4)
   print -n p_hflags -x lpeek(`a);(a += 4)
   print p_env -x lpeek(`a);(a += 4)
-  print -n p_1fill -x {8};x a (`a+8)
+  print -n p_1fill {8};x a (`a+8)
   print -n p_curdrv -x wpeek(`a);(a += 2)
   print -n p_uftsize -x wpeek(`a);(a += 2)
   print p_uft -x lpeek(`a);(a += 4)
 
   print -n p_curdir -x04 wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
   print -x04 wpeek(`a);(a += 2)
 
   print -n ======== -x04 wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
-  print -n -x04 -x wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
+  print -n -x04 wpeek(`a);(a += 2)
   print -x04 wpeek(`a);(a += 2)
 
   print -n p_3fill {8};(a += 8)
@@ -334,7 +317,7 @@ procedure block a flag
   print -n b_next -x lpeek(`a);(a += 4)
   set type peek(`a)
   print -n b_type -x `type;(a += 1)
-  print -n b_callno -x (peek(`a));(a += 1)
+  print -n b_callno -x peek(`a);(a += 1)
   print -n b_data is -x `a
   if (`type == 0) print free
   if (`type == 1) "print cut: ; docut `a"
@@ -350,7 +333,7 @@ procedure docut a
   print length: -x8 lpeek(`a + 8) own: -x8 lpeek(`a + c)
   (a += 10)
   print -n slot 2: link: -x8 lpeek(`a) start: -x8 lpeek(`a + 4)
-  print -x8 length: -x8 lpeek(`a + 8) own: -x8 lpeek(`a + c)
+  print length: -x8 lpeek(`a + 8) own: -x8 lpeek(`a + c)
   (a += 10)
   print -n slot 3: link: -x8 lpeek(`a) start: -x8 lpeek(`a + 4)
   print length: -x8 lpeek(`a + 8) own: -x8 lpeek(`a + c)
@@ -393,7 +376,7 @@ procedure everything
 
     print DISK BUFFERS
 
-    allbcbs
+    allbcbs -1 `bufdump
 
     print POOL
 
@@ -418,3 +401,7 @@ procedure _dopexec mode arg1 arg2 arg3
   if (mode == 4 || mode == 6) print arg1= `arg1 basepage= -x `arg2 arg3 = `arg3
   if (mode == 5 || mode == 7) "print -n arg1= -x `arg1 tail=;showtail arg2+1;print env= -x `arg3"
 .
+
+# this alias is used by DBCMDs in the source
+
+alias _c defer g

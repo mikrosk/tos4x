@@ -535,7 +535,11 @@ REG	DSB	*dsbs, *dsbd;
 	WORD	dev, sectno, ssect, dsect, trkops;
 REG	WORD	j, op, loop;
 
+#if 0
 	bootbuf = malloc(0x158L );
+#else
+	bootbuf = malloc(1024L);	/* assume sector size <= 1K */
+#endif
 	if( !bootbuf )
 	{
 errmem:	  do1_alert( FCNOMEM );
@@ -556,6 +560,12 @@ chksrc:	if( !(dsbs = trap13(GETBPB,devnos)) )
 /* should spc exist? */
 	spc = dsbs->dspc;			/* sectors per cylinder	   */
 	bps = dsbs->b.recsiz;			/* bytes per sector	   */
+	if (bps > 1024)				/* check the bootbuf we allocated before */
+	{
+	  free(bootbuf);
+	  bootbuf = malloc((long)bps);
+	  if (!bootbuf) goto errmem;
+	}
 	bpc = spc * bps;			/* bytes per cylinder	   */
 
 						/* buffer at least a track */

@@ -368,6 +368,8 @@ deskmain()
 				/* Catch only the terminate signal */	
 	Psignal( SIGTERM, desk_term );
 
+	initkballoc();		/* initialize the lmalloc() functions */
+
 	if ( !inf_path[0] )	/* Not set up yet		*/	
 	  m_infpath( inf_path );
 

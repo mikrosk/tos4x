@@ -11,6 +11,8 @@
 ;
 ;
 ; UPDATES:
+; 920818 kbad fixed stack offset error in setinterrupt
+; 920810 kbad fixed stack offsets for XBIOS calls
 ; 07/15/92  MS Changed setinterrupt due to doc error.
 ; 07/13/92 MS  Changed buffoper to return the current setting if mode = -1
 ;	   MS  Added function buffptr to return the play and record buffer
@@ -241,7 +243,7 @@ setmontrack:
 ;************************************************************************
 ; stack args:
 seti_which	equ 4	; 0=timer A, 1=MFP i7
-seti_type	equ 8	; 1=play, 2=record, 3=play/record
+seti_type	equ 6	; 1=play, 2=record, 3=play/record
 ;
 setinterrupt:
 	move.w	snd_dmsctl,d1
@@ -309,7 +311,8 @@ dsptristate:
 ;			6(sp).w	mode (0) set, (1) read, (2) write
 ;			8(sp).w	data
 ;
-;	Returns:	d0	0 - No Error.
+;	Returns:	d0		0 - No Error.
+;						or read input
 ;	
 ;***********************************************************************
 ; stack args:

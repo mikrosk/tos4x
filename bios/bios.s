@@ -4,13 +4,21 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/09/16 23:44:52 $
+* $Date: 1991/10/15 14:08:24 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.39  1991/10/15  14:08:24  apratt
+* Changed Bioskeys so it does something else, too: it nukes
+* key repeat.  In the first place, there was no way to do this
+* (and it's necessary for STBOOK), and in the second place, this
+* is not an unreasonable place to do it, since key repeat is based
+* on scan code and you're ostensibly changing the tables with this
+* call.
+*
 * Revision 2.38  1991/09/16  23:44:52  apratt
 * Fixed jdisabint twice: first, you can't clear ipra using bclr: it's an
 * asynchronous register.  Second, my "fix" back in 89 for clearing isr was
@@ -97,7 +105,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.38 $
+* $Revision: 2.39 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\bios.s,v $
@@ -5468,6 +5476,7 @@ keytrans:
 	bmi.b	kt1
 	move.l	$4(sp),skeytran.w
 kt1:	tst.l	$8(sp)
+	bmi.b	kt2
 	move.l	$8(sp),skeyshif.w
 kt2:	tst.l	$c(sp)
 	bmi.b	kt3

@@ -49,9 +49,7 @@
 #define MINTCBOX 8   /* IBOX in Baum ADDINFO */
 #define DEOK     11  /* BUTTON in Baum ADDINFO */
 
-#define SMILEY   2   /* Formular/Dialog */
-
-#define ADFILEIN 3   /* Formular/Dialog */
+#define ADFILEIN 2   /* Formular/Dialog */
 #define INFTITLE 1   /* TEXT in Baum ADFILEIN */
 #define FIFILE   2   /* FTEXT in Baum ADFILEIN */
 #define FILEFT   3   /* BOXCHAR in Baum ADFILEIN */
@@ -69,7 +67,7 @@
 #define FISKIP   15  /* BUTTON in Baum ADFILEIN */
 #define FICNCL   16  /* BUTTON in Baum ADFILEIN */
 
-#define ADDISKIN 4   /* Formular/Dialog */
+#define ADDISKIN 3   /* Formular/Dialog */
 #define DIDRIVE  2   /* FTEXT in Baum ADDISKIN */
 #define DIVOLUME 3   /* FTEXT in Baum ADDISKIN */
 #define DINFOLDS 4   /* FTEXT in Baum ADDISKIN */
@@ -79,13 +77,13 @@
 #define DIOK     8   /* BUTTON in Baum ADDISKIN */
 #define DIQUIT   9   /* BUTTON in Baum ADDISKIN */
 
-#define ADOPENAP 5   /* Formular/Dialog */
+#define ADOPENAP 4   /* Formular/Dialog */
 #define APPLNAME 1   /* FTEXT in Baum ADOPENAP */
 #define APPLPARM 3   /* FTEXT in Baum ADOPENAP */
 #define APPLOK   4   /* BUTTON in Baum ADOPENAP */
 #define APPLCNCL 5   /* BUTTON in Baum ADOPENAP */
 
-#define ADINSDIS 6   /* Formular/Dialog */
+#define ADINSDIS 5   /* Formular/Dialog */
 #define DRID     2   /* FTEXT in Baum ADINSDIS */
 #define DRLABEL  3   /* FTEXT in Baum ADINSDIS */
 #define IDRIVE   6   /* BUTTON in Baum ADINSDIS */
@@ -99,12 +97,12 @@
 #define DRCNCL   15  /* BUTTON in Baum ADINSDIS */
 #define DRQUIT   16  /* BUTTON in Baum ADINSDIS */
 
-#define ADMKDBOX 7   /* Formular/Dialog */
+#define ADMKDBOX 6   /* Formular/Dialog */
 #define MKNAME   1   /* FTEXT in Baum ADMKDBOX */
 #define MKOK     2   /* BUTTON in Baum ADMKDBOX */
 #define MKCNCL   4   /* BUTTON in Baum ADMKDBOX */
 
-#define ADFORMAT 8   /* Formular/Dialog */
+#define ADFORMAT 7   /* Formular/Dialog */
 #define FCBOX4   1   /* BOX in Baum ADFORMAT */
 #define FCBOXC   2   /* BOX in Baum ADFORMAT */
 #define SRCDRA   4   /* BOXCHAR in Baum ADFORMAT */
@@ -129,19 +127,19 @@
 #define FCBARA   25  /* BOX in Baum ADFORMAT */
 #define FCBARB   26  /* BOX in Baum ADFORMAT */
 
-#define ADICON   9   /* Formular/Dialog */
+#define ADICON   8   /* Formular/Dialog */
 #define ICON0    1   /* ICON in Baum ADICON */
 #define ICON1    2   /* ICON in Baum ADICON */
 #define ICON2    3   /* ICON in Baum ADICON */
 #define ICON3    4   /* ICON in Baum ADICON */
 #define ICON4    5   /* ICON in Baum ADICON */
 
-#define PRINTFIL 10  /* Formular/Dialog */
+#define PRINTFIL 9   /* Formular/Dialog */
 #define PFILE    1   /* FTEXT in Baum PRINTFIL */
 
-#define BACKGROU 11  /* Formular/Dialog */
+#define BACKGROU 10  /* Formular/Dialog */
 
-#define SSCREEN  12  /* Formular/Dialog */
+#define SSCREEN  11  /* Formular/Dialog */
 #define STITLE   1   /* TEXT in Baum SSCREEN */
 #define DESKPREF 4   /* BUTTON in Baum SSCREEN */
 #define WINPREF  5   /* BUTTON in Baum SSCREEN */
@@ -180,21 +178,21 @@
 #define SOK      43  /* BUTTON in Baum SSCREEN */
 #define SCANCEL  44  /* BUTTON in Baum SSCREEN */
 
-#define FILEOPTI 13  /* Formular/Dialog */
+#define FILEOPTI 12  /* Formular/Dialog */
 #define OPTNAME  2   /* FTEXT in Baum FILEOPTI */
 #define OPTOK    3   /* BUTTON in Baum FILEOPTI */
 
-#define DLAUNCH  14  /* Formular/Dialog */
+#define DLAUNCH  13  /* Formular/Dialog */
 #define RUNNAME  2   /* FTEXT in Baum DLAUNCH */
 #define LTOS     4   /* BUTTON in Baum DLAUNCH */
 #define LGRAPHIC 5   /* BUTTON in Baum DLAUNCH */
 #define LAUNCHOK 7   /* BUTTON in Baum DLAUNCH */
 #define LNCNCL   8   /* BUTTON in Baum DLAUNCH */
 
-#define TEXTLINE 15  /* Formular/Dialog */
+#define TEXTLINE 14  /* Formular/Dialog */
 #define TSTYLE   1   /* TEXT in Baum TEXTLINE */
 
-#define SAMENAME 16  /* Formular/Dialog */
+#define SAMENAME 15  /* Formular/Dialog */
 #define SNAME    1   /* TEXT in Baum SAMENAME */
 #define FNAME    2   /* FTEXT in Baum SAMENAME */
 #define EDFNAME  3   /* FTEXT in Baum SAMENAME */
@@ -202,7 +200,7 @@
 #define SKIP     5   /* BUTTON in Baum SAMENAME */
 #define QUIT     6   /* BUTTON in Baum SAMENAME */
 
-#define CPBOX    17  /* Formular/Dialog */
+#define CPBOX    16  /* Formular/Dialog */
 #define TITLE    1   /* TEXT in Baum CPBOX */
 #define NUMDIR   2   /* FTEXT in Baum CPBOX */
 #define NUMFILE  3   /* FTEXT in Baum CPBOX */
@@ -217,7 +215,7 @@
 #define OKCP     14  /* BUTTON in Baum CPBOX */
 #define CCANCEL  15  /* BUTTON in Baum CPBOX */
 
-#define INWICON  18  /* Formular/Dialog */
+#define INWICON  17  /* Formular/Dialog */
 #define IBOX1    2   /* BOX in Baum INWICON */
 #define WNAME    3   /* FTEXT in Baum INWICON */
 #define WBOX     5   /* BOX in Baum INWICON */
@@ -231,17 +229,17 @@
 #define WOK      14  /* BUTTON in Baum INWICON */
 #define WQUIT    16  /* BUTTON in Baum INWICON */
 
-#define HELP1    19  /* Formular/Dialog */
+#define HELP1    18  /* Formular/Dialog */
 #define MOREHELP 14  /* BUTTON in Baum HELP1 */
 
-#define HELP2    20  /* Formular/Dialog */
+#define HELP2    19  /* Formular/Dialog */
 
-#define SEAFILE  21  /* Formular/Dialog */
+#define SEAFILE  20  /* Formular/Dialog */
 #define SFILE    2   /* FTEXT in Baum SEAFILE */
 #define SEAOK    3   /* BUTTON in Baum SEAFILE */
 #define SEACNCL  4   /* BUTTON in Baum SEAFILE */
 
-#define MNINSAPP 22  /* Formular/Dialog */
+#define MNINSAPP 21  /* Formular/Dialog */
 #define MPFNAME  2   /* FTEXT in Baum MNINSAPP */
 #define MPARGS   3   /* FTEXT in Baum MNINSAPP */
 #define MPDTYPE  4   /* FTEXT in Baum MNINSAPP */
@@ -263,7 +261,7 @@
 #define MPCANCEL 20  /* BUTTON in Baum MNINSAPP */
 #define MPQUIT   21  /* BUTTON in Baum MNINSAPP */
 
-#define MNSETPRE 23  /* Formular/Dialog */
+#define MNSETPRE 22  /* Formular/Dialog */
 #define SPDTITLE 3   /* TEXT in Baum MNSETPRE */
 #define SPDBUTTN 4   /* BUTTON in Baum MNSETPRE */
 #define SPCTITLE 5   /* TEXT in Baum MNSETPRE */
@@ -273,7 +271,7 @@
 #define MNSPOK   9   /* BUTTON in Baum MNSETPRE */
 #define MNSPCAN  10  /* BUTTON in Baum MNSETPRE */
 
-#define MNSETVID 24  /* Formular/Dialog */
+#define MNSETVID 23  /* Formular/Dialog */
 #define SVCTITLE 2   /* TEXT in Baum MNSETVID */
 #define SVCBUTTN 3   /* BUTTON in Baum MNSETVID */
 #define SVLTITLE 4   /* TEXT in Baum MNSETVID */
@@ -285,7 +283,7 @@
 #define SVOK     10  /* BUTTON in Baum MNSETVID */
 #define SVCANCEL 11  /* BUTTON in Baum MNSETVID */
 
-#define MNVIDEO  25  /* Formular/Dialog */
+#define MNVIDEO  24  /* Formular/Dialog */
 #define SVSTLOW  3   /* BUTTON in Baum MNVIDEO */
 #define SVSTMED  4   /* BUTTON in Baum MNVIDEO */
 #define SVSTHIGH 5   /* BUTTON in Baum MNVIDEO */
@@ -295,7 +293,7 @@
 #define SVTTOK   9   /* BUTTON in Baum MNVIDEO */
 #define SVTTCAN  10  /* BUTTON in Baum MNVIDEO */
 
-#define MNMENU   26  /* Formular/Dialog */
+#define MNMENU   25  /* Formular/Dialog */
 #define MPIBASE  1   /* BOX in Baum MNMENU */
 #define MPINONE  2   /* STRING in Baum MNMENU */
 #define MPIF1    3   /* STRING in Baum MNMENU */
@@ -358,7 +356,7 @@
 #define MEM8MEG  60  /* STRING in Baum MNMENU */
 #define MEMNOLIM 61  /* STRING in Baum MNMENU */
 
-#define MNSYSTEM 27  /* Formular/Dialog */
+#define MNSYSTEM 26  /* Formular/Dialog */
 #define SDTITLE  2   /* TEXT in Baum MNSYSTEM */
 #define SDBUTTON 3   /* BUTTON in Baum MNSYSTEM */
 #define SITITLE  4   /* TEXT in Baum MNSYSTEM */

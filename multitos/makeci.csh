@@ -22,6 +22,7 @@ foreach i ($files)
 		cp $i rcs.bin\$vers\$i
 	else
 		echo $i is unchanged since version $lastvers
+		mv rcs.bin\$lastvers\$i rcs.bin\$vers\$i
 	endif
 end
 #

@@ -1,22 +1,29 @@
 /*
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: unknown $
 * =======================================================================
 *
-* $Date: 91/08/26 16:37:14 $
+* $Date: 1992/05/18 23:08:30 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: rwabs.c,v $
+* Revision 2.9  1992/05/18  23:08:30  unknown
+* Added USE_DISK_CHANGE for Sparrow.  Flop.s and this file need to be
+* built with that switch in the same state.  In this file the consequence
+* is that wpstatus and wplatch are gone, and the disk-change line is used
+* for media-change detection.  Other impact is stepping the drive to
+* make that signal go away.
+*
 * Revision 2.8  91/08/26  16:37:14  apratt
 * Changed to checksum only 6 sectors; diskbuf is under 4K in size in
 * STe VDI.  Also changed to use dskbufp the pointer, not diskbuf
 * the buffer, so changing the pointer really changes where this stuff
 * goes.
-*
+* 
 * Revision 2.7  91/08/05  15:15:33  apratt
 * Added code to compute checksums on the first N sectors of a disk
 * and compare with the old values, improving media-change detection
@@ -82,14 +89,15 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.8 $
+* $Revision: 2.9 $
 * =======================================================================
 *
-* $Source: /u2/MRS/osrevisions/bios/rwabs.c,v $
+* $Source: d:/tos/bios\rcs\rwabs.c,v $
 * =======================================================================
 *
 *************************************************************************
 */
+
 #include "portab.h"
 
 /*
@@ -152,6 +160,10 @@
  * three-byte serial number at offset 8.
  */
 
+/*
+ * May 1992: you can compile with -DUSE_DISK_CHANGE=1 to get a version
+ * that uses the disk-change output from the floppy.
+ */
 
 #define	MAXACCTIM	82L	/* about 1.5 sec. "free" time... */
 				/* Since this is based on video frames, */
@@ -256,13 +268,15 @@ struct dsb {
 } dsbtab[2];
 
 
+#if USE_DISK_CHANGE
+/* nothing here */
+#else
 /*
  * Variables maintained by floppy vblank monitor:
  */
 extern char wpstatus[];		/* write-protect status */
 extern char wplatch[];		/* write-protect status latch */
-extern WORD motoron;		/* motor-on status (for both drives) */
-
+#endif
 
 /*
  * Other floppy variables:
@@ -362,12 +376,24 @@ WORD dev;
      * Compute the DOS BPB from the MSDOS one.
      */
     do {
+#if USE_DISK_CHANGE
+	/*
+	 * Call check_disk_change here; if it returns 1, then we have to
+	 * step the drive, to make that signal go away. So read Trk1/Sect1.
+	 */
+	if (check_disk_change()) {
+	    ret = floprd(dskbufp, 0L, dev, 1, 1, 0, 1);
+	    if (ret < 0) goto critical;
+	}
+#endif
 #if CKSECTS
 	ret = floprd(dskbufp, 0L, dev, 1, 0, 0, CKSECTS);
 #else
 	ret = floprd(dskbufp, 0L, dev, 1, 0, 0, 1);
 #endif
-	if (ret < 0) ret = critic((WORD)ret, dev);
+	if (ret < 0) {
+critical:    ret = critic((WORD)ret, dev);
+	}
     } while (ret == CRITICAL_RETRY);
     if (ret < 0) return NULL;
 
@@ -419,11 +445,37 @@ WORD dev;
     }
 #endif
 							/* make safe/unsure */
+#if USE_DISK_CHANGE
+    diskmode[dev] = SAFE;
+#else
     diskmode[dev] = (wplatch[dev] = wpstatus[dev]) ? UNSURE : SAFE;
+#endif
 
     return (long)q;					/* return BPB ptr */
 }
 
+
+#if USE_DISK_CHANGE
+/*
+ * In a disk_change system, there is only one physical drive, so select it
+ * and read its state.  This procedure doesn't even take a drive-number
+ * argument.
+ *
+ * This could mess with any other code that's using the floppy select lines
+ * from the PSG, but if you're using those you shouldn't be calling Mediach().
+ */
+
+WORD
+check_disk_change() {
+    WORD ret;
+    WORD oporta;
+
+    oporta = setporta(0xfd);			/* drive 0 select */
+    ret = ((*(char *)0xffff860f)&0x80);		/* get the bit */
+    setporta(oporta);				/* restore values */
+    return (ret == 0);
+}
+#endif
 
 /*
  * mediach - determine if media has changed
@@ -444,11 +496,22 @@ WORD dev;
     dv = dev;
     dm = &diskmode[dv];
 
-    if (*dm == CHANGED) return CHANGED;		/* always hack CHANGED	*/
+    if (*dm == CHANGED) return CHANGED;		/* always return if CHANGED */
+
+#if USE_DISK_CHANGE
+    /*
+     * Remember, even if the disk_change line goes low, we want to return
+     * UNSURE until the next read or getbpb; this is so a seek caused by
+     * I/O in the "ignore mediach" mode doesn't make us forget it was unsure.
+     */
+    if (check_disk_change()) *dm = UNSURE;
+    return *dm;
+#else
     if (wplatch[dv]) *dm = UNSURE;		/* ==> UNSURE		*/
     if ((frclock - acctim[dv]) < maxacctim)	/* SAFE if within time limit */
 	return SAFE;
     return *dm;					/* return UNSURE or SAFE */
+#endif
 }
 
 
@@ -485,8 +548,21 @@ WORD dev;
     else if (i == UNSURE) {
 	/* read the first CKSECTS sectors and check serial # & cksum */
 	do {
+#if USE_DISK_CHANGE
+	    /*
+	     * Call check_disk_change here; if it returns 1, then we have to
+	     * step the drive, to make that signal go away. So read Trk1/Sect1.
+	     */
+	    if (check_disk_change()) {
+		ret = floprd(dskbufp, 0L, dev, 1, 1, 0, 1);
+		check_disk_change();    /* for debugging - see ftrap13 */
+		if (ret < 0) goto critical;
+	    }
+#endif
 	    ret = floprd(dskbufp,0L,dev,1,0,0,CKSECTS);
-	    if (ret < 0) ret = critic((WORD)ret,dev);
+	    if (ret < 0) {
+critical:	ret = critic((WORD)ret,dev);
+	    }
 	} while (ret == CRITICAL_RETRY);
 	if (ret < 0) return ret;
 
@@ -515,9 +591,13 @@ WORD dev;
 	    ckptr += 0x200;
 	}
 
+#if USE_DISK_CHANGE
+	diskmode[dev] = SAFE;
+#else
 	/* reset the write-protect latch */
 	if (!(wplatch[dev] = wpstatus[dev]))
 	    diskmode[dev] = SAFE;
+#endif
     }
     return SAFE;
 }
@@ -568,9 +648,13 @@ WORD dev;
 		if (dskbufp[MSDOS5_SER + i] != p->dmsd5_ser[i])
 			return CHANGED;
 
+#if USE_DISK_CHANGE
+	    diskmode[dv] = SAFE;
+#else
 	    /* Reset write-protect latch */
 	    if (!(wplatch[dv] = wpstatus[dv]))
 		diskmode[dv] = SAFE;
+#endif
 	}
 
     return SAFE;
@@ -797,10 +881,8 @@ boot()
      */
     if (nflops)
     {
-        err = COULDNT_LOAD;
-	if (!floprd(dskbufp, 0L, 0, 1, 0, 0, 1))
-	    err = OK;
-	    else if (!wpstatus[0]) return UNREADABLE;
+	if (!floprd(dskbufp, 0L, 0, 1, 0, 0, 1)) err = OK;
+	else return COULDNT_LOAD;
     }
     else err = NO_DRIVE;
 

@@ -1,25 +1,28 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/21 17:20:45 $
+* $Date: 89/11/21 13:42:46 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clear.s,v $
+* Revision 2.2  89/11/21  13:42:46  apratt
+* Removed '.s' from bra instructions so mas can handle it.
+*
 * Revision 2.1  89/02/21  17:20:45  kbad
 * *** TOS 1.4  FINAL RELEASE VERSION ***
-*
+* 
 * Revision 1.1  87/11/20  14:23:37  lozben
 * Initial revision
 * 
 *
 * =======================================================================
 *
-* $Revision: 2.1 $
+* $Revision: 2.2 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clear.s,v $
@@ -55,13 +58,13 @@ _clear:
 
 	move.l	a0,d0			; word align first location
 	btst	#0,d0
-	beq.s	clr1			; (not necessary)
+	beq	clr1			; (not necessary)
 	move.b	d1,(a0)+
 
 clr1:	move.l	a1,d0			; d0 = ((a1 - a0) & ~0xff)
 	sub.l	a0,d0
 	and.l	#$ffffff00,d0		; mask fractional bits, d0 = whole part
-	beq.s	clr3			; if (d0 == 0) do end-fraction;
+	beq	clr3			; if (d0 == 0) do end-fraction;
 	lea	(a0,d0.l),a0		; a0 -> end of huge area
 	move.l	a0,a2			; a2 -> there, too
 	lsr.l	#8,d0			; get 256-byte chunk count
@@ -75,12 +78,12 @@ clr2:	movem.l	d1-d7/a3,-(a2)		; clear 32 bytes
 	movem.l	d1-d7/a3,-(a2)		; clear 32 bytes
 	movem.l	d1-d7/a3,-(a2)		; clear 32 bytes
 	subq.l	#1,d0			; decrement count
-	bne.s	clr2			; while (d0) clear some more...
+	bne	clr2			; while (d0) clear some more...
 
 clr3:	cmp.l	a0,a1			; while (a0 != a1)
-	beq.s	clr4			; (done)
+	beq	clr4			; (done)
 	move.b	d1,(a0)+		; clear a byte
-	bra.s	clr3
+	bra	clr3
 
 clr4:	movem.l	(sp)+,d3-d7/a3		; restore registers
 	rts

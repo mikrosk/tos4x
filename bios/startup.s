@@ -4,13 +4,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/02/28 01:22:40 $
+* $Date: 1992/02/28 02:00:06 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.90  1992/02/28  02:00:06  apratt
+* Added .globl coldboot to import it.
+*
+* Revision 2.90  1992/02/28  02:00:06  apratt
+* Added .globl coldboot to import it.
+*
 * Revision 2.89  1992/02/28  01:22:40  apratt
 * The rev 2.88 log should have looked like this:
 *
@@ -23,9 +29,6 @@
 * attempt, rather than the stupid stuff that was there before.
 *
 * Here's the log message for revision 2.89:
-*
-* Vector nasty exceptions during boot to coldboot. Also backed out
-* sparrow-special in MicroWire handling, because that HW bug is fixed.
 *
 * Vector nasty exceptions during boot to coldboot. Also backed out
 * sparrow-special in MicroWire handling, because that HW bug is fixed.
@@ -279,10 +282,10 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.89 $
+*
 * =======================================================================
 *
-* $Revision: 2.89 $
+* $Revision: 2.90 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -516,7 +519,7 @@ bootcolor	equ	$fff		; WHITE for production ROMs
 	.globl	_getdsb			; return disk's state pointer
 	.globl	_boot			; load and check boot sector
 	.globl	_rwabs			; read/write on block dev
-
+	.globl	_getbpb			; get bios parameter block
 	.globl	_dskinit		; disk system initialization
 	.globl	_flopvbl		; floppy vblank handler
 	.globl	_floprd			; read sector(s)

@@ -1,12 +1,15 @@
 /*
 ***************************     FSCL.C     ******************************
 *
-* $Revision: 2.20 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
+* $Revision: 2.21 $	$Source: e:/tos/gd2\RCS\fscl.c,v $
 * =======================================================================
-* $Author: apratt $ 	$Date: 1991/06/20 10:56:38 $    $Locker:  $
+* $Author: apratt $ 	$Date: 1991/06/20 17:14:28 $    $Locker:  $
 * =======================================================================
 *
 * $Log: fscl.c,v $
+* Revision 2.21  1991/06/20  17:14:28  apratt
+* Applied fixes to invclean code, removed newcl, coded new Getfat.
+*
 * Revision 2.20  1991/06/20  10:56:38  apratt
 * Added new media-change code from other GEMDOS.  When media-change
 * state is 1, clean buffers are invalidated.  Thus changing disks
@@ -196,7 +199,7 @@ uint dev;
  * comments at the top of the file.
  */
 
-invclean(xdev)
+void invclean(xdev)
 int xdev;
 {
     REG int dev;
@@ -258,8 +261,8 @@ BCB *b;
 
 	rwabs(1,b->b_bufr,1,b->b_bufrec,d);
 
-	/* if FAT operation, flush to both FATs */
-	if (!n) 
+	/* if FAT operation and >1 FATs, flush to two FATs */
+	if (!n && !dmd->m_onefat)
 	    rwabs(1,b->b_bufr,1,b->b_bufrec - dmd->m_fsiz,d);
 	/* re-validate the buffer */
 	b->b_bufdrv = d;
@@ -340,7 +343,7 @@ DMD *dmd;
 
 #if NEW_MC
 	/* first, invalidate all clean buffers if read and "maybe changed" */
-	if (rwflag == 0 && (trap13(9,d) == 1)) invclean(d);
+	if (rwflg == 0 && (trap13(9,d) == 1)) invclean(d);
 #endif
 
 	/* flush all data blocks which overlap this write */
@@ -460,7 +463,8 @@ BCB **pbcb;
      * invalidating clean buffers.
      */
 
-    if (trap13(9,dmd->m_drvnum) == 1) invclean(dev->m_drvnum);
+    if (trap13(9,dmd->m_drvnum) == 1) invclean(dmd->m_drvnum);
+#endif
 
     /* 
      * b is last buf or empty buf, q is link field of b's prev.
@@ -491,7 +495,7 @@ doio:
 	/* &b appears in this DBCMD so it doesn't go in a register. */
 	/* I only hope it goes in (- `a6 4) since it's the first auto. */
 	rwabs(0,b->b_bufr,1,recn,dmd->m_drvnum);
-	DBCMD(0x400,(&b,"print did read;bcb (lpeek (`a6 - 4)) `bufdump;_c"));
+	DBCMD(0x400,(&b,"print did read;bcb lpeek(a6 - 4) `bufdump;_c"));
     }
     else {
     	DBCMD(2,"print 'did not read; dont really need to';_c");
@@ -552,10 +556,6 @@ alldone:
  * to get pointers to *two* FAT buffers, and assume they  are both in
  * memory at the same time.
  *
- * To use this code, set newcl = TRUE before and after any loop of cluster
- * calls in your code.  This invalidates the cached info so you're sure to 
- * get a read.  Calls:
- * 
  * getcl(cl,dmd) returns the FAT entry for cl
  * 
  * clfix(cl,link,dmd) writes 'link' into the FAT entry for cl
@@ -569,52 +569,55 @@ alldone:
  * 
  **********************************************************************/
 
-uint newcl;		/* flag: goes TRUE at start of a cluster loop */
-uint clsector;		/* holds saved sector number */
-DMD *cldev;		/* holds DMD of saved sector */
-char *clsave;		/* holds saved sector pointer */
-BCB *clbcb;		/* hold the cluster's BCB for marking dirty */
-
 /*
  * getfat: this combination of macro and procedure returns the requested
  * FAT sector from the disk, with a combination of speed & small code size.
  *
- * The logic is this: if newcl is set, you definitely call getfat, which
- * calls getrec.  If the dev isn't the same or the cluster isn't the same,
- * you call getfat.  Otherwise, you OR wflag into the record's dirty flag
- * and return the cached record pointer.
+ * The logic is this: if the last buffer obtained this way is (still)
+ * valid, and is the one you want (i.e. drive number and record number are
+ * the same), you get a pointer to it back from the macro. Otherwise getrec
+ * is called and you incur procedure-call and buffer-cache overhead.
  *
- * The win is when you are chasing a FAT chain: you set newcl=TRUE, then
- * call getcl (and clfix) a lot, and you only go through the buffer 
- * management code once per FAT *sector* you touch, instead of once  per
- * FAT *entry* you touch.  
+ * To invalidate this cache, set clbcb to bufl[0] and clsave to
+ * bufl[0]->b_bufr.  That happens at the top of every GEMDOS call.  That
+ * way if somebody outside (like the hard-disk driver) replaces the buffer
+ * cache wholesale, we won't have our cache-on-the-cache pointer pointing
+ * into the old list.  This trick also means we don't use a separate
+ * variable for validity checking.  And who knows? Maybe the first record
+ * in bufl[0] is the right one!
  *
- * Is this really a win?  Maybe not. When do you use this a lot? On
- * floppies, and when finding the next free cluster for an existing  file
- * (find first free cluster is a separate operation), and when Fseeking to
- * the end of a long file (but even then...).
+ * The win is when you are chasing a FAT chain: calling getcl and clfix a
+ * lot will result in spinning around in the same sector a lot, and this
+ * way you do it inline rather than by calling getrec once per cluster.
+ *
+ * Is this really a win?  Maybe not.  When do you use this a lot?  When
+ * finding the next free cluster for an existing file (find first free
+ * cluster is a separate operation), and when Fseeking in a long file.
+ *
+ * The Getfat macro would look like this if it were a procedure:
+ *
+ *  Getfat(uint s,DMD *dmd,int wflag)
+ *  {
+ *	if (clbcb->b_bufdrv == dmd->m_devno &&
+ *	    clbcb->b_bufrec == s + dmd->m_recfat) {
+ *		clbcb->b_dirty |= wflag;
+ *		return clsave;
+ *	}
+ *	else {
+ *	    clsave = getrec(s+dmd->m_recfat,dmd,wflag,&clbcb);
+ *	    return clsave;
+ *	}
+ *  }
  */
 
-#define Getfat(s,dmd,wflag) \
-    ((newcl || (cldev != (dmd)) || (clsector != (s))) \
-	? getfat((s),(dmd),(wflag)) \
-	: (clbcb->b_dirty |= wflag, clsave))
+extern char *clsave;		/* holds saved sector pointer */
+extern BCB *clbcb;		/* hold the cluster's BCB for marking dirty */
 
-char
-*getfat(s,dmd,wflag)
-unsigned int s;
-DMD *dmd;
-int wflag;
-{
-	/* get the buffer the sector is in */
-	newcl = TRUE;		/* do this in case getrec longjmp's */
-	clsave = getrec(s+dmd->m_recfat,dmd,wflag,&clbcb);
-	clsector = s;
-	cldev = dmd;
-	newcl = FALSE;
-	return clsave;
-}
-
+#define Getfat(s,dmd,wflag)				\
+    ((clbcb->b_bufdrv == (dmd)->m_drvnum &&		\
+      clbcb->b_bufrec == (s)+(dmd)->m_recfat) ?		\
+	    (clbcb->b_dirty |= (wflag), clsave) :	\
+	    (clsave = getrec((s)+(dmd)->m_recfat,(dmd),(wflag),&clbcb)))
 
 #define hibyte(w) (((w) >> 8) & 0xff)
 #define lobyte(w) ((w) & 0xff)
@@ -708,14 +711,16 @@ getcl(cl,dmd)
 uint cl;
 DMD *dmd;
 {
+    uint fatword;	/* first so it's at a6-2 */
     ulong pos;
     uint offset;
     uint sector;
     char *buf;
 
-    uint fatword;
     char *fptr;		/* points to first byte of fatword */
     char *q;		/* points to buf[offset] when that's known */
+
+    DBCMD(0x800,"print getcl cl: -x wpeek(a6+8) dmd: -x lpeek(a6+a);_c");
 
     if (dmd->m_16) {
 	/* compute byte offset into FAT */
@@ -729,6 +734,7 @@ DMD *dmd;
 
 	fatword = *(uint *)(&buf[offset]);
 	swp68(fatword);
+	DBCMD(0x800,"print getcl returns -x wpeek(a6-2);_c");
 	return fatword;
     }
     else {
@@ -757,6 +763,7 @@ DMD *dmd;
 	else
 	    cl &= 0x0fff;
 
+	DBCMD(0x800,(fatword = cl, "print getcl returns -x wpeek(a6-2);_c"));
 	return cl;
     }
 }
@@ -851,7 +858,7 @@ gotone:
  * If a free cluster is found, its number is put in cl2, and i is set to
  * zero, so the later test "if (i < lastcl)" will fail.
  *
- * Note that little-g getfat() is used, for low overhead.
+ * We use getrec() directly to get the FAT sectors.
  */
 
 uint
@@ -892,7 +899,7 @@ int freeflag;
     cl = min(clpersec,lastcl) - 2;
 
     /* buf: pointer following along in this sector */
-    buf = ((uint *)getfat(recno,dmd,FALSE)) + 2;
+    buf = ((uint *)getrec(recno+dmd->m_recfat,dmd,FALSE,NULL)) + 2;
 
 again:
     DBCMD(0x4,"print top of fastcl loop;_c");
@@ -919,7 +926,8 @@ again:
 	/* not the end of the FAT yet */
 	recno++;			    /* advance to next record */
 	cl = min(clpersec,lastcl-clcount);  /* set cl to size of valid part */
-	buf = (uint *)getfat(recno,dmd,FALSE);  /* get the record into RAM */
+	/* get the FAT record into RAM */
+	buf = (uint *)getrec(recno+dmd->m_recfat,dmd,FALSE,NULL);
 	goto again;			    /* and loop */
     }
     else if (freeflag) {
@@ -1028,8 +1036,6 @@ void (*bufxfr) _P((uint, void *, void *));
 
     curcl = ofd->o_curcl;
     currec = ofd->o_currec;
-
-    newcl = TRUE;
 
     if (!curcl) {
 	/* our r/w pointer is not valid */
@@ -1187,14 +1193,6 @@ eof:
  * Call this before doing anything with any drive in an OS call. fn2dir is
  * a good choice, but some calls (Fsnext, Dgetpath) don't take file names,
  * yet need to use this call.
- *
- * We could also call Mediach() here to see if we should process a
- * media-change on the drive before proceeding.  It is still possible to
- * get media change in the middle of an operation (think floppy, with
- * "insert other disk"), but if that is done wrong you'll just get EMEDIA
- * from the read or write. This takes Mediach() out of getrec, which is
- * GOOD!  This is theoretical; for better reliability, I'll leave mediach
- * where it is.
  */
 
 long
@@ -1241,7 +1239,8 @@ int drv;
     dmd->m_rblog = log2(b->recsiz);
     dmd->m_rbm = b->recsiz - 1;
     dmd->m_clblog = log2(b->clsizb);
-    dmd->m_16 = b->b_flags;
+    dmd->m_16 = b->b_flags & 1;
+    dmd->m_onefat = b->b_flags & 2;
 }
 
 
@@ -1265,7 +1264,6 @@ uint drv;
 
     dmd = &drvtbl[drv];
     free = 0;
-    newcl = TRUE;
     end = dmd->m_numcl + 2;	/* +2 here fixes missing 2 clusters */
 
     if (dmd->m_16) free = fastcl(dmd,TRUE);
@@ -1275,7 +1273,6 @@ uint drv;
 		free++;
     }
 
-    newcl = TRUE;
     *buf++ = (long)(free);
     *buf++ = (long)(dmd->m_numcl);
     *buf++ = (long)(dmd->m_recsiz);

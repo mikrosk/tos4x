@@ -1,0 +1,246 @@
+This file contains a discussion of most functions: its inputs, outputs,
+side effects.  The idea is to codify what each function expects, what it
+does, and what it returns, so its actual performance and usage elsewhere in
+the code can be checked against this standard.  Some help functions are
+left out.
+
+****************************************************************************
+
+SCAN.C:
+
+----------------------------------------------------------------------------
+
+ERR fn2dir(char **pname,DIR *dir,int flag)
+
+Inputs: *pname points to the start of the name string, including d:. dir
+	points to an empty dir structure. flag is FN_NORM, FN_EARLY, or
+	FN_DOTSOK.
+
+Hidden inputs: run->p_curdrv, run->p_curdir
+
+Outputs: If every component up to the last one is found, *pname is altered
+	to point to the start of its own last component.  Returns E_OK and
+	EFILNF if at least this much worked.  If E_OK, dir is fresh and
+	contains the slot found.  If EFILNF, dir contains the drv and clust
+	fields where the unsuccessful search started.  If FN_EARLY, the
+	last component isn't even attempted, and dir is as for EFILNF. 
+	Unless FN_DOTSOK, a last component of . or .. yields EBADRQ.
+	Other errors (wildcards in path components) can yield EBADRQ.
+
+----------------------------------------------------------------------------
+
+ERR dir2dir(DIR *dir)
+
+Inputs:	dir fields dev, recno, recoffs.
+
+Outputs: dir is freshened: bcb and fcb are valid.
+
+----------------------------------------------------------------------------
+
+ERR dirfirst(DIR *dir,DMD *dmd) [macro]
+
+Inputs:	dir fields dev and clust, and dmd.
+
+Outputs: Other dir fields curcl, recno, recoffs are filled in, and dir2dir
+	is called to fill in fcb and bcb.
+
+----------------------------------------------------------------------------
+
+ERR dirnext(DIR *dir, DMD *dmd) [macro/function]
+
+Inputs: fresh dir (all fields but bcb); dmd
+
+Outputs: fresh dir (all fields) which refers to the next slot in the
+	dir, including jumping to the next record or cluster.  Returns
+	nonzero for errors, including ERROR for hitting the end of the
+	directory (in which case dir isn't fresh any more).
+
+----------------------------------------------------------------------------
+
+ERR dirslot(DIR *dir)
+
+Inputs: dir fields dev, clust only
+
+Outputs: fresh dir (all fields) referring to the first available slot
+	in the dir.  Extends the dir if necessary.  Returns ERROR if the
+	dir is unexpandable (RD or disk full).
+
+----------------------------------------------------------------------------
+
+ERR name2fcb(char *name,char *end,FCB *fcb)
+
+Inputs: string at name, ending at end; if end is NULL, name ends at 0 byte.
+	
+Outputs: Fills name part of fcb with name.  Handles special cases "." and
+	".." Returns EBADRQ on some illegal names - currently just "..a" -
+	and doesn't touch fcb if name is illegal.  Handles wildcards.
+
+----------------------------------------------------------------------------
+
+int wmatch(FCB *pat, FCB *fcb)
+
+Inputs: Name and attr fields of FCB's.  
+
+Outputs: Matches pat (possibly containing wildcards) against fcb.  Returns
+	nonzero on a match, zero on mismatch. Attribute matching is here,
+	too, including FA_LABEL.
+
+****************************************************************************
+
+FSHAND.C:
+
+----------------------------------------------------------------------------
+
+int sftprobe(): returns the index of the first available slot in sft, or -1.
+
+----------------------------------------------------------------------------
+
+int syshnd(int h): returns the slot number in SFT for h, including indirect
+	though run->p_uft if necessary.  Returns -NUMBIOS for errors, other
+	negative numbers for BIOS devs.
+
+----------------------------------------------------------------------------
+
+ERR dfd_close(DFD *dfd): if the DFD is dirty, writes its info to the slot.
+	Frees the DFD.
+
+----------------------------------------------------------------------------
+
+ERR ofd_close(OFD *ofd): frees the OFD.
+
+----------------------------------------------------------------------------
+
+voidfn xmovs(int count, void *s, void *d): copy count bytes from s to d.
+	
+
+****************************************************************************
+
+FSCL.C:
+
+----------------------------------------------------------------------------
+
+int buflist(int buftyp): turns buftyp into the index into bufl for that type.
+
+----------------------------------------------------------------------------
+
+uint log2(uint n): returns log base 2 of n.
+
+----------------------------------------------------------------------------
+
+voidfn flush(BCB *bcb)
+
+Inputs:	valid, dirty buffer bcb
+
+Actions: Writes all valid, dirty buffers on the same drive and list as bcb
+	(including bcb itself) to disk, clearing their dirty bits.
+
+Outputs: none
+
+----------------------------------------------------------------------------
+
+voidfn flushall(): writes all valid, dirty buffers to disk.
+
+----------------------------------------------------------------------------
+
+usrio: used by xrw; flushes dirty buffers spanned by a r/w op, then does it.
+
+----------------------------------------------------------------------------
+
+void *getrec(uint recn, DMD *dmd, int flag)
+
+Inputs: recn, dmd, flag 0 (don't mark buffer dirty), 1 (mark dirty), or 2
+	(mark dirty but don't actually read on a cache miss).
+
+Outputs: a pointer to the first byte of a disk buffer for recn.
+
+----------------------------------------------------------------------------
+
+uint getcl(uint cl,DMD *dmd): return the value of FAT entry for cl.
+
+----------------------------------------------------------------------------
+
+voidfn clfix(uint cl,uint link, DMD *dmd): mark FAT entry for cl with link.
+
+----------------------------------------------------------------------------
+
+uint nextcl(uint cl, DMD *dmd, int extflag, int *extended)
+
+Inputs: cl, dmd, extflag.
+
+Actions: Returns next cluster in chain. If extend and (EOF || !cl), links
+	in a new cluster and sets *extend.
+
+Outputs: next cluster or zero for error, *extended (nonzero if file extended).
+	
+----------------------------------------------------------------------------
+
+uint fastcl(DMD *dmd,int freeflag)
+
+Inputs: freeflag is zero to return the first free cluster, nonzero to
+	return the number of free clusters.
+
+Outputs: the first free cluster or the number of free clusters.
+
+----------------------------------------------------------------------------
+
+ERR xrw(int wrtflg, OFD *ofd, long len, void *ubufr, void (*bufxfr)())
+
+Inputs: wrtflg zero for read, one for write.
+	OFD fields o_bytnum, o_curcl, o_currec, o_curbyt.
+	(If o_curcl is zero, currec and curbyt don't matter.)
+	For reads, len should not exceed EOF.
+
+Actions: performs I/O on the combination of cache buffers and records as
+	appropriate.
+
+Outputs: o_bytnum, o_curcl, o_currec, o_curbyt advanced appropriately.
+	Assumes someone else will mark ofd->o_dfd dirty, so changes that
+	to extend but doesn't mark it dirty.
+
+----------------------------------------------------------------------------
+
+ERR ckdrv(uint dev): build DMD for dev if necessary. Calls log() as a help.
+
+****************************************************************************
+
+FSFS.C:
+
+----------------------------------------------------------------------------
+
+DFD *getdfd(DIR *dir)
+
+Inputs:	dir fields dev, dirrec, diroffs
+
+Outputs: a DFD if one exists with matching dev, dirrec, diroffs; or NULL
+
+----------------------------------------------------------------------------
+
+ERR ixcreat(char *name, int attr, DIR *dir)
+
+Inputs: name, dir as for fn2dir; also attr
+
+Actions: creates directory entry for name, with appropriate checks,
+	including deleting existing files (again, with checks).
+
+Outputs: fresh dir
+
+----------------------------------------------------------------------------
+
+ERR ixopen(DIR *dir, int mode)
+
+Inputs: fresh dir fields fcb, dev, clust, recno, recoffs
+
+Outputs: ERR or a handle number referring to an OFD referring to a DFD for
+the file at the slot specified by DIR.
+
+----------------------------------------------------------------------------
+
+ERR ixdel(DIR *dir)
+
+Inputs: fresh dir fields fcb, bcb, dev.
+
+Actions: Mark dir slot with 0xe5, then free cluster chain
+
+Outputs: un-fresh dir.
+
+

@@ -1,0 +1,3 @@
+rwa.o fscomm.o fscl.o fsdir.o fsfs.o fshand.o
+fsinter.o fsmisc.o fsnam.o sup.o con.o fsproc.o mem.o time.o
+freednd.o pool.o panic.o setup.o

@@ -1,0 +1,4 @@
+-u -p -l -o gemdos
+con, freednd, fscl, fscomm, fsdir, fsfs, fshand, fsinter, fsmisc, fsnam, fsproc,
+mem, panic, pool, rwa, setup, sup, time
+ 

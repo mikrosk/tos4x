@@ -1,0 +1,112 @@
+global scc ; alias scca xscc ffff8c81 ; alias sccb xscc ffff8c85 ; scca
+
+# scc reads or writes a register
+procedure scc reg value
+  s`scc `reg
+  if (! (= `argc 2)) "x$ (peek `scc);print $"
+  if (== `argc 2) "s`scc `value"
+.
+
+# sccinit does a setup
+
+procedure sccinit
+  # modes and constants
+  scc 9 c0 		;# reset
+  scc 4 %01000100	;# Tx/Rx con, async mode
+  scc 1 %00000000	;# DMA mode: Wait/DMA = 1, on receive
+  scc 3 %11000000	;# 8 bits/char
+  scc 5 %01100000	;# tx disable, 8 bits/char
+#  scc 6 00
+#  scc 7 00
+  scc 9 01		;# VIS
+  scc a 00
+  scc b 50		;# RCV clock, xmit clock are BR gen output
+  scc c 0a		;# BR countdown low byte
+  scc d 00		;# BR countdown hi byte
+  scc e 02		;# BR source = PCLK, DTR/REQUEST in DTR mode
+  # enables
+  scc e 03		;# |= BR enable
+  scc 3 c1		;# |= Rx enable
+  scc 5 ea		;# |= DTR, Tx enable, RTS
+  # interrupt enables
+  scc f 00		;# enable no ints
+  scc 0 10		;# reset ext/int status
+  scc 0 10		;# twice
+  scc 9 00		;# no MIE, no VIS
+  scc 1 00		;# no DMA or IE at all
+.
+
+# sccloop continually writes aa to the transmit port, and writes nothing
+# every 10 chars, so you can ^C.
+
+procedure sccloop
+  local counter
+  #:begin
+    echo -n
+    x counter 0
+    #:loop
+    scc 8 aa
+    x counter (+ `counter 1)
+    if (> `counter f) goto begin
+    goto loop
+.
+
+procedure dmalong reg value
+  local u um lm l
+  x reg (+ (* `reg 8) ffff8c01)
+  if (== `argc 2) goto write
+#:read
+  xu (peek `reg) ; xum (peek (+ `reg 2))
+  xlm (peek (+ `reg 4)) ; xl (peek (+ `reg 6))
+  x$ (| (| (| (<< `u 18) (<< `um 10)) (<< `lm 8)) `l)
+  print -x08 $
+  goto end
+#:write
+  s`reg (>> `value 18)
+  s(+ `reg 2) (>> `value 10)
+  s(+ `reg 4) (>> `value 8)
+  s(+ `reg 6) `value
+#:end
+.
+
+procedure dmactl value
+  if (= `argc 0) print -x02 (peek ffff8c15)
+  if (= `argc 1) sffff8c15 `value
+.
+
+procedure dmares
+  print -x04 (wpeek ffff8c10) (wpeek ffff8c12)
+.
+
+procedure sccdma
+  # modes and constants
+  scc 9 c0 ; #reset
+  scc 4 44 ; # Tx/Rx con, async mode
+  scc 1 %01100000 ; # DMA mode: Wait/DMA = 1, on receive
+  scc 3 c0
+  scc 5 60
+  scc 6 00
+  scc 7 00
+  scc 9 00
+  scc a 00
+  scc b 50
+  scc c 0a
+  scc d 00
+  scc e 04
+  # enables
+  scc e 05
+  scc 3 c1
+  scc 5 ea
+  scc 1 %11100000 ; #enable DMA
+  # interrupt enables
+  scc f 00
+  scc 0 10
+  scc 0 10
+  scc 9 00
+  scc 1 %11100000 ; # copy bits from above
+.
+
+alias xmit "defer _valx;xt0"
+alias _valx "scc 8 `t0;  print -n rr0 ; scc 0 ; \
+  print -n rr1 ; scc 1 ;  print -n dma addr ; dmalong 0 ; \
+  print -n dma count ; dmalong 1 ;  print -n dma control ; dmactl"

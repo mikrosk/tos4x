@@ -1,0 +1,36 @@
+procedure desc a
+    local bits
+
+    print -n limit -x wpeek(a) ; (a += 2)
+    (bits = wpeek(a))
+    print -n s -d ((bits & 0100) >> 8)
+    print -n ci -d ((bits & 40) >> 6)
+    print -n m -d ((bits & 10) >> 4)
+    print -n u -d ((bits & 8) >> 3)
+    print -n wp -d ((bits & 4) >> 2)
+    print -n dt -d (bits & 3)
+    (a += 2)
+    print addr -x lpeek(a)
+.
+
+procedure table a n
+    #:loop
+    desc a
+    (a += 8)
+    (n -= 1)
+    if (n) goto loop
+.
+
+procedure call addr
+    local oldpc ; (oldpc = pc)
+    b pc
+    (sp -= 4)
+    sl sp pc
+    g addr
+.
+
+procedure dumptree
+    call .dump_tree
+.
+    
+global crp

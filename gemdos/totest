@@ -1,0 +1,53 @@
+fscl.c:
+log2
+(dirdirty, fatdirty, flush)
+flushall
+usrio
+getrec
+getcl, clfix, getfat
+nextcl
+fastcl
+xrw
+ckdrv, log
+xgetfree
+
+fsdir:
+xchdir
+xgetdir
+xmkdir
+xrmdir
+xsfirst/xsnext/filldta
+(getdfd)
+xcreat/ixcreat (also xmkdir/ixcreat)
+xopen/ixopen
+xchmod
+xdatime
+xdelete/ixdel
+xrename (file, directory, file in heir., dir in heir)
+xlseek
+
+fshand:
+handinit [done]
+sftprobe
+syshnd
+xdup
+xforce
+xclose/dfd_close/ofd_close
+xread
+xwrite/char_write
+xcreat
+xgetdta
+xsetdta
+xsetdrv [done]
+xgetdrv
+
+panic: panic
+
+scan:
+fn2dir (FN_NORM, FN_EARLY, FN_DOTSOK)
+dir2dir
+dirfirst/dirnext/_dirnext
+dirslot (empty slot, null slot, extend, full, rd, full rd)
+match
+wmatch
+name2fcb

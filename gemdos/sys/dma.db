@@ -1,0 +1,40 @@
+global dmabase
+
+procedure dma
+  print -n -x08 addr \
+    (| (| (<< (peek (+ `dmabase 1)) 18) (<< (peek (+ `dmabase 3)) 10)) \
+       (| (<< (peek (+ `dmabase 5)) 8) (peek (+ `dmabase 7))))
+  print -n -x08 count \
+    (| (| (<< (peek (+ `dmabase 9)) 18) (<< (peek (+ `dmabase b)) 10)) \
+       (| (<< (peek (+ `dmabase d)) 8) (peek (+ `dmabase f))))
+  print -x08 residue (lpeek (+ `dmabase 10)) -x02 ctl (peek (+ `dmabase 15))
+.
+
+procedure dmaa arg
+  if `arg 'sw `dmabase (>> `arg 18) (>> `arg 10) (>> `arg 8) `arg;goto done'
+  x$ (| (| (<< (peek (+ `dmabase 1)) 18) (<< (peek (+ `dmabase 3)) 10)) \
+       (| (<< (peek (+ `dmabase 5)) 8) (peek (+ `dmabase 7))))
+  $
+#:done
+.
+
+procedure dmac arg
+  if `argc 'sw (+ `dmabase 8) \
+	(>> `arg 18) (>> `arg 10) (>> `arg 8) `arg;goto done'
+  x$ (| (| (<< (peek (+ `dmabase 9)) 18) (<< (peek (+ `dmabase b)) 10)) \
+       (| (<< (peek (+ `dmabase d)) 8) (peek (+ `dmabase f))))
+  $
+#:done
+.
+
+procedure dmactl arg
+  if `argc 'sw(+ `dmabase 14) `arg;goto done'
+  x$ (peek (+ `dmabase 15))
+  $
+#:done
+.
+
+alias sccdma x dmabase ffff8c00
+alias scsidma x dmabase ffff8700
+
+sccdma

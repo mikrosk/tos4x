@@ -1,0 +1,20 @@
+sym etv_timer 400;sym etv_critic 404;sym etv_term 408;sym etv_xtra 40c
+sym memvalid 420;sym memcntlr 424;sym resvalid 426;sym resvector 42a
+sym phystop 42e;sym _membot 432;sym _memtop 436;sym memval2 43a
+sym flock 43e;sym seekrate 440;sym _timr_ms 442;sym _fverify 444
+sym _bootdev 446;sym palmode 448;sym defshiftmd 44a;sym sshiftmd 44c
+sym _v_bas_ad 44e;sym vblsem 452;sym nvbls 454;sym _vblqueue 456
+sym colorptr 45a;sym screenpt 45e;sym _vbclock 462;sym _frclock 466
+sym hdv_init 46a;sym swv_vec 46e;sym hdv_bpb 472;sym hdv_rw 476
+sym hdv_boot 47a;sym hdv_mediach 47e;sym _cmdload 482;sym conterm 484
+sym _res1 485;sym trp14ret 486;sym criticret 48a;sym themd 48e
+sym _____md 49e;sym savptr 4a2;sym _nflops 4a6;sym con_state 4a8
+sym save_row 4ac;sym sav_context 4ae;sym _bufl 4b2;sym _hz_200 4ba
+sym _res2 4be;sym _drvbits 4c2;sym _dskbufp 4c6;sym _autopath 4ca
+sym _vbl_list 4ce;sym _prtcnt 4ee;sym _dumpflg 4ee;sym _prtabt 4f0
+sym _sysbase 4f2;sym _shell_p 4f6;sym end_os 4fa;sym exec_os 4fe
+sym scr_dump 502;sym prv_lsto 506;sym prv_lst 50a;sym prv_auxo 50e
+sym prv_aux 512;sym pun_ptr 516;sym memval3 51a;sym xconstat 51e
+sym xconin 53e;sym xcostat 55e;sym xconout 57e;sym _longframe 59e
+sym _p_cookie 5a0;sym _ramtop 5a4;sym _ramvalid 5a8;sym bell_hook 5ac
+sym kcl_hook 5b0

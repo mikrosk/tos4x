@@ -1,0 +1,199 @@
+# gas2s.sed script to translate GAS format files to a sane format (MAS/PASM)
+# =======================================================================
+# I tried to make this 2 big subprograms, one for lines with quoted strings
+# and one for lines without, but sed didn't like that (bus errored on me).
+
+# defines (MAS can't handle 'em)
+#/^#APP/d
+#/^#NO_APP/d
+
+# PASM/MAS gag on symbols before .text (?)
+s/^gcc_compiled.:/gcc_compiled:/
+
+# String constant munging
+# -----------------------
+/"/{
+# embedded chars
+s/\\"/""/g
+s/\\15/",$0a,"/g
+s/\\12/",$0d,"/g
+s/\\10/",$08,"/g
+s/\\11/",$09,"/g
+s/\\33/",$1b,"/g
+
+# null terminators
+s/\\0"/",0/g
+}
+
+# fix moveml's
+/^	moveml #/s/moveml #0x\([^,]+\),sp@-/dc.w $48e7,$\1/
+
+/^$/!{
+# 680x0 instructions PASM doesn't grok
+# ------------------------------------
+
+### if NODB is defined:
+# in fshand @ _ixopen:L120:
+s/movel a3,a0@(a1:l:4)/dc.l $218B9C00/
+
+### if NODB is undefined:
+
+# in fshand @ _ixclose:L58:, _ttyopen:L126
+# in sup @ _osi:L80:
+s/movel d0,a1@(a0:l:4)/dc.l $23808c00/
+
+# in mem @ ffit:LI47:
+s/movew pc@([^b]*b,a0:l:2),d1/dc.l $323b8a06/
+
+# in mem @ ffit:LI45 (UNREAL mode)
+s/movew pc@([^b]*b,a0:l:2),d2/dc.l $343B8A0E/
+
+# in pool @ addheap:L5:
+s/divul d1,d3/dc.l $4c413000/
+
+# in sup @ _domediach:L26:
+s/clrw a1@(64,a2:l:2)/dc.l $4271aa40/
+
+# in sup @ _osif:LI67:
+s/movew pc@([^b]*b,a0:l:2),d4/dc.l $383b8a06/
+
+# in sup @ _osif:L58:,L59:,L60:,L61:,L62,:L64:,L65:
+s/movel a1@(a0:l:4),a0/dc.l $20718c00/
+
+# in con @ _conout:L32:, _qrem:L110
+s/movew a1@(a0:l:2),d0/dc.l $30318A00/
+
+# in con @ _conout:L32:
+s/movew d0,a1@(a0:l:2)/dc.l $33808A00/
+
+# in con @ _xrawio:
+s/movew a2@(a0:l:2),d2/dc.l $34328A00/
+s/cmpw a1@(a0:l:2),d2/dc.l $B4718A00/
+
+# in con @ _conin:,_constat
+s/movew a2@(a0:l:2),d1/dc.l $32328A00/
+s/cmpw a1@(a0:l:2),d1/dc.l $B2718A00/
+
+# in con @ _conbrk:L85:
+s/movew a1@(a3:l:2),d1/dc.l $3231BA00/
+s/cmpw a0@(a3:l:2),d1/dc.l $B270BA00/
+
+# in con @ _buflush:
+s/clrw a2@(a0:l:2)/dc.l $42728A00/
+s/clrw a1@(a0:l:2)/dc.l $42718A00/
+
+# in con @ _qrem:
+s/movew a2@(a0:l:2),d3/dc.l $36328A00/
+s/cmpw a1@(a0:l:2),d3/dc.l $B6718A00/
+
+# in con @ _qrem:L111:
+s/movew d1,a1@(a0:l:2)/dc.l $33818A00/
+
+# in con @ _qrem:L111:
+s/movel a1@(a0:l:4),d0/dc.l $20318C00/
+
+# in fsproc @ _ixterm:L18:, _xexec:L100:
+s/cmpl a1@(a0:l:4),a3/dc.l $B7F18C00/
+s/clrl a1@(a0:l:4)/dc.l $42B18C00/
+
+# in fsproc @ _xexec:L100:
+s/tstl a1@(a0:l:4)/dc.l $4AB18C00/
+
+# in fsproc @ _xexec:L100:
+s/movel a4,a1@(a0:l:4)/dc.l $238C8C00/
+
+}
+
+
+# Global syntax munges
+# --------------------
+
+# 0x -> $
+/"/!s/0x/$/g
+
+# bitfields
+/"/!s/{#/{/g
+/"/!s/:#/:/g
+
+# scalars, e.g. `:w:2' -> `.w*2'
+/"/!s/:\([wl]\):\([248]\)/.\1*\2/g
+
+# size specifiers: e.g. :b -> .b
+/"/!s/:\([bwl]\)/.\1/g
+
+# Insert newlines in <tab>xxx;<tab>xxx;<tab>xxx
+/"/!s/;[	 ]*/\
+	/g
+
+# Directives
+# ----------
+# don't bother checking quoted strings for these
+
+/^[	 ]*\./{
+# common storage
+s/\.lcomm/comm/
+
+# constant storage
+s/\.word/dc.w/
+s/\.byte/dc.b/
+s/\.long/dc.l/
+s/\.ascii/dc.b/
+
+# .skip -> .align
+s/\.skip /align/
+}
+
+# Instructions
+# ------------
+
+# branches
+/"/!s/[	 ]j\([ceghlmnprv]\)\([aceiloqst]\)[	 ]/	b\1\2 /
+
+/jbsr/{ # -> pc-relative jsr
+# in GEMDOS, everything except _clear is OK pc-relative.
+s/jbsr[	 ]+_clear/jsr _clear/
+s/jbsr[	 ]+_\([^	 ]+\)/jsr _\1(pc)/
+s/jbsr/jsr/
+}
+
+# moves
+s/mov\([bwl]\)/move\1/
+
+# now fix .b .w .l
+/"/!s/\(	[^b][^.	 ]+\)\([bwl]\)\([	 ]\)/\1.\2\3/
+
+# `tst.l aN' -> `cmp.w #0,aN'
+# MAS can't tst an Areg
+#/"/!s/\(tstl a\)\([0-7]\)/cmp.w #0,a\2/
+
+
+# Addressing modes
+# ----------------
+# don't bother checking quoted strings for these
+
+/@/{
+# aN@+ -> (aN)+
+s/\([asp]\)\([0-7pc]\)@\+/(\1\2)+/g
+
+# aN@- -> -(aN)
+s/\([asp]\)\([0-7pc]\)@-/-(\1\2)/g
+
+# aN@(xN.Z) -> (aN,xN.Z)
+s/\([asp]\)\([0-7pc]\)@(\([das]\)\([0-7p]\)\.\([wl]\))/(\1\2,\3\4\.\5)/g
+
+# aN@(xN.Z*S) -> (aN,xN.Z*S)
+s/\([asp]\)\([0-7pc]\)@(\([das]\)\([0-7p]\)\.\([wl]\)\*\([248]\))/(\1\2,\3\4.\5*\6)/g
+
+# aN@(bd,xN.Z) -> bd(aN,xN.Z)
+# aN@(bd,xN.Z*S) -> bd(aN,xN.Z*S)
+s/\([asp]\)\([0-7pc]\)@(\([^),]*\),\([^)]*\))/\3(\1\2,\4)/g
+
+# aN@(bd) -> bd(aN)
+s/\([asp]\)\([0-7pc]\)@(\([^)]*\))/\3(\1\2)/g
+
+# lastly, aN@ -> (aN)
+s/\([asp]\)\([0-7pc]\)@/(\1\2)/g
+}
+
+# unfix .b(
+/"/!s/\.b(/(/

@@ -158,6 +158,7 @@ int h;
 	PD *_run = run;
 
 	DBCMD(1,"print xdup -x (wpeek (`a6 + 8));_c");
+
 	if ((h<0) ||
 	    (h >= _run->p_uftsize) ||
 	    ((ofd = _run->p_uft[h]) == NULL))
@@ -205,10 +206,10 @@ PD *pd;
 	PD *_run = run;
 	OFD *ofd;
 
-	if ((dest < 0) || (dest >= pd->p_uftsize))
+	if ((dest < 0) || (dest >= (signed)pd->p_uftsize))
 		return(EIHNDL);
 
-	if (src < -NUMBIOS || src >= _run->p_uftsize) {
+	if (src < -NUMBIOS || src >= (signed)_run->p_uftsize) {
 	    /* too small/big */
 	    return EIHNDL;
 	}
@@ -291,7 +292,7 @@ PD *pd;
 
     xsync();
 
-    if (h < -NUMBIOS || h >= pd->p_uftsize) return EIHNDL;
+    if (h < -NUMBIOS || h >= (signed)pd->p_uftsize) return EIHNDL;
     if (h < 0) return E_OK;	    /* "close" an old-style TTY */
 
     if ((ofd = pd->p_uft[h]) == NULL) return EIHNDL;	/* not open */

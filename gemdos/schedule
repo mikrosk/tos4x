@@ -1,0 +1,126 @@
+
+ESTIMATED SCHEDULE FOR GEMDOS AS REQUESTED BY LT 2/22/91
+
+MILESTONES:
+
+	Getting Started:
+
+		Modify GEMDOS so it compiles with either Alcyon CC or GCC
+		(i.e. a compiler with good code generation and strict(er)
+		type checking).  Run this GEMDOS and see that it works.
+
+	Revise GEMDOS data structures, retaining compatibility:
+
+		Implement a handle system that doesn't fall apart when the
+		same file is open twice or referenced by two handles,
+		possibly in different processes.
+
+		Implement a file and directory system that does not rely on
+		having the disk structure in memory taking up pool.
+
+		Implement a process system that allows for multiple
+		processes, where chasing 'run' up to the top is not
+		adequate to visit all processes.
+
+	Memory Manager: 
+
+		Use TPA to keep track of TPA, rather than using pool.
+
+	Devices:
+
+		Ability to install devices by name at GEMDOS level and/or
+		by number at BIOS level.  Some kind of Ioctl() better than
+		Bconmap.
+
+	Multi-Tasking:
+
+		Simplest multi-tasking kernel.  Includes busy-waiting or
+		blocking console I/O and a "concurrent" mode for Pexec.
+
+		Better multi-tasking kernel. Definitely blocking console 
+		I/O, priority levels ("nice"), possibly other stuff.
+
+	AES and VDI:
+
+		I was instructed to submit a schedule for a multi-tasking
+		GEMDOS, not a multi-tasking TOS.  However, some features 
+		for other levels of the OS can go in with minimal effort. 
+		For instance, a semaphore on trap 2 can be created to stop
+		multi-tasking while "in" the AES or VDI.  Switching while
+		in the VDI isn't profitable anyway, and switching while in
+		the AES would probably be a disaster.  With just a little
+		help from Derek we can probably get something working where
+		the AES uses block and unblock calls to allow and disallow
+		the running of processes which are under its control, and
+		keep the world safe for wind_update that way.  Processes
+		which are NOT under AES's control would multi-task
+		continuously, doing their daemon things or whatever.
+
+	Interprocess Considerations:
+
+		Record locking, and new open modes for file sharing/locking.
+		MS-DOS semantics for calls (even when it's stupid.)
+
+		Interprocess communication streams (pipe, named pipe, pty).
+
+		Signals: at least block, unblock for AES to use, probably
+		more complete, including TSTOP (^Z), CONT, INT (^C), QUIT
+		(^\), KILL (-9), ALRM, CHLD, TTIN/TTOU (console read/write
+		when you don't own the console), etc.
+
+		Process data structure access (at least "ps" and maybe
+		enough for a debugger).
+
+		Memory protection.
+
+		Virtual memory.
+
+	Networking:
+
+		A network device driver (for interrupts) plus a daemon
+		process (for the OS interface layer) can run a peer-to-peer
+		network in this environment.  The redirecting abilities
+		of MetaDOS should probably exist inside GEMDOS so it
+		stays current with new calls, etc.
+
+SCHEDULE:
+
+Getting Started is done.  Revised GEMDOS data structures sections 1 and 2
+are done and under test, and part 3 is not much of a departure from the
+current stuff.  Estimated time: 3 weeks.
+
+The new memory manager is optional, and you lose compatibility and
+reliability if you use it.  Furthermore, you have to go to yet another
+system when you add memory protection and/or virtual memory.  It is
+therefore not actually desirable.
+
+The first kind of Multi-Tasking and the whole section labelled Interprocess
+Considerations is what MiNT already does.  I don't always like what he's
+done, like using "drive letters" Q: for queues (named pipes), V: for
+devices, and X: for processes, but they are not totally unreasonable
+solutions, and the rest appears to be really useful.
+
+At a rough guess, I will say six weeks to steal MiNT's ideas and fold them
+into GEMDOS. MiNT appears well-written and I have a good relationship with
+the guy who wrote it, and fast turnaround on mail with him.  If we do use a
+substantial part of it, it might be nice to throw him a bone, in the form
+of a couple of thousand dollars.  Being Canadian, he would probably even
+settle for Canadian dollars!
+
+Using MiNT seems to me to be a good solution to getting something with lots
+of desirable (read: Unix-like) features running in little time. There are
+large quantities of MiNT which I would have to implement anyway. In other
+words, "If MiNT did not already exist, it would be necessary to invent it."
+
+SUMMARY
+
+I estimate three more weeks from 2/25 to get the new-and-improved GEMDOS
+with cleaner and brighter data structures up and running.
+
+Six weeks after that to fold MiNT's ideas (and code!) into GEMDOS. This
+last number is much the weaker of the two.
+
+Good-case (not best, not worst) estimate, then, is the end of May for
+something that works reasonably well adn is reasonably full-featured, but
+hasn't undergone strenuous testing.  This basically assumes nothing but a
+porting effort for the MiNT stuff, rather than reimplementation.

@@ -1,0 +1,17 @@
+procedure buserr
+  local a ; (a = exspace)
+
+  print -n sr -x04 wpeek(a) ; (a += 2)
+  print -n pc -x08 lpeek(a) ; (a += 4)
+  print -n fmt -x04 wpeek(a) ; (a += 2)
+  print -n int -x04 wpeek(a) ; (a += 2)
+  print -n ssr -x04 wpeek(a) ; (a += 2)
+  print -n pipec -x04 wpeek(a) ; (a += 2)
+  print pipeb -x04 wpeek(a) ; (a += 2)
+  print -n fault_addr -x08 lpeek(a) ; (a += 4)
+  print -n int -x08 lpeek(a) ; (a += 4)
+  print -n data -x08 lpeek(a) ; (a += 4)
+  print int -x08 lpeek(a) ; (a += 4)
+.
+
+

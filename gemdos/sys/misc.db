@@ -1,0 +1,18 @@
+procedure long addr val
+  if (< `argc 1) print usage: long addr [val]
+  if (= `argc 1) print `addr = (lpeek `addr)
+  if (= `argc 2) "sl`addr `val;print `addr <- `val"
+.
+
+procedure word addr val
+  if (< `argc 1) print usage: word addr [val]
+  if (= `argc 1) print `addr = (wpeek `addr)
+  if (= `argc 2) "sw`addr `val;print `addr <- `val"
+.
+
+procedure byte addr val
+  if (< `argc 1) print usage: byte addr [val]
+  if (= `argc 1) print `addr = (peek `addr)
+  if (= `argc 2) "s`addr `val;print `addr <- `val"
+.
+

@@ -1,0 +1,28 @@
+Create a file
+Write to a file
+Close a file
+Delete a file
+Create a directory (EBADRQ)
+Delete a directory (EACCDN)
+Dcreate a directory over a file (EACCDN)
+Dcreate a directory over a directory (EACCDN)
+Create a file over a file
+Create a file over a directory
+Open a directory (EACCDN)
+Open a file
+Read a file
+Seek in a file
+Seek past EOF
+Read from end
+Write to end
+Write not at end
+Close a file
+Open a file twice
+Open a file that somebody else has open
+Dup, force
+Delete a file you have open
+Delete a file somebody else has open
+Ddelete an empty directory
+Ddelete a non-empty directory
+Ddelete the root directory
+Ddelete a file

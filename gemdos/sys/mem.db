@@ -1,0 +1,6 @@
+b #2 .xmalloc
+alias br2 "print xmalloc (lpeek (+ `sp 4));defer g"
+b #3 .ffit
+alias br3 "print ffit (lpeek (+ `sp 4)) (wpeek (+ `sp 8));defer g"
+b #4 .mbiggest
+alias br4 "print mbiggest (lpeek (+ `sp 4)) (wpeek (+ `sp 8));defer g"

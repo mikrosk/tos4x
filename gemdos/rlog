@@ -1,0 +1,1871 @@
+
+RCS file: rcs\gas2mac.e,v
+Working file: gas2mac.e
+head: 1.7
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 1.5
+	BAMMI1: 1.5
+	V060391: 1.5
+	freeze2: 1.2
+	freeze1: 1.2
+comment leader: "# "
+keyword substitution: kv
+total revisions: 7;	selected revisions: 7
+description:
+----------------------------
+revision 1.7
+date: 1991/12/14 01:20:10;  author: unknown;  state: Exp;  lines: +70 -7
+Added some other stuff
+----------------------------
+revision 1.6
+date: 1991/11/20 19:44:04;  author: apratt;  state: Exp;  lines: +3 -0
+Memory protection, first cut (no workee yet)
+----------------------------
+revision 1.5
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +127 -115
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 1.4
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +140 -68
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 1.3
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +53 -12
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 1.2
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +0 -0
+CI at the end of the week...
+----------------------------
+revision 1.1
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\setup.c,v
+Working file: setup.c
+head: 2.11
+branch:
+locks:
+access list:
+symbolic names:
+	V060391: 2.11
+	freeze2: 2.7
+	freeze1: 2.7
+comment leader: "* "
+keyword substitution: kv
+total revisions: 9;	selected revisions: 9
+description:
+----------------------------
+revision 2.11
+date: 1991/04/05 18:40:12;  author: apratt;  state: Exp;  lines: +9 -4
+Misc fixes to make it work
+----------------------------
+revision 2.10
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +11 -10
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.9
+date: 1991/03/13 17:51:44;  author: apratt;  state: Exp;  lines: +7 -3
+Added a define for default buffer size, and made it big.
+This is for testing; in production it should be 512.
+----------------------------
+revision 2.8
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +6 -4
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.7
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +26 -14
+CI at the end of the week...
+----------------------------
+revision 2.6
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +39 -49
+*** empty log message ***
+----------------------------
+revision 2.5
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +5 -2
+Checkin lest I lose work (again)
+----------------------------
+revision 2.4
+date: 1991/01/23 14:30:36;  author: apratt;  state: Exp;  lines: +1 -30
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.3
+date: 1990/08/03 13:42:43;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.27.10.
+=============================================================================
+
+RCS file: rcs\scan.c,v
+Working file: scan.c
+head: 1.18
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 1.15
+	BAMMI1: 1.13
+	V060391: 1.13
+	freeze2: 1.5
+	freeze1: 1.4
+comment leader: "* "
+keyword substitution: kv
+total revisions: 18;	selected revisions: 18
+description:
+Functions for scanning directories and handling dir struct.
+----------------------------
+revision 1.18
+date: 1991/06/26 23:41:50;  author: apratt;  state: Exp;  lines: +10 -3
+Added a line to fail if a slash is at the end of a string and
+this isn't a DIR scan.
+----------------------------
+revision 1.17
+date: 1991/06/25 13:04:24;  author: apratt;  state: Exp;  lines: +79 -94
+This is slightly simplified from before... dots are always OK,
+double slashes always stop the scan, and EROOT is returned only
+if scan_type is SCAN_DIR (FN_NORM, FN_DOTSOK, etc are obsolete).
+----------------------------
+revision 1.16
+date: 1991/06/25 11:51:48;  author: apratt;  state: Exp;  lines: +21 -10
+Dsetpath(".") in root didn't work before, and neither did \\ as an arg.
+Now they do, but it's a crock, and I'm trying to improve it.
+----------------------------
+revision 1.15
+date: 1991/06/20 17:18:56;  author: apratt;  state: Exp;  lines: +719 -0
+Fixed a bug: ANDing recno with clrm is only valid when recno
+is relative to the start of a cluster (e.g. cluster 2).
+----------------------------
+revision 1.14
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +9 -6
+Updated to DB release 3 (new print)
+----------------------------
+revision 1.13
+date: 1991/05/30 16:06:06;  author: apratt;  state: Exp;  lines: +36 -15
+Added kludge code to handle multiple backslashes in a row.
+----------------------------
+revision 1.12
+date: 1991/05/09 17:37:28;  author: apratt;  state: Exp;  lines: +44 -35
+Split out dotsok and added trailok, fixed logic and trailing SLASH,
+changed dirnext's end-of-dir return from ENMFIL to EFILNF.
+Removed extended flag arg from nextcl call.
+----------------------------
+revision 1.11
+date: 1991/05/03 00:14:20;  author: apratt;  state: Exp;  lines: +11 -4
+Added acceptance of trailing backslash when dotsok; dotsok is
+assumed to be a flag saying "I came from Dsetpath" and we must
+accept a trailing SLASH in Dsetpath because old Gemdos does.
+----------------------------
+revision 1.10
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +20 -17
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 1.9
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +83 -24
+Misc fixes making it work
+----------------------------
+revision 1.8
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +38 -4
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 1.7
+date: 1991/03/13 17:51:44;  author: apratt;  state: Exp;  lines: +8 -2
+Added a debugging message on a new level at _dirnext.
+----------------------------
+revision 1.6
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +14 -9
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 1.5
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +6 -4
+generic checkin
+----------------------------
+revision 1.4
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +51 -43
+This version performs this testbed perfectly.
+----------------------------
+revision 1.3
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +42 -27
+CI at the end of the week...
+----------------------------
+revision 1.2
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +24 -23
+*** empty log message ***
+----------------------------
+revision 1.1
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;
+Checkin lest I lose work (again)
+=============================================================================
+
+RCS file: rcs\testbed.c,v
+Working file: testbed.c
+head: 1.6
+branch:
+locks:
+access list:
+symbolic names:
+	V060391: 1.6
+	freeze2: 1.4
+	freeze1: 1.3
+comment leader: " * "
+keyword substitution: kv
+total revisions: 6;	selected revisions: 6
+description:
+Test bed for GEMDOS
+----------------------------
+revision 1.6
+date: 1991/03/28 17:49:18;  author: apratt;  state: Exp;  lines: +0 -0
+Safety checkin.
+----------------------------
+revision 1.5
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +0 -114
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 1.4
+date: 1991/02/22 15:29:02;  author: apratt;  state: Exp;  lines: +12 -1
+testbed - other versions frozen with this do this test OK
+----------------------------
+revision 1.3
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +14 -2
+This version performs this testbed perfectly.
+----------------------------
+revision 1.2
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +36 -5
+CI at the end of the week...
+----------------------------
+revision 1.1
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\mem.c,v
+Working file: mem.c
+head: 2.22
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.19
+	BAMMI1: 2.18
+	V060391: 2.18
+	freeze2: 2.13
+	freeze1: 2.13
+comment leader: "* "
+keyword substitution: kv
+total revisions: 14;	selected revisions: 14
+description:
+----------------------------
+revision 2.22
+date: 1992/05/20 00:30:02;  author: unknown;  state: Exp;  lines: +7 -37
+This ci represents falling back to 2.19, pre-memprot.  It has one
+thing put back in from 2.20: freesmall on MD's given up by xmunhook.
+----------------------------
+revision 2.21
+date: 1991/12/14 01:14:20;  author: unknown;  state: Exp;  lines: +7 -2
+Added some debugging
+----------------------------
+revision 2.20
+date: 1991/11/20 19:44:04;  author: apratt;  state: Exp;  lines: +35 -4
+Memory protection, first cut (no workee yet)
+----------------------------
+revision 2.19
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +18 -15
+Updated to DB release 3 (new print)
+----------------------------
+revision 2.18
+date: 1991/05/09 17:42:04;  author: apratt;  state: Exp;  lines: +22 -19
+Added a bunch of unsigned's.
+----------------------------
+revision 2.17
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +18 -15
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.16
+date: 1991/04/05 18:39:26;  author: apratt;  state: Exp;  lines: +6 -3
+debugging message change
+----------------------------
+revision 2.15
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +200 -180
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.14
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +6 -3
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.13
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +6 -3
+CI at the end of the week...
+----------------------------
+revision 2.12
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +7 -4
+*** empty log message ***
+----------------------------
+revision 2.11
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +5 -2
+Checkin lest I lose work (again)
+----------------------------
+revision 2.10
+date: 1991/01/23 14:30:22;  author: apratt;  state: Exp;  lines: +18 -130
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.9
+date: 1990/08/03 13:42:12;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.27.04.
+=============================================================================
+
+RCS file: rcs\gemerror.h,v
+Working file: gemerror.h
+head: 2.8
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.8
+	BAMMI1: 2.8
+	V060391: 2.8
+	freeze2: 2.6
+	freeze1: 2.6
+comment leader: "* "
+keyword substitution: kv
+total revisions: 6;	selected revisions: 6
+description:
+----------------------------
+revision 2.8
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +8 -4
+Misc fixes making it work
+----------------------------
+revision 2.7
+date: 1991/03/28 17:47:08;  author: apratt;  state: Exp;  lines: +7 -4
+THIS VERSION WORKS! DESKTOP OPS WORK!
+----------------------------
+revision 2.6
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +8 -5
+CI at the end of the week...
+----------------------------
+revision 2.5
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +7 -4
+Checkin lest I lose work (again)
+----------------------------
+revision 2.4
+date: 1991/01/23 14:30:20;  author: apratt;  state: Exp;  lines: +1 -1
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.3
+date: 1990/08/03 13:42:05;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.27.02.
+=============================================================================
+
+RCS file: rcs\makefile.,v
+Working file: makefile.
+head: 2.21
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.19
+	BAMMI1: 2.19
+	V060391: 2.19
+	freeze2: 2.13
+	freeze1: 2.13
+comment leader: "# "
+keyword substitution: kv
+total revisions: 13;	selected revisions: 13
+description:
+----------------------------
+revision 2.21
+date: 1991/12/12 23:46:10;  author: unknown;  state: Exp;  lines: +7 -4
+Changed some flags
+----------------------------
+revision 2.20
+date: 1991/11/20 19:44:04;  author: apratt;  state: Exp;  lines: +16 -10
+Memory protection, first cut (no workee yet)
+----------------------------
+revision 2.19
+date: 1991/06/03 15:29:50;  author: apratt;  state: Exp;  lines: +16 -8
+Changed to use fsstub, not fsstpar, the better to make available
+to alpha testers who have only MIDI-port remote debugging, if any.
+----------------------------
+revision 2.18
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +10 -20
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.17
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +18 -16
+Misc fixes making it work
+----------------------------
+revision 2.16
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +61 -25
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.15
+date: 1991/03/13 17:51:44;  author: apratt;  state: Exp;  lines: +6 -3
+Don't know.
+----------------------------
+revision 2.14
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +13 -8
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.13
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +6 -3
+This version performs this testbed perfectly.
+----------------------------
+revision 2.12
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +9 -6
+CI at the end of the week...
+----------------------------
+revision 2.11
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +31 -12
+*** empty log message ***
+----------------------------
+revision 2.10
+date: 1991/01/23 14:30:40;  author: apratt;  state: Exp;  lines: +16 -104
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.9
+date: 1990/11/26 13:51:27;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.28.00.
+=============================================================================
+
+RCS file: rcs\gas2mac.rc,
+Working file: gas2mac.rc
+head: 1.1
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 1.1
+	BAMMI1: 1.1
+	V060391: 1.1
+comment leader: "# "
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 1991/03/28 17:50:12;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\ftest.h,v
+Working file: ftest.h
+head: 1.2
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.2
+	V060391: 1.2
+comment leader: " * "
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +5 -0
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 1.1
+date: 1991/03/12 18:27:50;  author: apratt;  state: Exp;
+Ftest for testing gemdos
+=============================================================================
+
+RCS file: rcs\memprot.c,v
+Working file: memprot.c
+head: 1.3
+branch:
+locks:
+access list:
+symbolic names:
+comment leader: " * "
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+memory protection
+----------------------------
+revision 1.3
+date: 1991/12/14 01:35:38;  author: unknown;  state: Exp;  lines: +19 -32
+Changes - unknown, does not matter
+----------------------------
+revision 1.2
+date: 1991/11/20 19:44:04;  author: apratt;  state: Exp;  lines: +0 -0
+Memory protection, first cut (no workee yet)
+----------------------------
+revision 1.1
+date: 1991/11/20 19:43:04;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\fscl.c,v
+Working file: fscl.c
+head: 2.22
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.21
+	BAMMI1: 2.18
+	V060391: 2.18
+	freeze2: 2.13
+	freeze1: 2.12
+comment leader: "* "
+keyword substitution: kv
+total revisions: 17;	selected revisions: 17
+description:
+----------------------------
+revision 2.22
+date: 1991/06/25 13:16:52;  author: apratt;  state: Exp;  lines: +9 -12
+Changed comments to point out that invclean doesn't handle the
+case where a disk really is changed & has a new BPB, but the same
+serial number (i.e. MSDOS's non-serial-number).  Better MC code
+in BIOS is the only way out of that.
+----------------------------
+revision 2.21
+date: 1991/06/20 17:14:28;  author: apratt;  state: Exp;  lines: +68 -68
+Applied fixes to invclean code, removed newcl, coded new Getfat.
+----------------------------
+revision 2.20
+date: 1991/06/20 10:56:38;  author: apratt;  state: Exp;  lines: +133 -8
+Added new media-change code from other GEMDOS.  When media-change
+state is 1, clean buffers are invalidated.  Thus changing disks
+can only get you in trouble if you have files open (because if
+you have no files open there are no dirty buffers).
+----------------------------
+revision 2.19
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +23 -18
+Updated to DB release 3 (new print)
+----------------------------
+revision 2.18
+date: 1991/05/09 17:40:38;  author: apratt;  state: Exp;  lines: +36 -32
+General stuff.
+----------------------------
+revision 2.17
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +113 -91
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.16
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +75 -30
+Misc fixes making it work
+----------------------------
+revision 2.15
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +13 -8
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.14
+date: 1991/03/13 17:51:44;  author: apratt;  state: Exp;  lines: +10 -9
+Fixed a bug: extended was used in xrw without being set.
+Also, the comment about a bug concerning reads which end at
+sector boundaries was out of date.
+----------------------------
+revision 2.13
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +38 -35
+generic checkin
+----------------------------
+revision 2.12
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +215 -119
+This version performs this testbed perfectly.
+----------------------------
+revision 2.11
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +299 -281
+CI at the end of the week...
+----------------------------
+revision 2.10
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +103 -49
+*** empty log message ***
+----------------------------
+revision 2.9
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +444 -515
+Checkin lest I lose work (again)
+----------------------------
+revision 2.8
+date: 1991/01/23 17:09:42;  author: apratt;  state: Exp;  lines: +6 -11
+Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
+d_scan, m_fatofd, m_ofl, and d_dirfil.
+----------------------------
+revision 2.7
+date: 1991/01/23 14:29:54;  author: apratt;  state: Exp;  lines: +38 -250
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.6
+date: 1990/08/03 13:40:45;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.26.44.
+=============================================================================
+
+RCS file: rcs\rwa.mac
+Working file: rwa.mac
+head: 1.4
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 1.2
+	BAMMI1: 1.1
+	V060391: 1.1
+comment leader: "* "
+keyword substitution: kv
+total revisions: 4;	selected revisions: 4
+description:
+Assembly stuff
+----------------------------
+revision 1.4
+date: 1992/05/20 00:31:58;  author: unknown;  state: Exp;  lines: +5 -29
+This ci removes the memprot stuff from this file.  Other changes
+from revision 1.3 persist.
+----------------------------
+revision 1.3
+date: 1991/11/20 19:44:04;  author: apratt;  state: Exp;  lines: +34 -10
+Memory protection, first cut (no workee yet)
+----------------------------
+revision 1.2
+date: 1991/06/20 10:56:38;  author: apratt;  state: Exp;  lines: +13 -3
+Added a hook so you can easily find the offset to use to load
+symbols.  Use XBRA just before _enter (which is trap 1), and
+have mybp just before XBRA.
+----------------------------
+revision 1.1
+date: 1991/03/28 17:42:14;  author: apratt;  state: Exp;
+THIS VERSION BOOTS! DESKTOP OPS WORK!
+=============================================================================
+
+RCS file: rcs\pool.c,v
+Working file: pool.c
+head: 2.16
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.16
+	BAMMI1: 2.15
+	V060391: 2.15
+	freeze2: 2.13
+	freeze1: 2.12
+comment leader: "* "
+keyword substitution: kv
+total revisions: 9;	selected revisions: 9
+description:
+----------------------------
+revision 2.16
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +14 -11
+Updated to DB release 3 (new print)
+----------------------------
+revision 2.15
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +11 -8
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.14
+date: 1991/03/28 17:47:08;  author: apratt;  state: Exp;  lines: +5 -2
+THIS VERSION WORKS! DESKTOP OPS WORK!
+----------------------------
+revision 2.13
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +78 -79
+generic checkin
+----------------------------
+revision 2.12
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +7 -8
+CI at the end of the week...
+----------------------------
+revision 2.11
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +9 -21
+*** empty log message ***
+----------------------------
+revision 2.10
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +6 -3
+Checkin lest I lose work (again)
+----------------------------
+revision 2.9
+date: 1991/01/23 14:30:26;  author: apratt;  state: Exp;  lines: +31 -126
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.8
+date: 1990/08/03 13:42:23;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.27.06.
+=============================================================================
+
+RCS file: rcs\docall.gas
+Working file: docall.gas
+head: 1.1
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.1
+	V060391: 1.1
+comment leader: "# "
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 1991/03/28 17:48:04;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\fsdir.c,v
+Working file: fsdir.c
+head: 2.21
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.19
+	BAMMI1: 2.17
+	V060391: 2.17
+	freeze2: 2.12
+	freeze1: 2.11
+comment leader: "* "
+keyword substitution: kv
+total revisions: 17;	selected revisions: 17
+description:
+----------------------------
+revision 2.21
+date: 1991/06/26 15:04:00;  author: apratt;  state: Exp;  lines: +16 -3
+Added code to set and check DTAs as invalid when
+a search fails or is exhausted.  Fixed so a trailing
+slash results in EFILNF not EBADRQ.
+----------------------------
+revision 2.20
+date: 1991/06/25 13:16:06;  author: apratt;  state: Exp;  lines: +14 -16
+Changed FN_NORM etc to SCAN_NORM _DIR and _EARLY
+----------------------------
+revision 2.19
+date: 1991/06/20 17:14:06;  author: apratt;  state: Exp;  lines: +5 -4
+changes for new newcl/Getfat code
+----------------------------
+revision 2.18
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +12 -6
+Updated to DB release 3 (new print)
+----------------------------
+revision 2.17
+date: 1991/05/09 17:35:48;  author: apratt;  state: Exp;  lines: +14 -8
+Split out meanings of FN_DOTSOK and FN_TRAILOK, and fixed a bug
+where FA_NORM was being used instead of FN_NORM.  Changed
+dirnext's end-of-dir return from ENMFIL to EFILNF.
+Removed the extended flag from nextcl call.
+----------------------------
+revision 2.16
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +14 -11
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.15
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +73 -29
+Misc fixes making it work
+----------------------------
+revision 2.14
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +18 -4
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.13
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +46 -37
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.12
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +41 -31
+generic checkin
+----------------------------
+revision 2.11
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +20 -9
+This version performs this testbed perfectly.
+----------------------------
+revision 2.10
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +43 -25
+CI at the end of the week...
+----------------------------
+revision 2.9
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +18 -11
+*** empty log message ***
+----------------------------
+revision 2.8
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +432 -675
+Checkin lest I lose work (again)
+----------------------------
+revision 2.7
+date: 1991/01/23 17:09:46;  author: apratt;  state: Exp;  lines: +20 -16
+Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
+d_scan, m_fatofd, m_ofl, and d_dirfil.
+----------------------------
+revision 2.6
+date: 1991/01/23 14:30:00;  author: apratt;  state: Exp;  lines: +24 -121
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.5
+date: 1990/08/03 13:41:09;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.26.50.
+=============================================================================
+
+RCS file: rcs\panic.c,v
+Working file: panic.c
+head: 2.9
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.9
+	BAMMI1: 2.9
+	V060391: 2.9
+	freeze2: 2.8
+	freeze1: 2.7
+comment leader: "* "
+keyword substitution: kv
+total revisions: 7;	selected revisions: 7
+description:
+----------------------------
+revision 2.9
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +16 -2
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.8
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +6 -2
+generic checkin
+----------------------------
+revision 2.7
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +5 -2
+CI at the end of the week...
+----------------------------
+revision 2.6
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +7 -4
+*** empty log message ***
+----------------------------
+revision 2.5
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +5 -2
+Checkin lest I lose work (again)
+----------------------------
+revision 2.4
+date: 1991/01/23 14:30:24;  author: apratt;  state: Exp;  lines: +5 -35
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.3
+date: 1990/08/03 13:42:20;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.27.04.
+=============================================================================
+
+RCS file: rcs\rdb.rc,
+Working file: rdb.rc
+head: 1.4
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 1.4
+	BAMMI1: 1.3
+	V060391: 1.3
+comment leader: "# "
+keyword substitution: kv
+total revisions: 4;	selected revisions: 4
+description:
+----------------------------
+revision 1.4
+date: 1991/06/20 17:12:36;  author: apratt;  state: Exp;  lines: +2 -5
+updates for new DB
+----------------------------
+revision 1.3
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +4 -3
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 1.2
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +8 -5
+Misc fixes making it work
+----------------------------
+revision 1.1
+date: 1991/03/28 17:49:58;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\fscomm.c,v
+Working file: fscomm.c
+head: 2.9
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 2.9
+	V060391: 2.9
+	freeze2: 2.7
+	freeze1: 2.7
+comment leader: "* "
+keyword substitution: kv
+total revisions: 7;	selected revisions: 7
+description:
+----------------------------
+revision 2.9
+date: 1991/03/28 17:47:08;  author: apratt;  state: Exp;  lines: +5 -2
+THIS VERSION WORKS! DESKTOP OPS WORK!
+----------------------------
+revision 2.8
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +6 -4
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.7
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +9 -5
+CI at the end of the week...
+----------------------------
+revision 2.6
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +16 -3
+*** empty log message ***
+----------------------------
+revision 2.5
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +18 -24
+Checkin lest I lose work (again)
+----------------------------
+revision 2.4
+date: 1991/01/23 14:30:00;  author: apratt;  state: Exp;  lines: +0 -27
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.3
+date: 1990/08/03 13:41:03;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.26.46.
+=============================================================================
+
+RCS file: rcs\switches.s,v
+Working file: switches.s
+head: 1.1
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 1.1
+	BAMMI1: 1.1
+	V060391: 1.1
+comment leader: "# "
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+
+----------------------------
+revision 1.1
+date: 1991/05/30 16:05:54;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\fcmds.c,v
+Working file: fcmds.c
+head: 1.2
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.2
+	V060391: 1.2
+comment leader: " * "
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2
+date: 1991/03/28 17:49:18;  author: apratt;  state: Exp;  lines: +0 -0
+Safety checkin.
+----------------------------
+revision 1.1
+date: 1991/03/12 18:27:50;  author: apratt;  state: Exp;
+Ftest for testing gemdos
+=============================================================================
+
+RCS file: rcs\docall.mac
+Working file: docall.mac
+head: 1.2
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.2
+	V060391: 1.2
+comment leader: "; "
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2
+date: 1991/04/05 18:41:54;  author: apratt;  state: Exp;  lines: +33 -30
+Misc fixes to make it work
+----------------------------
+revision 1.1
+date: 1991/03/28 17:48:04;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\traps.mac
+Working file: traps.mac
+head: 1.2
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.2
+	V060391: 1.2
+comment leader: "; "
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+Works.
+----------------------------
+revision 1.2
+date: 1991/04/05 18:41:54;  author: apratt;  state: Exp;  lines: +24 -24
+Misc fixes to make it work
+----------------------------
+revision 1.1
+date: 1991/03/28 17:43:14;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\fsfs.c,v
+Working file: fsfs.c
+head: 2.20
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.19
+	BAMMI1: 2.17
+	V060391: 2.17
+	freeze2: 2.12
+	freeze1: 2.11
+comment leader: "* "
+keyword substitution: kv
+total revisions: 16;	selected revisions: 16
+description:
+----------------------------
+revision 2.20
+date: 1991/06/25 13:16:22;  author: apratt;  state: Exp;  lines: +46 -12
+Changed FN_NORM etc for SCAN_NORM _DIR and _EARLY
+and added handling for Fcreate of volume labels.
+----------------------------
+revision 2.19
+date: 1991/06/20 17:14:06;  author: apratt;  state: Exp;  lines: +5 -4
+changes for new newcl/Getfat code
+----------------------------
+revision 2.18
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +9 -5
+Updated to DB release 3 (new print)
+----------------------------
+revision 2.17
+date: 1991/05/30 16:06:06;  author: apratt;  state: Exp;  lines: +6 -3
+Changed use of FN_TRAILOK to FN_DOTSOK, which is what
+was really meant here (in chmod).
+----------------------------
+revision 2.16
+date: 1991/05/09 17:40:38;  author: apratt;  state: Exp;  lines: +9 -4
+General stuff.
+----------------------------
+revision 2.15
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +10 -7
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.14
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +10 -4
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.13
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +9 -6
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.12
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +36 -235
+generic checkin
+----------------------------
+revision 2.11
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +61 -59
+This version performs this testbed perfectly.
+----------------------------
+revision 2.10
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +61 -92
+CI at the end of the week...
+----------------------------
+revision 2.9
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +56 -68
+*** empty log message ***
+----------------------------
+revision 2.8
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +520 -785
+Checkin lest I lose work (again)
+----------------------------
+revision 2.7
+date: 1991/01/23 17:07:46;  author: apratt;  state: Exp;  lines: +14 -10
+Previously, using Fdatime to write the date/time of a zero-length file
+would write that date/time to any open zero-length file in that dir. Fixed.
+
+Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
+d_scan, m_fatofd, m_ofl, and d_dirfil.
+----------------------------
+revision 2.6
+date: 1991/01/23 14:30:04;  author: apratt;  state: Exp;  lines: +16 -175
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.5
+date: 1990/08/03 13:41:17;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.26.52.
+=============================================================================
+
+RCS file: rcs\fsdecl.h,v
+Working file: fsdecl.h
+head: 2.12
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.12
+	BAMMI1: 2.11
+	V060391: 2.11
+	freeze2: 2.9
+	freeze1: 2.8
+comment leader: "* "
+keyword substitution: kv
+total revisions: 9;	selected revisions: 9
+description:
+----------------------------
+revision 2.12
+date: 1991/06/20 17:14:06;  author: apratt;  state: Exp;  lines: +5 -3
+changes for new newcl/Getfat code
+----------------------------
+revision 2.11
+date: 1991/03/28 17:47:08;  author: apratt;  state: Exp;  lines: +5 -2
+THIS VERSION WORKS! DESKTOP OPS WORK!
+----------------------------
+revision 2.10
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +6 -5
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.9
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +7 -2
+generic checkin
+----------------------------
+revision 2.8
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +10 -11
+CI at the end of the week...
+----------------------------
+revision 2.7
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +7 -3
+*** empty log message ***
+----------------------------
+revision 2.6
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +15 -35
+Checkin lest I lose work (again)
+----------------------------
+revision 2.5
+date: 1991/01/23 14:29:58;  author: apratt;  state: Exp;  lines: +9 -87
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.4
+date: 1990/08/03 13:41:06;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.26.48.
+=============================================================================
+
+RCS file: rcs\sup.c,v
+Working file: sup.c
+head: 2.17
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.17
+	BAMMI1: 2.16
+	V060391: 2.16
+	freeze2: 2.10
+	freeze1: 2.10
+comment leader: "* "
+keyword substitution: kv
+total revisions: 12;	selected revisions: 12
+description:
+----------------------------
+revision 2.17
+date: 1991/06/20 17:14:06;  author: apratt;  state: Exp;  lines: +14 -2
+changes for new newcl/Getfat code
+----------------------------
+revision 2.16
+date: 1991/05/31 17:28:36;  author: apratt;  state: Exp;  lines: +22 -13
+Fixed a bug in osif: the pw variable wasn't being forced
+out of a register correctly.  Also, created ppw as a
+register form of this variable, set after the setjmp.
+----------------------------
+revision 2.15
+date: 1991/05/29 14:21:06;  author: apratt;  state: Exp;  lines: +15 -5
+Added &ni for Flock, for future reference.  Made NFUNCS a constant
+derived from the size of the function-pointer array.
+----------------------------
+revision 2.14
+date: 1991/05/03 00:14:20;  author: apratt;  state: Exp;  lines: +60 -7
+Folded setup.c into this file.  Added an array telling how many
+words of arguments each call has, so we don't copy too many.  Turns
+out that with TT RAM, you often DO make calls with usp close to teh
+end of RAM.
+----------------------------
+revision 2.13
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +121 -3
+Folded setup.c into this file.  Setup.c is no more.
+----------------------------
+revision 2.12
+date: 1991/03/28 17:47:08;  author: apratt;  state: Exp;  lines: +5 -2
+THIS VERSION WORKS! DESKTOP OPS WORK!
+----------------------------
+revision 2.11
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +123 -506
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.10
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +39 -87
+CI at the end of the week...
+----------------------------
+revision 2.9
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +7 -8
+Checkin lest I lose work (again)
+----------------------------
+revision 2.8
+date: 1991/01/23 17:08:56;  author: apratt;  state: Exp;  lines: +7 -6
+Changed d_left to d_child, d_right to d_next globally.  Removed o_thread,
+d_scan, m_fatofd, m_ofl, and d_dirfil.
+----------------------------
+revision 2.7
+date: 1991/01/23 14:30:36;  author: apratt;  state: Exp;  lines: +11 -125
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.6
+date: 1990/08/03 13:42:46;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.27.12.
+=============================================================================
+
+RCS file: rcs\traps.gas
+Working file: traps.gas
+head: 1.5
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.5
+	V060391: 1.5
+	freeze2: 1.3
+	freeze1: 1.3
+comment leader: "# "
+keyword substitution: kv
+total revisions: 5;	selected revisions: 5
+description:
+----------------------------
+revision 1.5
+date: 1991/03/28 17:43:50;  author: apratt;  state: Exp;  lines: +0 -0
+This rev isn't up to date w.r.t. traps.s of this date.
+----------------------------
+revision 1.4
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +10 -0
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 1.3
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +6 -20
+This version performs this testbed perfectly.
+----------------------------
+revision 1.2
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +12 -10
+CI at the end of the week...
+----------------------------
+revision 1.1
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\db.rc,
+Working file: db.rc
+head: 1.10
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.10
+	V060391: 1.10
+	freeze2: 1.6
+	freeze1: 1.4
+comment leader: "# "
+keyword substitution: kv
+total revisions: 10;	selected revisions: 10
+description:
+----------------------------
+revision 1.10
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +6 -5
+Misc fixes making it work
+----------------------------
+revision 1.9
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +1 -1
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 1.8
+date: 1991/03/13 17:51:44;  author: apratt;  state: Exp;  lines: +2 -0
+generic checkin
+----------------------------
+revision 1.7
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +2 -274
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 1.6
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +9 -3
+generic checkin
+----------------------------
+revision 1.5
+date: 1991/02/21 03:10:26;  author: apratt;  state: Exp;  lines: +1 -0
+little change
+----------------------------
+revision 1.4
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +78 -84
+This version performs this testbed perfectly.
+----------------------------
+revision 1.3
+date: 1991/02/15 18:48:10;  author: apratt;  state: Exp;  lines: +0 -0
+dummy ci
+----------------------------
+revision 1.2
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +60 -54
+CI at the end of the week...
+----------------------------
+revision 1.1
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\con.c,v
+Working file: con.c
+head: 2.10
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.10
+	BAMMI1: 2.10
+	V060391: 2.10
+	freeze2: 2.8
+	freeze1: 2.8
+comment leader: "* "
+keyword substitution: kv
+total revisions: 7;	selected revisions: 7
+description:
+Desc.
+----------------------------
+revision 2.10
+date: 1991/03/28 17:47:08;  author: apratt;  state: Exp;  lines: +5 -2
+THIS VERSION WORKS! DESKTOP OPS WORK!
+----------------------------
+revision 2.9
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +367 -361
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.8
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +174 -129
+CI at the end of the week...
+----------------------------
+revision 2.7
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +37 -52
+*** empty log message ***
+----------------------------
+revision 2.6
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +5 -2
+Checkin lest I lose work (again)
+----------------------------
+revision 2.5
+date: 1991/01/23 14:29:46;  author: apratt;  state: Exp;  lines: +58 -138
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.4
+date: 1990/08/03 13:40:23;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.25.42.
+=============================================================================
+
+RCS file: rcs\time.c,v
+Working file: time.c
+head: 2.9
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.9
+	BAMMI1: 2.9
+	V060391: 2.9
+	freeze2: 2.7
+	freeze1: 2.7
+comment leader: "* "
+keyword substitution: kv
+total revisions: 7;	selected revisions: 7
+description:
+----------------------------
+revision 2.9
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +4 -9
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.8
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +93 -6
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.7
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +9 -6
+CI at the end of the week...
+----------------------------
+revision 2.6
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +7 -4
+*** empty log message ***
+----------------------------
+revision 2.5
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +5 -2
+Checkin lest I lose work (again)
+----------------------------
+revision 2.4
+date: 1991/01/23 14:30:40;  author: apratt;  state: Exp;  lines: +0 -34
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.3
+date: 1990/08/03 13:42:56;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.27.14.
+=============================================================================
+
+RCS file: rcs\rwa.gas
+Working file: rwa.gas
+head: 2.13
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 2.13
+	V060391: 2.13
+	freeze2: 2.12
+	freeze1: 2.12
+comment leader: "* "
+keyword substitution: kv
+total revisions: 5;	selected revisions: 5
+description:
+----------------------------
+revision 2.13
+date: 1991/03/28 17:43:28;  author: apratt;  state: Exp;  lines: +550 -548
+This rev isn't up to spec w.r.t. rwa.mac of this date.
+----------------------------
+revision 2.12
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +6 -3
+CI at the end of the week...
+----------------------------
+revision 2.11
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +18 -32
+*** empty log message ***
+----------------------------
+revision 2.10
+date: 1991/01/23 14:38:20;  author: apratt;  state: Exp;  lines: +2 -74
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.9
+date: 1990/11/26 13:50:55;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.37.12.
+=============================================================================
+
+RCS file: rcs\docall.s,v
+Working file: docall.s
+head: 1.1
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.1
+	V060391: 1.1
+comment leader: "# "
+keyword substitution: kv
+total revisions: 1;	selected revisions: 1
+description:
+----------------------------
+revision 1.1
+date: 1991/03/12 18:28:02;  author: apratt;  state: Exp;
+Ftest for testing gemdos
+=============================================================================
+
+RCS file: rcs\fs.h,v
+Working file: fs.h
+head: 2.26
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.23
+	BAMMI1: 2.22
+	V060391: 2.22
+	freeze2: 2.15
+	freeze1: 2.14
+comment leader: "* "
+keyword substitution: kv
+total revisions: 19;	selected revisions: 19
+description:
+----------------------------
+revision 2.26
+date: 1991/12/12 22:51:12;  author: unknown;  state: Exp;  lines: +5 -5
+Added some prototypes
+----------------------------
+revision 2.25
+date: 1991/11/20 19:44:04;  author: apratt;  state: Exp;  lines: +8 -2
+Memory protection, first cut (no workee yet)
+----------------------------
+revision 2.24
+date: 1991/06/25 13:16:06;  author: apratt;  state: Exp;  lines: +9 -7
+Changed FN_NORM etc to SCAN_NORM _DIR and _EARLY
+----------------------------
+revision 2.23
+date: 1991/06/20 17:13:30;  author: apratt;  state: Exp;  lines: +11 -4
+changed version number because production GEMDOS is now $2000
+----------------------------
+revision 2.22
+date: 1991/05/30 16:07:56;  author: apratt;  state: Exp;  lines: +10 -6
+Added uchar data type and made "attrib" fields that type.
+----------------------------
+revision 2.21
+date: 1991/05/09 17:40:38;  author: apratt;  state: Exp;  lines: +11 -12
+General stuff.
+----------------------------
+revision 2.20
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +7 -4
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.19
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +45 -12
+Misc fixes making it work
+----------------------------
+revision 2.18
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +59 -65
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.17
+date: 1991/03/13 17:51:44;  author: apratt;  state: Exp;  lines: +7 -2
+Don't know.
+----------------------------
+revision 2.16
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +33 -19
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.15
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +24 -6
+generic checkin
+----------------------------
+revision 2.14
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +8 -2
+This version performs this testbed perfectly.
+----------------------------
+revision 2.13
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +63 -65
+CI at the end of the week...
+----------------------------
+revision 2.12
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +46 -36
+*** empty log message ***
+----------------------------
+revision 2.11
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +157 -107
+Checkin lest I lose work (again)
+----------------------------
+revision 2.10
+date: 1991/01/23 17:06:48;  author: apratt;  state: Exp;  lines: +26 -20
+Use voidfn for "function returning void" in prototypes.  Changed d_left to
+d_child, d_right to d_next globally.  Removed o_thread, d_scan, m_fatofd,
+m_ofl, and d_dirfil.
+----------------------------
+revision 2.9
+date: 1991/01/23 14:29:50;  author: apratt;  state: Exp;  lines: +65 -62
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.8
+date: 1990/08/03 13:40:36;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.26.44.
+=============================================================================
+
+RCS file: rcs\fs.db,
+Working file: fs.db
+head: 1.6
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 1.6
+	BAMMI1: 1.4
+	V060391: 1.4
+comment leader: "# "
+keyword substitution: kv
+total revisions: 6;	selected revisions: 6
+description:
+----------------------------
+revision 1.6
+date: 1991/06/20 17:12:36;  author: apratt;  state: Exp;  lines: +37 -50
+updates for new DB
+----------------------------
+revision 1.5
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +164 -158
+Updated to DB release 3 (new print)
+----------------------------
+revision 1.4
+date: 1991/05/09 17:40:38;  author: apratt;  state: Exp;  lines: +2 -2
+General stuff.
+----------------------------
+revision 1.3
+date: 1991/05/03 00:14:20;  author: apratt;  state: Exp;  lines: +32 -22
+More fixups for infix db
+----------------------------
+revision 1.2
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +246 -196
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 1.1
+date: 1991/03/28 17:48:56;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\ftest.c,v
+Working file: ftest.c
+head: 1.2
+branch:
+locks:
+access list:
+symbolic names:
+	BAMMI1: 1.2
+	V060391: 1.2
+comment leader: " * "
+keyword substitution: kv
+total revisions: 2;	selected revisions: 2
+description:
+----------------------------
+revision 1.2
+date: 1991/03/28 17:49:18;  author: apratt;  state: Exp;  lines: +0 -0
+Safety checkin.
+----------------------------
+revision 1.1
+date: 1991/03/12 18:27:50;  author: apratt;  state: Exp;
+Ftest for testing gemdos
+=============================================================================
+
+RCS file: rcs\unreal.c,v
+Working file: unreal.c
+head: 1.3
+branch:
+locks:
+access list:
+symbolic names:
+	V060391: 1.3
+comment leader: " * "
+keyword substitution: kv
+total revisions: 3;	selected revisions: 3
+description:
+File containing externs which come from other, real places.
+----------------------------
+revision 1.3
+date: 1991/04/05 18:40:12;  author: apratt;  state: Exp;  lines: +2 -0
+Misc fixes to make it work
+----------------------------
+revision 1.2
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +51 -33
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 1.1
+date: 1991/03/12 18:24:30;  author: apratt;  state: Exp;
+Initial revision
+=============================================================================
+
+RCS file: rcs\proto.h,v
+Working file: proto.h
+head: 1.12
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 1.10
+	BAMMI1: 1.10
+	V060391: 1.10
+	freeze2: 1.6
+	freeze1: 1.5
+comment leader: "* "
+keyword substitution: kv
+total revisions: 12;	selected revisions: 12
+description:
+----------------------------
+revision 1.12
+date: 1992/05/20 00:30:56;  author: unknown;  state: Exp;  lines: +0 -6
+This ci represents falling back to 2.10, pre-memprot.
+----------------------------
+revision 1.11
+date: 1991/11/20 19:44:04;  author: apratt;  state: Exp;  lines: +6 -0
+Memory protection, first cut (no workee yet)
+----------------------------
+revision 1.10
+date: 1991/05/09 17:38:58;  author: apratt;  state: Exp;  lines: +7 -7
+*** empty log message ***
+----------------------------
+revision 1.9
+date: 1991/04/05 18:40:12;  author: apratt;  state: Exp;  lines: +1 -17
+Misc fixes to make it work
+----------------------------
+revision 1.8
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +66 -75
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 1.7
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +126 -61
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 1.6
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +64 -64
+generic checkin
+----------------------------
+revision 1.5
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +81 -112
+CI at the end of the week...
+----------------------------
+revision 1.4
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +30 -35
+*** empty log message ***
+----------------------------
+revision 1.3
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +132 -151
+Checkin lest I lose work (again)
+----------------------------
+revision 1.2
+date: 1991/01/23 17:07:30;  author: apratt;  state: Exp;  lines: +30 -30
+Use voidfn for "function returning void" in prototypes.
+----------------------------
+revision 1.1
+date: 1991/01/23 14:30:30;  author: apratt;  state: Exp;
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+=============================================================================
+
+RCS file: rcs\fshand.c,v
+Working file: fshand.c
+head: 2.18
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.17
+	BAMMI1: 2.16
+	V060391: 2.16
+	freeze2: 2.9
+	freeze1: 2.8
+comment leader: "* "
+keyword substitution: kv
+total revisions: 16;	selected revisions: 16
+description:
+----------------------------
+revision 2.18
+date: 1991/12/11 20:16:44;  author: unknown;  state: Exp;  lines: +6 -3
+Changed FN_NORM to SCAN_NORM in one place
+----------------------------
+revision 2.17
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +27 -22
+Updated to DB release 3 (new print)
+----------------------------
+revision 2.16
+date: 1991/05/30 16:06:06;  author: apratt;  state: Exp;  lines: +9 -3
+Cash uftsize to signed when comparing against a handle
+coming from the user, which could be a (negative) character
+device number.
+----------------------------
+revision 2.15
+date: 1991/05/28 15:10:00;  author: apratt;  state: Exp;  lines: +27 -9
+Fixed again - the special case where currec points past curcl
+can have happened before a call to ixlseek, so you have to
+deal with it at the front end as well as the back end.
+----------------------------
+revision 2.14
+date: 1991/05/09 17:40:38;  author: apratt;  state: Exp;  lines: +36 -5
+General stuff.
+----------------------------
+revision 2.13
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +30 -28
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.12
+date: 1991/04/05 18:38:22;  author: apratt;  state: Exp;  lines: +7 -3
+Misc fixes making it work
+----------------------------
+revision 2.11
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +49 -19
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.10
+date: 1991/03/12 18:25:26;  author: apratt;  state: Exp;  lines: +223 -51
+Making gtest.prg works and lets you test functions in this version
+----------------------------
+revision 2.9
+date: 1991/02/22 15:29:28;  author: apratt;  state: Exp;  lines: +339 -38
+generic checkin
+----------------------------
+revision 2.8
+date: 1991/02/21 03:07:32;  author: apratt;  state: Exp;  lines: +9 -5
+This version performs this testbed perfectly.
+----------------------------
+revision 2.7
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +164 -223
+CI at the end of the week...
+----------------------------
+revision 2.6
+date: 1991/02/12 18:20:10;  author: apratt;  state: Exp;  lines: +50 -19
+*** empty log message ***
+----------------------------
+revision 2.5
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +338 -160
+Checkin lest I lose work (again)
+----------------------------
+revision 2.4
+date: 1991/01/23 14:30:08;  author: apratt;  state: Exp;  lines: +12 -70
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.3
+date: 1990/08/03 13:41:29;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.26.54.
+=============================================================================
+
+RCS file: rcs\fsproc.c,v
+Working file: fsproc.c
+head: 2.23
+branch:
+locks:
+access list:
+symbolic names:
+	R910620b: 2.20
+	BAMMI1: 2.18
+	V060391: 2.18
+	freeze2: 2.15
+	freeze1: 2.15
+comment leader: "* "
+keyword substitution: kv
+total revisions: 12;	selected revisions: 12
+description:
+----------------------------
+revision 2.23
+date: 1992/05/20 00:28:58;  author: unknown;  state: Exp;  lines: +2 -12
+This checkin represents falling back to 2.20, pre-memprot.
+----------------------------
+revision 2.22
+date: 1991/12/13 02:55:48;  author: unknown;  state: Exp;  lines: +6 -3
+Only call init_t2 if mode == 0
+----------------------------
+revision 2.21
+date: 1991/11/20 19:44:04;  author: apratt;  state: Exp;  lines: +12 -2
+Memory protection, first cut (no workee yet)
+----------------------------
+revision 2.20
+date: 1991/06/20 17:12:50;  author: apratt;  state: Exp;  lines: +7 -4
+updates for new DB
+----------------------------
+revision 2.19
+date: 1991/06/18 17:52:02;  author: apratt;  state: Exp;  lines: +14 -9
+Updated to DB release 3 (new print)
+----------------------------
+revision 2.18
+date: 1991/05/03 00:17:02;  author: apratt;  state: Exp;  lines: +5 -4
+Took out xmfree calls on the env and basepage of a process: if the
+terminating process doesn't own its env or basepage then they should
+not be freed.
+----------------------------
+revision 2.17
+date: 1991/04/30 12:12:38;  author: apratt;  state: Exp;  lines: +12 -9
+Converted DBCMDs to new infix DB style
+----------------------------
+revision 2.16
+date: 1991/03/28 17:39:36;  author: apratt;  state: Exp;  lines: +211 -190
+THIS VERSION BOOTS! DESKTOP OPERATIONS WORK!
+----------------------------
+revision 2.15
+date: 1991/02/15 18:45:40;  author: apratt;  state: Exp;  lines: +6 -3
+CI at the end of the week...
+----------------------------
+revision 2.14
+date: 1991/02/11 19:56:48;  author: apratt;  state: Exp;  lines: +5 -2
+Checkin lest I lose work (again)
+----------------------------
+revision 2.13
+date: 1991/01/23 14:30:16;  author: apratt;  state: Exp;  lines: +150 -270
+Trimmed logs & comments, changed to compile under GCC or (new) Alcyon.
+----------------------------
+revision 2.12
+date: 1990/08/03 13:41:51;  author: apratt;  state: Exp;
+checked in with -k by apratt at 91.01.23.14.27.00.
+=============================================================================

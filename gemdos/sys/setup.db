@@ -1,0 +1,4 @@
+load dma.db
+load scc.db
+load ..\mfp\mfp.db
+getsym scctest2.prg (+ `clientbp 100)

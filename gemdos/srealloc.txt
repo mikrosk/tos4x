@@ -1,0 +1,108 @@
+
+void *s_start;
+signed long s_length;
+
+/* Function 0x15: void *xsrealloc(signed long size);
+ * 920709 kbad
+ * This call is brought to you by the ingenious wizards who created
+ * a machine with a video mode that uses more than 70% of system memory.
+ *
+ * GEMDOS now must keep track of a resizable block at the end of ST RAM.
+ * To avoid intruding on the rest of GEMDOS memory management,
+ * this block is maintained separately from those on the pmd lists.
+ *
+ * xsrealloc(-1L) returns the size of the largest possible screen,
+ * xsrealloc(size) returns a pointer to the newly reallocated screen,
+ * or NULL on failure.
+ *
+ * Note that this code intentionally does signed math with pointer values.
+ */
+void *
+xsrealloc(ss)
+signed long ss;
+{
+    MD	*p, *lastp, **q;
+    long ssmax, newstart;
+
+/* Find the last free MD in ST RAM (the free list is ordered by start addr) */
+    lastp = p = *(q = &pmd.mp_mfl);
+    while (p && !FLAG(p->m_start))
+	lastp = p, p = *(q = &p->m_link);
+    p = lastp;
+
+/*
+ * Compute the max available screen size:
+ * The current size, plus the size of the last free block
+ * (if there is one, and it's contiguous with the screen),
+ * minus screen pad (screens can't abut the end of memory).
+ * If this call is a size inquiry, return it.
+ */
+    ssmax = s_length - 0x100L;
+    if (!p) newstart = (long)s_start;
+    else
+    {
+        newstart = (s_start) ? (long)p->m_start + (long)p->m_length : 0L;
+        if (newstart == (long)s_start)
+            ssmax += (long)p->m_length;
+    }
+    if (ssmax < 0L) ssmax = 0L;
+    if (ss < 0L)
+        return (void *)(ssmax);
+
+    ss += 0x100L; /* pad size: screens can't abut the end of memory */
+
+/*
+ * Lose if the request is too big, or if the last free block is not
+ * contiguous with the current screen.
+ */
+    if (ss > ssmax || newstart != (long)s_start )
+	return NULPTR;
+
+/*
+ * At this point, we have a valid size,
+ * so calculate & align the new screen start.
+ */
+    newstart = (newstart + s_length - ss) & ~0xffL;
+
+    if (newstart < 0)
+    {
+    /* No screen has yet been allocated:
+     * newstart is actually an offset from the end of the last free block.
+     */
+	newstart = -newstart;
+	if (p->m_length < newstart) /* paranoia */
+	    return NULPTR;
+	p->m_length -= (s_length = newstart);
+	newstart = (long)p->m_start + (long)p->m_length;
+    }
+
+    else if (newstart != (long)s_start)
+    {
+	if (p)
+	{
+	/* Resize the adjacent block */
+	    if (newstart < (long)p->m_start) /* paranoia */
+		return NULPTR;
+	    p->m_length = (ulong)(newstart - (long)p->m_start);
+	}
+	else
+	{
+	/* Smaller screen: make an MD for the new free block */
+	    if ( !(p = getsmall()) )
+		return NULPTR;
+	    p->m_start = s_start;
+	    p->m_length = (ulong)(newstart - (long)p->m_start);
+	    freeit(p, &pmd);
+	    /* p=NULPTR isn't needed here to avoid the zap below,
+	     * since this new block isn't zero length.
+	     */
+	}
+	s_length += (long)s_start - newstart;
+    }
+    if (p && !p->m_length) /* zap zero length blocks */
+	*q = p->m_link, freesmall(p);
+
+    clear((void *)newstart, (void *)(newstart+s_length));
+    return (s_start = (void *)newstart);
+}
+

@@ -1,0 +1,122 @@
+global mfp ; alias stmfp 'xmfp fffffa00' ; alias ttmfp 'xmfp fffffa80' ; stmfp
+
+procedure gpip arg
+  if `argc 's(+ `mfp 01) `arg;goto done'
+  print -x02 (peek (+ `mfp 01))
+#:done
+.
+procedure aer arg
+  if `argc 's(+ `mfp 03) `arg;goto done'
+  print -x02 (peek (+ `mfp 03))
+#:done
+.
+procedure ddr arg
+  if `argc 's(+ `mfp 05) `arg;goto done'
+  print -x02 (peek (+ `mfp 05))
+#:done
+.
+procedure iera arg
+  if `argc 's(+ `mfp 07) `arg;goto done'
+  print -x02 (peek (+ `mfp 07))
+#:done
+.
+procedure ierb arg
+  if `argc 's(+ `mfp 09) `arg;goto done'
+  print -x02 (peek (+ `mfp 09))
+#:done
+.
+procedure ipra arg
+  if `argc 's(+ `mfp 0b) `arg;goto done'
+  print -x02 (peek (+ `mfp 0b))
+#:done
+.
+procedure iprb arg
+  if `argc 's(+ `mfp 0d) `arg;goto done'
+  print -x02 (peek (+ `mfp 0d))
+#:done
+.
+procedure isra arg
+  if `argc 's(+ `mfp 0f) `arg;goto done'
+  print -x02 (peek (+ `mfp 0f))
+#:done
+.
+procedure isrb arg
+  if `argc 's(+ `mfp 11) `arg;goto done'
+  print -x02 (peek (+ `mfp 11))
+#:done
+.
+procedure imra arg
+  if `argc 's(+ `mfp 13) `arg;goto done'
+  print -x02 (peek (+ `mfp 13))
+#:done
+.
+procedure imrb arg
+  if `argc 's(+ `mfp 15) `arg;goto done'
+  print -x02 (peek (+ `mfp 15))
+#:done
+.
+procedure vr arg
+  if `argc 's(+ `mfp 17) `arg;goto done'
+  print -x02 (peek (+ `mfp 17))
+#:done
+.
+procedure tacr arg
+  if `argc 's(+ `mfp 19) `arg;goto done'
+  print -x02 (peek (+ `mfp 19))
+#:done
+.
+procedure tbcr arg
+  if `argc 's(+ `mfp 1b) `arg;goto done'
+  print -x02 (peek (+ `mfp 1b))
+#:done
+.
+procedure tcdcr arg
+  if `argc 's(+ `mfp 1d) `arg;goto done'
+  print -x02 (peek (+ `mfp 1d))
+#:done
+.
+procedure tadr arg
+  if `argc 's(+ `mfp 1f) `arg;goto done'
+  print -x02 (peek (+ `mfp 1f))
+#:done
+.
+procedure tbdr arg
+  if `argc 's(+ `mfp 21) `arg;goto done'
+  print -x02 (peek (+ `mfp 21))
+#:done
+.
+procedure tcdr arg
+  if `argc 's(+ `mfp 23) `arg;goto done'
+  print -x02 (peek (+ `mfp 23))
+#:done
+.
+procedure tddr arg
+  if `argc 's(+ `mfp 25) `arg;goto done'
+  print -x02 (peek (+ `mfp 25))
+#:done
+.
+procedure scr arg
+  if `argc 's(+ `mfp 27) `arg;goto done'
+  print -x02 (peek (+ `mfp 27))
+#:done
+.
+procedure ucr arg
+  if `argc 's(+ `mfp 29) `arg;goto done'
+  print -x02 (peek (+ `mfp 29))
+#:done
+.
+procedure rsr arg
+  if `argc 's(+ `mfp 2b) `arg;goto done'
+  print -x02 (peek (+ `mfp 2b))
+#:done
+.
+procedure tsr arg
+  if `argc 's(+ `mfp 2d) `arg;goto done'
+  print -x02 (peek (+ `mfp 2d))
+#:done
+.
+procedure udr arg
+  if `argc 's(+ `mfp 2f) `arg;goto done'
+  print -x02 (peek (+ `mfp 2f))
+#:done
+.

@@ -1,0 +1,9 @@
+procedure BCB a
+  print -n link (lpeek `a);xa (+ `a 4)
+  print -n bufdrv (wpeek `a);xa (+ `a 2)
+  print -n buftyp (wpeek `a);xa (+ `a 2)
+  print -n bufrec (wpeek `a);xa (+ `a 2)
+  print -n dirty (wpeek `a);xa (+ `a 2)
+  print -n dm (lpeek `a);xa (+ `a 4)
+  print bufr (lpeek `a);xa (+ `a 4)
+.

@@ -1,0 +1,26 @@
+What does Pexec do?
+
+	(0, 3) catch longjmp so xpgmld read errors get cleaned up
+
+	(0, 3) open file, read header to set hflags and sizes
+	(7) set hflags from first arg, zero sizes
+	(other) hflags = 0, zero sizes
+
+	(0, 3, 5, 7) 
+		Allocate & copy environment, get TPA
+		set TPA start, TPA size, default DTA, env, hflags, args
+		inherit files, current directories
+
+	(0, 3)
+		load program, set basepage start&size fields
+
+	(0, 4, 6)
+		Set parent pointer, stack top
+		Set up gouser frame: reg set, return PC, SR, SSP
+		Set basepage areg copies of a7 & a6 to frame end
+		set basepage areg copies of a5=dbase, a4=bbase
+		Set run to the new basepage
+		(0, 6) Change ownership to child
+		gouser();
+
+	(3, 5, 7) return basepage address

@@ -1,0 +1,47 @@
+procedure pool
+  local ptr
+  local type
+
+  x ptr (lpeek ._blockhe)
+  #:loop
+    print -n `ptr next (lpeek `ptr)
+    x type (peek (+ `ptr 4))
+    if (= `type 0) print FREE
+    if (= `type ff) print USED
+    if (= `type 1) "print -n CUT:;showcut `ptr;print"
+    x ptr (lpeek `ptr)
+  if `ptr goto loop
+.
+
+procedure showcut block
+  local btype
+  local count
+
+# advance block past the block header, making it an MD pointer
+  x block (+ `block 6)
+
+  x count 4
+  #:loop
+    x btype (lpeek (+ `block c))
+    if (= `btype 1) print -n unused
+    if (> `btype 1) print -n alloc
+    if (= `btype 0) print -n free
+    x block (+ `block 10)
+    x count (- `count 1)
+  if `count goto loop
+.
+
+procedure block ptr
+  print block `ptr next (lpeek `ptr) type -x02 (peek (+ `ptr 4)) \
+    callno (peek (+ `ptr 5))
+  dl(+ `ptr 6)[40]
+.
+
+procedure blocks
+  local ptr
+  x ptr (lpeek ._blockhe)
+  #:loop
+    block `ptr
+    x ptr (lpeek `ptr)
+  if `ptr goto loop
+.

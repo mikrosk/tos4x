@@ -3,18 +3,23 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/04/27 13:36:26 $
+* $Date: 88/04/28 16:06:39 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.7  88/04/28  16:06:39  apratt
+* Backed out Flopwp XBIOS call... Turned out to be a flop.
+* (I didn't want the Desktop to use this one Flop call, because it's possible
+* that somebody installed an Rwabs-level driver for drives A and B.)
+*
 * Revision 1.6  88/04/27  13:36:26  apratt
 * Added code to set last-access time of both drives to "long ago"
 * when you change logical disks in a physical drive, so the next call
 * to mediach() won't think it's still in the "grace period."
-*
+* 
 * Revision 1.5  88/04/05  17:45:52  apratt
 * Tested Flopwp call; it returns TRUE when there is no disk in the drive.
 * This can be overcome by doing a READ to make sure there *is* a disk
@@ -38,7 +43,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.6 $
+* $Revision: 1.7 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -114,7 +119,7 @@ tcdr		equ	$fffffa00+$23
 
 *------ Exports:
 	.globl _flopini			; init floppy			func
-	.globl _flopwp			; check wp state of floppy	func
+*	.globl _flopwp			; check wp state of floppy	func
 	.globl _flopvbl			; vertical blank monitor	func
 	.globl _flopwr			; write sector			func
 	.globl _flopfmt			; format drive/track		func
@@ -1178,34 +1183,34 @@ _floprate:
 rate1:	move.w	dseekrt(a1),d0		; get the old rate
 	move.w	6(sp),d1		; get the desired rate
 	cmp.w	#-1,d1			; no change?
-
-_flopwp:
-	sub.w	#$8,sp		; "push" 3 dummy longs
-	bsr	change		; get right disk in drive
+	beq	ratedone		; yes
+	cmp.w	#-2,d1			; set no-spinup-delay flag?
+	beq	setspinup
+	cmp.w	#-3,d1			; clear no-spinup-delay flag?
 	beq	clrspinup
-	add.w	#$8,sp		; clean up stack
-	move.w	$4(sp),d0	; get (possibly new) dev number
-	and.w	#$1,d0		; keep only bit 0
-	lea	_wpstatus(a5),a0
-	add.w	d0,a0		; a0 -> WP status table entry
+	cmp.w	#-4,d1			; interrogate no-spinup-delay flag?
+	beq	getspinup
+	move.w	d1,dseekrt(a1)		; no - do change it.
+*	lea	_wpstatus(a5),a0
+	ext.l	d0			; clear high part of return code
+	rts				; and return.
 
-	addq.b	#1,d0		; turn into drive-select bits
-	lsl.b	#1,d0		; (magic shift left)
-	eor.b	#7,d0
-	bsr	setporta	; (d2 = old bits)
-	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
-	btst	#6,d0
-	sne.b	d0		; d0 = $00 or $ff
-	move.b	d0,(a0)		; wpstatus = $00 or $ff
-	move.b	d2,d0		; d0 = old bits
-	bsr	setporta	; restore old select bits
-
-	move.w	_wpstatus(a5),d0
-	or.w	d0,_wplatch(a5)	; (catch WP transitions)
-	move.b	(a0),d0		; reload the WP status as return value.
-	ext.w	d0
-	ext.l	d0
+setspinup:
+.if HI_DEN
+	move.b	#$08,dspinflag(a1)	; set the no-spin-delay flag.
+.endif
+	moveq.l	#0,d0			; return zero for fun
 	rts
+
+clrspinup:
+.if HI_DEN
+	clr.b	dspinflag(a1)		; clear the flag
+*	move.w	_wpstatus(a5),d0
+*	or.w	d0,_wplatch(a5)	; (catch WP transitions)
+	rts
+
+getspinup:
+.if HI_DEN
 	tst.b	dspinflag(a1)		; return 0 or -1, not the flag itself.
 
 * wrfast - the buffer address is at 8(sp), count at $18(sp)

@@ -3,16 +3,19 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/02/06 15:17:41 $
+* $Date: 89/02/06 21:55:55 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.31  89/02/06  21:55:55  apratt
+* Little (but frustrating!) bug fixes so TT would work.
+*
 * Revision 1.30  89/02/06  15:17:41  apratt
 * Oops - left out _termtab.
-*
+* 
 * Revision 1.29  89/02/06  13:22:23  apratt
 * Added TT code.  No change if you set TT = 0.  EXCEPT:
 * bombs now cause Pterm(-1) to be called, rather than Pterm0().
@@ -160,7 +163,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.30 $
+* $Revision: 1.31 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -224,7 +227,7 @@ denmark		=      13 ***DON'T  CHANGE***
 * code is stopgap, such as programming the memory controller for 2Meg
 * and short-circuiting the RTC.  Caveat programmer.
 * The switches TT, STPLUS, systype, and country
-TT		=	0
+TT		=	0	; @check@
 * of one of the canned switch settings files.
 
 * set DMASND to 1 if you want to enable DMA sound: this assumes that
@@ -232,21 +235,21 @@ TT		=	0
 * not cause a bus error) and that MONOMON is XORed with the sound chip's
 * IRQ line.
 
-DMASND		=	0
+DMASND		=	0	; @check@
 * have a short-frame processor (68000).  Currently that's only TT.
 * set STPLUSVIDEO to 1 if you have ST PLUS video, with four bits per
 * gun instead of three in the palette.
 
-STPLUSVIDEO	=	0		; set to 1 for ST PLUS video & palette
+STPLUSVIDEO	=	0	; @check@
 
 * Set LONGFRAME to 1 for code which runs on 68000 *or* 680[1-3]0.
 * Even if this is zero, the new system variable _longframe at $59e
 * is initialized.
 
-LONGFRAME	=	0		; set to 1 to enable long frames
+LONGFRAME	=	0	; @check@
 
-systype		=	rom		; 'rom' or 'ram'
-country		=	usa      	; 'usa', etc....
+systype		=	rom	; 'rom' or 'ram' @check@
+country		=	usa     ; 'usa', etc.... @check@
 .ifeq TT
 version		=	$0104		; version number *MUST BE EVEN*
 date		=	$12131988	; date, $MMDDYYYY
@@ -1457,6 +1460,7 @@ ill_2:	nop				; (dumb as68 can't have endc after
 .ifne TT
 * TT: use a table of BSR's to get exception number
 	lea	_termtab(pc),a1
+	lea	8,a0
 	move.w	#64-2-1,d0
 sei1:	move.l	a1,(a0)+
 	addq.l	#$2,a1
@@ -2359,6 +2363,7 @@ trap_1:	nop				; sorry about this...
 .ifne TT
 *		to signal the "old ROM" case.
 	bclr.l	#0,d0			; clear & test odd bit
+	move.l	d0,a0			; doesn't affect ccr!
 * Keeps:	C registers
 .endc
 * Notes:	BIOS traps are re-entrant to 'nlevels' (declared near the
@@ -2871,7 +2876,7 @@ tpriv:	bsr.s	_term		; 08: privilege violation (see movesr)
 
 	tst.b	_iamanst		; decide what mask to use
 	move.l	(sp)+,d0		; get addr of bsr instruction
-	sub.l	_termtab,d0		; d0 now offset of bsr
+	sub.l	#_termtab,d0		; d0 now offset of bsr
 	asr.w	#1,d0			; d0 now index of bsr
 	addq.l	#2,d0			; d0 now exception number
 	clr.l	a5

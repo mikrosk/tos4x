@@ -4,22 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/08/21 11:20:03 $
+* $Date: 91/08/22 11:30:18 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.78  91/08/22  11:30:18  apratt
+* fixed an oops for ste mch setting; this is 2.06i
+*
+* Revision 2.78  91/08/22  11:30:18  apratt
+* fixed an oops for ste mch setting; this is 2.06i
+* 
 * Revision 2.77  91/08/21  11:20:03  apratt
 * STPAD fixes: if both POWER-ON and TOP-CLOSED are down at boot time,
 * then DON'T go through resvector.  This defeats the
 * shutdown/startup code, which is necessary when things go wrong.
 * Also fixed a bug that caused shutdown/startup to initialize
 * wrong after a cold boot.
-*
-* THIS VERSION IS 3.06h RELEASED TO TEST THIS DATE.
-*
 * 
 * THIS VERSION IS 3.06h RELEASED TO TEST THIS DATE.
 * 
@@ -164,7 +167,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.77 $
+* $Revision: 2.78 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1653,8 +1656,9 @@ clrm_2:	move.l	d0,(a0)+		; zero a longword
 	move.l	#"_VDO",(a0)+
 	move.l	#$00030000,(a0)+	; Sparrow video
 	move.l	#"_MCH",(a0)+
+	move.l	#$00010100,(a0)+	; STe w/minor 0100
 .else
-					; but leave the vector alone
+* else decide what kind of ST/STPLUS we are: ST, STe, Mega STe, and STe-PLUS.
 	beq	pickste
 	move.l	#"_VDO",(a0)+
 	clr.l	(a0)+

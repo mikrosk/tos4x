@@ -1,0 +1,31 @@
+D:\TOS\GD2
+
+This directory contains "the new GEMDOS."  The differences from the old
+GEMDOS are many, but also few.  There are no new calls.  Internal
+management of handles is MUCH improved, so you don't get into trouble if
+you are multitasking and you open the same file twice, dup and force
+arbitrarily deeply, and stuff like that.  Directory scanning is tons
+faster, so "rm *" in a directory with 300 files is REALLY FAST compared to
+old GEMDOS.
+
+This GEMDOS has been in use by Ken Bad and Jwahar Bammi (bammi@cadence.com)
+since October 1991 or so.  They have used it under MiNT and pronounced
+it good.  I haven't.
+
+This GEMDOS is built with GCC.  Ken wants to rebuild it with Lattice;
+that's fine with me.  In order to work with ALN, the assembly output from
+GCC is transformed into Alcyon assembly code and assembled with MAS, the
+Turbo C assembler.  The transformation is done with an Emacs script. Bammi
+sent me a perl script that also does it, and possibly does it better, but
+it's much slower.  The limited amount of variation in the assembly output
+from the compiler makes this job pretty easy.
+
+920703 kbad
+The "fallback" mentioned in the comment at the head of mem.c was a
+lose.  First off, the freesmall in xmunhook was called in the wrong
+place (it was called for allocated blocks _not_ owned by the proc being
+unhooked!), Besides that, there's a problem with calling freesmall() on
+the blocks that _are_ being unhooked; it was causing a panic before
+getting out of the auto folder.  I don't know what the thinking there
+was, except maybe to free up pool for unlinked MD's used by TSRs.
+

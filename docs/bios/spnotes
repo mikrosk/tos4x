@@ -1,0 +1,77 @@
+MEMORY SIZING
+
+* In the case of Sparrow it is much easier
+* just read from location $FFFF8006, this will set up the memory
+* controller automatically.  The register looks like this:
+* 8006 Read only vvmm rrbf
+*
+*			f - 0 - 0 wait state DRAMS
+*			    1 - 1 wait state DRAMS
+*			b - 0 - 16 bit video bus
+*			    1 - 32 bit video bus
+*		       rr - 00 - 0 wait state ROMS
+*			    01 - 1 wait state ROMS
+*			    10 - 1 wait state ROMS
+*			    11 - reserved
+*		       mm - 00 - 256K deep DRAM
+*			    01 - 1M deep DRAM
+*			    10 - 4M deep DRAM
+*			    11 - reserved
+*		       vv - 00 - VGA monitor
+*			    01 - ST monochrome monitor
+*			    10 - ST colot monitor
+*			    11 - TV
+* Note that the vv bits are for information only, they do not actually affect
+* the hardware in any way.  The other bits are actually used by the hardware
+* to set itself up.
+*
+* To determine memory size:
+* Memory size is depth of DRAM times width of bus divided by 8.
+* Memory size is (256*1024)*(4^mm)*(b+1)*2 in bytes.
+* I guess that a table is better the writting pow().
+* Further note: The maximum RAM that is useable is 14M so the max config
+* of 16M must be clamped to 14M.
+
+Table for memory size:
+
+	mm b	size
+	00 0	512K
+	00 1	1M
+	01 0	2M
+	01 1	4M
+	10 0	8M
+	10 1	14M
+	11 x	illegal
+
+Or, (512K << mmb) capped to 14MB.
+
+Initialization:
+
+	move.w	SPAR_CONF,d0	; auto-config memory controller
+	lsr.w	#8,d0		; get switches in low word: d0=vvmmrrbf
+	lsr.b	#1,d0		; d0=vvmmrrb
+	move.b	d0,d1
+	and.b	#1,d1		; just keep low bit -- d1=b
+	lsr.b	#2,d0		; d0=vvmmr
+	and.b	#6,d0		; d0=00mm0
+	or.b	d0,d1		; d1=00mmb
+	move.l	#$80000,d0	; 512KB
+	asl.l	d1,d0		; 512K << d1 is the memory size
+	cmp.b	#5,d1		; unless mmb was 5
+	bne	gotmem		; (no)
+	move.l	#1024*1024*14,d0	; ...in which case we cap at 14MB.
+gotmem:	move.l	d0,d5		; d5 is phystop
+
+----------------------------------------------------------------------------
+
+MICROWIRE: zeros don't get shifted in, so you can't wait for anything.
+Just loop; this means uWire devices aren't initialized properly, but
+who cares?
+
+SCREEN TEST: Don't check for screen changes.
+
+SETSCREEN: rez bits are reversed when read.
+
+TTSCU: missing; accesses here cause bus error.
+
+VIDEO: have to write to ST palette to kick in ST mode.  This will change.

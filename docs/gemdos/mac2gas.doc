@@ -1,0 +1,62 @@
+	MAC				GAS
+
+	dc.w	$1234			.dc.b	0x1234
+	dc.b	"zzz"			.ascii	"zzz"
+	dc.w	1,2			.word	1,2
+	dc.l	1,2			.long	1,2
+
+one:	ds.w	1			.common one,4
+two:	ds.w	1			two	equ	one+2
+
+	.globl	foo			.globl	foo
+
+foo::					foo: (with .globl)
+
+	move	(a3),d0			move	a3@,d0
+	move	4(a3),d0		move	a3@(4),d0
+	move	4(a0,d0.w)			a0@(4,d0:w)
+	move	-(sp)				sp@-
+	move	(a4)+				a4@+
+	move.l				movel
+	move.w				movew
+	move.b				moveb
+
+
+C function call interface:
+
+	foo() becomes jsr _foo
+
+	foo should look like this:
+
+.globl _foo
+_foo:
+	link	a6,#-4			; link if necessary
+	moveml	d2-d7/a2-a5,sp@-	; save all registers that C needs saved
+
+	...
+
+	moveml	sp@+,d2-d7/a2-a5
+	unlk	a6
+	rts
+
+GCC command line:
+
+	-traditional		you might need this
+
+	-O 			optimize
+	-fstrength-reduce	(loops)
+	-fcombine-regs
+	-fforce-mem
+
+	-Wall			lots of warnings
+
+	-mshort 		16-bit ints
+	-lpml16			math lib for 16-bit ints
+	-lgem16			gem bindings for 16-bit ints
+	(-lgnu16)		standard C library for 16-bit ints (automatic)
+
+optional:
+	-fomit-frame-pointer	makes a6 available as an A register
+	-fwritable-strings	if two instances of "1234" must be distinct
+
+

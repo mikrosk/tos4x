@@ -1,0 +1,20 @@
+execute-file gas2mac.e
+
+1 store-macro
+  set $cmdhook nop
+  set %firstbufname $cbufname
+*loop
+  gas2mac
+  save-file
+  !force next-buffer
+  !if &not &seq $cbufname %firstbufname
+    !goto loop
+  !endif
+  exit-emacs
+!endm
+
+; I do this because cmdhook is the first time you get control
+; after the files are loaded and before the editor is waiting for the
+; user to hit a key.
+
+set $cmdhook execute-macro-1

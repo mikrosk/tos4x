@@ -1,0 +1,279 @@
+FILES/FUNCTIONS WRITTEN
+
+----------------------------------------------------------------------------
+FSHAND.C
+
+sftprobe(): returns the slot number in sft of the first empty slot, or -1
+if there aren't any.
+
+syshnd(h): returns the sft slot number of h, indirecting through PD if nec.
+Returns -NUMBIOS on error (i.e. handle out of range), and h if h itself is
+negative (i.e. a BIOS device number, like Fwrite(-1,1,"x");).
+
+xdup(h): h is std; uses a new slot in sft, copies the ofd field of the slot
+that h refers to (after indirecting through PD).
+
+xforce(std,h): call ixforce(std,h,run)
+
+ixforce(std,h,pd): cause 'std' to refer to the same thing that 'h' does.
+'h' is relative to run, but 'std' is relative to process 'pd'.  Calls
+xclose(std) if std ultimately refers to a file.  Doesn't really need the
+restriction that 'h' must not be a std handle, but has it for now.
+
+xclose(h): for -ve handles, EIHNDL or a no-op.  For h referring to a file,
+close the OFD and DFD if their use counts are 1.  Then, if h was a std,
+re-open it on the default BIOS device.  Returns errors from closes before
+doing side effects.  Calls dfd_close, ofd_close.  Does not yet flush all
+buffers on all drives.
+
+xread(handle, count, buffer): does the obvious.  Might get called with -ve
+handle (calls char_read(h+3,len,buf)) or std handle referring to BIOS dev
+(calls char_read(dev,len,buf)).  Otherwise shortens the request to at most
+the rest of the file and calls xrw(0,ofd,len,buf,xfr2usr). Will not call either
+(just returns zero) for zero length read on valid handle.
+
+xwrite: same as ixread, but calls xrw(1,ofd,len,buf,usr2xfr).
+
+xcreat(name,attr): calls ixcreat, but filters out illegal attr settings.
+Then calls xopen to open the created file.
+
+xgetdta, xsetdta, xsetdrv, xgetdrv
+
+xsfirst(name,attr): calls ixsfirst(name,attr,run->p_xdta).
+
+----------------------------------------------------------------------------
+FSFS.C
+
+getdfd(dir): if there's a DFD referring to the file in 'dir' then return
+a pointer to it, else NULL.
+
+ixcreat(name,mode): create the file.  Just create it, don't open it.
+Clobbers existing writable files by the same name, but doesn't clobber
+files when creating directories, and doesn't clobber directories ever, and
+refuses if the file is open or if the name is invalid.  Includes a special
+case for FA_LABEL, which ISN'T CODED YET.
+
+xopen(name,mode) does open stuff.  Calls getdfd to reuse an existing one,
+or calls newdfd, fills it in and links in.  Calls newofd, fills it in,
+links it to the dfd.  Links an sft slot to the ofd, returns that slot.
+Initting the r/w pointer info isn't done yet.
+
+xchmod(name,wflag,newmode): There are few restrictions on this call: you
+CAN shoot yourself in the foot here.  You can't change the SUBDIR bit, and
+you can't change the LABEL bit of a SUBDIR, but you can do anything else,
+including changing wierd undefined bits.  Returns the old attrib for a
+read, or the new for a write, or an error code.  The logic is that you want
+access to the bits we haven't decided what to do with yet.
+
+xdatime(buf,h,wflag): returns EIHNDL for invalid, negative, and TTY
+handles.  Returns the date & time if !wflag, else writes the new info to
+the DFD and marks the DFD as dirty.  Fsfirst has to check for the DFD or
+its info will be out of date (which is also true of the length).
+
+xdelete(name): external version of delete. Eventually calls ixdel to
+actually remove the thing from the disk. Before doing that, checks to see
+if somebody else has the file open. If so, returns EACCDN.  If *you* have
+it open, calls xclose once per handle of yours that refers to the file.
+NOTE: Fdelete of an open file on a write-protected disk will close the file
+before failing to delete it.
+
+ixdel(dir): removes a dir entry from the disk.  Just e5's out the slot and
+frees the cluster chain. No sanity checks.  e5's out the slot first, so if
+that write succeeds but others fail no harm is done.
+
+xrename(oldname, newname): if the old name doesn't exist (as a file or
+dir), error.  If the new path doesn't exist, error.  If the new file *does*
+exist, error.  If the new name is invalid, error.  If the two aren't on the
+same drive, error.  If old name is an open file, error.  If they're in the
+same directory, copy the new name in. Else get FCB from old dir, mark as
+erased & dirty, flush, copy FCB into new dir, copy new name over that, mark
+new dir as dirty, flush.  Note that there is no check for renaming a
+directory through the structure: this is as easy as renaming a file through
+the structure.  It *will* change the CWD of anybody whose current directory
+is the one being moved or a descendent.
+
+xlseek(whither,h,whence): decodes 'whence' (with error checking) and places
+the read-write pointer of h's OFD there.  Returns ERROR if any cluster
+entry in the FAT has a value of zero or $FFFx, as these are illegal or
+unexpected at this point.
+
+****************************************************************************
+
+MACROS AND FUNCTIONS USED BUT NOT WRITTEN
+
+
+xrw(rwflag,ofd,len,buffer,xfer_fn)
+
+char_read, char_write.
+
+dfd_close(dfd): expected to write disk information out (modified time,
+attribs) if dirty, and free the dfd.  Called only when use count is 1 and
+being closed.  May longjmp on error.  Returns 0 on success.
+
+ofd_close(ofd): expected to free the ofd.  The dfd is already gone. Called
+only when use count is 1 and being closed.  Probably can't fail, but
+returns 0 for success.
+
+#define DIR struct _dir
+
+DIR {
+	int dir_dev;			/* dev this dir is on */
+	unsigned int dir_clust;		/* start clust of this dir */
+	unsigned int dir_recno;		/* record slot was found in */
+	unsigned int dir_recoffs;	/* offs into recno of slot */
+	BCB *dir_bcb;			/* buffer block (for marking dirty) */
+	FCB *dir_fcb;			/* pointer to slot in cache buf */
+};
+
+errcode = fn2dir(pfn,dir,attr,dirflag): fill in *dir with directory
+information while finding *pfn.  *pfn at the end contains a pointer to its
+last component, or to the end of the string if there was a trailing SLASH
+or dirflag is set.  Attr can limit the search.
+
+The components of fn including colons and up to the last SLASH are consumed
+and the result placed in the dir structure.  EFILNF and EPTHNF mean what
+they say; in the former case, dev/clust are valid.  If the last component
+to be scanned for is found, recno is the record number it was found in,
+recoffs is the offset into that record, and buf points to the BCB and ptr
+is a pointer to that slot in a cache buffer.  Great care must be taken not
+to abuse buf or ptr, but they can be used to read or write info (see below).
+
+Returns EACCDN when fn is empty, or the last component is empty and dirflag
+is zero, or the last component starts with 0xe5 or dot-dot ("..") or
+consists of just dot ("."), or contains wildcard characters.  This is
+because these checks are so common.  (Need a flag saying dot and dot-dot
+are OK!)
+
+long dir2dir(dir) takes dev, recno and recoffs and fills in buf and ptr.
+Again, these are valid only under special circumstances. ("Freshens" them.)
+
+long dirslot(dir) takes a dev, clust and fills in recno, recoffs, buf and
+ptr for the first slot in the directory which is erased (0xe5) or null
+(0x00), and extends the directory if necessary.  Returns ERROR for full
+disk and full root directory, zero for success.  If the directory needs
+extending, this call does it and writes the FAT; if it fails, it does so in
+a way that is not catastrophic, and returns an error code.
+
+The basis of the dir system is that a dir structure is local to the routine
+that uses it, and pointers to that are passed down to helpers. The bcb and
+fcb fields are only usable when they're "fresh."  They're "fresh" when the
+dir struct is filled by fn2dir with no error, and they become stale when
+any call is made that might cause disk  activity. This includes read and
+write, obviously, but also FAT operations, other calls to dir functions,
+xclose, etc. It is NOT guaranteed that you can have two fresh dirs at a
+time. The only routine which could want this is xrename, and it's coded so
+as to avoid needing that.
+
+long
+fn2dir(pfn,dir,dirflag)
+char **pfn;
+DIR *dir;
+int dirflag;
+{ ; }
+
+long
+dir2dir(dir)
+DIR *dir;
+{ ; }
+
+long
+dirslot(dir)
+DIR *dir;
+{ ; }
+
+dirflush(dir): write the dir entry out.  Really a flush on dir->dir_bcb.
+Dir must be fresh.
+
+padname(namepart,fcb->f_name) places namepart into f_name in the GEMDOS way.
+
+xgetrec(dev,rec,pbcb,pbuf) gets dev/rec into a buffer, returns the BCB
+pointer  in *pbcb, the buffer pointer in *pbuf.
+
+Somewhere, in each call that uses dir's, we need to call something
+which builds a DMD for the drive in question.  Other calls index in 
+drvtbl, but somebody has to do the getbpb and build that entry!
+
+dirnext(dir): fill (fresh) dir in with FCB pointer of the NEXT slot in dir.
+Return ENMFIL if you fall off the end of the dir, but not for a zero slot.
+Return zero for success.  dir comes in fresh so you can just say fcb++ if
+the fcb isn't at the end of a sector.
+
+****************************************************************************
+
+GENERAL NOTES:
+
+xclose doesn't flush all buffers on all drives yet.
+
+ixcreat doesn't include its special case for labels yet.
+
+newdfd(), newofd()
+
+ofd_head, dfd_head: variables which point to the heads of these lists.
+NULL at init time.
+
+xopen doesn't do devices yet, doesn't init the r/w info yet.
+
+Oh, brother. We have to assume that a media-change error might occur in the
+middle of any OS call, since even a read can cause a write to other drives
+(to flush a dirty victim cache buffer), resulting in a "put disk B in drive
+A..." and the user could put the wrong disk in.  Also, when we get back to
+the read that started it all, the user could put the wrong disk *back* in
+A, and we therefore get ANOTHER media change.  Furthermore, in the first
+case, we could get a write error that's unrelated to the operation being
+performed!  This complicates every call. Every call must be analyzed for
+the results of media change at each step, in addition to read and write
+errors.
+
+Hmmm.. we can introduce the notion of "the drive the current call is acting
+on."  There's only ever going to be one.  Only Frename *might* act on two
+drives, and in that case it'll fail anyway.  So we treat errors differently
+based on that: if it happens to the drive we're operating on, it's serious,
+but if it happens to another drive, we get over it to some extent.
+
+If you get E_CHNG you always start processing it the same way: close files,
+invalidate buffers.  But if it happened on other than the current drive
+(as can happen in writing a dirty victim) you then proceed with the
+original call uninterrupted.  If it happened on the drive you're working
+on, you longjmp to restart the call.
+
+If you get another error you return the error code.  The caller then
+cleans up modified data structures and returns the error.  The caller
+should not cause any more I/O.  We declare a new error code which is
+"I/O Error on another disk" to take care of that case.
+
+Recovery from disk errors should NOT include invalidating cached buffers on
+the drive, because that would be very bad.  What if you have unwritten data
+and FAT sectors, then write-protect a disk, then get a WP error on a 
+separate Fcreate and cancel, then un-write-protect it and close the
+original file?  The close should succeed.  Hmm.  Should it?  This is pretty
+far-fetched.  Just don't be stupid.
+
+From POSIX (IEEE 1003.1) appendix B section B.2.2.1.2: 
+
+	"Various exception conditions ... can cause data to be lost. ...
+	The data can be lost, in whole or in part, so that only careful
+	inspection of file contents could determine that an update did
+	not occur. ... [This] can leave inconsistencies ... in the
+	filesystem itself. ... The consequences of this to the user may
+	be arbitrarily bad."
+
+We already know that at the start of a GEMDOS call only open files can have
+dirty data anywhere in GEMDOS memory: unwritten FAT and data blocks, and
+un-updated directory entries.  Losing any of these things is not a
+disaster, just annoying.  More to the point, the disk can't normally be
+left in a state that would cause GEMDOS itself to bomb or get tied up in
+knots. The worst case is still bad: two entries pointing at the same file
+(half of an Frename). So you Fopen one of these, write into the first
+sector (now it's cached), Fdelete the other one (the clusters are freed),
+Dcreate a new directory (it gets those clusters), then write to the open
+file again and close it.  Now the first sector of the directory is hosed. 
+Sigh.  Half of a Drename is worse: which is the parent?
+
+We could prevent this by checking all DFD's for the same starting cluster
+number, to see if you're opening a file which itself has two entries, but
+this is really pathological stuff.
+
+fatflush(dm): write the FAT of drive DM out.  This is because we never want
+the FAT to be out-of-date w.r.t. the disk after a GEMDOS call, except for
+open files.
+

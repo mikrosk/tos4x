@@ -1,0 +1,56 @@
+This version (refer to it as 910620 b) fixes the two bugs I found:
+
+	1. There was a bug that was hidden if the data part of the disk
+started on an even sector number.
+
+	2. There was a short-cut in the code which was not adequately
+guarded.
+
+Also, this version has two new features:
+
+	1. If your BIOS sets bit 1 of the flags word of the BPB, it is
+taken to mean that the disk in question has only one FAT.  Thus, with an
+appropriate Getbpb hook (or a new BIOS :-) you can safely use disks which
+have only one FAT.  MSDOS sometimes formats disks with only one FAT. GEMDOS
+has always been able to read such disks, but writing to them has been
+disasterous.  On disks with more than two FATs, only the last two will be
+used.  In any case, only the last FAT (the one abutting the root directory)
+will be read; the other FAT will only be written.
+
+	2. When the state of a disk goes to "maybe changed" (i.e. you have
+popped out a floppy disk) and there are no dirty buffers on that disk, all
+cached data from that disk is forgotten.  This means that removing a disk
+from a machine, modifying it on another machine, and putting it back in the
+first machine will not cause stale data to be used.  Also, when there are
+no open files on the disk in question, removing a disk and replacing it
+with another that has the same serial number no longer causes any stale
+data to be used.
+
+	Open files are not forgotten.  You can still get stale data if
+there are open files on the disk that is removed.  You can actually destroy
+data on the new disk if there are dirty buffers destined for the old disk.
+Since the only way to have dirty buffers on a disk is to have open files on
+the disk which have been written to and not closed, you are safe if you do
+not remove a disk that has open files on it.  Thus:
+
+	Thou Shalt Not Remove Disks When Thou Hast Open Files On Them.
+
+	"Removing a disk" does not include swapping logical disks A and B
+when instructed to, or removing a disk from the drive (e.g. to change its
+write-protect tab or read its label) and putting the same disk back in the
+same drive.
+
+	I have found that MSDOS 3.x exhibits the same unsafe behavior, and
+this is much safer than old GEMDOS, so it's definitely a net win.
+
+	MSDOS version 5.x (4.x?) puts a serial number on each disk, but not
+in the same place that TOS uses.  Most MSDOS disks appear to TOS to have
+the same serial number.  A future BIOS will include the MSDOS 5.x serial
+number area in the media-change checking code.  This is transparent to
+GEMDOS.
+
+	This feature is slightly imperfect: if the disk you put in appears
+to have the same serial number, but is not formatted the same way (i.e.
+sizes of the FATs and root directory) there will be trouble.  A new BIOS
+and/or GEMDOS will address this concern.
+

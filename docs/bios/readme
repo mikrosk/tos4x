@@ -1,0 +1,55 @@
+TODO LIST:
+
+Back out FPU probe.
+
+Decide whether to change version number back to x.06.
+
+----------------------------------------------------------------------------
+
+Diffs with respect to TOS of November 1991:
+
+STARTUP.S:
+
+FPU probe and Frestore (not well tested; back this out).
+
+Vector exceptions during boot to coldboot.
+
+.if SPARROW changes
+.if M68030 changes
+
+version number changed to x.07 (commented as x.08); change it back?
+
+Test only one IDE device for bootability.  Test only one SCSI device, too.
+
+Fix in auto folder execution: if the dev doesn't exist we jumped to
+never-never land, now we rts.
+
+----------------------------------------------------------------------------
+
+BIOS.S
+
+Coldboot changed to work on STbook and Sparrow (only 1MB gets cleared in
+those case).
+
+Fix to RTS/CTS in SCC code; stop sending based on hardware bit state,
+not software state, which can be detected much later.  (no impact on STbook)
+
+----------------------------------------------------------------------------
+
+CLOCK.S:
+
+Fixed an oops - we DO want to diable the alarm when STBook boots.
+
+----------------------------------------------------------------------------
+
+DMAREAD.S:
+
+Changed cache: .if M68030, not .if SCSI.
+
+Much Sparrow stuff.  Fixed a bug in ACSI devices.  IDE Timeout is long.
+
+----------------------------------------------------------------------------
+
+FLOP.S:
+
+All changes are .if SPARROW or .if M68030/TT

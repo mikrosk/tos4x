@@ -1,0 +1,17 @@
+Things to think about
+
+
+	o Should line1010 routines be soft vectored
+
+	o Can a vitual work station have the capability to have
+	  customized low level drawing routines. I.E. each work
+	  station has a pointer to customized drawing primitives.
+	  If the pointer is NULL then we default to system routines.
+
+	o Should we add capability to scale or shrink bit images
+	  to a specified area ?
+
+	o Should we add the capabitlity to set the origin so that
+	  all vdi drawing primitives will use that as an offset.
+
+	o Should we introduce a call obscure cursor ?

@@ -1,0 +1,92 @@
+ISSUE: handle & directory inheritance happens when a basepage is created,
+not when the child actually starts.  This causes trouble if it's never
+allowed to terminate, or if it is allowed to terminate more than once.
+
+FIX: new Pexec modes (!) which do this at the right time.
+
+ISSUE: lack of an Fsync call
+
+ISSUE: DND's lying around all over the place.
+
+The DND doesn't really hold any information that's important. You can keep
+track of the same stuff elsewhere.  I would like to replace DND's with a
+cache of DND FCB's, and hook them together via drive/starting-cluster
+pairs.  A file is identified on disk by the drive/clust pair for the
+directory it's in, the clust/offs of its FCB in that directory, and its own
+starting cluster number.
+
+ISSUE: FTAB/OFD is an incomplete implementation of file handles
+
+Currently: FTAB holds a pointer to an OFD, an owner ID, and a reference
+count. 
+
+The OFD contains a reference count and the read/write pointer information,
+plus the file info like time, date, start cluster, and size, and DMD and
+DND and such.
+
+The correct way is to have FTAB entries contain an owner and a pointer  to
+an intermediate structure, holding the RW pointer info; that in turn has a
+reference count (how many FTAB's point to it) and a pointer to the (single)
+OFD for that file.  If the file is opened multiple times, there's a new OFD
+for each open.  If the handle is dup'd, a new FTAB entry is created
+pointing to the same RW pointer structure.
+
+ISSUE: a process' current-directory spec (however it's done) can be
+rendered invalid because a drive gets media changed or the directory gets
+deleted. If you create a new directory in that same place (same drv/clust
+or same struct pointer), then that will become the current directory of the
+process!  Hmm. The current system works: it has a slot in the diruse/dirtbl
+table for each current directory that's used, and it resets the slot to
+"root" when you get media-change.  This will not be "freed" until the
+process terminates.
+
+An alternative is to have a chain of all basepages and fix up each one.
+This is bad because of people using Pexec for nefarious purposes.  The
+alternative is to keep the current system (dammit!) where the basepage
+contains an index into a table.  This can be bad if inheritance is done
+wrong.  Hell, screw 'em!  Have to handle the case of a drive/clust pair
+which aren't valid any more...
+
+ISSUE: "hidden directory" is not valid under GEMDOS.  It is under MSDOS,
+and therefore can exist on some disks.  Why not allow directories to have
+attributes like that?  But do you fail to find a hidden  directory if the
+search attribute is 0x20?  In any case, such directories shouldn't be
+treated as files.  In a related development, what about reserved attribute
+bits?  Probably shouldn't return "access denied" in these cases; what if we
+decide we want to do something with them?
+
+ISSUE: prototypes.  You can run mkproto on *.c, but then you have to edit
+the result.  Change ^void to ^voidfn, and xrw's prototype reads as follows:
+
+	long xrw _P(( int wrtflg , OFD *x_p , long len , 
+		void *ubufr , voidfn (*bufxfr )(int, void *, void *)));
+
+ISSUE: number of FATs is always two.  This is bad, since MSDOS sometimes
+formats with just one.  However, the BPB doesn't include this information!
+
+ISSUE: no equivalent of "inode" uniquely identifying a file.  Proposed
+solution was dev/startcl, but then all zero-length files on a drive appear
+to be the same file!  Alternatively, dev/dirstart/diroffs would do it.
+
+ISSUE: in xdatime, if we're writing the time/date of a file, we write the
+time/date of ALL copies of the OFD for this file.
+
+ISSUE: Frename will work on an open file, but not update the OFD.  It needs
+to return EACCDN if the file is open.
+
+ISSUE: new calls for file/record locking.  Per Bill Rhebock's request, I
+have assigned some function numbers for networking, file and record
+locking, etc. The function numbers 0x58 to 0x60 are assigned for that
+purpose, with a short-term option on 0x61-0x67. (1/91)
+
+ISSUE: rmdir of somebody's (even YOUR) current directory. I had initially
+wanted to deny rmdir of a directory which is anybody's current directory on
+that drive, because it's safer.  However, a current directory can be a
+pretty wierd concept when even the guy who did it has forgotten about it. 
+In addition, the Desktop actually does a chdir to a directory, then rmdir
+of that same directory.  Therefore, rmdir has to allow deleting any  empty
+directory, and we have to decide what to do.  Decision: bump them up to ..
+rather than bumping them all the way to root, which is the only other
+option.  (Bumping to root has precedent: it happens after media change.
+However, that's the ONLY solution after media change, so that's no help.)
+

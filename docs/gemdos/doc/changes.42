@@ -1,0 +1,12 @@
+Changes to GEMDOS between TOS 4.01 and 4.02:
+
+scan.c: checked for an empty name, and if found return an error.
+        This corrects a bug where renaming a file to an empty name
+	(e.g. from the desktop) caused it to get a name like
+	"C:\" (i.e. it's directory name); since this isn't a legal
+	file name, such files could never be deleted.
+
+fshand.c: fixed Fforce() so that Fforce(0,-1) makes stdout refer to
+	CON:. This was always intended to work (and did work in
+	TOS 1.x, 2.x and 3.x) but a typo broke it in TOS 4.0 and 4.01.
+

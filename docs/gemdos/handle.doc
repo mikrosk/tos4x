@@ -1,0 +1,63 @@
+HANDLES IN THE NEW GEMDOS:
+
+SFT is the system handle table (never mind the name).
+
+FTAB {
+	PD *f_own;		/* owner; 0 means free */
+	OFD *f_ofd;		/* OFD this handle refers to */
+}
+
+/* macros for setting & checking the OFD field in SFT */
+
+#define ofdisatty(ofd) (((long)(ofd)) & 1)
+#define ofddevno(ofd) ((short)((((unsigned long)(ofd)) >> 1)))
+#define ofdmaketty(ofd,devno) ((ofd) = (OFD *)(((devno) << 1) | 1))
+
+As you can see, the ofd field, when odd, says "this is a tty."  The rest of
+the field is the BIOS device number of it.  The first NUMSTD slots are BIOS
+devices 0-5, and they're owned by rootpd so they never go away.  This way
+we handle processes which Fread/Fwrite on handle -1, for instance,
+expecting the console; they get sft[-(-1)] which is sft[1], which is
+initalized to BIOS device 2.  Fforce(0,-1) has a different effect: a new
+entry in SFT is created with ofdmaketty(sft[h].f_ofd,(-1)+3).
+
+Fopen of CON: AUX: etc. do NOT return negative numbers any more.  They
+return positive handle numbers, whose slots in sft are TTY entries.
+
+OFD is a structure representing a read/write pointer on a file. Many
+entries in SFT from many processes may point to a single OFD, so it has a
+reference count and no owner.  It has read/write pointer info and the open
+mode -- read only, shared/exclusive, etc.  It also has a pointer
+to the DFD.
+
+OFD {
+	OFD *o_next;
+	int o_use;
+	int o_mode;
+	(r/w pointer info)
+	DFD *o_dfd;
+};
+
+DFD is a structure containing the information specific to a file on disk.
+This includes its starting cluster number, length, last-mod date & time,
+file attributes, and also the drive/clust of the directory it's in, and the
+offset in that directory of this file's slot (format TBD) so you can write
+the date & time etc. back.
+
+DFD {
+	DFD *dfd_next;
+	int dfd_use;
+
+    /* the next 4 items must be in same order as FCB. In memory,	*/
+    /* date, time, and strtcl are in 8088 format, but fileln isn't.	*/
+	int	dfd_time;
+	int	dfd_date;
+	int	dfd_strtcl;
+	long	dfd_fileln;
+
+	int	dfd_dev;	/* device this file's on */
+	int	dfd_dircl;	/* starting cluster of this file's dir */
+	int	dfd_dirrec;	/* recno this file's slot is in */
+	int	dfd_diroffs;	/* offset into dirrec of file's slot */
+	int	dfd_dirty;	/* flag: new strtcl, len, date, or time */
+}

@@ -1,0 +1,56 @@
+This file documents how to go about developing and debugging GEMDOS.
+
+The way you develop GEMDOS is to create DOS.SYS, copy it to a special
+boot disk, and cold-boot your system using that disk.  This will cause
+DOS.SYS to replace the ROM GEMDOS.
+
+Creating DOS.SYS is easy: say 'make'.  The first thing this does is
+create gemdos.o, just like the ROMs use.  It then slaps some glue to the
+beginning of it to generate DOS.SYS. 
+
+The glue is self.o, ld_dos.o, announce.o, clock.o, and clear.o,
+along with fsstub.o, the debugger stub for the file system.
+
+self.o must be the first file in the link: it gets control after the
+boot sector on the disk loaded it.  It performs fixups on its own image,
+just like Pexec does.
+
+ld_dos.o must be the second file: when self.o is done, it falls right
+through to the next object file.  ld_dos.o provides some externals which
+GEMDOS needs, installs the debugger stub if you ask for it, and displays
+the logic-hazard announcement with the version date.  Then it calls
+_osi, the initialization entry point for GEMDOS.  ld_dos also
+installs a reset handler which clears _bootdev when you hit reset.
+This is becase 11/20 and 4/22 ROMs don't check the floppy for a
+warm boot when you have a bootable hard disk.
+
+Note that if you DO have a bootable hard disk, it will work as always
+after DOS.SYS loads.
+
+The other chunks of glue provide externals like clear and clock
+which normally come from the BIOS in ROM and TOS.IMG versions.
+
+Once you have DOS.SYS which loads and announces itself, you debug
+as follows:
+
+While DOS.SYS is loading from floppy, hold down the left
+shift key.  This causes the system to pause after the logic-hazard
+announcement.  As long as you hold down the left-shift key, the
+system will stay paused.  A menu appears telling what to do now:
+let go of left-shift to continue, or hit right-shift to install
+the debugger stub, or hit Control to install the stub AND CALL THE 
+DEBUGGER RIGHT AWAY.  Ideally, you have the same DOS.SYS file
+accessible on the debugger machine, so you can load symbols
+from it.  To load symbols, say
+
+	getsym dos.sys (+ `stubbp 1c)
+
+because `stubbp gets set to the "basepage" (really just the PRG header)
+for DOS.SYS, and the text base (where self.o starts) is at that
+address plus $1c.
+
+Now you have symbols, and can debug GEMDOS just like any other program.
+Stop buttons come in handy here, and the file "os.db" and "doos.db" and
+"doosif.db" interact (I forget just how) to let you see all OS calls,
+their parameters, and what they return.  It might be slow, but it sure
+is informative.

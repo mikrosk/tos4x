@@ -1,0 +1,101 @@
+* docall.s -- help function for btest.c
+*
+* Usage:
+*   docall(trap,fncode,p_args,p_types,max_args)
+*   int trap;
+*   int fncode;
+*   long *p_args;
+*   int *p_types;
+*   int max_args;
+*
+*	p_types is an array of max_args ints; if the 0x80 bit is set,
+*	the corresponding element of p_args should be pushed as a long.
+*	When p_types is zero, the corresponding arg is not pushed at all.
+*
+*
+
+.globl _docall
+.globl _osif
+
+_docall:
+	move.w	4(sp),d0	; trap number in d0
+	move.w	6(sp),fncode	; function number in fncode
+	move.l	8(sp),a0	; a0 -> args (all longs)
+	move.l	$c(sp),a1	; a1 -> types (all words)
+	move.w	$10(sp),d2	; d2 = max number of args
+	move.l	sp,osp
+
+	move.w	d2,d1
+	subq.l	#1,d1		; d1 = count for dbra (max #args - 1)
+
+	asl.w	#1,d2		; d2 *= 2 (offset past last type word)
+	lea.l	-2(a1,d2.w),a1	; a1 -> last type word
+	asl.w	#1,d2		; d2 *= 2 again (offs past last arg long)
+	lea.l	-4(a0,d2.w),a0	; a0 -> last arg longword
+
+loop:
+	tst.b	1(a1)
+	beq.b	next
+	bmi.b	islong
+; int
+	move.w	2(a0),-(sp)	; move lo word of Nth arg to stack
+	bra.b	next
+
+islong:	move.l	(a0),-(sp)	; move whole long of Nth arg to stack
+next:	subq	#$4,a0
+	subq	#$2,a1
+	dbra	d1,loop
+
+	move.w	fncode,-(sp)
+	asl.w	#2,d0		; trapno *= 4
+	jmp	jmptab(PC,d0.w)
+	nop
+
+jmptab:
+	trap	#0
+	bra.b	done
+	bra.b	dotrap1
+	nop
+	bra.b	done
+	trap	#2
+	bra.b	done
+	trap	#3
+	bra.b	done
+	trap	#4
+	bra.b	done
+	trap	#5
+	bra.b	done
+	trap	#6
+	bra.b	done
+	trap	#7
+	bra.b	done
+	trap	#8
+	bra.b	done
+	trap	#9
+	bra.b	done
+	trap	#$a
+	bra.b	done
+	trap	#$b
+	bra.b	done
+	trap	#$c
+	bra.b	done
+	trap	#$d
+	bra.b	done
+	trap	#$e
+	bra.b	done
+	trap	#$f
+	bra.b	done
+	nop
+done:
+	move.l	osp,sp
+	rts
+
+dotrap1:
+	move.l	sp,a0
+	move.l	a0,-(sp)
+	jsr	_osif
+	bra	done
+
+.bss
+osp:	ds.l	1
+fncode:	ds.w	1

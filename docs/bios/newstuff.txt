@@ -1,0 +1,103 @@
+.if SPARROW
+* 80-87 unimplemented on Sparrow
+
+	dc.l	unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl
+
+* 88-95 Sparrow video calls from vtg.o
+
+	dc.l	_VsetMode		; 88
+	dc.l	_VgetMonitor		; 89
+
+	dc.l	_VsetSync		; 90
+	dc.l	_VgetSize		; 91
+	dc.l	_VsetVars		; 92
+	dc.l	_VsetRGB		; 93
+	dc.l	_VgetRGB		; 94
+	dc.l	_ValidMode		; 95
+
+* 96-127: Sparrow DSP calls from dsp.o
+
+ .globl	_DspDoBlock, 		_DspBlkHandShake,	_DspBlkUnpacked
+ .globl	_DspInStream,		_DspOutStream,		_DspIOStream
+ .globl	_DspRemoveInterrupts,	_DspGetWordSize,	_DspLock
+ .globl	_DspUnlock,		_DspAvailable,		_DspReserve
+ .globl	_DspLdProg,		_DspExProg,		_DspExBoot
+ .globl	_DspLodToBinary,	_DspTriggerHC,		_DspRequestUniqueAbility
+ .globl	_DspGetProgAbility,	_DspFlushSubroutines,	_DspLdSubroutine
+ .globl	_DspInqSubrAbility,	_DspRunSubroutine,	_DspHf0
+ .globl	_DspHf1,		_DspHf2,		_DspHf3
+ .globl	_DspBlkWords,		_DspBlkBytes,		_DspHStat
+ .globl	_DspSetVectors,		_DspMultBlocks
+
+	dc.l 	_DspDoBlock		; 96
+	dc.l	_DspBlkHandShake	; 97
+	dc.l	_DspBlkUnpacked		; 98
+	dc.l	_DspInStream		; 99
+	dc.l	_DspOutStream		; 100
+	dc.l	_DspIOStream		; 101
+	dc.l	_DspRemoveInterrupts	; 102
+	dc.l	_DspGetWordSize		; 103
+	dc.l	_DspLock		; 104
+	dc.l	_DspUnlock		; 105
+	dc.l	_DspAvailable		; 106
+	dc.l	_DspReserve		; 107
+	dc.l	_DspLdProg		; 108
+	dc.l	_DspExProg		; 109
+	dc.l	_DspExBoot		; 110
+	dc.l	_DspLodToBinary		; 111
+	dc.l	_DspTriggerHC		; 112
+	dc.l	_DspRequestUniqueAbility ; 113
+	dc.l	_DspGetProgAbility	; 114
+	dc.l	_DspFlushSubroutines	; 115
+	dc.l	_DspLdSubroutine	; 116
+	dc.l	_DspInqSubrAbility	; 117
+	dc.l	_DspRunSubroutine	; 118
+	dc.l	_DspHf0			; 119
+	dc.l	_DspHf1			; 120
+	dc.l	_DspHf2			; 121
+	dc.l	_DspHf3			; 122
+	dc.l	_DspBlkWords		; 123
+	dc.l	_DspBlkBytes		; 124
+	dc.l	_DspHStat		; 125
+	dc.l	_DspSetVectors		; 126
+	dc.l	_DspMultBlocks		; 127
+
+* 128-151: Sparrow sound calls from spsound.o
+
+ .globl locksnd,unlocksnd,soundcmd,setbuffer
+ .globl setmode,settrack,setmontrack,setinterrupt
+ .globl buffoper,dsptristate,gpio,devconnect
+ .globl sndstatus,buffptr
+
+	dc.l	locksnd			; 128 Open a sound channel
+	dc.l	unlocksnd		; 129 Close a sound channel.
+	dc.l	soundcmd		; 130 Perform a sound functions.
+	dc.l	setbuffer		; 131 Set rec/play buffer location.
+	dc.l	setmode			; 132 Set sound 8/16 bit stereo/mono.
+	dc.l	settrack		; 133 Set number of tracks.
+	dc.l	setmontrack		; 134 Set monitor track.
+	dc.l	setinterrupt		; 135 Set interrupt type.
+	dc.l	buffoper		; 136 Set rec/play buffer operations.
+	dc.l	dsptristate		; 137 Tristates DSP bus
+	dc.l	gpio			; 138 Talks to gpio acording to mode.
+	dc.l	devconnect		; 139 connects src to dst devices.
+	dc.l	sndstatus		; 140 Get current sound status.
+	dc.l	buffptr			; 141 Get current buffer offsets.
+	dc.l	unimpl			; 142 [reserved]
+	dc.l	unimpl			; 143 [reserved]
+* 144
+; This line has been commented out because it is taken care of below..
+; See towns for details..
+*	dc.l	unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl,unimpl
+
+* 152-159: Sparrow VDI video calls
+
+	dc.l	unimpl			; 144
+	dc.l	unimpl			; 145
+	dc.l	unimpl			; 146
+	dc.l	unimpl			; 147
+	dc.l	unimpl			; 148
+	dc.l	unimpl			; 149
+	dc.l	_SetMasks		; 150
+	dc.l	_SetOverlay		; 151
+

@@ -1,19 +1,23 @@
 ******************* Revision Control System *****************************
 *
-* $Author: kbad $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/28 21:01:16 $
+* $Date: 89/08/29 17:36:45 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.25  89/08/29  17:36:45  apratt
+* Added code (two lines) to set GEMDOS date/time when XBIOS Settime()
+* call is made.
+*
 * Revision 2.24  89/08/28  21:01:16  kbad
 * Changed mushroom code to get rid of the LUT for initial screen offset,
 * since there are only two of them (and TT res offsets are > word length)
-*
+* 
 * Revision 2.23  89/08/28  19:03:23  kbad
 * Fixed(?) bomb handler for all resolutions.  Also fixed a couple of
 * fatfingers at dmaboot. (_diskbufp != _dskbufp !!!)
@@ -299,7 +303,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.24 $
+* $Revision: 2.25 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -4073,6 +4077,8 @@ noblank1:
 	bra.s	clkswtch
 *+
 * Search for a package, execute it.
+*
+*	+---------------+
 *	|   $12123456	| base + 0, on a 512-byte boundary
 *	|		|
 *	+---------------+

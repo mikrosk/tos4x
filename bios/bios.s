@@ -4,17 +4,30 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/06/18 16:36:05 $
+* $Date: 90/07/19 14:46:56 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.22  90/07/19  14:46:56  apratt
+* Fixed a bug in rsconf: -2 for TT MFP's port always returned rate
+* for ST MFP.  Now it is right.  Also sped up memory clearing in
+* coldboot.
+*
+* Added a thing that Insignia needs for their SoftPC product: a vector
+* BEFORE Kbdvbase() which is jmp'ed through when the BIOS has established
+* that a scan code from the keyboard is a make or break code from a key,
+* not part of a mouse or joystick packet.  By default points to "itsakey."
+*
+* Made cold-boot RAM clearing faster using a tower of four.
+*
 * Revision 2.21  90/06/18  16:36:05  apratt
 * Fixed keyclicks so caps-lock keyclick goes through kcl_hook, not the
 * built-in keyclick.
-*
+* 
+* 
 * Revision 2.20  90/05/09  16:46:58  apratt
 * Fixed scc tx int code so it works (oops).
 * 
@@ -224,7 +237,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.21 $
+* $Revision: 2.22 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -710,7 +723,16 @@ mibuffer:	ds.b	minsize		;midi input buffer
 
 
 *	Acia error handler vectors -- init'ed to point to 'rte' unless
+*	changed subsequent to boot-up
+
+* A pointer to this vector table is returned by Kbdvbase, so don't
+* be changing it.  Also, kstate is now officially documented as
+* coming after ikbdsys.  It always has, but now it's official. See below.
 *
+* As of 7/12/90, at offset -4 from the Kbdvbase vectors is a RAM vector
+* which gets JMPed to when the BIOS has established that the byte
+* from the keyboard is really a key make or break event.  (This includes
+* shift keys, and mouse-sending-keystrokes keys.)
 
 ikbdkey:	ds.l	1	;this is Kbdvbase()-4 (see above)
 
@@ -1725,6 +1747,7 @@ ttmfp	equ	$fffffa81
 	move.w	#-1,altkp
 
 	move.l	#aciaexit,d0
+	move.l	d0,vkbderr.w	;init keyboard error handler address
 	move.l	d0,vmiderr.w	;init midi error handler address
 	move.l	#sysmidi,midivec.w	;point to user midi interrupt vector
 	move.l	#vecmidi,midisys.w	;point to system midi interrupt vector
@@ -2639,7 +2662,7 @@ auxrsconf:
 * EXPECTS: a0=iorec, a2=mfp.
 * RETURNS: see above for rsconf return values
 *
-	move.w	auxbrate,d0
+	move.w	brate(a0),d0
 rscommon:
 	moveq.l	#0,d0		;pre-clear hi word of return value
 	cmp.w	#-2,4(sp)	;check for special case: rsconf(-2)
@@ -4108,8 +4131,16 @@ aciaexit:
 arcvrint:
 	move.b	iodata(a1),d0	;grab data byte from acia data register
 	cmpa.l	#kbufrec,a0
+	bne	midibyte	;don't treat midi acia data as anything other
+*				;than as pure data...
+	tst.b	kstate.w
 	bne.b	ML3
-	bcs	itsakey		;branch early if it is not a ikbd header!
+
+* new code 7/12/90: if it's the first byte of a packet, bra to kbheader;
+* else jump through the vector ikbdkey.  This defaults to "itsakey."
+
+	cmpi.b	#$f6,d0
+	bcc	kbheader
 
 	move.l	ikbdkey.w,-(sp)	;jmp without using any regs
 	rts			;(because I don't know what's safe)
@@ -5053,12 +5084,18 @@ cploop:	move.l	d0,(a0)+
 tdis:	dc.l	0
 .text
 
+.endif
+
+	move.w	#(coldend-coldcode)/4,d0	; number of longs - 1
 	lea.l	coldcode(PC),a0
 	move.l	#$c,a1
 .ifne TT
 	dbra	d0,mloop
 	jmp	$c			; with no cache this is safe
 
+*
+* cold boot code - clear all of slow memory (until bus error),
+* then all of fast memory (until bus error) if on a TT.
 * 
 .endc
 coldcode:

@@ -643,6 +643,8 @@ chk_r2(win, id, mode, x, y)
 {
 	MLOCAL	WORD	osrow, oscol;
 	MLOCAL	WORD	ox, oy, ow, oh;
+	MLOCAL	WORD	clip_x, clip_y;
+	MLOCAL	WORD	top;
 	LOCAL	WORD	srtitem, enditem;
 	LOCAL	WORD	crow, ccol;
 	LOCAL	WORD	srow, scol;
@@ -655,7 +657,8 @@ chk_r2(win, id, mode, x, y)
 	MLOCAL	DIR	*wdir;
 	REG 	WORD	irow, jcol, acol;
 	LOCAL	WORD	ii, jj;
-	LOCAL	WORD	wx, wy;
+	LOCAL	WORD	wx, wy, ww, wh;
+	
 
 	if (mode == 0) { 
 		/* 
@@ -670,10 +673,18 @@ chk_r2(win, id, mode, x, y)
 			limit = win->w_items;
 			wdir = (DIR *) win->w_memory;
 		}
+		wind_get(win->w_id, WF_TOP, &top, &ii, &ii, &ii);
+		if (top == win->w_id)
+			top = TRUE;
+		else
+			top = FALSE;
+
 		ox = win->w_work.g_x; /* work area */
 		oy = win->w_work.g_y;
 		ow = obj[1].ob_width;
 		oh = obj[1].ob_height;
+		clip_x = ox + win->w_work.g_w;
+		clip_y = oy + win->w_work.g_h;
 
 		/* original start column and start row */		 
 		oscol = win->w_coli + (x - ox) / (win_xoff + ow);
@@ -773,8 +784,23 @@ chk_r2(win, id, mode, x, y)
 					obj[oi].ob_state = dir->d_state;
 					doit = FALSE;
 					objc_offset(obj, oi, &wx, &wy);
-					draw_loop(id, obj, 0, MAX_DEPTH, wx, wy, 
+					if (!top)
+					   draw_loop(id, obj, 0, MAX_DEPTH, wx, wy, 
 					     obj[oi].ob_width, obj[oi].ob_height);
+					else { /* little bit more speed... */
+						desk_mice( M_OFF );
+						ww = obj[oi].ob_width; 
+						wh = obj[oi].ob_height;
+						ww = ((wx + ww) > clip_x) ?
+							clip_x - wx : ww;
+						wh = ((wy + wh) > clip_y) ?
+							clip_y - wy : wh;
+						if ((ww > 0) && (wh > 0))
+							objc_draw( (LONG)obj, 0, 
+								MAX_DEPTH, 
+								wx, wy, ww, wh);
+						desk_mice( M_ON );
+					}
 				}	
 			}
 		}

@@ -106,7 +106,7 @@ WORD 	wind_update(WORD mode);
 /* FILE: DOSBIND.C
  * --------------------------------------------------------------------
  */
-WORD	isdrive( VOID );
+LONG	isdrive( VOID );
 
 LONG	dos_pexec( WORD mode, BYTE *name, BYTE *tail, BYTE *envr );
 
@@ -115,6 +115,8 @@ WORD	pgmld( BYTE *pname, LONG **ldaddr, BYTE *tail, BYTE *envrn );
 WORD	dos_sfirst( LONG pspec, WORD attr);
 
 WORD	dos_snext( VOID );
+
+WORD	dos_create( BYTE *pname, WORD access );
 
 WORD	dos_open( BYTE *pname, WORD access );
 
@@ -126,6 +128,8 @@ UWORD	dos_write( WORD handle, LONG cnt, BYTE *pbuffer );
 
 LONG	dos_lseek( WORD handle, WORD smode, LONG sofst );
 
+WORD	dos_delete( BYTE *pdrvpath );
+
 WORD	dos_gdir( WORD drive, LONG pdrvpath );
 
 LONG	dos_xalloc( LONG nbytes, WORD type );
@@ -134,13 +138,15 @@ WORD	dos_gdrv( VOID );
 
 WORD	dos_dta( LONG ldta );
 
+LONG	dos_gdta( VOID );
+
 WORD	dos_close( WORD handle );
 
 LONG	dos_chdir( LONG pdrvpath );
 
 WORD	dos_free( LONG maddr );
 
-WORD	dos_sdrv( WORD newdrv );
+LONG	dos_sdrv( WORD newdrv );
 
 WORD	do_cdir( WORD drive, BYTE *path );
 

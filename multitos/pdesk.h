@@ -361,6 +361,7 @@ VOID	up_allwin(BYTE *, WORD);
 WORD	up_win(WINDOW *, WORD);
 VOID	bottop(VOID);
 WORD	path_alloc(WORD);
+VOID	alloc_icnobj(WINDOW *, WORD);
 VOID	free_path(VOID);
 VOID	clr_allwin(VOID);
 VOID	clr_xwin(WINDOW *, WORD);
@@ -390,6 +391,8 @@ VOID	blit(WORD, WINDOW *, GRECT *, WORD);
 VOID	setclip(GRECT *);
 VOID	iconify_window(WORD, GRECT *);
 VOID	uniconify_window(WORD, GRECT *);
+VOID	alliconify_windows(WORD, GRECT *);
+VOID	alluniconify_windows(WORD, GRECT *);
 VOID	set_wiconname(WINDOW *);
 VOID	set_winfont(TEDINFO *, WORD);
 

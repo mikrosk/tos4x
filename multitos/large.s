@@ -22,9 +22,11 @@
 	.globl  _LWCOPY
 	.globl	_LSTCPY
 	.globl	_LBWMOV
+.if 0
 	.globl	lmul
 	.globl	ldiv
 	.globl	_ldivr
+.endif
 	.globl _expand_data
 	.globl	_reverse
 
@@ -267,6 +269,8 @@ lbcend:
 *
 
 
+
+.if 0
 *
 *
 * ========================================================
@@ -283,6 +287,10 @@ lbcend:
 *
 *
 lmul:
+	move.l	(a7)+,a0
+	move.l	d0, -(a7)
+	move.l	d1, -(a7)
+	move.l	a0, -(a7)
 	link	a6,#-4
 	clr.w	d2
 	tst.l	8(a6)		;is first arg negative?
@@ -312,6 +320,8 @@ L3:
 L4:
 	unlk	a6
 	rts
+
+
 *
 *
 * ========================================================
@@ -321,6 +331,10 @@ L4:
 * ========================================================
 *
 ldiv:
+	move.l	(a7)+,a0
+	move.l	d1, -(a7)
+	move.l	d0, -(a7)
+	move.l	a0, -(a7)
 	link	a6,#-2
 	movem.l	d2-d7,-(sp)
 	clr.w	d3
@@ -390,6 +404,7 @@ La1:
 	movem.l	(sp)+,d2-d7
 	tst.l	d2
 	unlk	a6
+	move.l	_ldivr,d1
 	rts
 
 
@@ -397,4 +412,7 @@ La1:
 
 _ldivr:		.ds.l	1
 
+.endif
+
 	.end
+

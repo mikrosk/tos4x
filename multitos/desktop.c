@@ -36,6 +36,9 @@
 #include "signal.h"
 #include "vdomode.h"
 #include "deskusa.h"
+#if 0
+#include "linea.h"
+#endif
 #include "pdesk.h"
 #include "pmisc.h"
 #include "pboth.h"
@@ -268,11 +271,16 @@ i_1:					/* restore the pglobal	*/
 	return( ret );
 }
 
+
 	WORD
 d_load_fonts()			/* load GDOS fonts */
 {
 	REG WORD	i;
 	REG FNTLST	*fontsp;
+	WORD		Mwchar, Iwchar;
+	WORD		dummy;
+	WORD		attrib[10];
+	WORD		nfonts_used;
 
 	if (d_spd && !ctldown)	/* Is Speedo GDOS there? */
 		d_numfonts = d_v_load_fonts();
@@ -286,14 +294,31 @@ d_load_fonts()			/* load GDOS fonts */
 	/*
 	 *	Get font names
 	 */
-	for (i = 1, fontsp = d_fontlst; i <= d_numfonts; i++, fontsp++) {
+	nfonts_used = 0;
+	for (i = 1, fontsp = d_fontlst; i <= d_numfonts; i++) {
 		fontsp->fnt_id = d_v_font_name(i, &fontsp->fnt_name[2], &fontsp->fnt_type);
 		fontsp->fnt_name[0] = ' ';	/* build strings so we can also */
 		fontsp->fnt_name[1] = ' ';	/* use them in the popup menu 	*/
 		fontsp->fnt_name[34] = ' ';
 		fontsp->fnt_name[35] = '\0';
+
+		if (fontsp->fnt_type == 0) {	  /* NO SPEEDO FONT */
+			d_vqt_attributes(attrib); /* save current text attributes */
+			d_v_setfont(fontsp->fnt_id);	  /* set to window font 	  */
+			d_vqt_width('M', &Mwchar, &dummy, &dummy);						
+			d_vqt_width('.', &Iwchar, &dummy, &dummy);
+			if (Mwchar == Iwchar) {
+				nfonts_used++;
+				fontsp++;	/* only get monospaced bitmap fonts */	
+			}
+			d_v_setfont(attrib[0]); /* restore system font */
+		} else {
+			nfonts_used++;
+			fontsp++;
+		}
 		Debug1( fontsp->fnt_name);
 	}
+	d_numfonts = nfonts_used;
 
 	return( TRUE );
 }
@@ -320,7 +345,7 @@ build_fontmenu()	/* build font popup menu for "Set Color & Style" dialog" */
 		rsrc_gaddr(R_TREE, ADDINFO, &tree); /* Desktop Info... */
 		ted = (TEDINFO *) tree[GEMMSG].ob_spec;
 		ted->te_font = GDOS_PROP;
-		ted->te_fontid = 3;	/* Swiss */
+		ted->te_fontid = 5003;	/* Swiss (5000 is Speedo offset!!!) */
 		ted->te_fontsize = -1;	/* Take size of system font */
 	}
 
@@ -778,10 +803,11 @@ top:
 
 	ret = TRUE;		/* assume everything is OK	*/
 
+	d_spd = 0;
 	if ( getcookie( 0x46534d43L, (LONG *)&pvalue ) ) /* FSMC */
 	{
 	  if ( (*pvalue++ == 0x5F535044L) && 
-	  (((WORD)(*pvalue >> 16)) == 0x0411)) /* _SPD */
+	  (((WORD)(*pvalue >> 16)) >= 0x0411)) /* _SPD */
 	  	d_spd = 1;    /* at least Version 4.11 */
 	} 
 

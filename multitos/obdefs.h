@@ -60,6 +60,7 @@
 #define	GDOS_MONO	1
 #define GDOS_BITM	2
 #define IBM 		3
+#define GDOS_MBITM	4
 #define SMALL 		5
 
 /* Object Drawing Types */

@@ -112,8 +112,8 @@ app_alloc( VOID )
 {
 	REG APP	*list;
 
-	list = (APP*)0;
 again:
+	list = (APP*)0;
 
 	if ( appfree )
 	{

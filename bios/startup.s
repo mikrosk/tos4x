@@ -4,21 +4,45 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1991/10/15 14:08:24 $
+* $Date: 1991/11/07 00:09:34 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.86  1991/11/07  00:09:34  apratt
+* Evidently not all Mega ST's are created equal.  The one I used here for
+* testing STe TOS on an ST worked with Theory 1 for noblank and theory 3 for
+* noblank1; others don't. So now noblank uses theory 3 and everybody should
+* be happy.
+*
+* In addition, some Megas do give bus errors at dstride, which I was using to
+* probe for ST-vs-STe before RAM was good.  Problem yet to be solved. Idea:
+* use dbasell (which at least two kinds of Megas I have *do* dtack) as the
+* probe and some other register in the shifter as the control that prevents
+* getting a false-positive due to bus capacitance.  That is coded (but
+* ill-tested) in this version.
+*
+* Also, in flop.s, the code writes to the 1772-clock-select register, and
+* again, I didn't get a bus error there, but other Megas do, so that will
+* have to change.
+*
+* Finally, I changed the CRC-check code so it only runs if this is a cold
+* boot.  The cold-boot detection for this is the same as the hard-disk
+* timeout: if _hz_200 reads eighty seconds or more, then you don't get the
+* CRC check.  This bailout only works when not TT, because on TT it's quick
+* enough, and because without it there's no opportunity to use the ALT key to
+* go to ST LOW rez.
+*
+* enough, and because without it there's no opportunity to use the ALT key to
+* go to ST LOW rez.
+*
 * Revision 2.85  1991/10/15  14:08:24  apratt
 * The test for power-plus-top-closed to subvert resvector on
 * STBOOK was wrong: other events can pull the power bit low,
 * and if the top was closed, say, when modem-wake happened,
 * resvector would be subverted when it wasn't meant to be.
-* Now we check for the value $FC explicitly: top-closed and
-* power and nothing else.
-*
 * Now we check for the value $FC explicitly: top-closed and
 * power and nothing else.
 *
@@ -226,7 +250,7 @@
 * 
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 2.85 $
+* $Revision: 2.86 $
 * =======================================================================
 *
 * $Source: e:/tos/bios\RCS\startup.s,v $
@@ -1216,30 +1240,33 @@ pad_big:
 * STPAD sizing done, size is in d5
 
 .else
+*--- init vars + hardware:
+	clr.w	d6			; d6 = configuration byte
+	move.b	#$0a,memconf		; setup	controller for 2Mb/2Mb
+
 *--- write test-pattern to both banks:
-	move.b	#$fe,dbasell		; see if dbasell and dstride are RAM
-	move.b	#$00,dstride		; write fe, then 00
+	move.w	#8,a0			; a0 -> bank0 (skip ROM shadow)
+	lea	bank1+8,a1		; a1 -> bank1
+	clr.w	d0			; d0 = start of	pattern
 fmem1:	move.w	d0,(a0)+		; write	to bank 0
-					; would put $FE on the bus.
-	cmp.b	#$fe,d0			; NOW cmp.b
+	move.w	d0,(a1)+		; write	to bank 1
+	add.w	#$fa54,d0		; bump pattern with a magic number
 	cmp.l	#$200,a0		; filled $200 bytes?
-	tst.b	dstride
+	bne	fmem1			; (no, loop)
+
+*+
+* Determine size of both banks
 * from test-pattern signatures.
-	move.b	#$00,dbasell
-	move.b	#$fe,dstride
-	tst.b	dbasell
-	bne	memST
-	move.b	dstride,d0
-	cmp.b	#$fe,d0
-	bne	memST
-	clr.b	dstride			; set stride back to reset state
+*-
+
+* STPLUS is just like ST except the shadows are at different places.
 * If a shadow appears at the first shadow place, you know you have small
 * parts.  If one appears at the second place, you have medium parts.
 * If neither shadow appears, but the pattern took in the first place,
 * you have big parts.
 *
 * Starting with 9/91 ROMs, ST and STPLUS are the same thing, so
-	
+* we do this at run time instead of compile time.  "shadow" used
 * to be an assembly-time constant, now it's in d7.
 *
 * We detect ST-vs-STe by seeing if the high 7 bits of dbasell are RAM.
@@ -1550,30 +1577,26 @@ reset4:
 * each of these so we can tell when it's shifted completely out.
 
 *		  addr  cmd  data   lobit
-* the ST/STe case, check to see if the low byte video address register and
-* the stride register are there.
+vtpgm:	dc.w	($0600+$01ff)*2		; mask for all cmds
+	dc.w	($0400+$00c0+$28)*2+1	; max master volume
+	dc.w	($0400+$0140+$14)*2+1	; max left channel volume
 	dc.w	($0400+$0100+$14)*2+1	; max right channel volume
 	dc.w	($0400+$0080+$06)*2+1	; flat treble
 	dc.w	($0400+$0040+$06)*2+1	; flat bass
 	dc.w	($0400+$0000+$01)*2+1	; mix GI sound with DMA sound
-	move.b	#$fe,dbasell		; see if dbasell and dstride are RAM
-	move.b	#$00,dstride		; write fe, then 00
+	dc.w	$0			; end of this list
+
+* SPARROW NOTE: the prototype has a bug w.r.t. the TT MW interface:
 * the data is a rotate register, not a shift register.  Thus you wait
-					; would put $FE on the bus.
-	cmp.b	#$fe,d0			; NOW cmp.b
+* for the mask register to change, then wait for it to be its old
+* self again, to be sure it's shifted out completely.  This works only
 * because we're doing this at boot time at IPL 7; this code is not
-	tst.b	dstride
-	bne	iset
-	move.b	#$00,dbasell
-	move.b	#$fe,dstride
-	tst.b	dbasell
-	bne	iset
-	move.b	dstride,d0
-	cmp.b	#$fe,d0
-iset:
-	sne	_iamanst
-	clr.b	dstride			; set stride back to reset state
-	clr.b	dbasell			; and dbasell too
+* general-purpose (it breaks if you get an interrupt at the wrong time).
+*
+* The fixed sparrow will be like a TT.
+
+vtloop:	move.w	d0,mwdata		; write data
+vtwait:	tst.w	mwdata			; wait for data == 0
 	bne	vtwait
 vtend:	move.w	(a0)+,d0
 	bne	vtloop
@@ -1724,7 +1747,7 @@ usem:	move.l	4(a0),end_os.w		; init end-of-OS pointer
 	move.l	#savend,savptr.w	; register-save pointer for traps 13&14
 	move.l	#_rts,swv_vec.w		; ignore monitor changes for now
 	clr.l	_drvbits.w		; clobber "drive-alive" bits
-*		00010000 	STe (.if STPLUS)
+*		00010000 	STe
 	clr.w	_bootdev.w		; clear bootdev
 *		    0008	STe/AT (.if STPLUS and IDE bus exists)
 *		    0010	Mega STe (.if STPLUS and SCU exists)
@@ -2692,8 +2715,14 @@ icondone:
 	tst.b	sshiftmd.w
 	bne	gotd7
 	moveq	#12+' ',d7	; code for line 12 (STLOW)
+gotd7:
 	move.l	#$00030002,d6
 	move.w	#27,-(sp)
+	move.l	d6,-(sp)
+	trap	#$d		; Bconout(2,27);
+	move.w	#'Y',4(sp)
+	move.l	d6,(sp)
+	trap	#$d		; Bconout(2,'Y');
 	move.w	d7,4(sp)
 	move.l	d6,(sp)
 	trap	#$d		; Bconout(2,d7);
@@ -2715,6 +2744,10 @@ icondone:
 *
 * This happens for ROM systems only.  You will find toscrc later in 
 * this file. It's also conditional on crcstride.
+*
+* Added 4/24/91 by AKP because I got burned by an incorrect jumper setting.
+*
+	blo	crcdone			; skip if we've been alive a while
 *
 * Changed 11/5/91 to check only if _hz_200 < EIGHTY_SECONDS
 *   because otherwise warm boots take too long.  But not on TT because
@@ -4871,16 +4904,17 @@ mushroom:				; (sic)
 	dc.w	%0001111111111111
 	dc.w	%0001111111101111
 	dc.w	%0000111111101110
-* count 240 ticks on Timer B, then wait for "2ms" without any ticks on
-* Timer B.  "2ms" is in quotes because it's a number of times through a
-* loop, and I haven't counted the cycles. THEORY 1 states that it's safe if
-* you get a tick on Timer B at all.
+	dc.w	%0000111111011110
+	dc.w	%0000011111111100
+	dc.w	%0000001111111000
 	dc.w	%0000000011100000
-* What these theories have in common is the idea that the unsafe period is
+
+
 *+
 *  This function replaces 'vwait' -- it is not to return until
 *  it's sure we are NOT in a vblank.  This is accomplished by
-* get DE's, because if you get a DE then you know you're far from VBLANK."
+*  programming Timer B to count hblanks, then waiting for it
+*  to change.  At the instant of change, we know there's 
 *  at least a little time before vblank: long enough.
 *
 *  Passed:	A6 -> return address
@@ -4888,13 +4922,22 @@ mushroom:				; (sic)
 *  Uses:	no registers; clobbers TBDR
 *
 * Noblank1 is the same thing, but returns via RTS, and...
-*-
+*  Uses:	d0, d1, d3, d4; clobbers TBDR
+* 
+* I tried to implement noblank1 without clobbering Timer B, but it's no
+* use. The SCU interrupt state register sometimes seems stuck (I think
+* because of the synchronous bus).  On the TT there's another MFP where
+* Timer B's input is also the hblank counter, but that's no use on Mega
+* STe's and other machines with no second MFP.  So I clobber Timer B (and
+* disable its interrupt).  Since this only happens during rez changes, I
+* don't think that's a hardship: you couldn't count hblanks reliably when
+* changing rez anyway.  If you're using Timer B for timing, well, sorry.
+* 
+* After version [23].05, the noblank1 code was improved slightly: the old 
+* timer B enable bit from iera is saved and restored.  Some programs (NEO)
 * enable the interrupt, *then* call Setscreen to change rez.  You can't
-* noblank: use THEORY 1, it's safe any time you get a tick on timer B.
-* This code can clobber the heck out of Timer B, because it's only
-* used in the boot sequence.  This code works 9/91 2.06m but it didn't
-* work in an earlier version that implemented the same thing...?
-
+* reliably count hblanks across a rez change, but you can have the
+* interrupt enabled...
 *
 * Sigh... Saving the iera is probably only half the battle; now I save the
 * timer's control register, too.  You STILL can't count hblanks across the
@@ -4902,6 +4945,26 @@ mushroom:				; (sic)
 * break because of this, but it can't hurt, right?  (5/2/91; in TOS 3.06)
 *
 * Background first: Timer B ticks based on the falling edge of DE,
+* Display Enable.  That happens at the right edge of the nonblank
+* part of a horizontal trace.
+*
+* Now, here is the Lore of Noblank: you can't bang the shift mode register
+* at just any time.  If you do it wrong, an ST monochrome monitor will be
+* off by 16 pixels: the image is shifted to the right, and what belongs on
+* the right edge appears to the left of the left edge.  There is some time
+* when it is "safe" and some time when it is not.  This time may or may not
+* be the same for all non-TT shifters.  Nobody is giving me a straight
+* answer.  There are competing theories, gleaned from code which has worked
+* in the past, as to "when it is safe."  One theory is that it's "safe"
+* after VBLANK -- that is, after the interrupt at IPL 4 occurs, and the
+* handler executes, and the RTE, it is safe.  That is the theory
+* implemented by THEORY 3 below.  THEORY 2 states that it's safe after you
+* count 240 ticks on Timer B, then wait for 2ms without any ticks on
+* Timer B.  THEORY 1 states that it's safe if you get a tick on Timer B at
+* all.
+*
+* What these theories have in common is the idea that the things to be
+* avoided are times when display is actually being produced, and something
 * around VBLANK.  THEORY 3 most clearly states "it's safe just after
 * VBLANK."  THEORY 2 states "it's safe just BEFORE vblank; that is, just
 * after the last DE of a trace."  THEORY 1 states "it's safe any time you

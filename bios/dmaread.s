@@ -1,19 +1,29 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: minna $
+* $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/02/26 17:58:37 $
+* $Date: 91/03/27 12:36:36 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
-* Revision 1.11  91/02/26  17:58:37  minna
-* Base address of IDE bus has been moved to $F00000.
+* Revision 1.12  91/03/27  12:36:36  apratt
+* Base address of IDE has moved to $F00000.  This code assumes that the base
+* address is on a longword boundary.  Added guards against missing IDE bus,
+* and against missing ACSI (bus error when accessing DMA chip).  This is
+* for prototype PADs only, and may go away soon.
 *
+* Changed switches to SCSI and IDE_AT, which are set based on TT and STPAD at
+* the top of the file.
+*
+* Revision 1.11  91/02/26  17:58:37  minna
+* Base address of IDE bus has been moved to $F00000.  Note that this code
+* relies on the base address of the IDE bus being on a longword boundary.
+* 
 * Revision 1.10  90/10/29  15:52:12  minna
 * Base address of IDE bus has been moved to $C00040 (long word boundary).
 * 
@@ -52,7 +62,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.11 $
+* $Revision: 1.12 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -60,14 +70,15 @@
 *
 *************************************************************************
 
-* TT equate is in switches.s
+* TT and STPAD equates are in switches.s
 
 .include "switches.s"
 
-;+ Temporary equ's
-;TT	equ	0
-;IDE_AT	equ	1
-;-
+* The code you get in assembling this file depends on the switches SCSI
+* and IDE_AT.  For now (2/91), only TT has SCSI and only STPAD has IDE.
+
+SCSI		=	TT
+IDE_AT		=	STPAD
 
 ;+
 ; DMAREAD(), DMAWRITE() - 
@@ -193,7 +204,7 @@ dmarw:	moveq	#EUNDEV,d0		; assume it's an unknown device
 .ifne IDE_AT
 	cmpi.w	#MAXAT,$e(sp)		; unit# > IDE-AT unit# 16-17?
 .else
-.ifne TT
+.ifne SCSI
 	cmpi.w	#MAXSCSI,$e(sp)		; unit# > SCSI unit# 8-15?
 .else
 	cmpi.w	#MAXACSI,$e(sp)		; unit# > ACSI unit# 0-7?
@@ -229,7 +240,24 @@ rw0:	bsr	_dowcmd			; send a write data command
 .ifne IDE_AT
 	bra	rw1			; branch will take place for non-IDE
 					;	drives
-at:	pea	sbuf			; scratch buffer for drive parameters
+*
+* Before doing anything with the IDE bus, make sure it's there.
+* (The label noide is before at just because it fits better.)
+*
+
+noide:	move.l	a1,sp			; got the bus error on bAT;
+	move.l	a0,$8			; restore vector & sp, return EUNDEV
+	moveq.l	#EUNDEV,d0
+	bra	rwend			; branch to rts
+
+at:	move.l	$8,a0
+	move.l	sp,a1
+	move.l	#noide,$8
+	tst.b	bAT			; read a register to probe for IDE bus
+	move.l	a1,sp			; hey! no bus error!
+	move.l	a0,$8			; restore vector & sp and continue.
+
+	pea	sbuf			; scratch buffer for drive parameters
 	move.w	$12(sp),-(sp)		; AT unit#
 	bsr	_identify		; identify()
 	addq.w	#6,sp			; clean up stack
@@ -262,7 +290,7 @@ at1:	bsr	_atwrite		; write sectors
 at2:	adda	#16,sp			; clean up stack
 .endc	
 rw1:	
-.ifne	TT
+.ifne	SCSI
 	move.w	sr,-(sp)		; go to IPL 7
 	ori	#$700,sr		; no interrupts right now please
 	movec	cacr,d1			; d1 = (cache control register)
@@ -296,7 +324,7 @@ rwend:	rts
 ;	a0.l = buffer address
 ;-
 _dorcmd:
-.ifne TT
+.ifne SCSI
 	cmp.w	#MAXACSI,d0		; unit# > ACSI unit# 0 - 7?
 	bls.b	rcacsi			; if not, it's an ACSI device
 	bsr	_rcvscsi		; else, it's a SCSI device
@@ -316,7 +344,7 @@ rcacsi:	bsr	_rcvacsi		; it's an ACSI device
 ;	a0.l = buffer address
 ;-
 _dowcmd:
-.ifne	TT
+.ifne	SCSI
 	cmp.w	#MAXACSI,d0		; unit# > ACSI unit# 0 - 7?
 	bls.b	wracsi			; if not, it's an ACSI device
 	bsr	_wrtscsi		; else, it's a SCSI device
@@ -398,7 +426,7 @@ _endcmd:
 	bsr	_fdone			; wait for operation complete
 	bmi	endce			; (timed-out, so complain)
 
-.ifne	TT				; dump D cache
+.ifne	SCSI				; dump D cache
 	move.w	sr,-(sp)		; go to IPL 7
 	ori.w	#$700,sr		; no interrupts right now kudasai
 	movec	cacr,d0			; d0 = (cache control register)
@@ -452,6 +480,15 @@ wait:	cmp.l	_hz_200,d0		; while (_hz_200 <= lastacstm)
 ; bytes, and a multiple of 16 bytes.
 ;-
 _rcvacsi:
+
+* check to see if the ACSI bus actually exists! Needed for prototype PADs
+	move.l	$8,a1
+	move.l	sp,a2
+	move.l	#noacsi,$8
+	tst.w	WDL			; harmless or bus erorr
+	move.l	a1,$8			; no bus error - restore & continue
+	move.l	a2,sp
+
 	st	flock			; lock FIFO
 	bsr	_delay			; delay if necessary
 	movea.l	#WDC,a1			; a1 = pointer to DMA chip
@@ -479,6 +516,15 @@ raend:	bra	_hdone			; cleanup after IRQ
 ;	a0.l = buffer address
 ;-
 _wrtacsi:
+
+* check to see if the ACSI bus actually exists! Needed for prototype PADs
+	move.l	$8,a1
+	move.l	sp,a2
+	move.l	#noacsi,$8
+	tst.w	WDC			; harmless or bus erorr
+	move.l	a1,$8			; no bus error - restore & continue
+	move.l	a2,sp
+
 	st	flock			; lock FIFO
 	bsr	_delay
 	movea.l	#WDC,a1			; a1 = pointer to DMA chip
@@ -495,6 +541,14 @@ _wrtacsi:
 
 waend:	bra	_hdone			; cleanup after IRQ
 
+* You get to this label if there is a bus error when probing for
+* the ACSI bus: it's meant for prototype PADs, which don't
+* have an ACSI DMA chip.
+
+noacsi:	moveq.l	#-15,d0			; return EUNDEV
+	move.l	a2,sp
+	move.l	a1,$8
+	rts
 
 ;+
 ; sblkacsi() - send command block
@@ -588,7 +642,7 @@ rstdelay:
 	rts
 
 
-.ifne	TT
+.ifne	SCSI
 
 ;+++++++++++++++++++++++++++++++;
 ;				;

@@ -4,21 +4,24 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 91/03/27 12:33:58 $
+* $Date: 91/04/02 12:34:47 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.29  91/04/02  12:34:47  apratt
+* Folded in some more things from SERPTCH. This is the version for 3.06.
+*
 * Revision 2.28  91/03/27  12:33:58  apratt
 * Turned on Bconmap for TT+STPLUS rather than just TT. It should really be on
 * for ANYTHING.  Also, a bug fix in RSCONF for MFP's: was writing rsmode in
 * iorec as word, not byte.  Could be other problems which I haven't handled
 * yet, but which are fixed by SERPTCH.
-*
+* 
 * Took out midi part of ikbd/midi interrupt if STPAD, since pad has no MIDI.
-*
+* 
 * Revision 2.27  91/01/31  13:50:17  apratt
 * Fixed some bugs in serial port handling for SCC.
 * 
@@ -49,7 +52,7 @@
 * 
 * =======================================================================
 *
-* $Revision: 2.28 $
+* $Revision: 2.29 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -459,6 +462,7 @@ rxderr	equ	$12C	;receiver error interrupt
 rxbufe	equ	$130	;receiver buffer full interrupt
 .ifne TT
 rng232	equ	$138	;ring indicator rs-232		(i6)
+monitr	equ	$13C	;monochrome monitor detect	(i7)
 .endc
 
 .if TT
@@ -1485,8 +1489,6 @@ initmfp:
 	movep.l	d0,gpip(a0)	;clear gpip thru iera
 	movep.l	d0,ierb(a0)	;clear ierb thru isrb
 .ifne TT
-ttmfp	equ	$fffffa81
-
 
 	move.b	#$48,vr(a0)	;set mfp autovector and s-bit
 	bset.b	#2,aer(a0)	* NOTE: Trigger on Withdrawn CTS
@@ -1566,7 +1568,7 @@ ttmfp	equ	$fffffa81
 	bsr	dtron
 	bsr	rtson
 
-	bsr	lbmove		;do block move and return
+*	initialize the rs-232 buffer record structure
 
 .ifne TT
 	lea	rs232init,a1
@@ -1725,14 +1727,14 @@ rs232init:
 
 	dc.l	robuffer	;obufptr
 	dc.w	rbufsize	;obufsiz
-	dc.b	0		;rsrbyte
+	dc.w	0		;obufhead
 	dc.w	0		;obuftail
 	dc.w	rbufsize/2	;obuflow
 	dc.w	rbufsize*3/4	;obufhigh
 
-	dc.b	0		* sendnow
-	dc.b	1		* brate: 9600 baud
-	dc.b	$ff		* mask: keep all bits
+	dc.b	0		;rsrbyte (or "status")
+	dc.b	0		;tsrbyte
+	dc.b	0		;rxoff
 	dc.b	0		;txoff
 	dc.b	1		;rsmode -- Flow Control ON
 	dc.b	0		;sendnow
@@ -2977,12 +2979,14 @@ ttrs232init:
 
 	dc.l	ttrobuffer	;obufptr
 	dc.w	rbufsize	;obufsiz
-	dc.b	0		;rsrbyte
+	dc.w	0		;obufhead
 	dc.w	0		;obuftail
 	dc.w	rbufsize/2	;obuflow
 	dc.w	rbufsize*3/4	;obufhigh
 
-	dc.b	0		* sendnow
+	dc.b	0		;rsrbyte (or "status")
+	dc.b	0		;tsrbyte
+	dc.b	0		;rxoff
 	dc.b	0		;txoff
 	dc.b	1		;rsmode -- Flow Control ON
 	dc.b	0		;sendnow
@@ -3887,7 +3891,8 @@ iorecinit:	dc.l	chaibuffer	; ibufptr
 		dc.w	rbufsize
 		dc.w	0,0
 		dc.w	rbufsize/2
-		dc.w	1		; initial baud rate
+		dc.w	rbufsize*3/4
+		dc.b	%00001000	; ucr_shadow: 8bits/1stop/nopar/even
 		dc.b	%11101010	; wr5 shadow: dtr/8bits/txen/rts
 		dc.b	0,0		; rxoff,txoff
 		dc.b	1,0		; flow,sendnow (rssize ends here)

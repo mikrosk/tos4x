@@ -1,15 +1,18 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.12 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.13 $	$Source: e:/tos/bios\RCS\makefile.,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 91/08/05 15:29:10 $     $Locker:  $
+#  $Author: apratt $	$Date: 1991/09/25 19:35:36 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.12  91/08/05  15:29:10  apratt
-#  Added calls to biosvers to create version.s which exports date and dosdate
-#  to startup.  Added the memtest target.
+#  Revision 2.13  1991/09/25  19:35:36  apratt
+#  Removed clear.o -- absorbed into startup.s or something.
 #
+# Revision 2.12  91/08/05  15:29:10  apratt
+# Added calls to biosvers to create version.s which exports date and dosdate
+# to startup.  Added the memtest target.
+# 
 # Revision 2.11  91/05/21  16:54:35  apratt
 # Fixed so 'rm' doesn't rely on wildcards or globbing, and
 # no pushd/popd, and no temp directories.
@@ -96,7 +99,7 @@
 # letters free:     e  h j lm opqr   v xyz0123456789
 
 CCODE=u
-MACHINE=p
+MACHINE=e
 
 # that's all you need to set for different machines or countries.
 ############
@@ -122,7 +125,7 @@ ASM = mas -3 -8 -S $*.s -O=$@
 
 # SFILES are those not affected by country or machine switches
 
-SFILES	=	xinout.o clear.o memtest.o
+SFILES	=	xinout.o memtest.o
 
 # CFILES are those which come from .c sources, also not affected
 # by country or machine switches.
@@ -138,8 +141,6 @@ allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o \
 		aln -u -u -p -w -l -o $@ $< version.o
 		cp $@ ..\build
 		@echo $@ linked.
-
-# add fsstub.o to this list if you define USEDB as 1 in startup.s
 
 allbios.$(MACHINE)a$(CCODE):	startup.$(MACHINE)a \
 			dmaread.$(MACHINE) clock.$(MACHINE) \
@@ -158,9 +159,6 @@ rwabs.o:	portab.h rwabs.c
 xinout.o:	xinout.s
 		$(ASM)
 
-clear.o:	clear.s
-		$(ASM)
-
 memtest.o:	memtest.s
 		$(ASM)
 
@@ -169,15 +167,15 @@ memtest.o:	memtest.s
 # any switches.x?? will do, where x is machine
 
 flop.$(MACHINE): flop.s
-		cp switches\switches.$(MACHINE)au switches.s
+		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
 dmaread.$(MACHINE): dmaread.s
-		cp switches\switches.$(MACHINE)au switches.s
+		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
 clock.$(MACHINE): clock.s
-		cp switches\switches.$(MACHINE)au switches.s
+		cp switches\switches.$(MACHINE)ou switches.s
 		$(ASM)
 
 ############
@@ -197,5 +195,5 @@ startup.$(MACHINE)o:	startup.s
 # any switches.x?y will do for BIOS (x is machine, y is country)
 
 bios.$(MACHINE)$(CCODE):	bios.s
-		cp switches\switches.$(MACHINE)a$(CCODE) switches.s
+		cp switches\switches.$(MACHINE)o$(CCODE) switches.s
 		$(ASM)

@@ -4,17 +4,20 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/12/08 15:40:49 $
+* $Date: 90/02/22 12:23:28 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: clock.s,v $
+* Revision 2.6  90/02/22  12:23:28  apratt
+* Removed ".w" from _time and _date.
+*
 * Revision 2.5  89/12/08  15:40:49  apratt
 * Changed TT clock code to use bitfield instructions.
 * Also fixes a bug: the minutes were set to half the correct value.
-*
+* 
 * Revision 2.4  89/09/22  16:42:45  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
@@ -46,7 +49,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.5 $
+* $Revision: 2.6 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/clock.s,v $
@@ -149,9 +152,9 @@ _iclock:
 	cmp.l	#-1,d0			; bad time?
 	beq	iclfai			; yes --- punt
 
-	move.w	d0,_time.w		; set GEMDOS time
+	move.w	d0,_time		; set GEMDOS time
 	swap	d0
-	move.w	d0,_date.w		; set GEMDOS date
+	move.w	d0,_date		; set GEMDOS date
 
 	moveq	#0,d0			; return "Ok fine"
 	rts
@@ -489,9 +492,9 @@ timeok:
 	bsr	_getclock
 	cmp.l	#-1,d0
 	beq	iclkfail
-	move.w	d0,_time.w
+	move.w	d0,_time
 	swap	d0
-	move.w	d0,_date.w
+	move.w	d0,_date
 
 	moveq.l	#0,d0
 	rts

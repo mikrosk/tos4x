@@ -4,18 +4,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/09/22 16:39:12 $
+* $Date: 89/10/03 10:03:02 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: bios.s,v $
+* Revision 2.8  89/10/03  10:03:02  apratt
+* Changed initialization of MFP's TSR to make the output state
+* "High" not "Hi-Z" (open collector) when the transmitter is idle.
+* This finally gets rid of the spurious $ff character transmitted
+* when you reset an ST.  Also added code to initialize TTMFP's serial
+* port and set it to 9600 baud.  (No other non-ST serial support yet.)
+*
 * Revision 2.7  89/09/22  16:39:12  apratt
 * THIS VERSION REQUIRES TURBO C'S "MAS" ASSEMBLER
 * No functional changes from previous revision, which is the last to
 * require Alcyon's AS68 assembler.
-*
+* 
 * Revision 2.6  89/09/12  12:57:08  apratt
 * Fixed bad initialization of serial port; added dummy read of TSR
 * at end of txerror as 68901 book suggests; changed use of bclr
@@ -134,7 +141,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.7 $
+* $Revision: 2.8 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/bios.s,v $
@@ -1493,9 +1500,9 @@ initmfp:
 	movep.l	d0,gpip(a0)	;clear gpip thru iera
 	movep.l	d0,ierb(a0)	;clear ierb thru isrb
 .ifne TT
-TT_mfp	equ	$fffffa81
+ttmfp	equ	$fffffa81
 
-	lea	TT_mfp,a0	; init TT mfp
+
 	move.b	#$48,vr(a0)	;set mfp autovector and s-bit
 	bset.b	#2,aer(a0)	* NOTE: Trigger on Withdrawn CTS
 
@@ -1528,10 +1535,29 @@ TT_mfp	equ	$fffffa81
 	moveq	#dtimer,d0	;select the d timer
 	moveq	#c9600,d1	;init for /4 for 9600 baud
 	moveq	#d9600,d2	;init for 9600 baud
+	bsr	setimer		;branch to our timer initialier...
+	move.b	#$1,(brate+ribufptr).w	;9600 is baud rate number 1
+
+*	now init the 3 rs232 chip registers
+*	(reload a0 with ST MFP base)
+*
+* 10/89	The init value for tsr was 01, now 05: this means the output state
+*	TTMFP has no control lines, so that doesn't matter.  TT's two
+*	SCC ports should also be initialized here, but they aren't.
+*	$ff which used to be transmitted when you reset an ST.
 *
 *	Also, I've added initializing the TTMFP's port and set it to 9600 too.
-	move.l	#$00880101,d0
+*	TTMFP has no control lines, so that doesn't matter.
 *	The TT's two SCC channels are initialized here, too.
+*
+.ifne TT
+	lea.l	mfp,a0
+	move.l	#$00880105,d0
+	movep.l	d0,scr(a0)	;inits scr,ucr,rsr,tsr
+
+.if TT
+	lea.l	ttmfp,a0
+.endc
 
 	tst.b	_iamanst		; if you're an ST don't do this
 	bne	noscc

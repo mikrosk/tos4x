@@ -1,10 +1,20 @@
 *	DESKSTART.S		5/1/91		D.Mui		*
 
 
+*	Set the DESK_PROGRAM (DESKPRG) flag to compile this file for a
+*	replacement Desktop. Clear it for making GEM.SYS
+*       DESK_PROGRAM (DESKPRG) must also be set/cleared in
+*	      DESKTOP.C, DESKVARI.C, DESKROM.C
+*	See the Defines in the makegem/makedesk files.
+
+
+
 	.globl	_crystal
 	.globl	_ctrl_cnts
 	.globl	_desk_vdi
+.iff DESKPRG
 	.globl	_desktop
+.endif
 	.globl	_iconaddr
 
 
@@ -12,11 +22,16 @@
 *
 
 
+.iff DESKPRG
 _desktop:
 	move.l	#bottom,a7
 	clr.l	_iconaddr
 	jsr	_deskmain
 	rts	
+.endif
+
+
+
 
 _crystal:
 	move.l	4(a7),d1

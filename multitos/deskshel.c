@@ -12,6 +12,7 @@
 /************************************************************************/
 
 #include "portab.h"
+#include "machine.h"
 #include "obdefs.h"
 #include "deskdefi.h"
 #include "deskwin.h"
@@ -32,6 +33,11 @@ EXTERN	WORD	x_type;
 
 EXTERN	WORD	sh_iscart;
 EXTERN	WORD	global[];
+
+EXTERN	BYTE	*lp_mid;
+EXTERN	BYTE	*lp_start;
+EXTERN	BYTE	*q_addr;
+EXTERN	UWORD	apsize;
 
 BYTE	SHPRINT[] = "SHPRINT=";
 BYTE	SHSHOW[] = "SHSHOW=";
@@ -506,20 +512,66 @@ run_it( file, tail, graphic, setdir, code )
 	  *(ptr+1) = 0;
 
 	code |= 0x0400;
-
+	if (!d_multi)
+		code |= 0x1000;	/* special way to launch programs */
+				/* in single tasking mode 	  */
+				/* (Desktop won't exit!!!)	  */
+				/* See sh_write, sh_exec, sh_fork */
+		
 	ptrs[0] = (LONG) file;		/* file name */
 	ptrs[3] = (LONG) g_buffer;	/* default directory */
 
 	if (!d_multi) {
-		hide_windows(TRUE);
+		/*
+		 * Preparing for launching an application.
+		 * Save windows etc. Free memory.
+		 */
+		Debug5("NEWDESK saving windows\r\n");
+		save_inf(FALSE, NULL);
+		free_windows();
+		free( lp_start );		/* free string buffer	*/
+		free( appnode );		/* free app buffer	*/
+		free( backid );
+		free( q_addr );		/* update inf file on disk	*/
+		Debug5("NEWDESK after freeing windows\r\n");
+#if 0
+		/* not need sine we do a save_/read_inf */
+		hide_windows(TRUE); 
+#endif
 		wind_update(0);		/* make sure screen is free */
 	}
 	if ( !shel_write( code, graphic, 1,(LONG)&ptrs[0],(LONG)tail ) )
 	  fill_string( file, FTOLAUNC ); /* was FTOLAUNCH, changed for LC */
 
-	if (!d_multi)
-		hide_windows(FALSE);
+	if (!d_multi) {
+		/*
+		 * Do all the stuff the desktop does when it starts.
+		 */
+		Debug5("NEWDESK restoring windows\r\n");
+		appnode = (APP*)0;	/* No app buffer yet		*/
+		applist = (APP*)0;	/* No app list yet		*/
+		apsize = 0;		/* Initalize app size		*/
+		if ( !ini_icon() )		/* hide all desktop icons	*/
+		{				/* 		*/
+	  		appl_exit();
+		}
+		if ( !mem_init() )		/* init the app path buffer	*/
+		{				/* and desk app buffer		*/
+	  		appl_exit();
+		}		
+		ini_windows();
+		read_inf();
+		q_inf();
+		open_def();
+		Debug5("NEWDESK after restoring windows\r\n");
+#if 0
+		/* not need sine we do a save_/read_inf */
+		hide_windows(FALSE); 
+#endif
+	}
 }
+#if 0
+		/* not need sine we do a save_/read_inf */
 
 /*
  *	added 3/29/93 hmk for single tasking mode of MultiTOS
@@ -553,3 +605,4 @@ WINDOW	*wp;			/* right order				*/
 	return;
 }
 		
+#endif

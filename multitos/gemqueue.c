@@ -105,12 +105,16 @@ aqueue( isqwrite, e, lm )
 	EVB		*e1;
 	WORD		qready,reverse;
 
-	if ( !( p = idtopd( lm->qpb_pid ) ) )
+	if ( !( p = idtopd( lm->qpb_pid ) ) ) {
+	  Debug5("aqueue: p is null\r\n");
 	  return( FALSE );
+	} 
 	else
 	{
-	  if ( p->p_state == PS_DEAD )
+	  if ( p->p_state == PS_DEAD ) {
+	    Debug5("aqueue: p is dead\r\n");
 	    return( FALSE );
+	  }
 	}
 
 	if ( isqwrite )
@@ -174,8 +178,16 @@ q_1:	  if ( e1 = *ppe )
 	    e->e_parm = ( LONG )lm;
 	    evinsert( e, ppe );
 	  }	
-	  else				/* to prevent dead lock		*/
+	  else {
+	    Debug5("aqueue: deadlock case\r\n");
+	    if (spdid){
+		Debug1("spdid is: "); Debug1(currpd->p_name); Debug1("\r\n");
+	    }else
+		Debug1("spdid is 0\r\n");	
+
+					/* to prevent dead lock		*/
 	    return( FALSE );		/* reject the request		*/
+	  }
 	}
 
 	return( TRUE );

@@ -1,4 +1,4 @@
- /*	GEMAPLIB.C			10/31/90	D.Mui		*/
+/*	GEMAPLIB.C			10/31/90	D.Mui		*/
 /*	Fix the ap_tplay, so after it finished, it stay where it is	*/
 /*	4/17/86			Derek Mui				*/ 
 /*	Fix at ap_tplay	4/8/86			Derek Mui		*/
@@ -400,7 +400,7 @@ a_1:
 	      Debug1( currpd->p_name );
 	      Debug1( "make Ap_rdwr need to wait\r\n" );	
 				/* everything is OK	*/
-	      mwait( msk );	/* wait for event	*/
+ 	      mwait( msk );	/* wait for event	*/
 	      aret( msk );
 	      return( TRUE );
 	    } else {

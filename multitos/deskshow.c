@@ -2,20 +2,25 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.5 $	$Source: f:\multitos/RCS/deskshow.c,v $
+*  $Revision: 1.6 $	$Source: f:\multitos/RCS/deskshow.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/04/14 22:19:54 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
 * =======================================================================
 *  $Log: deskshow.c,v $
-*  Revision 1.5  1993/04/14  22:19:54  ersmith
-*  Incorporated more single/multitasking changes.
+*  Revision 1.6  1993/04/27  23:00:14  ersmith
+*  Merged Cary's and Hans-Martin's changes
 *
- * Revision 1.4  1993/03/12  19:51:12  ersmith
- * Merged HMK's loadable resource stuff
- *
- * Revision 1.3  1993/03/10  20:12:42  ersmith
- * Lattice port
- *
+*
+*		03/24/93	cjg
+* Removed usage of gl_button in the show file code - uikey()
+* 
+*
+* Revision 1.4  1993/03/12  19:51:12  ersmith
+* Merged HMK's loadable resource stuff
+*
+* Revision 1.3  1993/03/10  20:12:42  ersmith
+* Lattice port
+*
 * Revision 1.1  1993/02/24  23:52:46  ersmith
 * 1 meg floppy MultiTOS
 *
@@ -302,8 +307,11 @@ EXTERN WORD gl_button;		/* changed 3/6/91	*/
 
 LONG uikey()
 {
+#if 0
+    /* DISABLED MOUSE BUTTON HANDLING FOR DISPLAYING FILES IN THIS FASION - CJG */
     if( gl_button & 1 ) return SPACE;    /* left mouse button = next page    */
     if( gl_button & 2 ) return CTLC;     /* right mouse button quits         */
+#endif
     if( Bconstat(2) ) return Bconin(2); /* if there's a key, return it      */
     return 0;                           /* otherwise, return nullo          */
 }

@@ -116,7 +116,7 @@ GLOBAL	BYTE	AE_TREDRAW[] = "AE_TREDRAW=";
 GLOBAL	BYTE	AE_SREDRAW[] = "AE_SREDRAW=";
 
 MLOCAL	BYTE	MY_MSG[] = "[1][ MultiTOS is written by | Derek Mui, Allan Pratt |\
- and Eric Smith.| Copyright 1992 by Atari Corp| All Rights Reserved][ OK ]";
+ and Eric Smith.| Copyright 1992-1993 Atari Corp.| All Rights Reserved][ OK ]";
 
 
 /*	Find the top window handle of a particular process 		*/
@@ -213,8 +213,8 @@ ct_wmsgup(message, owner, wh, m1, m2, m3, m4)
 /*	Handle the window click action and send message	*/
 
 	VOID
-hctl_window( mx, my )
-	WORD		mx, my;
+hctl_window( mx, my, kshift )
+	WORD		mx, my, kshift;
 {
 	GRECT		f, real;
 	WORD		set, w_handle, x, y, w, h, buttonset;
@@ -249,10 +249,15 @@ hctl_window( mx, my )
 
 	switch( cpt )
 	{
+	    case W_SMALLER:
+		message = (kshift & 3) ? WM_CLOSE : WM_FULLED;
+		goto do_cpt;
+
 	    case W_CLOSER:
 	    case W_FULLER:
 		message = ( cpt == W_FULLER ) ? WM_FULLED : WM_CLOSE; 
 
+do_cpt:
 		set = FALSE;
 		while( TRUE )
 		{
@@ -365,8 +370,10 @@ hctl_window( mx, my )
 h_2:	      if ( w_handle != gl_topw )
 	      {
 		if ( w_handle )		/* Not the top window	*/
-	          message = WM_TOPPED;
+	          message = (kshift & 3) ? WM_BOTTOMED : WM_TOPPED;
 	      }
+	      else if (kshift & 3)
+	        message = WM_BOTTOMED;
 	      else
 	      {
 		rets[0] = 0;
@@ -435,8 +442,10 @@ h_2:	      if ( w_handle != gl_topw )
 	  {
 	    if ( message )
 	    {
-	      if ( message == WM_TOPPED )
+	      if ( message == WM_TOPPED || message == WM_BOTTOMED )
+	      {
 	        ct_wmsgup( message, p->p_pid, w_handle, x, y, w, h );
+	      }
 	      else
 	        ct_msgup( message, p->p_pid, w_handle, x, y, w, h );
 	    }
@@ -513,7 +522,7 @@ hctl_rect( mx, my )
 
 	  if ( mn_hdo( &title, ( OBJECT **)&ptree, &pmenu, &item, &keyret ) )
 	  {
-	    if ( keyret & 0x04 )
+	    if (gl_multi && (keyret & 0x04))
 	      kill = TRUE;	
 		
 	    owner = gl_mnpid;
@@ -765,7 +774,7 @@ hctl_timer( VOID )
 /*	Process 1 - Screen manager 	*/
 
 	VOID
-screenmgr( VOID )
+screenmgvr( VOID )
 {
 	REG WORD	ev_which;
 	WORD		rets[6];
@@ -822,7 +831,7 @@ screenmgr( VOID )
 	    cont = hctl_mesag( msgbuff );
 
 	  if ( ev_which & MU_BUTTON )
-	    hctl_window( rets[0], rets[1] );
+	    hctl_window( rets[0], rets[1], rets[3] );
 						/* mouse over menu bar	*/
 	  if (ev_which & MU_M1)
 	    hctl_rect( rets[0], rets[1] );

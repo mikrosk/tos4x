@@ -7,6 +7,16 @@
 /*	Restore into C language	from 3.01	8/31/90	D.Mui		*/
 /*	Convert to Lattice C 5.51		2/17/93	C.Gee		*/
 /*	Force the use of prototypes		2/25/93 C.Gee		*/
+
+/*
+ *	Set the DESKPRG flag to compile this file for a
+ *	replacement Desktop. Clear it for making GEM.SYS
+ *      DESKPRG must also be set/cleared in
+ *	      DESKSTAR.S, DESKVARI.C, DESKROM.C
+ *	See the Defines in makedesk/makegem files.
+ */
+
+
 #include "pgem.h"
 #include "pmisc.h"
 #include "gemdos.h"
@@ -15,7 +25,12 @@
 EXTERN	LONG	trap();
 
 GLOBAL	WORD	DOS_AX;
+
+#if DESKPRG
+EXTERN	WORD	d_multi;
+#else
 EXTERN	WORD	gl_multi;
+#endif
 
 /*  I know what this does, but I don't
 *  know why it's supposed to do it.
@@ -47,7 +62,11 @@ pgmld( pname, ldaddr, tail, envrn )
 	if ( *ldaddr = ( LONG *)trap( X_EXEC, 3, pname, tail, envrn ) )
 	{
   	  temp = *ldaddr;		/* code+data+bss lengths */
+#if DESKPRG
+	  if (d_multi)
+#else
 	  if (gl_multi)
+#endif
   	    length = temp[3] + temp[5] + temp[7] + 0x150;
 	  else
 	  {
@@ -163,8 +182,11 @@ dos_xalloc(nbytes, type)
 	WORD		type;
 {
 	LONG		ret;
-
+#if DESKPRG
+	if (!d_multi) {
+#else
 	if (!gl_multi) {
+#endif
 		type &= 0x03;
 	}
 	ret = trap( X_XMALLOC, nbytes, type );

@@ -1,3 +1,41 @@
+Changes made 4/23/93:
+
+desk*.rsc:
+	Updated the Help menus to reflect reality; added
+	"Clr/Home" for redraw screen, and deleted "Alt-Help"
+	and "Alt-[1..6]", which are no longer supported.
+
+Changes made 4/22/93:
+
+gemwmlib.c:
+	Added the iconifier gadget (W_SMALLER).
+gemctrl.c:
+	Made single-clicking on the name result in a TOPPED
+	message, and shift-clicking on the name give a
+	BOTTOMED message.
+windlib.h,gemlib.h,gemwmlib.c:
+	Added WM_BOTTOMED message, definition for iconifier
+	gadget, and commented out the remaining menu bar
+	gadget code.
+
+Changes made 4/21/93:
+
+aestrap.s:
+	Made waitforaes() and releaes() use a global variable for a
+	semaphore; this should save considerable system call overhead
+	(it saves two calls to Psemaphore() per trap #2 call).
+
+Changes made 4/20/93:
+
+gemevlib.c:
+	Fixed a misleading comment for ev_dclick.
+gemdisp.c:
+	Extensive changes to do non-blocking waits; now instead of sitting
+	in a loop doing Syield(), the AES does an Fselect which causes
+	it to sleep until some event occurs. To accomplish this, it installs
+	a new MiNT device (\DEV\AES_MT) which responds to mouse clicks
+	and timer events.
+
 Changes made 4/14/93:
 
 gem*.rsc:
@@ -15,6 +53,12 @@ gemfmalt.c:
 	Added wm_update(1)/wm_update(0) calls to lock the screen while
 	an alert box is displayed. Also: made all the text strings
 	TOUCHEXIT so that the box may be moved by grabbing any part of it.
+
+Changes made in March and April generally:
+
+*.[csh]:
+	EXTENSIVE changes to allow single tasking operation; too many
+	to detail here, but look for tests of the gl_multi flag.
 
 Changes made 3/10/93:
 

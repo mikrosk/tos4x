@@ -46,7 +46,7 @@ VOID	ct_msgup( WORD message, WORD owner, WORD wh,
 VOID	ct_wmsgup( WORD message, WORD owner, WORD wh,
 		   WORD m1, WORD m2, WORD m3, WORD m4 );
 
-VOID	hctl_window( WORD mx, WORD my );
+VOID	hctl_window( WORD mx, WORD my, WORD kshift );
 
 VOID	swap_prg( PD *p );
 
@@ -119,7 +119,9 @@ VOID	ps_term( PD *p );
 
 VOID	yieldcpu( VOID );
 
+VOID	mt_opendev( VOID );
 
+VOID	mt_wakeup( VOID );
 
 /* FILE: GEMEVLIB.C
  * --------------------------------------------------------------------

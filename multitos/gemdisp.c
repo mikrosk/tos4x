@@ -36,7 +36,11 @@
 #include "dispvars.h"
 #include "windlib.h"
 #include "message.h"
+#if 0
 #include "aesmint.h"
+#else
+#include "mintbind.h"
+#endif
 #include "signal.h"
 
 #define KEYSTOP 0x2b1c0000L		/* control backslash	*/
@@ -77,6 +81,30 @@ GLOBAL	PD	*shutpd;	/* process that shut down the system */
 
 GLOBAL	WORD	gl_debug;
 GLOBAL	WORD	gl_port;
+
+EXTERN	WORD	sh_inwrite;		/* Only for single tasking mode!	*/
+					/* Flag set when application other than	*/
+					/* the DESKTOP did a sh_write. If flag	*/
+					/* set sh_write will launch specified	*/
+					/* application after the current prg.	*/
+					/* terminated. This flag is also tested	*/
+					/* in swap_next() in GEMDISP.C. This is */
+					/* done to prevent the menu bar to 	*/
+					/* change to the DESKTOP's menu bar	*/
+					/* during the process of launching the	*/
+					/* next application.			*/
+
+#define MT_DEVICE
+
+#ifdef MT_DEVICE
+VOID mt_wakeup( VOID );
+#endif
+
+GLOBAL	WORD	mt_fd;		/* file handle for our special AES "device" */
+struct kerinfo *mt_kernel;
+static LONG mtwhich = 0;
+static WORD mtdata = 0;
+
 
 
 /*	Show all the current process on the screen	*/
@@ -378,6 +406,7 @@ send_ctrl( p, type )
 /*	Switch to next top window's process	*/
 /*	Call by scheduler			*/
 
+
 	VOID
 swap_next( p, pterm )
 	PD		*p;
@@ -458,9 +487,18 @@ swap_next( p, pterm )
 					/* if not on top then ask him to do so */
 		set_desk( newp );	/* set the background screen owner */
 					/* and pointer 			   */
-
-		Debug1("swap_next() does send_ctrl(8)\r\n");
-		send_ctrl( newp, 8 );	/* update the menu		*/
+		Debug1("swap_next() does set_desk(). newp=");
+		Debug1(newp->p_name); Debug1("\r\n");
+		
+		if (gl_multi || !sh_inwrite) {	/* Single tasking mode! 	*/
+		/* Change menu only when we go back to the DESKTOP but not when */
+		/* we are inside the loop where an appl. launches another appl. */
+		/* using shel_write. This prevents us from getting the DESKTOP's*/
+		/* menu bar shown while launching the next application.		*/		
+			send_ctrl( newp, 8 );	/* update the menu		*/
+			Debug1("swap_next() does send_ctrl(8). newp=");
+			Debug1(newp->p_name); Debug1("\r\n");
+		}
 	}
 	if ( pterm )		/* process termination, let the	*/
 	  send_ctrl( newp, 2 );	/* screen manager decides what  */
@@ -539,12 +577,16 @@ sendmsg( d1, d0 )
 	  {
 	    if ( !( p->p_type & AESSYSTEM ) )
 	      while ( cpdid  && ( cpdid != p->p_pid ) )
+	      {
 	        Syield();
+	      }
 	  }
 	}
-
 	msg.aes_func = d0;
 	msg.aes_blk  = d1;
+#ifdef MT_DEVICE
+	mt_wakeup();
+#endif
 	Pmsg( 2, 100L, &msg );	/* send message and wait	*/
 }
 
@@ -558,6 +600,9 @@ forkq( fcode,fdata )
 {
 	REG FPD		*f;
 
+#ifdef MT_DEVICE
+        mt_wakeup();
+#endif
 	if ( fpcnt < NFORKS )		/* queue up a incoming event	*/
 	{
 	  f = &D.g_fpdx[fpt++];
@@ -697,8 +742,9 @@ again:
 	    Debug7( " is blocked\r\n" );
 	    link_tail( &slr, p );
 	    if ( cpdid == p->p_pid )
+	    {
 	      cpdid = -1;
-
+	    }
 	    break;	
 
 	  case PS_DEAD:		/* This is process is marked dead	*/
@@ -913,7 +959,9 @@ disp( VOID )
 {
 	AES		msg;
 	VOID (*startfunc)(PD *, BYTE *);
-
+#ifdef MT_DEVICE
+	LONG	fdmask;
+#endif
 	while( TRUE )		/* keep looking for AES requests */
 	{
 	  if (!gl_multi && !currpd) {
@@ -946,7 +994,19 @@ Debug1(currpd->p_name);
 	    toaes( msg.aes_func, msg.aes_blk, msg.aes_id );
 	  			/* aes will not return to here	*/
 	  if (gl_multi)
+#ifdef MT_DEVICE
+	  {
+	    fdmask = (1L << mt_fd)|1;
+	    if (mtdata) {
+		mtdata = 0;
+		mtwhich = 0;
+		Syield();
+	    } else
+		(void)Fselect(0, &fdmask, 0L, 0L);
+	  }
+#else
 	    Syield();
+#endif
 	  else
 	    dsptch();
 	}
@@ -1146,4 +1206,98 @@ yieldcpu()
 
 	if (giveup)
 	  ev_timer(20);
+}
+
+/*
+ * New dispatch stuff:
+ * If MiNT is active, we install a special device that the AES can select()
+ * on. The AES system process then doesn't have to busy wait for events;
+ * instead it does an Fselect(), and whenever anything interesting happens
+ * forkq() gets called and bumps us out of the select().
+ * Added 4/15/93 by ERS.
+ */
+
+/* The MiNT device driver functions, &c that we will need */
+/* This device really only implements open(), close(), and select() */
+
+LONG MTD_open(FILEPTR *f)
+{
+	(*mt_kernel->debug)("MT_open");
+	return 0;
+}
+
+LONG MTD_rdwr(FILEPTR *f, char *buf, LONG nbytes)
+{
+	return 0;
+}
+
+LONG MTD_error(FILEPTR *f)
+{
+	return -1;
+}
+
+LONG MTD_close(FILEPTR *f, WORD pid)
+{
+	return 0;
+}
+
+LONG MTD_select(FILEPTR *f, LONG p, WORD mode)
+{
+	if (mtdata) {
+		mtdata = 0;
+		return 1;
+	}
+	if (!mtwhich)
+		mtwhich = p;
+	return 0;
+}
+
+VOID MTD_unselect(FILEPTR *f, LONG p, WORD mode)
+{
+	if (mtwhich == p)
+		mtwhich = 0;
+}
+
+DEVDRV mt_devinfo = {
+MTD_open,	/* open */
+MTD_rdwr,	/* write */
+MTD_rdwr,	/* read */
+(LONG (*)(FILEPTR *, LONG, WORD))MTD_error,	/* lseek */
+(LONG (*)(FILEPTR *, WORD, void *))MTD_error,	/* ioctl */
+(LONG (*)(FILEPTR *, WORD *, WORD))MTD_error,	/* datime */
+MTD_close,	/* close */
+MTD_select,	/* select */
+MTD_unselect	/* unselect */
+};
+
+struct dev_descr MTD_descr = {
+	&mt_devinfo,
+	0,
+	0,
+	0,
+	0
+};
+
+VOID
+mt_opendev( )
+{
+	mt_kernel = (struct kerinfo *)Dcntl(DEV_INSTALL, "U:\\DEV\\AES_MT",
+						&MTD_descr);
+	mt_fd = dos_open("U:\\DEV\\AES_MT", 0);
+	if (mt_fd < 0)
+		bailout("Unable to open AES multitasking device\r\n");
+}
+
+VOID
+mt_wakeup()
+{
+#ifdef MT_DEVICE
+	if (!gl_multi) return;
+	if (mtwhich) {
+		mtdata = 0;
+		(*mt_kernel->wakeselect)(mtwhich);
+	} else {
+		mtdata = 1;
+	}
+#endif
 }

@@ -34,7 +34,8 @@ EXTERN	WINDOW		*x_win;
 EXTERN	OBJECT		*menu_addr;
 
 
-
+#if 0
+/* this function already existed in deskmn.c */
 /* XDeselect()
  * ====================================================================
  * Deselect an object and redraw - use the flag to redraw in case
@@ -57,7 +58,7 @@ WORD   obj;
          objc_draw((LONG)tree,obj,MAX_DEPTH,trect.g_x,trect.g_y,trect.g_w,trect.g_h );
        }
 }
-
+#endif /* 0 */
 
 #if 0		/* see kballoc.c for implementation */
 	BYTE

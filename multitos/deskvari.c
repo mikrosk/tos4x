@@ -13,6 +13,15 @@
 #include "deskwin.h"
 #include "osbind.h"
 
+/*
+ *	Set the DESKPRG flag to compile this file for a
+ *	replacement Desktop. Clear it for making GEM.SYS
+ *      DESKPRG must also be set/cleared in
+ *	      DESKSTAR.S, DESKTOP.C, DESKROM.C
+ *	See the Defines in the makegem/makedesk files.
+ */
+
+
 BYTE	dr[32];		/* drives flag			*/	
 WORD	p_timedate;	/* preserve time and date	*/
 
@@ -89,3 +98,29 @@ BYTE	infpath[] = "C:\\NEWDESK.INF";
 BYTE	icndata[] = "C:\\DESKICON.RSC";
 BYTE	cicndata[] = "C:\\DESKCICN.RSC";
 BYTE	Nextline[] = "\012\015";
+
+
+#if DESKPRG
+/* APGSXIF.C Globals */
+GLOBAL WORD	gl_nrows;
+GLOBAL WORD	gl_ncols;
+
+GLOBAL WORD	gl_wchar;	/* character cell width	*/
+GLOBAL WORD	gl_hchar;	/* character cell height*/
+
+GLOBAL WORD	gl_wbox;
+GLOBAL WORD	gl_hbox;
+
+GLOBAL WORD	contrl[12];
+GLOBAL WORD	intin[256];
+GLOBAL WORD	ptsin[256];
+GLOBAL WORD	intout[256];
+GLOBAL WORD	ptsout[256];
+
+GLOBAL LONG	ad_intin;
+
+GLOBAL	LONG	gl_vdo;
+
+GLOBAL  WORD	ctldown;	/* ctrl key down ?	*/
+
+#endif

@@ -2,13 +2,13 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.5 $	$Source: f:\multitos/RCS/gemrom.c,v $
+*  $Revision: 1.6 $	$Source: f:\multitos/RCS/gemrom.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/04/14 22:19:54 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
 * =======================================================================
 *  $Log: gemrom.c,v $
-*  Revision 1.5  93/04/14  22:19:54  ersmith
-*  Incorporated more single/multitasking changes.
+*  Revision 1.6  1993/04/27  23:00:14  ersmith
+*  Merged Cary's and Hans-Martin's changes
 *
  * Revision 1.4  1993/03/12  19:51:12  ersmith
  * Merged HMK's loadable resource stuff
@@ -77,24 +77,29 @@
  *	[A|C]:\MULTITOS\GEM.RSC.  
  *
  *	NOTE: You have to define SOFTLOAD in geminit.c and desktop.c, too.
+ *
+ *	See the Defines in the makegem/makedesk files.
  */
-#define SOFTLOAD	1	
+
 /*
- *	Version number of the GEM.RSC file. Use "rscvers versnr GEM.RSC"
+ *	Turn on resource file version number checking by setting the
+ *	GEMRSVER to 1. Use "rscvers versnr GEM.RSC"
  *	to create a GEM.RSC with a version number in the first byte of the
  *	resource header. This is to prevent user from using the wrong
  *	resource file.
+ *	See the Defines in the makegem/makedesk files.
  */
-#define GEMRSVER	1 
+
 /* 
  * 	Set the ONERSC flag to indicate that the system just has the
  *	U.S. desktop resource in ROMs. If the system cannot load the
  *	GEM.RSC from disk, it will displaying a warning, saying that
  *	the U.S. version from ROM will be used.
+ *	See the Defines in the makegem/makedesk files.
  *
  *	-> This message has to get internationalized?!
  */
-/* #define ONERSC	1	*/
+
 
 
 EXTERN	LONG	rs_global;
@@ -109,7 +114,7 @@ EXTERN	UWORD	SPARSC[];
 
 MLOCAL	LONG		gl_pglue;
 MLOCAL	LONG		gemptr;		/* GEM's rsc pointer		*/
-#ifdef SOFTLOAD
+#if SOFTLOAD
 MLOCAL	LONG		rgemptr;	/* GEM's rsc pointer (ROM vers)	*/
 MLOCAL	WORD		romuse;
 #endif
@@ -117,14 +122,14 @@ MLOCAL	UWORD		*tosrsc;
 
 MLOCAL VOID		rom_read( VOID );
 
-#ifdef SOFTLOAD
+#if SOFTLOAD
 
 MLOCAL UWORD		*rscaddr; 	/* addr of the loaded rsc file */
 MLOCAL LONG		rsc_load( VOID );
 MLOCAL BYTE *GEMRSC = 	"C:\\MULTITOS\\GEM.RSC"; /* fname of rsc file */
 #endif
 
-#ifdef ONERSC
+#if ONERSC
 MLOCAL	BYTE	*RSCTABLE[] =
 {
 	USARSC		/* USA, UK	*/
@@ -164,7 +169,7 @@ rom_ram( which, pointer )
 	switch( which )
 	{
 	  case 0:		/* get the gem resource	*/
-#ifdef SOFTLOAD
+#if SOFTLOAD
 	    if (rgemptr == gemptr) {	/* we only have to do this, if the */
 					/* rom version is used */ 
 	   	 ptr = (BYTE *)tosrsc;
@@ -190,7 +195,7 @@ rom_ram( which, pointer )
 				/* ok, the rsc file was not found 	*/
 				/* on disk, so we have to use the 	*/
 				/* rom version.				*/
-#ifdef SOFTLOAD
+#if SOFTLOAD
 	    if (!romuse) {
 		rom_read();
 		
@@ -205,7 +210,7 @@ rom_ram( which, pointer )
 	    break;
 
 	  case 3:		/* read in desktop.inf		*/
-#ifdef SOFTLOAD
+#if SOFTLOAD
 	    if (!romuse) {
 		rom_read();
 		
@@ -226,7 +231,7 @@ rom_ram( which, pointer )
 rsc_free( VOID )
 {
 	
-#ifdef SOFTLOAD	
+#if SOFTLOAD	
 	
 	if (romuse) {
 		dos_free( gl_pglue );
@@ -267,8 +272,8 @@ rsc_read( VOID )
 	  st_lang = 0;
 #endif
 
-#ifdef SOFTLOAD
-#ifdef ONERSC
+#if SOFTLOAD
+#if ONERSC
 	tosrsc = RSCTABLE[0];	/* only US version in roms */
 #else
 	tosrsc = RSCTABLE[st_lang];
@@ -279,7 +284,7 @@ rsc_read( VOID )
 					/* use US Version in ROMs */
 		rom_read();
 		gemptr = rgemptr;
-#ifdef ONERSC
+#if ONERSC
 		if (st_lang) != 0) {
 			trap(0x9, "> Unable to open GEM.RSC in MULTITOS\r\n");
 			trap(0x9, "> directory. Using US ROM version of\r\n");
@@ -327,7 +332,7 @@ rom_read( VOID )
 
 	intptr = ( UWORD *)gl_pglue;
 
-#ifdef SOFTLOAD
+#if SOFTLOAD
 	rgemptr = (LONG)(gl_pglue + 10);	/* Gem Resource */
 	rdeskptr = (LONG)(gl_pglue + intptr[0]);/* Desktop Resource */
 	rinfptr = (LONG)( gl_pglue + intptr[1] );/* Inf file resource */
@@ -340,7 +345,7 @@ rom_read( VOID )
 
 }
 
-#ifdef SOFTLOAD
+#if SOFTLOAD
 
 /* read gem.rsc from disk */
 
@@ -364,6 +369,7 @@ LONG rsc_load()
 	      *                 |  +- version number
 	      *                 +---- always one
 	      */
+#if GEMRSVER
 	     vers = (BYTE) (hdr_buff[0] >> 8);
 	     if (vers != (GEMRSVER | 0x80)) {
 					/* wrong version number */ 
@@ -373,6 +379,7 @@ LONG rsc_load()
 			Fselect(3000, 0L, 0L, 0L); 
 			goto rs_end;
 	     }
+#endif
 					/* get size of resource	*/
 
 						/* New format		*/

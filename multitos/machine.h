@@ -2,13 +2,13 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.5 $	$Source: f:\multitos/RCS/machine.h,v $
+*  $Revision: 1.6 $	$Source: f:\multitos/RCS/machine.h,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 93/04/14 22:19:54 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
 * =======================================================================
 *  $Log: machine.h,v $
-*  Revision 1.5  93/04/14  22:19:54  ersmith
-*  Incorporated more single/multitasking changes.
+*  Revision 1.6  1993/04/27  23:00:14  ersmith
+*  Merged Cary's and Hans-Martin's changes
 *
  * Revision 1.4  1993/03/12  19:51:12  ersmith
  * Merged HMK's loadable resource stuff
@@ -56,7 +56,7 @@
 #ifndef _MACHINE_H_
 #define _MACHINE_H_
 
-#define DEBUGMSGS	/* define this for debugging */
+/*#define DEBUGMSGS	/* define this for debugging */
 
 #ifdef DEBUGMSGS
 #define	Debug0(a)	Debug(0,a)

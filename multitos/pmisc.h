@@ -345,7 +345,7 @@ VOID	dispret( VOID );
 VOID	toaes( LONG, LONG, WORD );
 VOID	savestate( VOID );
 VOID	switchto( LONG );
-WORD	runaes( BYTE *, BYTE * );
+WORD	runaes( VOID );
 WORD	setrunacc( VOID );
 
 #endif

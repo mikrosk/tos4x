@@ -1,4 +1,4 @@
-/*	GEMSHLIB.C	4/18/84 - 01/07/85	Lee Lorenzen		*/
+ /*	GEMSHLIB.C	4/18/84 - 01/07/85	Lee Lorenzen		*/
 /*	68k		2/18/85 - 05/28/85	Lowell Webster		*/
 /*	International 	07/19/85		Derek Mui		*/
 /*	french		08/08/85		Mike Schmal		*/
@@ -101,6 +101,8 @@ EXTERN	WORD	awinp[];
 
 EXTERN	WORD	gl_nplanes;		/* in APGSXIF.C */
 
+EXTERN	WORD	spdid;
+
 GLOBAL	WORD	envsize;
 GLOBAL	BYTE	*ad_envrn;
 GLOBAL	BYTE	*ad_shcmd;		/* Shell command buffer	*/
@@ -108,10 +110,27 @@ GLOBAL	BYTE	*ad_shtail;		/* Shell command tail	*/
 GLOBAL	LONG	ad_path;
 GLOBAL	WORD	sh_iscart;		/* cart program 	*/
 GLOBAL	WORD	sh_graphic;
+GLOBAL	WORD	sh_accflag;		/* Used for sh_draw to not redraw whole */
+					/* screen when launching Accs.		*/
+					/* See sendcli() in gemcli.c		*/
 
+GLOBAL	WORD	sh_inwrite;		/* Only for single tasking mode!	*/
+					/* Flag set when application other than	*/
+					/* the DESKTOP did a sh_write. If flag	*/
+					/* set sh_write will launch specified	*/
+					/* application after the current prg.	*/
+					/* terminated. This flag is also tested	*/
+					/* in swap_next() in GEMDISP.C. This is */
+					/* done to prevent the menu bar to 	*/
+					/* change to the DESKTOP's menu bar	*/
+					/* during the process of launching the	*/
+					/* next application.			*/
+					
 BYTE		sh_xpath[CMDLEN];		/* auxially path buffer	*/
 BYTE		sh_xtail[CMDLEN];
 WORD		sh_xisgem;
+
+PD		*saveshpd;			/* used in sh_exec() */
 
 GLOBAL	WORD	shutdown;	/* system in shutdown mode	    */
 GLOBAL	WORD	reschid;	/* process that requests res chg */
@@ -427,14 +446,14 @@ sh_broadcast( sender, message )
 sh_draw( lcmd )
 	BYTE	*lcmd;
 {
-	REG	LONG	tree;
+ 	REG	LONG	tree;
 
 	gsx_sclip( &gl_rscreen );
 	upperstr( lcmd );
 	tree = ad_stdesk;
 	LLSET( LLGET(OB_SPEC(TITLE)), ( LONG )lcmd );
 
-	if (gl_multi)
+	if (gl_multi || sh_accflag)
 		ob_draw( tree, ASCREEN, MAX_DEPTH );
 	else
 		ob_draw( tree, 0, MAX_DEPTH );
@@ -539,13 +558,13 @@ sh_fork( program, tail, envrn )
 	    i = dos_pexec( 100, program, tail, envrn );
 	  else
 	  {
-	    Debug1("Free memory: "); Ndebug1((LONG)dos_xalloc(-1L, 3))
+	    Debug1("Free memory: "); Ndebug1((LONG)dos_xalloc(-1L, 3));
 	    i = dos_pexec( 3, program, tail, envrn );
 	  }
 	  tail[CMDLEN-1] = savechr;
 	  Debug1( "After dos_exec\r\n" );
 
-	  if ( i < 0 )	/* fail */
+	  if ( i < 0L )	/* fail */
 	  {
 	    Debug1( "Dos_pexec fails: error code " );
 	    Ndebug1( i );
@@ -563,12 +582,22 @@ sh_fork( program, tail, envrn )
 		pstart(p, (BYTE *)execBP, (BYTE *)i);
 		Debug1( "sh_fork: after pstart, going into while loop now\r\n" );
 	/* now wait for the child to finish */
+		if (saveshpd != NULL)
+			shellpd = saveshpd;	/* see HACK alert in sh_exec */
+
 		if (!(currpd->p_type & AESSYSTEM)) {
-			do {
+			do {			/* wait for child to finish */
 				ev_mesag( (BYTE *) msgbuf );
 			} while (msgbuf[0] != CH_EXIT);
 		}
 		Debug1( "sh_fork: after while loop\r\n" );
+		all_run();	/* Make sure SCREEN runs first to */
+				/* update the menu bar. */
+#if 0		
+		/* not neede this we do an all_run() */
+		 sh_draw( " " ); 
+		 mn_bar(0x0L, 0x200);
+#endif
 	    }
 	    return( p->p_pid );
 	  }
@@ -653,9 +682,10 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 	UWORD		length;
 	BYTE		*dptr;	/* ++ERS 12/10/92 */
 
+
 	ret = 0;		/* return code, assuming failed  */
 
-	if ( doex & 0xFF00 )	/* extended mode	*/
+	if (doex & 0xFF00)	/* extended mode	*/
 	{
 	  ptr = ( LONG *)pcmd;		/* This is the file name */
 	  pcmd = ( BYTE *)ptr[0];
@@ -740,7 +770,7 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 	if ( !( doex & 0x0400 ) )
 	   dos_setdir( ad_shcmd, 0 );
 
-	if ( doex & 0xFF00 )	/* if high byte is set */
+	if (doex & 0xFF00) /* if high byte is set */
 	{
 	  if ( doex & 0x0100 )	/* set memory limit	*/
 	    Psetlimit( 3, ptr[1] );
@@ -787,23 +817,70 @@ sh_exec( doex, isgem, isargv, pcmd, ptail )
 
 	  case 1:
 	  case 2:
+	
 	    if ( isgem )		/* run graphic program */
 	    {
 	      if (gl_multi == 0)
 	      {
-	        close_accs();
+		/*
+		 *  Only the desktop can launch programs instantly
+		 *  (doex & 0x1000). Other programs will have to exit
+		 *  before they can launch another program.
+		 *  --> This is true only for single tasking mode.
+		 */
+		if (doex & 0x1000) {
+			/* H A C K   A L E R T ! ! !
+			 * If you launch a DESK.PRG from the ROM
+			 * desktop you want it to return to 
+			 * DESK.PRG after you ran an application.
+			 * With mode 0x1000 we can assume that
+			 * the currpd is the desktop (DESK.PRG).
+			 * So with setting shellpd to currpd we
+			 * make sure that the swap_next in appl_exit
+			 * will bring us back to DESK.PRG.
+			 * Without the hack, we would get back to 
+			 * the ROM desktop since shellpd still
+			 * points to it.
+			 */
+			saveshpd = shellpd;	/* save old shell pd */
+			shellpd = currpd;	/* HACK !!! */
+			shellpd->p_type |= AESSHELL;
 
-		mn_bar(0x0L, 0x200);
-		/*sh_background();*/
-		set_desk(scr_pd);
-	        sh_draw( sh_name(ad_shcmd) );
-		
-	      }
-	      ret = sh_fork( ad_shcmd, ad_shtail, envrn );
-	      if (gl_multi == 0)
-	      {
+			close_accs();
+			mn_bar(0x0L, 0x200);
+			/*sh_background(); *no needed* */
+			set_desk(scr_pd);
+		        sh_draw( sh_name(ad_shcmd) );
+
+			ret = sh_fork( ad_shcmd, ad_shtail, envrn );
+			/*
+			 * What's going on?
+			 * In old TOS, an application had to exit before
+			 * an application was launched using shel_write. 
+			 * Even the desktop exited. Now in the single
+			 * tasking version of MultiTOS the desktop stays
+			 * resident and launches appl. using mode 0x1000.
+			 * If an application like EasyDraw does a shel_write
+			 * we just set a flag (sh_inwrite). When it exits and
+			 * we come back from sh_fork and sh_inwrite is set,
+			 * we do a sh_fork again, launching the appl. the exited
+			 * appl. wanted to launch using sh_write. If sh_inwrite
+			 * is not set we simply return to the desktop.
+			 * Roger?
+			 */ 	
+			while (sh_inwrite) {
+			        sh_draw( sh_name(ad_shcmd) );
+				mn_bar(0x0L, 0x200);
+				sh_inwrite = FALSE;
+				ret = sh_fork( ad_shcmd, ad_shtail, envrn );
+			}	
+		} else {
+			sh_inwrite = TRUE;
+		}
 		w_drawchange(&gl_rscreen, NIL, NIL);
-		mn_bar(0x0L, 0x200 | TRUE);
+		mn_bar(0x0L, 0x200 | TRUE); 
+	      } else {
+		ret = sh_fork( ad_shcmd, ad_shtail, envrn );
 	      }
 	    }
 	    else			/* run tos program	*/
@@ -952,6 +1029,16 @@ ss_3:		  D.g_loc2[0] = dos_gdrv();
 		Debug1( "Sh_exec 3 fails\r\n" );
 	    }
 	    break;
+	  case 13:	/* start softload desktop in single tasking mode */
+		if (!gl_multi) {
+			mn_bar(0x0L, 0x200);
+			/*sh_background();*/
+			set_desk(scr_pd);
+			sh_draw( sh_name(ad_shcmd) );
+			ret = sh_fork( ad_shcmd, ad_shtail, envrn );
+		}
+		break;
+
 	}
 
 	if ( changed )
@@ -1010,6 +1097,9 @@ ex_exit:
       bit 1 = set Prenice
       bit 2 = set default directory
       bit 3 = set environment string
+      bit 4 = undocumented feature for desktop to 
+	      launch programs in single tasking mode 
+	      (Desktop will stay resident!!!)
 
 	and so on up to 8 settings
 
@@ -1038,6 +1128,7 @@ ex_exit:
     9 Message informer
 
    10 Send message to AES	
+
 */
 
 	WORD
@@ -1055,6 +1146,7 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 	  case 1:
 /*	  case 2:	*/
 	  case 3:
+
 	    if ( !shutdown )
 	    {
 /*	      Debug1( "Shel_write " );
@@ -1213,6 +1305,19 @@ sh_write(doex, isgem, isover, pcmd, ptail)
 	
 	    break;
 
+	  case 13:		/* start softload desktop in single tasking mode */
+	    if (!gl_multi && !shutdown )
+	    {
+	      i = sh_exec(doex,isgem,isover,pcmd,ptail);
+	      if ( !i )
+		Debug1( "Sh_exec fails\r\n" );
+
+	      return( i );
+	    }
+	    else
+	      break;
+
+		
 	  default:
 	    break;
 	}
@@ -1533,7 +1638,7 @@ sh_spath( path )
 	BYTE	*path;
 {
 	REG BYTE	*start;
-	BYTE		*dest,*new,*p1,*p2;
+ 	BYTE		*dest,*new,*p1,*p2;
 	WORD		add;
 	UWORD		len;
 	int		size,cursize;
@@ -1638,10 +1743,15 @@ l_shell( buffer )
 	BYTE	*buffer;
 {
 	WORD	id;
+	WORD	mode;
 
 	if ( !shellpd )	/* Not launched */
 	{
-	  if ( id = sh_write( 0x0001, 1, 0, buffer, "" ) )
+	  if (gl_multi)
+		mode = 0x0001;
+	  else
+		mode = 0x000d;
+	  if ( id = sh_write(mode, 1, 0, buffer, "" ) )
 	  {
 	    sh_draw( buffer );
 	    shellpd = idtopd( id );

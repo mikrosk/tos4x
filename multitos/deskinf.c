@@ -313,7 +313,7 @@ uhex_dig(wd)
 
 	/********** Kludge **********/
 	/* make the old inf works with the new one	*/
-	if ( ( app->a_type == TOS ) && ( !app->a_name[0] ) )
+	if ( ( app->a_type == TOS ) && (app->a_name) && ( !app->a_name[0] ) )
 	  app->a_type = TEXT;
 
 	/***************************/

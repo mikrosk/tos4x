@@ -2,13 +2,13 @@
 *************************************************************************
 *			Revision Control System
 * =======================================================================
-*  $Revision: 1.5 $	$Source: f:\multitos/RCS/gemflag.c,v $
+*  $Revision: 1.6 $	$Source: f:\multitos/RCS/gemflag.c,v $
 * =======================================================================
-*  $Author: ersmith $	$Date: 1993/04/14 22:19:54 $	$Locker:  $
+*  $Author: ersmith $	$Date: 1993/04/27 23:00:14 $	$Locker:  $
 * =======================================================================
 *  $Log: gemflag.c,v $
-*  Revision 1.5  1993/04/14  22:19:54  ersmith
-*  Incorporated more single/multitasking changes.
+*  Revision 1.6  1993/04/27  23:00:14  ersmith
+*  Merged Cary's and Hans-Martin's changes
 *
  * Revision 1.4  1993/03/12  19:51:12  ersmith
  * Merged HMK's loadable resource stuff
@@ -131,7 +131,7 @@ take_ownership( ownit )
 	  }
 	  wm_update( 0 );
 	
-	  Debug7( "off\r\n" );
+	  Debug7( "restore mouse\r\n" );
 	}
 }
 
@@ -146,19 +146,16 @@ unsync( VOID )
 	if ( p = slr )	/* if sombody is waiting then wake him up */
 	{
 	  Debug7( p->p_name );
-	  Debug7( " is unblocked\r\n" );
+	  Debug7( " is unblocked (unsync)\r\n" );
 	  slr = p->p_link;
 	  spdid = p->p_pid;
 	  p->p_state = PS_READY;
 	  link_tail( &drl, p );
-#if 0
-	  if (!gl_multi)
-                dsptch();
-#endif
-
 	}
-	else
+	else {
+	  Debug7("unsync: clear spdid\r\n");
 	  spdid = 0;
+	}
 }
 
 
@@ -172,14 +169,16 @@ nosync( VOID )
 	
 	if ( spdid == currpd->p_pid )	/* does he owns the screen?*/
 	{
-	  Debug6( currpd->p_name );
-	  Debug6( " release wm_update\r\n" );	  
-	  if ( !currpd->p_wmtas )	/* count down		*/
+	  Debug7( currpd->p_name );
+	  Debug7( " release wm_update\r\n" );	  
+	  if ( !currpd->p_wmtas ) {	/* count down		*/
 	    unsync();			/* wake someone up	*/
-
+	  } else {
+		Debug1("unsync not called, p_wmtas="); Ndebug1((LONG)currpd->p_wmtas);
+	  }
 	  return( TRUE ); 
 	}
-
+	Debug7("nosync failed\r\n");
 	return( FALSE );
 }
 
@@ -222,7 +221,7 @@ ch_wmlock( p, reset )
 
 
         WORD
-wm_update( flag )
+wm_update ( flag )
         WORD	flag;
 {				/* if critical error then bypass it	*/
 
@@ -261,8 +260,8 @@ wm_update( flag )
 	      {				/* No		*/
 		currpd->p_prvstate = currpd->p_state;
 		currpd->p_state = PS_BLOCKED;
-		Debug1( "wm_update call dsptch\r\n" );	
-		if ( !dsptch( currpd ) )
+		Debug6( "wm_update call dsptch\r\n" );	
+		if ( !dsptch() )	/* REALLY??? */
 		{
 	  	  Debug6( "Wm_update calls dsptch fails\r\n" );
 		  while(1)

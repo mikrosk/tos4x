@@ -306,6 +306,7 @@ wm_start()
     REG RLIST   *rp;	/* pointer to RLIST structure */
     REG WORD	i;	/* counter */
     GRECT	desksiz;
+    WORD	whandles[8];
 		
     /* Allocate memory for memory header and window structures */
     if ((wmhead = (MEMHDR *)
@@ -380,10 +381,33 @@ wm_start()
     r_set( ( WORD *)&wp->full, 0, gl_hbox, gl_rfull.g_w, gl_rfull.g_h );
 
     wmopen(deskwind, &desksiz);
-
     /* create a phantom window	*/
+
+    if (!gl_multi) {
+	/* The HACK of the year!
+	 * To make MultiTOS more compatible in single tasking mode
+	 * we create 7 (# of possible windows in old TOS) dummy windows.
+	 * Now the phantom window (which didn't exist in old TOS) will
+	 * get handle number 8. That way, programs like Calamus will still
+	 * work. Without this hack they wouldn't becuase they assume that
+	 * they will always get window handle 1 for their first created window.
+	 * After creating the phantom window, we are deleting these dummy
+	 * windows again. (04/22/93 hmk)
+	 */
+	for (i = 0; i < 7; i++) 
+		whandles[i] = wm_create(0, &desksiz);
+    }
 		
-    phanwind = wm_create( 0, &desksiz);
+    phanwind = wm_create( 0, &desksiz);	/* create phantom window */
+
+    if (!gl_multi) {
+	/*
+	 *	Deleting dummy windows.
+	 *	See few lines above for descr.
+	 */
+	for (i = 0; i < 7; i++)
+		wm_delete(whandles[i]);
+    }
 
    /* Fake the full x y w and h for deskwind */
     wp = srchwp( phanwind );
@@ -478,6 +502,10 @@ wm_create( kind, rect )
 	if (kind & FULLER) {
 	    w_bld(wp, W_FULLER, G_BOXCHAR, W_TITLE, 0x07010000, IS3D);
 	}
+
+	if (kind & SMALLER) {
+	    w_bld(wp, W_SMALLER, G_BOXCHAR, W_TITLE, 0x2e010000, IS3D);
+	}
     }
 
     if (kind & INFO) {
@@ -487,7 +515,7 @@ wm_create( kind, rect )
 	w_ted(&(wp->itxt), "", 0, wtcolor[W_INFO]);
     }
 
-#if 0
+#ifdef MNBAR
     if (kind & MNBAR) {
 	w_bld(wp, W_MNBAR, G_BOXTEXT, W_BOX, &(wp->mtxt), NO3D);
 	w_ted(&(wp->mtxt), " Desk  File  View  Options", 0, wtcolor[W_MNBAR]);
@@ -572,7 +600,9 @@ wmopen(handle, rect)
 				/* or window already opened, return error	*/
 
     if ((wp = srchwp(handle)) == ( WINDOW *)NULLPTR || wp->status.opened) {
-	Debug5("wm_open fails\r\n");
+	Debug5("wm_open fails, handle="); Ndebug5((LONG)handle);
+	if (wp->status.opened)
+		Debug5("window is already opened!\r\n");
 	return ( FALSE );
     }
 
@@ -1443,13 +1473,14 @@ WORD *oh;	/* output height of work/border area */
     xinc = gl_wbox + (ADJ3DPIX << 1);
     yinc = gl_hbox + (ADJ3DPIX << 1);
 	
-    if (kind & (NAME | CLOSER | FULLER))
+    if (kind & (NAME | CLOSER | FULLER | SMALLER))
 	tb += yinc;
     if (kind & INFO)
 	tb += gl_hbox;
+#ifdef MNBAR
     if (kind & MNBAR)
 	tb += yinc;
-
+#endif
     vparts = kind & (UPARROW | DNARROW | VSLIDE);
     hparts = kind & (LFARROW | RTARROW | HSLIDE);
 
@@ -1510,7 +1541,7 @@ wm_min( kind, ow, oh )
     xinc = gl_wbox + (ADJ3DPIX << 1);
     yinc = gl_hbox + (ADJ3DPIX << 1);
 	
-    if ( kind & (NAME | CLOSER | FULLER) )
+    if ( kind & (NAME | CLOSER | FULLER | SMALLER) )
     {
 	h1 += yinc;
 	if ( kind & NAME )
@@ -1521,13 +1552,18 @@ wm_min( kind, ow, oh )
 
 	if ( kind & FULLER )
 	  w1 += xinc;
+
+	if (kind & SMALLER)
+	  w1 += xinc;
     }
 
     if ( kind & INFO )
 	h1 += yinc;
 
+#ifdef MNBAR
     if ( kind & MNBAR )
 	h1 += yinc;
+#endif
 
     vparts = kind & (UPARROW | DNARROW | VSLIDE);
     hparts = kind & (LFARROW | RTARROW | HSLIDE);
@@ -1965,6 +2001,10 @@ activate(wp, topped)
         if (kind & FULLER) {
 	    setcol(wp, W_FULLER, topped);
 	}
+
+	if (kind & SMALLER) {
+	    setcol(wp, W_SMALLER, topped);
+	}
     }
 
     if (kind & INFO)
@@ -2016,8 +2056,10 @@ activate(wp, topped)
 	}
     }
 
+#ifdef MNBAR
     if (kind & MNBAR)
 	setcol(wp, W_MNBAR, topped);
+#endif
 }
 
 
@@ -2115,6 +2157,12 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	    urx = inx;
 	}
 
+	if (wp->kind & SMALLER)
+	{
+	    w_obrect(wp, W_SMALLER, (rect->g_w-urx-w3dbox+ADJ3DPIX), ADJ3DPIX,
+		gl_wbox, gl_hbox);
+	    urx += inx;
+	}
 	if (wp->kind & NAME || wp->kind & MOVER) 
 	{
 	    sz = rect->g_w-ulx-urx-(ADJ3DPIX << 1);
@@ -2127,10 +2175,12 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	uly = ury += gl_hbox;
     }
 
+#ifdef MNBAR
     if (wp->kind & MNBAR) {
 	w_obrect(wp, W_MNBAR, 0, uly, rect->g_w, h3dbox);
 	uly = ury += iny;
     }
+#endif
 
     urx = 0;	/* reinitialize upper right x offset */
 

@@ -18,6 +18,9 @@
 #define WM_MOVED 	28
 #define WM_UNTOPPED	30
 #define WM_ONTOP	31
+/* what is 32 for? assume it is reserved */
+#define WM_BOTTOMED	33
+#define WM_ICONIFIED	34
 
 #define AC_OPEN 	40
 #define AC_CLOSE 	41
@@ -40,52 +43,6 @@
 #define DK_INFLOAD	70	/* Load in INF again		*/
 #define DK_ICNLOAD	71	/* Load in ICN file again	*/	
 #define SH_WDRAW	72	/* redraw windows		*/
-
-/*	The above values are published and can't be changed */
-
-#if 0
-
-#define	TO_SLEEP	65	/* Request to sleep, change to icon */
-#define TO_WAKEUP	66	/* Request to wake up	*/
-#define TO_SFAIL	67	/* Sleep fail		*/
-#define TO_WFAIL	68	/* wake up fail		*/
-
-#define SH_REQUE	70	/* Request mode		*/
-#define SH_ACKNO	71	/* Acknowledge	mode	*/
-
-#define	SH_XCOPY	72	/* file copy	*/
-#define	SH_XDELE	73	/* file delete	*/
-#define SH_XMOVE	74	/* file move	*/
-
-#define SH_FORMA	75	/* format disk	*/
-#define SH_PRINT	76	/* print file	*/
-#define SH_SHOW		77	/* show a file	*/
-#define SH_EXIT		78	/* Default shell exits 	*/
-#define SH_START	79	/* Default shell starts */
-#define SH_WDRAW	80	/* redraw certain window	*/
-#define SH_WCLOSE	81	/* close certain window		*/
-
-#define	TO_SLEEP	65	/* Request to sleep, change to icon */
-#define TO_WAKEUP	66	/* Request to wake up	*/
-#define TO_SFAIL	67	/* Sleep fail		*/
-#define TO_WFAIL	68	/* wake up fail		*/
-
-#define SH_REQUE	70	/* Request mode		*/
-#define SH_ACKNO	71	/* Acknowledge	mode	*/
-
-#define	SH_XCOPY	72	/* file copy	*/
-#define	SH_XDELE	73	/* file delete	*/
-#define SH_XMOVE	74	/* file move	*/
-
-#define SH_FORMA	75	/* format disk	*/
-#define SH_PRINT	76	/* print file	*/
-#define SH_SHOW		77	/* show a file	*/
-#define SH_EXIT		78	/* Default shell exits 	*/
-#define SH_START	79	/* Default shell starts */
-#define SH_WDRAW	80	/* redraw certain window	*/
-#define SH_WCLOSE	81	/* close certain window		*/
-
-#endif
 
 #define	CH_EXIT		90	/* child process exit		*/
 

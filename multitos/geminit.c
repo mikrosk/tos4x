@@ -74,14 +74,15 @@
 #include "signal.h"
 #include "gemusa.h"
 #include "gemdos.h"
+#include "softload.h"
 /*
  *	Set the SOFTLOAD flag to implement softloaded GEM AES resources.
  *	The AES will then try to read its resource file from
  *	[A|C]:\MULTITOS\GEM.RSC. 
- *	NOTE: You have to define SOFTLO4AD in gemrom.c, too, because there
+ *	NOTE: You have to define SOFTLOAD in gemrom.c, too, because there
  *	      are the actual functions.
+ *	See Defines in SOFTLOAD.H
  */
-#define SOFTLOAD	1	
 /*
  *	Set the LOADKBT flag to implement softloaded keyboard tables. The
  *	system will try to load the keyboad table from 
@@ -107,8 +108,8 @@
  *	coded while the bios with AKP uses tables for the alternate key
  *	handling.
  *	
+ *	See Defines in SOFTLOAD.H
  */
-#define LOADKBT		1
 
 
 BYTE	*scan2_2( REG BYTE *pcurr, REG UWORD *pwd );
@@ -579,6 +580,7 @@ main( VOID )
 				/* This is the trap2 AES semaphore */
 					/* ("_MUI") */
 	if (gl_multi) {
+	  mt_opendev();			/* install our special AES device */
 	  Psemaphore( 0, 0x5F4D5549L, 0x0L );
 
 /*
@@ -763,7 +765,7 @@ main( VOID )
 	  bailout( "Failed to create a desktop process!\r\n" );
 	  goto i_6;
 	}
-					/* create an error process	*/
+ 					/* create an error process	*/
 	if ( ! ( errpd = get_pd( "ERROR", AESSYSTEM ) ) )
 	{
 	  bailout( "Failed to create a critical error process!\r\n" );
@@ -777,7 +779,7 @@ main( VOID )
 	  errpd->p_sysid = -1;
 	}
 
-	
+
 	if ( !ctldown )
 	{
 	  ldaccs();			/* load in accessory	*/

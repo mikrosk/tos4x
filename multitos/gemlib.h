@@ -71,6 +71,7 @@
 #define LFARROW 0x0200
 #define RTARROW 0x0400
 #define HSLIDE  0x0800
+#define SMALLER 0x1000
 						/* wind_create flags	*/
 #define WC_BORDER 	0
 #define WC_WORK   	1
@@ -203,7 +204,7 @@ typedef struct rstree
 #define RIGHT	0x0004
 #define BOTTOM	0x0008
 
-#define	MAXOBJ	20		/* maximum number of objects in a window */
+#define	MAXOBJ	21		/* maximum number of objects in a window */
 #define	NUMRECT	80		/* # RLISTs per block of memory allocated */
 #define	NUMWIN	8		/* # window structures per block of memory */
 #define	HASHSIZ	8		/* size of hash table */

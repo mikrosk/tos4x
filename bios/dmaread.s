@@ -3,23 +3,27 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 89/08/25 16:49:18 $
+* $Date: 89/09/07 16:30:02 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.3  89/09/07  16:30:02  apratt
+* Added delay after (potentially) resetting ACSI DMA chip; see SLOWACSI
+* code in flop.s.
+*
 * Revision 1.2  89/08/25  16:49:18  apratt
 * Moved lastacstm from text seg to bss.
-*
+* 
 * Revision 1.1  89/08/25  16:45:32  apratt
 * Initial revision
 * 
 *
 * =======================================================================
 *
-* $Revision: 1.2 $
+* $Revision: 1.3 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -262,7 +266,15 @@ _rcvacsi:
 	movea.l	#WDC,a1			; a1 = pointer to DMA chip
 
 	move.w	#$190,XWDL(a1)	;WDL	; toggle DMA chip to direction
+	tst.b	GPIP
+	tst.b	GPIP
+	tst.b	GPIP
+	tst.b	GPIP
 	move.w	#$90,XWDL(a1)	;WDL	;  for receiving data
+	tst.b	GPIP
+	tst.b	GPIP
+	tst.b	GPIP
+	tst.b	GPIP
 	bsr	setadma			; set DMA pointer
 	bsr	setacnt			; set DMA count
 	lea	_cmdblk,a0		; a0 = address of command block

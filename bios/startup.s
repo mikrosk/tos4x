@@ -3,16 +3,25 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/10/12 17:25:57 $
+* $Date: 88/11/02 15:21:19 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 1.17  88/11/02  15:21:19  apratt
+* Backed out clearing of _bootdev; caused more pain than it's worth.
+* Specifically, people with bootable ramdisks (!) became unhappy.
+*
+* Also added code to set GEMDOS time from IKBD if real-time clock chip
+* doesn't exist or has a bad time, and if IKBD has a good time.
+* JWT says IKBD clock is defined as starting up at 0/0/00, which is
+* an unambiguously illegal date.
+*
 * Revision 1.16  88/10/12  17:25:57  apratt
 * Added table entry for floprate call: see flop.s for more.
-*
+* 
 * Revision 1.15  88/10/03  15:01:09  kbad
 * Incorporated changes for new build method (several things were made
 * obsolete -- look for the keyword "newbuild" to find these changes).
@@ -78,7 +87,7 @@
 *
 * Revision 2.57  90/08/03  13:23:45  apratt
 * TTOS FINAL RELEASE
-* $Revision: 1.16 $
+* $Revision: 1.17 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/startup.s,v $
@@ -1251,7 +1260,10 @@ clrm_1:	move.w	d0,(a0)+		; clobber a word
 	move.l	#savend,savptr(a5)	; register-save pointer for traps 13&14
 	move.l	#_rts,swv_vec(a5)	; ignore monitor changes for now
 	clr.l	_drvbits		; clobber "drive-alive" bits
-	clr.w	_bootdev		; clear this (NEW 5/5/88)
+*	clr.w	_bootdev		; clear this (NEW 5/5/88)
+
+*--- Disk vectors:
+	move.l	#_dskinit,hdv_init.w	; initialization
 *--- Prtblk vectors:
     ifeq systype-rom
 	bsr	copy_header		; kludge OS ROM header
@@ -1441,6 +1453,20 @@ priv1:	move.l	(sp)+,a0
 	move.l	(sp)+,a1
 	movem.l	(sp)+,d0-d2
 .if M68030
+	jmp	_term			; jmp to bomb handler
+.else
+* by AKP and KBAD 11/2/88.  Note that _iclock returns Carry Set on error.
+	jmp	_term+$08000000		; strange but true!
+	bcc.s	noikbdclk		; if cc, don't bother with ikbd
+	bsr	gettime			; but if cs, get IKBD time
+priv2:
+
+	beq.s	noikbdclk		; whoops! that's invalid, too!
+*+
+*
+* NOW WE'RE COOKING!
+*	Initialize GEMDOS;
+*	Set system date to date the system was built;
 *
 
 .if crcstride == 4

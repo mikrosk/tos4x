@@ -4,13 +4,17 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 1992/03/11 01:24:22 $
+* $Date: 1992/03/11 01:26:14 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: startup.s,v $
+* Revision 2.94  1992/03/11  01:26:14  apratt
+* CHanged version number back to x.06; was commented as changed to x.08,
+* but was really x.07.  Back to .06 for STPAD ROMs of this date.
+*
 * Revision 2.93  1992/03/11  01:24:22  apratt
 * Clear the high byte of d0.w before writing into SPAR_VMC.  This wasn't in
 * the first one, the one before the cartridge-port check.  In the first
@@ -331,7 +335,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.93 $
+* $Revision: 2.94 $
 * =======================================================================
 *
 * $Source: d:/tos/bios\rcs\startup.s,v $
@@ -400,7 +404,7 @@ vershi		equ	$02
 .endif
 
 * set the low byte of the version number each release.
-verslo		equ	$07
+verslo		equ	$06
 
 
 * The date is now in another file, which is updated automatically

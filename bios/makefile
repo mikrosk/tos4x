@@ -1,14 +1,19 @@
 ########################### BIOS MAKEFILE  ##############################
 #
-#  $Revision: 2.6 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
+#  $Revision: 2.7 $	$Source: /u2/MRS/osrevisions/bios/makefile,v $
 # =======================================================================
-#  $Author: apratt $	$Date: 90/08/03 13:23:19 $     $Locker:  $
+#  $Author: apratt $	$Date: 90/11/26 13:16:28 $     $Locker:  $
 # =======================================================================
 #
 #  $Log: makefile,v $
-#  Revision 2.6  90/08/03  13:23:19  apratt
-#  TTOS FINAL RELEASE
+#  Revision 2.7  90/11/26  13:16:28  apratt
+#  Flop now has .sx, .e, and .t extensions, though .e and .t
+#  are really the same thing.  (Both TT and MSTE have high-density
+#  floppy capability.)
 #
+# Revision 2.6  90/08/03  13:23:19  apratt
+# TTOS FINAL RELEASE
+# 
 # Revision 2.5  90/08/03  11:28:25  apratt
 # This version has variables set for machine and country, to tell it
 # what switches and object files to use.
@@ -44,13 +49,33 @@
 # middle letter: a for RAM, o for ROM.  Country is the third
 # letter: u=usa, g=germany, ...
 #
-# dmaread, flop, and clock are affected only by machine switches,
-# and even then there are only two: t for TT and sx for others.
+# dmaread and clock are affected only by machine switches,
+# and then only by TSXMACHINE: t for TT and sx for others.
+#
+# flop is affected by MACHINE, though t and e are actually the same.
 #
 # bios is affected by machine and country.
 #
 # Set these switches with no spaces.  MACHINE is s, e, or t;
-# TSXMACHINE is sx or t (for dmaread, flop, and clock).
+# TSXMACHINE is sx or t (for dmaread, and clock).
+# These are the one-letter country codes used in file names for building TOS:
+# 
+# 	u	usa
+# 	g	germany
+# 	f	france
+# 	k	uk
+# 	s	spain (must also set PAL to 0 or 1)
+# 	i	italy
+# 	w	sweden
+# 	a	swissfra
+# 	b	swissger
+# 	t	turkey
+# 	c	finland
+# 	n	norway
+# 	d	denmark
+# 
+# letters used: abcd fg i k  n    stu w
+# letters free:     e  h j lm opqr   v xyz
 
 CCODE=u
 MACHINE=t
@@ -61,18 +86,18 @@ TSXMACHINE=t
 
 TMPDIR	=	m:
 
-ASM = mas -3 -S $*.s -O=$@
+ASM = mas -3 -8 -S $*.s -O=$@
 
 # You can add "-s c:\alcyon\lib\oas68sym.dat" or whatever to the as68 line.
 
 .c.o:
 	cp $*.c $(TMPDIR)
 	pushd $(TMPDIR)
-	cp68 $*.c $*.i
-	c068 $*.i $*.1 $*.2 $*.3 -f
-	c168 $*.1 $*.2 $*.s
+	ocp68 $*.c $*.i
+	oc068 $*.i $*.1 $*.2 $*.3 -f
+	oc168 $*.1 $*.2 $*.s
 	optimize $*.s
-	as68 -l -u $*.s
+	oas68 -l -u -s c:\alcyon\lib\oas68sym.dat $*.s
 	popd
 	mv $(TMPDIR)\$*.o .
 	rm $(TMPDIR)\$*.[c|i|1|2|3|s]
@@ -88,19 +113,21 @@ SFILES	=	xinout.o clear.o
 
 CFILES	=	prtblk.o rwabs.o
 
-allbios.$(MACHINE)a$(CCODE):	startup.$(MACHINE)a$(CCODE) \
-			dmaread.$(TSXMACHINE) flop.$(TSXMACHINE) \
-			clock.$(TSXMACHINE) bios.$(MACHINE)$(CCODE) \
+allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o \
+			dmaread.$(TSXMACHINE) clock.$(TSXMACHINE) \
+			bios.$(MACHINE)$(CCODE) flop.$(MACHINE) \
 			$(CFILES) $(SFILES)
-		aln -u -p -w -l -o $@ $<
+		aln -u -u -p -w -l -o $@ $<
 		cp $@ ..\build
 		@echo $@ linked.
 
-allbios.$(MACHINE)o$(CCODE):	startup.$(MACHINE)o$(CCODE) \
-			dmaread.$(TSXMACHINE) flop.$(TSXMACHINE) \
-			clock.$(TSXMACHINE) bios.$(MACHINE)$(CCODE) \
+# add fsstub.o to this list if you define USEDB as 1 in startup.s
+
+allbios.$(MACHINE)a$(CCODE):	startup.$(MACHINE)a \
+			dmaread.$(TSXMACHINE) clock.$(TSXMACHINE) \
+			bios.$(MACHINE)$(CCODE) flop.$(MACHINE) \
 			$(CFILES) $(SFILES)
-		aln -u -p -w -l -o $@ $<
+		aln -u -u -p -w -l -o $@ $<
 		cp $@ ..\build
 		@echo $@ linked.
 
@@ -126,18 +153,15 @@ flop.t:		flop.s
 		cp switches.tau switches.s
 		$(ASM)
 
-clock.t:	clock.s
-		cp switches.tau switches.s
-		$(ASM)
-
-
-# any switches.s* file will do for these three
-
-dmaread.sx:	dmaread.s
-		cp switches.sau switches.s
+flop.e:		flop.s
+		cp switches.eau switches.s
 		$(ASM)
 
 flop.sx:	flop.s
+		cp switches.sau switches.s
+		$(ASM)
+
+dmaread.sx:	dmaread.s
 		cp switches.sau switches.s
 		$(ASM)
 
@@ -145,14 +169,19 @@ clock.sx:	clock.s
 		cp switches.sau switches.s
 		$(ASM)
 
-############
-
-startup.$(MACHINE)a$(CCODE):	startup.s
-		cp switches.$(MACHINE)a$(CCODE) switches.s
+clock.t:	clock.s
+		cp switches.tau switches.s
 		$(ASM)
 
-startup.$(MACHINE)o$(CCODE):	startup.s
-		cp switches.$(MACHINE)o$(CCODE) switches.s
+
+############
+
+startup.$(MACHINE)a:	startup.s
+		cp switches.$(MACHINE)au switches.s
+		$(ASM)
+
+startup.$(MACHINE)o:	startup.s
+		cp switches.$(MACHINE)ou switches.s
 		$(ASM)
 
 ############

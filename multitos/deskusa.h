@@ -44,6 +44,7 @@
 #define BITBLT   60  /* STRING in Baum ADMENU */
 
 #define ADDINFO  1   /* Formular/Dialog */
+#define GEMMSG   1   /* TEXT in Baum ADDINFO */
 #define VERTEXT  2   /* TEXT in Baum ADDINFO */
 #define MINTCBOX 8   /* IBOX in Baum ADDINFO */
 #define DEOK     11  /* BUTTON in Baum ADDINFO */
@@ -170,8 +171,14 @@
 #define COLOR13  33  /* BOX in Baum SSCREEN */
 #define COLOR14  34  /* BOX in Baum SSCREEN */
 #define COLOR15  35  /* BOX in Baum SSCREEN */
-#define SOK      36  /* BUTTON in Baum SSCREEN */
-#define SCANCEL  37  /* BUTTON in Baum SSCREEN */
+#define WFTITLE  37  /* TEXT in Baum SSCREEN */
+#define WINFONT  38  /* BOXTEXT in Baum SSCREEN */
+#define WINFMBTN 39  /* BOXCHAR in Baum SSCREEN */
+#define WINFSIZE 40  /* FTEXT in Baum SSCREEN */
+#define WFSZDN   41  /* BOXCHAR in Baum SSCREEN */
+#define WFSZUP   42  /* BOXCHAR in Baum SSCREEN */
+#define SOK      43  /* BUTTON in Baum SSCREEN */
+#define SCANCEL  44  /* BUTTON in Baum SSCREEN */
 
 #define FILEOPTI 13  /* Formular/Dialog */
 #define OPTNAME  2   /* FTEXT in Baum FILEOPTI */

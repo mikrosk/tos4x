@@ -1,23 +1,28 @@
 .super
 ******************* Revision Control System *****************************
 *
-* $Author: apratt $
+* $Author: minna $
 * =======================================================================
 *
-* $Date: 91/08/15 16:18:07 $
+* $Date: 91/08/20 13:22:25 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: dmaread.s,v $
+* Revision 1.17  91/08/20  13:22:25  minna
+* Added iderdy() to test if IDE drive is ready before 
+* it's being talked to.  If the drive does not become
+* ready in 5 sec., it's considered as an unknown device.
+*
 * Revision 1.16  91/08/15  16:18:07  apratt
 * Added code for IDE to wait until ATASR shows READY before
 * doing anything else.  Also changed so IDE_AT is assembled for
 * all STPLUS versions; the bus error detection will take care
 * of failing out quick on those machines that don't really have
 * an IDE bus.
-*
+* 
 * Revision 1.15  91/08/02  16:21:23  minna
 * Added delay between identify() and initparm(),
 * and reversed changes made earlier today.
@@ -87,7 +92,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.16 $
+* $Revision: 1.17 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/dmaread.s,v $
@@ -171,6 +176,10 @@ IDE_AT		=	STPLUS
 ;			sending it the identify() command, by testing the
 ;			DRDY (driver ready) bit in the Alternate Status
 ;			Register.
+;
+; Aug-20-91	ml.	Added iderdy() to check if an IDE drive is ready
+;			or not, this includes the check for the existence 
+;			of the slave drive (IDE unit 1.)
 ;-
 
 .globl	_dmaread
@@ -194,6 +203,7 @@ ATWRITE		equ	$30	; opcode for Write sectors
 INITPARM	equ	$91	; opcode for Initialize Drive Parameters
 IDENTIFY	equ	$ec	; opcode for Identify Drive
 D_WORST		equ	2000	; worst case delay (10s)
+ATRDY		equ	1000	; delay to wait for IDE drive to be ready
 MAXAT		equ	17	; highest IDE-AT unit#
 
 ; Error codes to return to BIOS
@@ -255,8 +265,7 @@ _dmawrite:
 	move.b	#1,rwflag		; rwflag = 1 => a write
 	move.w	#WRITE,d1		; d1 = opcode for WRITE
 	
-dmarw:	moveq	#EUNDEV,d0		; assume it's an unknown device
-
+dmarw:
 .ifne IDE_AT
 	cmpi.w	#MAXAT,$e(sp)		; unit# > IDE-AT unit# 16-17?
 .else
@@ -266,7 +275,7 @@ dmarw:	moveq	#EUNDEV,d0		; assume it's an unknown device
 	cmpi.w	#MAXACSI,$e(sp)		; unit# > ACSI unit# 0-7?
 .endc
 .endc
-	bhi	rwend			; if so, return with error
+	bhi	undev			; if so, return unknow device
 
 .ifne IDE_AT
 	cmp.w	#MAXSCSI,$e(sp)		; an IDE-AT unit?
@@ -303,7 +312,7 @@ rw0:	bsr	_dowcmd			; send a write data command
 
 noide:	move.l	a1,sp			; got the bus error on ATASR;
 	move.l	a0,$8			; restore vector & sp, return EUNDEV
-	moveq.l	#EUNDEV,d0
+undev:	moveq.l	#EUNDEV,d0
 	bra	rwend			; branch to rts
 
 at:	move.l	$8,a0
@@ -313,11 +322,13 @@ at:	move.l	$8,a0
 	move.l	a1,sp			; hey! no bus error!
 	move.l	a0,$8			; restore vector & sp and continue.
 
-at3:	btst.b	#6,ATASR		; is drive ready yet?
-	beq.b	at3			; if not, wait longer
-
+	move.b	$f(sp),d0		; IDE unit#
+	bsr	iderdy			; wait for drive to be ready
+	beq	undev			; if drive never gets ready, return
+					;   with unknown device
+					; else
 	pea	sbuf			; scratch buffer for drive parameters
-	move.w	$12(sp),-(sp)		; AT unit#
+	move.w	$12(sp),-(sp)		; IDE unit#
 	bsr	_identify		; identify()
 	addq.w	#6,sp			; clean up stack
 	tst.w	d0			; successful?
@@ -1306,6 +1317,32 @@ wrtbuf:
 	lea	ATDR,a1		; a1 -> data bus
 wb0:	move.l	(a0)+,(a1)	; write data to bus
 	dbra	d0,wb0		;  repeat until all done
+	rts
+
+
+;+
+; iderdy() - test if the IDE drive is ready
+;
+; Passed:
+;	d0.b = IDE drive unit #
+;
+; Returns: 0 - if drive is NOT ready
+;	   1 - if drive is ready
+;-
+	.globl	_iderdy
+_iderdy:
+	andi.b	#7,d0		; mask off flags (if any)
+	lsl.b	#4,d0		; shift unit # to place
+	move.b	d0,ATSDH	; set drive #
+	move.l	#ATRDY,d0	; set up timer
+	add.l	_hz_200,d0
+ir0:	btst.b	#6,ATASR	; is drive ready?
+	bne.b	ir1		; if so, return with drive ready
+	cmp.l	_hz_200,d0	; time-out yet?
+	bcc.b	ir0		; if not, wait longer
+	moveq	#0,d0		; else return drive NOT ready
+	rts
+ir1:	moveq	#1,d0		; else, drive is ready
 	rts
 	rts
 .endc

@@ -4,16 +4,26 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 90/03/01 17:11:39 $
+* $Date: 90/04/30 18:43:55 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 2.13  90/04/30  18:43:55  apratt
+* Added code to check the cookie jar for _FRB the first time alternative
+* RAM is used, rather than counting on the BIOS having found the alt. RAM
+* at boot time.  This lets people call "Maddalt()" and add an _FRB cookie
+* to install new memory (e.g. on the VME bus).
+*
+* Also removed the first toggle of the direction bit, so it changes
+* either once or twice, not twice or three times.  Makes the ACSI DMA
+* chip happier, and might even allow removal of SLOWACSI code.
+*
 * Revision 2.12  90/03/01  17:11:39  apratt
 * Oops - end of track is 1400 bytes regular, 2800 high density. Fixed.
-*
+* 
 * Revision 2.11  90/03/01  15:47:26  apratt
 * Changed track leadin on high-density floppies from 60 bytes to 120.
 * Changed track trailer, too: 700 bytes in reg. den., 1400 in high.
@@ -113,7 +123,7 @@
 *
 * =======================================================================
 *
-* $Revision: 2.12 $
+* $Revision: 2.13 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -186,7 +196,10 @@
 * least.
 *
 
-SLOWACSI	equ	1	; set to 1 for TT(?) @check@
+SLOWACSI	equ	TT	; set to 1 for TT(?) @check@
+
+READFIFO	equ	0	; fixes a bug in TT MCU 4/90, but
+				; is deadly to older MCU's!
 
 HI_DEN		equ	TT	; 1.44MB flag same as TT flag.
 * to speed.								*
@@ -226,7 +239,8 @@ tcdr		equ	$fffffa00+$23
 	.globl	_nflops			; number of floppy drives attached
 .ifne TT
 	.globl	seekrate		; default floppy seek rate
-	.globl	def_frb
+	.globl	_diskmode		; disk change mode
+	.globl	_p_cookie
 .endc
 	.globl	_iamanst		; byte: true if we're on an ST
 	.globl	clrcache		; clear i & d caches on TT
@@ -330,6 +344,7 @@ gpip	equ	mfp+1			; general purpose I/O
 * Passed (on the stack):
 *	 $0(sp)	return address
 *
+	bsr	select			; select drive and side
 
 	bsr	restore			; attempt restore
 	beq	fi_ok			; (quick exit if that won)
@@ -387,16 +402,16 @@ fdcprobe:
 	cmp.b	#$ff,d0			; still $ff?
 					; (leave ccr set)
 .ifeq SLOWACSI
-	move.w	#$090,(a6)		; toggle DMA data direction,
+*	move.w	#$090,(a6)		; toggle DMA data direction,
 	move.w	#$190,(a6)		;	leave hardware in READ state
 	move.w	#$090,(a6)
 .endc
 .ifne SLOWACSI
-	move.w	#$090,(a6)
-	tst.b	gpip
-	tst.b	gpip
-	tst.b	gpip
-	tst.b	gpip
+*	move.w	#$090,(a6)
+*	tst.b	gpip
+*	tst.b	gpip
+*	tst.b	gpip
+*	tst.b	gpip
 					; (doesn't affect ccr)
 	eor.w	#4,sr			; flip Z bit
 	rts				; EQ means no floppies
@@ -429,7 +444,8 @@ _floprd:
 	bsr	rdfast
 	bsr	floplock		; lock floppies, setup parameters
 frd1:	bsr	select			; select drive,	setup registers
-frd4:	move.w	#$090,(a6)		; examine DMA status register
+frd4:	move.l	d7,$37c			; for debugging...
+	move.w	#$090,(a6)		; examine DMA status register
 	bcs	flopfail		; EMPTY DRIVE - FAIL NOW
 	bne	frde			; retry on seek failure
 
@@ -523,16 +539,16 @@ eb1:	move.w	d1,curr_err.w		; set current error number & return
 * Passed (on the stack):
 *	$14(sp) count
 .ifeq SLOWACSI
-	move.w	#$190,(a6)		; toggle DMA chip to clear status
+*	move.w	#$190,(a6)		; toggle DMA chip to clear status
 	move.w	#$090,(a6)
 	move.w	#$190,(a6)		; leave	in WRITE mode
 .endc
 .ifne SLOWACSI
-	move.w	#$190,(a6)		; toggle DMA chip to clear status
-	tst.b	gpip
-	tst.b	gpip
-	tst.b	gpip
-	tst.b	gpip
+*	move.w	#$190,(a6)		; toggle DMA chip to clear status
+*	tst.b	gpip
+*	tst.b	gpip
+*	tst.b	gpip
+*	tst.b	gpip
 *	 $e(sp) sectno
 *	 $c(sp) devno
 *	 $8(sp)	->DSB
@@ -773,16 +789,16 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 *--- data block:
 	move.b	#$fb,(a2)+		; $fb -- data intro
 .ifeq SLOWACSI
-	move.w	#$190,(a6)		; toggle R/W flag and
+*	move.w	#$190,(a6)		; toggle R/W flag and
 	move.w	#$090,(a6)		; select sector-count register
 	move.w	#$190,(a6)
 .endc
 .ifne SLOWACSI
-	move.w	#$190,(a6)		; toggle R/W flag and
-	tst.b	gpip
-	tst.b	gpip
-	tst.b	gpip
-	tst.b	gpip
+*	move.w	#$190,(a6)		; toggle R/W flag and
+*	tst.b	gpip
+*	tst.b	gpip
+*	tst.b	gpip
+*	tst.b	gpip
 	move.b	virgin+1.w,(a2)+	; copy low byte
 	dbra	d1,ot2			; fill 512 bytes
 	move.b	#$f7,(a2)+		; $f7 -- write checksum
@@ -794,7 +810,6 @@ ot1:	moveq	#12-1,d1		; 12 x $00
 	tst.w	interlv.w		; if interlv is NEG use skew table
 	bmi	use_skewtbl		; 
 .endc
-
 	moveq	#$30,d7			; (absurd sector count)
 	cmp.w	spt.w,d4		; if(d4	<= spt)	then_continue;
 	ble	ot1			; proto	more sectors this pass
@@ -902,16 +917,16 @@ _flopver:
 
 	bsr	change			; hack disk change
 .ifeq SLOWACSI
-	move.w	#$090,(a6)		; toggle R/W (leave in W state)
+*	move.w	#$090,(a6)		; toggle R/W (leave in W state)
 	moveq	#e_read,d0		; set default error#
 	move.w	#$090,(a6)
 .endc
 .ifne SLOWACSI
-	move.w	#$090,(a6)		; toggle R/W (leave in W state)
-	tst.b	gpip
-	tst.b	gpip
-	tst.b	gpip
-	tst.b	gpip
+*	move.w	#$090,(a6)		; toggle R/W (leave in W state)
+*	tst.b	gpip
+*	tst.b	gpip
+*	tst.b	gpip
+*	tst.b	gpip
 	move.w	#$190,(a6)
 	bsr	select			; select floppy
 	bsr	go2track		; go to track
@@ -1001,11 +1016,12 @@ tvr6:	addq.w	#1,csect.w		; bump sector count
 	subq.w	#1,ccount.w		; while(--count) read_another;
 	bne	tvrlp
 	sub.l	#$200,cdma.w		; readjust DMA pointer
-	move.w	diskctl.w,d0		; get 1770 status
-	btst	#6,d0			; test Write-Protect status bit
+	clr.w	(a2)			; terminate bad sector list
+	rts				; and return EQ
+
 *--- read failure: retry or record bad sector
 tvre:	cmp.w	#midretry,retrycnt.w	; re-seek head?
-	bsr	setporta
+	bne	tvr5			; (no)
 	bsr	reseek			; yes: back to home and	then back
 tvr5:	subq.w	#1,retrycnt.w		;	to the current track...
 	bpl	tvr1
@@ -1016,6 +1032,7 @@ tvr5:	subq.w	#1,retrycnt.w		;	to the current track...
 *+
 * _flopvbl - floppy vblank handler
 	bsr	fdcprobe
+	beq	fvblr			; no floppies!
 .endif
 
 	move.l	_frclock.w,d0		; check a drive every 8 jiffies
@@ -1406,30 +1423,36 @@ select:
 	addq.b	#1,d0			; add and shift	to get select bits
 	lsl.b	#1,d0			; into bits 1 and 2
 	or.w	cside.w,d0		; or-in	side number (bit 0)
+	eor.b	#7,d0			; negate bits for funky	hardware select
+	and.b	#7,d0			; strip	anything else out there
+	bsr	setporta		; do drive select
 
 	move.w	#trkreg,(a6)		; setup	1770 track register
 	move.w	dcurtrack(a1),d7	;	from current track number
 	bsr	wdiskctl
-	bra	rwdelay			;	delay and return
+
 *--- alternate entry point: setup R/W parameters on 1770
 select1:
 	move.w	#secreg,(a6)		; setup	requested sector_number	from
 	move.w	csect.w,d7		;	caller's parameters
-	bra	rwdelay			;	delay and return
+	bsr	wdiskctl
 	move.b	cdma+3.w,dmalow		; setup	DMA chip's DMA pointer
 	move.b	cdma+2.w,dmamid
 	move.b	cdma+1.w,dmahigh
 	rts
-	bra	rwdelay			;	delay and return
+
 
 *+
 * setporta - set floppy	select bits in PORT A on the sound chip
 * Passed:	d0.b (low three	bits)
+* Returns:	d1 = value written to port A
+*		d2 = old value read from port A
 * Uses:		d1
-setporta:
 .ifne TT
+setporta:
 	move	sr,-(sp)		; save our IPL
 	or	#$0700,sr		; start	critical section
+	move.b	#giporta,giselect	; select port on GI chip
 	move.b	giread,d1		; get current bits
 	move.b	d1,d2			; save old bits for caller
 	and.b	#$ff-7,d1		; strip	low three bits there
@@ -1437,11 +1460,10 @@ setporta:
 	move.b	d1,giwrite		; and write 'em	back out there
 	move	(sp)+,sr		; restore IPL to terminate CS, return
 	rts
-	beq	rwd1			; wait for a change
-	dbra	d0,rwd2			; loop d0 times
+
+
 *+
 .endc
-	move.w	(sp)+,d0		; restore register
 *
 * The 1770 can't keep up with full-tilt	CPU accesses, so
 * we have to surround reads and	writes with delay loops.
@@ -1610,6 +1632,13 @@ getspinup:
 *	add.w	#$8,sp		; clean up stack
 *	move.w	$4(sp),d0	; get (possibly new) dev number
 *	and.w	#$1,d0		; keep only bit 0
+*	lea	_wpstatus.w,a0
+*	add.w	d0,a0		; a0 -> WP status table entry
+*
+*	addq.b	#1,d0		; turn into drive-select bits
+*	lsl.b	#1,d0		; (magic shift left)
+*	eor.b	#7,d0
+*	bsr	setporta	; (d2 = old bits)
 *	move.w	diskctl,d0	; get WP state from bit 6 of disk ctl
 *	sne.b	d0		; d0 = $00 or $ff
 *
@@ -1621,7 +1650,7 @@ getspinup:
 
 *
 * code to handle fast vs slow ram:
-	move.l	def_frb,a1
+*
 *	In each case, if the buffer address is in slow RAM, return.
 *	Else...
 *
@@ -1636,8 +1665,9 @@ getspinup:
 * (for copying the result list).
 *
 *	vrfast: (verify) same as fmfast.
+*
 * The common code which returns from all these services calls "unfast"
-	move.l	def_frb,8(sp)		; actual DMA to _FRB
+* which performs the "tail copy" if necessary: if fastcnt is not zero,
 * that many sectors are copied from _FRB to fastbuf.  Unfast does not
 * use d0.  Unfast pre-clears fastcnt for the next Flop call.  Flopini
 * clears it to begin with.
@@ -1646,8 +1676,9 @@ getspinup:
 * destined for the caller.
 *
 * This code checks for an FRB cookie the first time it's needed.
+* If there is no FRB cookie, it dies horribly.  It pops the stack
 * back to the caller's level and returns e_error.
-	move.l	def_frb,a0		; dest = _FRB
+* (It must check for the cookie at "run time" because alternative
 * RAM can be added after boot time.)
 *
 
@@ -1659,14 +1690,42 @@ MAXACSI equ	$00E00000		; max addr for Sparrow: 14MB.
 .else
 MAXACSI	equ	$00400000		; max addr where ACSI DMA works
 .endif
-	move.l	def_frb,8(sp)		; actual DMA to _FRB
+.endif
+
 unfast:
 	move.w	fastcnt,d1
 	beq	undone
+.if M68030
+	move.l	d0,-(sp)		; clrcache clobbers d0 so save it
+	bsr	clrcache		; after DMA read, must clear cache.
+	move.l	(sp)+,d0		; restore d0
+.endif
+	clr.w	fastcnt			; make sure count is zero next time
+	move.l	fastbuf,a0
+	move.l	_frb,a1
+unmove:	asl.w	#5,d1			; d1 is now number of 16's of bytes
+	subq.w	#1,d1
+unloop:	move.l	(a1)+,(a0)+
+	move.l	(a1)+,(a0)+
+	move.l	(a1)+,(a0)+
+	move.l	(a1)+,(a0)+
+	dbra	d1,unloop
+undone:	rts
+
+* rdfast - the buffer address is at 8(sp), count at $18(sp)
+* Change the pointer and set up for the copy at unfast time.
+
+rdfast:	cmp.l	#MAXACSI,8(sp)
+	bcs	undone			; never mind
+	bsr	getfrb
+	move.l	8(sp),fastbuf		; after op, copy to user's buffer
+	moveq.l	#e_error,d0		; return general failure
+	move.w	$18(sp),fastcnt		; count
 .endc
 	rts
 
 * wrfast - the buffer address is at 8(sp), count at $18(sp)
+_frb:		ds.l	1		; frb address to use (zero until set)
 * Change the pointer and do the copy.
 
 wrfast:	cmp.l	#MAXACSI,8(sp)

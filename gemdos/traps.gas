@@ -1,0 +1,32 @@
+.globl _trap13
+.globl _trap14
+	
+_trap13:
+	link	a6,#0
+	movml	d2/a2,sp@-
+	movl	a6@(0x08),sp@-
+	movl	a6@(0x0c),sp@-
+	movl	a6@(0x10),sp@-
+	movl	a6@(0x14),sp@-
+	movl	a6@(0x18),sp@-
+	movl	a6@(0x1c),sp@-
+	trap	#13
+	addw	#24,sp
+	movml	sp@+,d2/a2
+	rts
+
+_trap14:
+	link	a6,#0
+	movml	d2/a2,sp@-
+	movl	a6@(0x08),sp@-
+	movl	a6@(0x0c),sp@-
+	movl	a6@(0x10),sp@-
+	movl	a6@(0x14),sp@-
+	movl	a6@(0x18),sp@-
+	movl	a6@(0x1c),sp@-
+	trap	#14
+	addw	#24,sp
+	movml	sp@+,d2/a2
+	rts
+
+

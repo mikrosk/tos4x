@@ -3,18 +3,22 @@
 * $Author: apratt $
 * =======================================================================
 *
-* $Date: 88/06/28 16:27:21 $
+* $Date: 88/10/12 17:23:15 $
 * =======================================================================
 *
 * $Locker:  $
 * =======================================================================
 *
 * $Log: flop.s,v $
+* Revision 1.9  88/10/12  17:23:15  apratt
+* Added the Floprate call: oldrate = Floprate(devno,newrate) where
+* newrate == -1 if you don't want to change it.
+*
 * Revision 1.8  88/06/28  16:27:21  apratt
 * Removed extra index information because it made 10-sector
 * formatting not work.  Better to be compatible with our own
 * programs than to try to be compatible with crummy PC drives.
-*
+* 
 * Revision 1.7  88/04/28  16:06:39  apratt
 * Backed out Flopwp XBIOS call... Turned out to be a flop.
 * (I didn't want the Desktop to use this one Flop call, because it's possible
@@ -48,7 +52,7 @@
 *
 * =======================================================================
 *
-* $Revision: 1.8 $
+* $Revision: 1.9 $
 * =======================================================================
 *
 * $Source: /u2/MRS/osrevisions/bios/flop.s,v $
@@ -124,7 +128,7 @@ tcdr		equ	$fffffa00+$23
 
 *------ Exports:
 	.globl _flopini			; init floppy			func
-*	.globl _flopwp			; check wp state of floppy	func
+	.globl _floprd			; read sector			func
 	.globl _flopvbl			; vertical blank monitor	func
 	.globl _flopwr			; write sector			func
 	.globl _flopfmt			; format drive/track		func
@@ -1177,6 +1181,41 @@ rwd2:	cmp.b	tcdr,d1
 	move.b	(sp)+,(a0,d0.w)		; set drive's mode
 * Returns:	both media "might have changed" condition
 *		and "grace" timers expired.
+*
+* Uses:		C registers
+*
+*-
+change:
+	cmp.w	#1,_nflops		; if there are zero or two floppies
+	bne	ch_r			;       then do nothing (return OK)
+	move.w	$10(sp),d0		; if cdev == _curflop
+	cmp.w	_curflop,d0		; (...current disk == current drive?)
+	beq	ch_ok1			; then return OK (but use drive #0)
+
+*--- ask the user to stick in the other floppy (via critical error handler)
+	move.w	d0,-(sp)		; push disk# we want inserted
+*	00	 6 ms
+*	01	12 ms
+*	02	 2 ms
+*	03	 3 ms
+	move.w	#e_insert,-(sp)		; push "INSERT_A_DISK" error number
+	clr.l	(a0)+			; so the grace period in mediach
+	clr.l	(a0)			; is always expired.
+setdmode:
+	lea	_diskmode.w,a0		; a0 -> disk mode table
+	move.b	d0,-(sp)		; (save mode)
+	lea.l	dsb0,a0			; get dsb0 first
+	cmp.w	#1,_nflops		; one floppy?
+	beq.s	rate1			; yes.
+	lea.l	dsb1,a0			; no - use dsb1
+rate1:	move.w	dseekrt(a0),d0		; get the old rate
+	rts
+
+	beq.s	ratedone		; yes
+	move.w	d1,dseekrt(a0)		; no - do change it.
+*	DRIVE	RAM TOS		11/20/85	4/22/87
+*	  A	 6cb		  a09		  a4f
+*	  B	 6cf		  a0d		  a53
 *
 *
 *-

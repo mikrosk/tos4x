@@ -1,0 +1,12 @@
+# POSIX cksum of what the TOS 4.00 build must reproduce byte for byte: the ROM (tos400.rom plus the
+# missing last byte $13, md5 f1b79aaee8e35ec0fa22b2c3f2228394).
+2519929274 524288 D:\ROM\TOS.IMG
+# vdivtg.o of the stand-alone VDI, against the shipped one (1992-08-03 20:08:36)
+3408447450 7754 D:\VDIVTG\VDIVTG.O
+# stand-alone programs without a surviving copy of this state: the checksums of this build
+# md5 3fd188a738a6210554cf759e40d773e4
+3037673899 317422 D:\PIXVDI\SOURCES\SCREEN.PRG
+# md5 ff26245e1854c6a9dd2695aa75bd7752
+2903390037 238925 D:\PIXVDI\SOURCES\SMSCREEN.PRG
+# usa.prg with Swedish resources: this build's own bytes (md5 45e07670f42ddaf2bf3acb5e539dac32)
+3415331817 394582 D:\AES\USA.PRG

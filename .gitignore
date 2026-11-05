@@ -1,0 +1,14 @@
+# written by the Hatari build (build/build.sh)
+/build/drives/c/BUILD.JOB
+/build/drives/c/EXPECT.LST
+/build/drives/c/build.log
+/build/drives/c/headless
+/build/hatari.out
+/build/home
+/build/drives/d/*
+!/build/drives/d/.keep
+/build/drives/m/*
+!/build/drives/m/.keep
+/build/boot/run.*
+/build/boot.src*
+/build/boot.ref*

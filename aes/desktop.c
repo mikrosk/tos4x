@@ -79,7 +79,6 @@ re_icon( )
 	BYTE	temp[30];
 	LONG	*ptr;
 	BYTE	buf2[18];	
-	BYTE	*iaddr;
 
 	LBCOPY( temp, pglobal, 30 );	/* save the pglobal	*/ 
 
@@ -92,16 +91,14 @@ re_icon( )
 	if ( !rsrc_load( buf2 ) )
 	  return( FALSE );
 
-	ptr = &pglobal[7];		/* get the new rsc address	*/
-	iaddr = *ptr;  
-	
 	if ( iconmem )			/* free up memory	*/
 	{				/* use rs_free to free memory */
-	  *ptr = iconmem;		/* because it may have color icons */
-	  rs_free( pglobal );
+					/* because it may have color icons */
+	  Mfree( iconmem );
 	}
 
-	iconmem = iaddr;
+	ptr = &pglobal[7];		/* get the new rsc address	*/
+	iconmem = *ptr;
 	iconaddr = get_tree( 0 );	
 	numicon = iconaddr[0].ob_tail;
 	iconaddr++;			/* get the icon address	*/
@@ -281,15 +278,11 @@ deskmain()
 	WORD		ret;
 	WORD		handle,x;
 	WORD		*ptr;
-	BYTE		temp[30];
-	LONG		*lptr;
 
 	if ( !inf_path[0] )	/* Not set up yet		*/	
 	  m_infpath( inf_path );
 
-#if 0
 	ciconaddr = (BYTE*)0;	/* 7/10/92 */
-#endif
 
 top:	
 	gl_apid = ap_init( pglobal );	/* initalize the application	*/
@@ -397,8 +390,6 @@ m_2:	  desknoerr();
 	desk_wait( TRUE );		
 	free_windows( );		/* free up all windows	*/	
 
-	wind_set( 0, WF_NEWDESK, 0x0L, 0, 0 );
-
 	Mfree( lp_start );		/* free string buffer	*/
 	Mfree( appnode );		/* free app buffer	*/
 	Mfree( backid );
@@ -425,11 +416,8 @@ m_1:
 	  iconaddr = (OBJECT*) 0;
 	  if ( iconmem )
 	  {
-	    LBCOPY( temp, pglobal, 30 ); /* construct the pglobal	*/ 
-	    ptr = temp;
-	    lptr = &ptr[7];
-	    *lptr = iconmem;	
-	    rs_free( temp );
+	    				 /* construct the pglobal	*/ 
+	    Mfree( iconmem );
 	    iconmem = (BYTE*) 0;
 	  }
 	  ret = FALSE;			/* resolution change	*/
@@ -566,19 +554,12 @@ ch_1:	  if ( ( temp = trap14( 64, -1 ) ) & 0x2 )
 
 
 /* adjust object colors if it is invalid */
-/* This routine should no longer be necessary, but is left
- * in for the TOS 4.02 release as a precautionary measure.
- * objc_draw now understands that "hollow, white, 3D" objects
- * should be drawn in the appropriate 3D color, or white if
- * there aren't enough colors, and the resources have been
- * updated accordingly	++ERS 1/19/93
- */
 
 	VOID
 adjdcol(color)
 unsigned int color;
 {
-    REG OBJECT  *obj;
+    OBJECT  *obj;
 
     if (gl_ws[13] > LWHITE)
 	return;
@@ -616,31 +597,21 @@ unsigned int color;
 	VOID
 adjobjects()
 {
-    REG		OBJECT *obj;
-    WORD	x,y,w,h,dx,dy;	    
+    OBJECT *obj;
 	
     obj = get_tree( ADINSDIS );
-    objc_gclip( obj, IUP, &dx, &dy, &x, &y, &w, &h );
-    obj[ IDOWN ].ob_y = h + obj[IUP].ob_y;   
+    obj[ IUP ].ob_y += 2;
+    obj[ IDOWN ].ob_y = obj[IUP].ob_y + obj[IUP].ob_height + 4;   
     obj[ IDRIVE ].ob_y += 2;
     obj[ ITRASH ].ob_y += 2;
     obj[ IPRINTER ].ob_y += 2;
 
     obj = get_tree( INWICON );
-    objc_gclip( obj, WUP, &dx, &dy, &x, &y, &w, &h );
-    obj[ WDOWN ].ob_y = h + obj[ WUP ].ob_y;
-    obj[ WFOLDER ].ob_height = gl_hchar;
-    obj[ WNONE ].ob_height = gl_hchar;
-    obj[ WOK ].ob_height = gl_hchar;
-    obj[ WREMOVE ].ob_height = gl_hchar;
-    obj[ WSKIP ].ob_height = gl_hchar;
-    obj[ WQUIT ].ob_height = gl_hchar;    
+    obj[ WDOWN ].ob_y = obj[ WUP ].ob_y + obj[ WUP ].ob_height + 4;
 
     obj = get_tree( MNSYSTEM );
-    objc_gclip( obj, MFUP, &dx, &dy, &x, &y, &w, &h );
-    obj[ MFDOWN ].ob_y = h + obj[ MFUP ].ob_y;
-    objc_gclip( obj, MKUPS, &dx, &dy, &x, &y, &w, &h );    
-    obj[ MKDOWNS ].ob_y = h + obj[ MKUPS ].ob_y;
+    obj[ MFDOWN ].ob_y = obj[ MFUP ].ob_y + obj[ MFUP ].ob_height + 4;
+    obj[ MKDOWNS ].ob_y = obj[ MKUPS ].ob_y + obj[ MKUPS ].ob_height + 4;
     obj[ MFBASE ].ob_height += 2;
 
     obj = get_tree( ADFILEIN );
@@ -649,4 +620,27 @@ adjobjects()
     obj[ FICNCL ].ob_y += 2;
     obj[ FIRONLY ].ob_y -= 1;
     obj[ FIRWRITE ].ob_y -= 1;
+
+    obj = get_tree( ADFORMAT );
+    obj[ FCSINGLE ].ob_height = gl_hchar;
+    obj[ FCDOUBLE ].ob_height = gl_hchar;
+    obj[ FCHIGH ].ob_height = gl_hchar;
+
+    obj = get_tree( DLAUNCH );
+    obj[ LGRAPHIC ].ob_y -= 1;
+    obj[ LTOS ].ob_y -= 1;
+    obj[ LAUNCHOK ].ob_y += 1;
+    obj[ LNCNCL ].ob_y += 1;
+
+    obj = get_tree( CPBOX );
+    obj[ OKCP ].ob_y += 1;
+    obj[ CCANCEL ].ob_y += 1;
+
+    obj = get_tree( INWICON );
+    obj[ WFOLDER ].ob_height = gl_hchar;
+    obj[ WNONE ].ob_height = gl_hchar;
+    obj[ WOK ].ob_height = gl_hchar;
+    obj[ WREMOVE ].ob_height = gl_hchar;
+    obj[ WSKIP ].ob_height = gl_hchar;
+    obj[ WQUIT ].ob_height = gl_hchar;    
 }

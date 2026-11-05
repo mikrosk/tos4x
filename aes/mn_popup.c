@@ -21,7 +21,6 @@
  * 07/01/92  cjg   - Limit the Scroll value to the children of the parent.
  * 07/09/92  cjg   - Use gl_button instead of gr_mkstate
  * 09/22/92  cjg   - Clip to the intersection of the screen and menu
- * 01/13/93  cjg   - Added MTOP_FLAG() and MB_FLAG() to AssignMenuData()
  */
 
 
@@ -141,8 +140,6 @@ MENU	*MData;			/* the output menu structure	 */
     obj = -1L;			/* Set it to no object selected  */
     if( !MenuBar_Mode )		/* PopUp Menu Routines!          */
     {
-      wm_update( BEG_MCTRL );	/* Lock the menus and mouse      */
-
       /* Wait for the up button */
 /*
       do
@@ -155,6 +152,7 @@ MENU	*MData;			/* the output menu structure	 */
       {
       }while( gl_button );
 			        /* moved 03/23/92 cjg 		 */
+      wm_update( BEG_MCTRL );	/* Lock the menus and mouse      */
 
       /* Get the new Menu ID! */
       if( ( MenuID = Menu_Insert( tree, Menu->mn_menu )) > 0 )
@@ -282,12 +280,10 @@ WORD		start_obj;		/* the obj we want on top   */
 
     MTOP_OBJ( MenuPtr )       = MFIRST_CHILD( MenuPtr );
     MTOP_STATE( MenuPtr )     = ObState( MFIRST_CHILD( MenuPtr ) );
-    MTOP_FLAG( MenuPtr )      = ObFlags( MFIRST_CHILD( MenuPtr ) );
     MTOP_TXT( MenuPtr )[0]    = '\0';
 
     MB_OBJ( MenuPtr )    = MLAST_CHILD( MenuPtr );
     MB_STATE( MenuPtr )  = ObState( MLAST_CHILD( MenuPtr ) );
-    MB_FLAG( MenuPtr )   = ObFlags( MLAST_CHILD( MenuPtr ) );
     MB_TXT( MenuPtr )[0] = '\0';
 
     MBUFFER( MenuPtr )        = NULL;

@@ -262,9 +262,6 @@ GLOBAL UWORD	gl_alrtcol;	/* alert background color */
 GLOBAL WORD	crt_error;	/* critical error handler semaphore	    */
 				/* set in jbind.s, checked by dispatcher    */
 
-GLOBAL WORD	adeskp[3];	/* desktop colors & backgrounds */
-GLOBAL WORD	awinp[3];	/* window colors & backgrounds */
-
 EXTERN BYTE *strcpy();		/* optimize.s	*/
 EXTERN BYTE *sh_name();		/* gemshlib.c	*/
 EXTERN WORD do_cdir();		/* jdos.s	*/
@@ -516,12 +513,11 @@ main()
 
 	if (gl_ws.ws_ncolors <= LWHITE) {    /* init button color */
     	    gl_actbutcol = gl_indbutcol = WHITE;
-    	    gl_alrtcol = WHITE;	/* init alert background color */
 	} else {
     	    gl_actbutcol = gl_indbutcol = LWHITE;
-    	    gl_alrtcol = LWHITE;	/* init alert background color */
 	}
 
+    	gl_alrtcol = WHITE;	/* init alert background color */
 
 	rom_ram( 0, ad_sysglo );
 
@@ -692,8 +688,6 @@ REG LONG newcacr;
 *	pre read the desktop.inf file and get the resolution set
 *	accordingly. If there are no disks or a desktop.inf does
 *	not exist or the resolutions match then return FALSE.
-*
-* ++ERS 1/14/93: also read the preferred desktop backgrounds
 */
 	WORD
 pred_dinf()
@@ -705,7 +699,6 @@ pred_dinf()
 	REG BYTE	*temp;
 	WORD		defdrv;
 	BYTE		*chrptr;
-	WORD		i;
 
 	gl_vdo = 0x0L;
 				/* _VDO */		/* 7/17/92 */
@@ -718,13 +711,6 @@ pred_dinf()
 	sh_get( pbuf, SIZE_AFILE );
 
         rom_ram( 3, pbuf, NULL );	/* res is default from ROM	*/
-
-	adeskp[0] = 0x41;	/* 4 = dither, 1 = black */
-	adeskp[1] = 0x73;	/* 7 = solid color, 3 = green */
-	adeskp[2] = 0x7D;	/* 7 = solid color, D = light cyan */
-	awinp[0] = 0x70;
-	awinp[1] = 0x70;
-	awinp[2] = 0x70;
 
 	if ( ctldown )
 	  goto p_1;
@@ -780,16 +766,8 @@ p_1:
 		temp = scan_2( temp, &g_flag );
 		temp = escan_str( temp, &g_autoboot[0] );
 	      }	
-	      else if ( *temp == 'Q' )
-	      {
-	        temp += 2;
-		for (i = 0; i < 3; i++)
-		{
-		  temp = scan_2( temp, &adeskp[i] );
-		  temp = scan_2( temp, &awinp[i] );
-		}
-	      }
-	      else if ( *temp == 'E' )
+	      else
+	      if ( *temp == 'E' )
 	      {
 		if ( LONGFRAME )
 		{
@@ -983,10 +961,10 @@ gr_slidebox(tree, parent, obj, isvert)
 {
 	REG GRECT	*pt, *pc;	/* new pointer for Reg Opt	*/
 	GRECT		t, c;
-	REG LONG	divnd, divis;
+	REG WORD	divnd, divis;
 	OBJECT		*objc;
-	WORD		pflags,cflags;
-	WORD		ret,setxy,setwh;
+	WORD		ptype,ctype;
+	WORD		ret;
 
 	pt = &t;
 	pc = &c;
@@ -996,28 +974,25 @@ gr_slidebox(tree, parent, obj, isvert)
 	ob_relxywh(tree, obj, pt);
 
 	objc = tree;
- 	pflags = objc[parent].ob_flags;
-	cflags = objc[obj].ob_flags;	
+ 	ptype = objc[parent].ob_type >> 8;
+	ctype = objc[obj].ob_type >> 8;	
 
-	if ( ( pflags & IS3DOBJ ) )
-	  pflags = 1;
+	if ( ( ptype == X_3DIND ) || ( ptype == X_3DACT ) )
+	  ptype = 1;
 	else
-	  pflags = 0;
+	  ptype = 0;
 
-	if ( ( cflags & IS3DOBJ ) )
-	  cflags = 1;
+	if ( ( ctype == X_3DIND ) || ( ctype == X_3DACT ) )
+	  ctype = 1;
 	else
-	  cflags = 0;
+	  ctype = 0;
 	  
-	setxy = 0;
-
-	if ( cflags ) 	/* if the child is 3D, then check 	    */
+	if ( ctype ) 	/* if the child is 3D, then check 	    */
 	{	
-	  if ( !pflags ) /* if parent is not 3D, then the child is   */
+	  if ( !ptype ) /* if parent is not 3D, then the child is   */
 	  {		/* ADJ3DPIX off, we need to adjust it	    */
   	    pt->g_x -= ADJ3DPIX;
 	    pt->g_y -= ADJ3DPIX;
-	    setxy = 1;	
 	  }	
 	  pt->g_w += (ADJ3DPIX << 1);
 	  pt->g_h += (ADJ3DPIX << 1);
@@ -1037,63 +1012,13 @@ gr_slidebox(tree, parent, obj, isvert)
 	  divis = pc->g_w - pt->g_w;
 	}
 
-	if ( setxy )
-	{
-	  if ( divnd )
-  	    divnd += ADJ3DPIX;
-	}
-
 	if (divis)
-	{
-	  ret = ( divnd * 1000 ) / divis;
-	  if ( ret > 1000 )
-	    ret = 1000;
-	  return( ret );
-	}	
+	  return( mul_div( divnd, 1000, divis ) );
 	else
 	  return(0);
 }
 
 
-/*
-*	Routine to watch the mouse while the button is down and
-*	it stays inside/outside of the specified rectangle.
-*	Return TRUE as long as the mouse is down.  Block until the
-*	mouse moves into or out of the specified rectangle.
-*/
-
-	WORD
-gr_stilldn(out, x, y, w, h)
-	WORD		out, x, y, w, h;
-{
-/*	WORD		rets[6];*/
-	WORD		status;
-/*	WORD		state;	*/
-					/* compiler had better	*/
-					/*   put the values out,*/
-					/*   x, y, w, h in the	*/
-					/*   right order on the	*/
-					/*   stack to form a	*/
-					/*   MOBLK		*/
-	while( TRUE )
-	{
-	  forker();
-	  if ( !( button & 0x01 ) )
-	  {
-	    status = FALSE;		
-	    break;
-	  }
-	  else
-	  {
-	    if ( out != inside( xrat, yrat, &x ) )
-	    {
-	      status = TRUE;
-	      break;
-	    }
- 	  }  	
-	}
-	return( status );
-} /* gr_stilldn */
 
 
 #if 0

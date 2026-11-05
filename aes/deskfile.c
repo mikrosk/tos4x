@@ -356,7 +356,7 @@ set_newview( index, win )
 	    *(text - 1) = 0;
 	  }
 	  
-	  obj->ob_flags &= ~HIDETREE;
+	  obj->ob_flags = NONE;
 	  obj->ob_states = dir[i].d_state;
 	  obj->ob_next = k+1;
 
@@ -372,7 +372,7 @@ set_newview( index, win )
 	obj++;			/* finish up the rest 	*/
 
 	for( ; k < vicons; k++, obj++ )
-	  obj->ob_flags |= HIDETREE;
+	  obj->ob_flags = HIDETREE;
 }
 
 
@@ -459,11 +459,7 @@ read_files( win, attr )
 	  if ( dtabuf.dirfile.d_att & 0x10 )
 	  {
 	    if ( dtabuf.dirfile.d_name[0] == '.' )
-	    {
-	      if ( ( dtabuf.dirfile.d_name[1] == '.' ) || 
-		   ( !dtabuf.dirfile.d_name[1] ) ) 		
-		goto r_3;
-	    } 	
+	      goto r_3;
 	  }
 	  else
 	  {				/* file match ?		*/

@@ -167,13 +167,8 @@ ev_mouse(pmo, rets)
 ev_mesag(pbuff)
 	LONG		pbuff;
 {
-	if ( rlr->p_qindex > 0 )
+	if ( !rd_mymsg( pbuff ) )
 	  return( ap_rdwr(AQRD, rlr->p_pid, 16, pbuff) );
-	else
-	{
-	  if ( !rd_mymsg( pbuff ) )
-	    return( ap_rdwr(AQRD, rlr->p_pid, 16, pbuff) );
-	}
 
 	return( TRUE );
 }

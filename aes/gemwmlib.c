@@ -8,8 +8,6 @@
 /* 8/7/92 - 8/10/92	Fix w_adjust to accomdate 3D buttons		*/
 /* 8/13/92	D.Mui	Fix at wm_start for opening background window	*/
 /* 8/13/92	D.Mui	Check minimum window size before open		*/
-/* 9/3/92	D.Mui	Implement WF_BEVENT and WF_BOTTOM		*/
-/* 9/10/92	D.Mui	Return WM_ONTOP or WM_UNTOPPED message		*/
 
 #include <portab.h>
 #include <machine.h>
@@ -19,10 +17,6 @@
 #include <taddr.h>
 #include <gemlib.h>
 #include <osbind.h>
-
-/* whether window objects are 3D or not */
-#define NO3D	0
-#define IS3D	1
 
 /* in GEMFLAG.C */
 EXTERN WORD     unsync();
@@ -164,8 +158,6 @@ wm_start()
     deskwind = wm_create(0, &windsiz);
     
     /* Fake the full x y w and h for deskwind */
-    wp = srchwp( deskwind );
-    r_set( &wp->full, 0, gl_hbox, gl_rfull.g_w, gl_rfull.g_h );
 
     /* Open the background window */	
     wm_open(deskwind, &windsiz);
@@ -194,7 +186,6 @@ REG GRECT   *rect;	/* x, y, width and height of full size window */
     if ((wp = newwp()) == NULLPTR || newhndl(wp) == FAILURE)
 	return FAILURE;
 
-    wp->type = 0;
     wp->status.opened = FALSE;		/* window has not been opened yet */
     wp->owner = rlr;		    	/* init owner of window */
     wp->mowner = NIL;			/* no mouse owner FOR NOW */
@@ -224,86 +215,86 @@ REG GRECT   *rect;	/* x, y, width and height of full size window */
     wp->parent = wp->child = wp->sibling = NIL;
 
     /* first object is the background, and it has a shadow */
-    w_bld(wp, W_BOX, G_IBOX, NIL, GBOX_OBS, NO3D);
+    w_bld(wp, W_BOX, G_IBOX, NIL, GBOX_OBS);
     wp->obj[W_BOX].ob_state |= SHADOWED;;
 
     hparts = kind & HPARTS;	/* mask for vertical slider elements */
     vparts = kind & VPARTS;	/* mask for horizontal slider elements */
 
     if (kind & TPARTS) {	/* any title bar elements? */
-	w_bld(wp, W_TITLE, G_BOX, W_BOX, GBOX_OBS, NO3D);
+	w_bld(wp, W_TITLE, G_BOX, W_BOX, GBOX_OBS);
 
 	if (kind & CLOSER) {
-	    w_bld(wp, W_CLOSER, G_BOXCHAR, W_TITLE, 0x05010000, IS3D);
+	    w_bld(wp, W_CLOSER, A3DBOXCHAR, W_TITLE, 0x05010000);
 	}
 
 	if (kind & NAME) {
-	    w_bld(wp, W_NAME, G_BOXTEXT, W_TITLE, &(wp->ttxt), IS3D);
+	    w_bld(wp, W_NAME, A3DBOXTEXT, W_TITLE, &(wp->ttxt));
 	    w_ted(&(wp->ttxt), "Title Bar", 2, wtcolor[W_TITLE]);
 	} else if (kind & MOVER) {
-	    w_bld(wp, W_NAME, G_IBOX, W_BOX, 0L, NO3D);
+	    w_bld(wp, W_NAME, G_IBOX, W_BOX, 0L);
 	}
 
 	if (kind & FULLER) {
-	    w_bld(wp, W_FULLER, G_BOXCHAR, W_TITLE, 0x07010000, IS3D);
+	    w_bld(wp, W_FULLER, A3DBOXCHAR, W_TITLE, 0x07010000);
 	}
     }
 
     if (kind & INFO) {
-	w_bld(wp, W_INFO, G_BOXTEXT, W_BOX, &(wp->itxt), NO3D);
+	w_bld(wp, W_INFO, G_BOXTEXT, W_BOX, &(wp->itxt));
 	w_ted(&(wp->itxt), "Info Line", 0, wtcolor[W_INFO]);
     }
 
     if (kind & MNBAR) {
-	w_bld(wp, W_MNBAR, G_BOXTEXT, W_BOX, &(wp->mtxt), NO3D);
+	w_bld(wp, W_MNBAR, G_BOXTEXT, W_BOX, &(wp->mtxt));
 	w_ted(&(wp->mtxt), " Desk  File  View  Options", 0, wtcolor[W_MNBAR]);
     }
 
     if (kind & SIZER) {
-	w_bld(wp, W_SIZER, G_BOXCHAR, W_BOX, 0x06010000, IS3D);
+	w_bld(wp, W_SIZER, A3DBOXCHAR, W_BOX, 0x06010000);
 
 	if (!hparts && !vparts) {
-	    w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS, NO3D);
+	    w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS);
 	    /* Taken out to expand work area by 1 line	    */
-	    /* w_bld(wp, W_HBAR, G_BOX, W_BOX, GBOX_OBS, IS3D);    */
+	    /* w_bld(wp, W_HBAR, A3DBOX, W_BOX, GBOX_OBS);    */
 	}
     } else if (hparts && vparts) {
-	w_bld (wp, W_SIZER, G_BOX, W_BOX, GBOX_OBS, IS3D);
+	w_bld (wp, W_SIZER, A3DBOX, W_BOX, GBOX_OBS);
     }
 
     if (vparts) {
-	w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS, NO3D);
+	w_bld(wp, W_VBAR, G_BOX, W_BOX, GBOX_OBS);
 
 	if (kind & UPARROW) {
-	    w_bld(wp, W_UPARROW, G_BOXCHAR, W_VBAR, 0x01010000, IS3D);
+	    w_bld(wp, W_UPARROW, A3DBOXCHAR, W_VBAR, 0x01010000);
 	}
 
 	if (kind & DNARROW) {
-	    w_bld(wp, W_DNARROW, G_BOXCHAR, W_VBAR, 0x02010000, IS3D);
+	    w_bld(wp, W_DNARROW, A3DBOXCHAR, W_VBAR, 0x02010000);
 	}
 
 	if (kind & VSLIDE) {
-	    w_bld(wp, W_VSLIDE, G_BOX, W_VBAR, 0x00010000, NO3D);	
-	    w_bld(wp, W_VELEV, G_BOX, W_VSLIDE, GBOX_OBS, IS3D);	
-/*	    w_bld(wp, W_VELEV, G_BOX, W_VSLIDE, GBOX_OBS, NO3D);	*/
+	    w_bld(wp, W_VSLIDE, G_BOX, W_VBAR, 0x00010000);	
+	    w_bld(wp, W_VELEV, A3DBOX, W_VSLIDE, GBOX_OBS);	
+/*	    w_bld(wp, W_VELEV, G_BOX, W_VSLIDE, GBOX_OBS);	*/
 	}
     }
 
     if (hparts) {
-	w_bld(wp, W_HBAR, G_BOX, W_BOX, GBOX_OBS, NO3D);
+	w_bld(wp, W_HBAR, G_BOX, W_BOX, GBOX_OBS);
 
 	if (kind & LFARROW) {
-	    w_bld(wp, W_LFARROW, G_BOXCHAR, W_HBAR, 0x04010000, IS3D);
+	    w_bld(wp, W_LFARROW, A3DBOXCHAR, W_HBAR, 0x04010000);
 	}
 
 	if (kind & RTARROW) {
-	    w_bld(wp, W_RTARROW, G_BOXCHAR, W_HBAR, 0x03010000, IS3D);
+	    w_bld(wp, W_RTARROW, A3DBOXCHAR, W_HBAR, 0x03010000);
 	}
 
 	if (kind & HSLIDE) {
-	    w_bld(wp, W_HSLIDE, G_BOX, W_HBAR, 0x00010000, NO3D);
-            w_bld(wp, W_HELEV, G_BOX, W_HSLIDE, GBOX_OBS, IS3D); 
-/*          w_bld(wp, W_HELEV, G_BOX, W_HSLIDE, GBOX_OBS, NO3D);	*/
+	    w_bld(wp, W_HSLIDE, G_BOX, W_HBAR, 0x00010000);
+            w_bld(wp, W_HELEV, A3DBOX, W_HSLIDE, GBOX_OBS);     
+/*          w_bld(wp, W_HELEV, G_BOX, W_HSLIDE, GBOX_OBS);	*/
 	}
     }
 
@@ -325,7 +316,7 @@ REG GRECT   *rect;	    /* x, y, width and height of opened window */
 {
     REG WINDOW  *wp;	    /* pointer to window structure */
     WINDOW	*srchwp();
-    WORD	ret,x,w,h;	    /* return code */
+    WORD	ret;	    /* return code */
 
     /* if window structure can't be found or window already opened,
        return error */
@@ -336,18 +327,12 @@ REG GRECT   *rect;	    /* x, y, width and height of opened window */
 
     /* check the minimum size	*/
 	
-    wm_min( wp->kind, &w, &h );
-
-    if ( w > rect->g_w )
-      rect->g_w = w;
-
-    if ( h > rect->g_h )
-      rect->g_h = h;
+    if ( handle )
+      rc_intersect( &gl_rfull, rect );
 
     w_adjust(wp, rect);	    	    /* init window components */
-    wp->prev = wp->curr;
-    wp->status.opened = TRUE;	    /* Grand opening!		*/
 
+    wp->status.opened = TRUE;	    /* remember that this is opened */
     ret = totop(handle, WMOPEN);    /* top it */
     wm_update(FALSE);
     return ret;
@@ -395,12 +380,8 @@ WORD	handle;			/* handle of window to be closed */
 
     /* maintain linked list of opened windows */
     if (handle == topw) {
-	if ((topw = wp->under) != NIL) 
-	{
+	if ((topw = wp->under) != NIL) {
 	    totop(topw, WMCLOSE);
-	    wp = srchwp(topw);  	
-    	    ap_sendmsg(wind_msg, WM_ONTOP, wp->owner->p_pid, topw, 
-		       0, 0, 0, 0 );
 	} else {
 	    botw = NIL;
 	}
@@ -442,7 +423,7 @@ WORD	handle;		/* handle of window to be deleted */
     if (wp->fxywh)
 	delrect(0L, wp->fxywh);
 
-#if	1
+#if	0
     if (wp->status.opened)	/* if not already closed, */
 	wm_close(handle);	/* close the window first */
 #endif
@@ -520,11 +501,10 @@ WORD	handle;		/* handle of window to be deleted */
  *
  */
 WORD
-wm_get(handle, field, ow, iw)
-	REG WORD    handle;	/* window handle */
-	WORD	    field;	/* flag to identify what info to be returned */
-	REG WORD    ow[];	/* return values */
-	WORD	    iw[];
+wm_get(handle, field, ow)
+REG WORD    handle;	/* window handle */
+WORD	    field;	/* flag to identify what info to be returned */
+REG WORD    ow[];	/* return values */
 {
     int		ret, i;
     REG WINDOW	*wp;
@@ -532,15 +512,8 @@ wm_get(handle, field, ow, iw)
     WINDOW	*srchwp();
     RLIST	*genrlist();
 
-
-    if ( ( field == WF_DCOLOR ) || ( field == WF_TOP ) || ( field == WF_SCREEN ) ||
-	 ( field == WF_BOTTOM )	)
-      goto wg_1;
-
     if ((wp = srchwp(handle)) == NULLPTR)
 	return FALSE;
-
-wg_1:
 
     ret = TRUE;
 
@@ -583,12 +556,7 @@ wg_1:
 	    break;
 
 	case WF_TOP:
-	    wp = srchwp( topw );
 	    ow[0] = topw;
-	    ow[1] = wp->owner->p_pid;
-	    ow[2] = wp->under;
-	    break;
-
 	    break;
 
 	case WF_FIRSTXYWH:
@@ -626,33 +594,18 @@ wg_1:
 	    ow[2] = newroot;
 	    break;
 
-	case WF_SCREEN:
-	    gsx_mret(&ow[0], &ow[2]);
-	    break;
-
 	case WF_COLOR:
-	    ow[1] = wp->tcolor[iw[0]];
-	    ow[2] = wp->bcolor[iw[0]];
+	    ow[1] = wp->tcolor[ow[0]];
+	    ow[2] = wp->bcolor[ow[0]];
 	    break;
 
 	case WF_DCOLOR:
-	    ow[1] = wtcolor[iw[0]];
-	    ow[2] = wbcolor[iw[0]];
+	    ow[1] = wtcolor[ow[0]];
+	    ow[2] = wbcolor[ow[0]];
 	    break;
 
-	case WF_OWNER:
-	    ow[0] = wp->owner->p_pid;
-	    ow[1] = wp->status.opened;
-	    ow[2] = wp->ontop;
-	    ow[3] = wp->under;
-	    break;
-
-	case WF_BEVENT:
-	    ow[0] = wp->type;
-	    break;
-	
-	case WF_BOTTOM:
-	    ow[0] = srchwp(0)->ontop; 
+	case WF_SCREEN:
+	    gsx_mret(&ow[0], &ow[2]);
 	    break;
 
 	case WF_RESVD:
@@ -686,17 +639,12 @@ REG WORD    iw[];	    /* values to change to */
     REG	OBJECT	*work;
     GRECT	rect, rect1;
 
-    if ( ( field == WF_NEWDESK ) || ( field == WF_DCOLOR ) )
-      goto ws_1;
-	
     if ((wp = srchwp(handle)) == NULLPTR)
 	return FALSE;	
 
-ws_1:
-
     ret = TRUE;		    /* assume everything will be ok */
 
-    wm_update(1);	    /* grab the window sync */
+    wm_update(TRUE);	    /* grab the window sync */
 
     switch (field) {
 	case WF_NAME:
@@ -712,11 +660,7 @@ ws_1:
 	    break;
 
 	case WF_CURRXYWH:
-	    if ( iw[1] < gl_hbox )
-	      iw[1] = gl_hbox;
-
 	    rect = *(GRECT *)iw;
-
 	    w_adjust(wp, &rect);
 
 	    if (wp->status.opened) {
@@ -754,23 +698,11 @@ ws_1:
 	    }
 	    break;
 
- 	case WF_HSLSIZE:
 	case WF_HSLIDE:
-	    if ( !( wp->kind & HSLIDE ) )
-	    {
-	       ret = FALSE;
-	       break;
-	    }
-	    goto ws_2;
-
-	case WF_VSLSIZE:
 	case WF_VSLIDE:
-	    if ( !( wp->kind & VSLIDE ) )
-	    {
-	       ret = FALSE;
-	       break;
-	    }
-ws_2:
+	case WF_HSLSIZE:
+	case WF_VSLSIZE:
+
 	    if (iw[0] > 1000)
 		iw[0] = 1000;
 	    else if (iw[0] < -1)
@@ -844,6 +776,9 @@ ws_2:
 		ret = totop(handle, WMSET);
 	    break;
 
+	case WF_BOTTOM:
+	    ret = tobot(handle);
+	    break;
 
 	case WF_NEWDESK:
 	    newdesk = *(LONG *)&iw[0];
@@ -862,10 +797,8 @@ ws_2:
 		setcol(wp, iw[0], FALSE);
 
 	    /* if window is already opened, redraw it */
-
 	    if (wp->status.opened)
 		w_clipdraw(wp, iw[0], NULLPTR);
-
 	    break;
 
 	case WF_DCOLOR:
@@ -875,21 +808,13 @@ ws_2:
 		wbcolor[iw[0]] = iw[2];
 	    break;
 
-	case WF_BEVENT:
-	    wp->type = iw[0];
-	    break;
-	
-	case WF_BOTTOM:
-	    ret = tobot(handle);
-	    break;
-
 	case WF_RESVD:	    /* old WMLIB has code, but doc says RESERVED */
 	default:
 	    ret = FALSE;
 	    break;
     }
 
-    wm_update(0);	    /* give up the window sync */
+    wm_update(FALSE);	    /* give up the window sync */
     return ret;
 }
 
@@ -922,7 +847,7 @@ int my;		/* mouse's y position */
  *		 his current rectangle list.
  *
  */
-	WORD
+VOID
 wm_update(code)
 int code;	/* flag for the call's function */
 {
@@ -937,7 +862,7 @@ int code;	/* flag for the call's function */
 	code -= 2;
 	take_ownership(code);
     }
-    return(TRUE);
+    return(code);
 }
 
 
@@ -946,7 +871,7 @@ int code;	/* flag for the call's function */
  *		window's border area or work area
  *
  */
-	WORD
+VOID
 wm_calc(type, kind, ix, iy, iw, ih, ox, oy, ow, oh)
 int type;	/* the type of calculation to perform */
 int kind;	/* components present in the window */
@@ -963,24 +888,30 @@ int *oh;	/* output height of work/border area */
     REG	WORD	yinc, xinc;
     int		hparts, vparts;
 
-    tb = bb = rb = 0;
-    lb = 1;
-	
-    xinc = gl_wbox + (ADJ3DPIX << 1);
-    yinc = gl_hbox + (ADJ3DPIX << 1);
+    tb = bb = rb = lb = 1;
+
+    xinc = gl_wbox - 1 + (ADJ3DPIX << 1);
+    yinc = gl_hbox - 1 + (ADJ3DPIX << 1);
+/*
+    yinc = ob_hbox - 1;
+/**/
+/* June 19 1992 - ml
+    yinc = ob_hbox;
+    xinc = ob_wbox;
+/**/
 	
     if (kind & (NAME | CLOSER | FULLER))
 	tb += yinc;
     if (kind & INFO)
-	tb += gl_hbox;
+	tb += yinc;
     if (kind & MNBAR)
 	tb += yinc;
 
     vparts = kind & (UPARROW | DNARROW | VSLIDE);
     hparts = kind & (LFARROW | RTARROW | HSLIDE);
 
-    if ( ( kind & SIZER ) && (!vparts && !hparts) )
-	rb += xinc;	
+    if ((kind & SIZER) && (!vparts && !hparts))
+	rb += xinc;
 
     if (vparts)
 	rb += xinc;
@@ -988,17 +919,8 @@ int *oh;	/* output height of work/border area */
     if (hparts)
 	bb += yinc;
 
-    if ( !rb )	/* if no right elements */
-      rb = 1;
-
-    if ( !bb )	/* if no bottom elements */
-      bb = 1;
-	
-    if ( !tb )	/* if no top elements	*/
-      tb = 1;
-			
-    /* negate values to calc Border Area	*/
-
+					/* negate values to calc*/
+					/*   Border Area	*/
     if (type == WC_BORDER) {
 	lb = -lb;
 	tb = -tb;
@@ -1010,96 +932,6 @@ int *oh;	/* output height of work/border area */
     *oy = iy + tb;
     *ow = iw - lb - rb;
     *oh = ih - tb - bb;
-
-    return TRUE;
-}
-
-
-
-/*
- * Wm_min() - calculates the min width and height of a window's border 
- *	      area
- *
- */
-VOID
-wm_min( kind, ow, oh )
-	REG WORD 	kind;	/* coamponents present in the window */
-	WORD 		*ow;	/* output width of work/border area */
-	WORD 		*oh;	/* output height of work/border area */
-{
-    REG WORD	w1, w2, w3, h1, h2, h3;
-    REG	WORD	yinc, xinc;
-    WORD	hparts, vparts;
-
-    w1 = w2 = w3 = h1 = h2 = h3 = 1;
-
-    xinc = gl_wbox + (ADJ3DPIX << 1);
-    yinc = gl_hbox + (ADJ3DPIX << 1);
-	
-    if ( kind & (NAME | CLOSER | FULLER) )
-    {
-	h1 += yinc;
-	if ( kind & NAME )
-	  w1 += xinc;
-
-	if ( kind & CLOSER )
-	  w1 += xinc;
-
-	if ( kind & FULLER )
-	  w1 += xinc;
-    }
-
-    if ( kind & INFO )
-	h1 += yinc;
-
-    if ( kind & MNBAR )
-	h1 += yinc;
-
-    vparts = kind & (UPARROW | DNARROW | VSLIDE);
-    hparts = kind & (LFARROW | RTARROW | HSLIDE);
-
-    if ( vparts )
-	w2 += xinc;
-
-    if ( hparts )
-	h3 += yinc;
-
-    if ( kind & UPARROW )
-        h2 += yinc;
-
-    if ( kind & DNARROW )
-        h2 += yinc;
-
-    if ( kind & VSLIDE )
-        h2 += yinc;
-
-    if ( kind & LFARROW )
-	w3 += xinc;
-
-    if ( kind & RTARROW )
-	w3 += xinc;
-
-    if ( kind & HSLIDE )
-	w3 += xinc;
-
-    if ( kind & SIZER ) 
-    {	
-	if ( (!vparts && !hparts) )
-	{
-	  w2 += xinc;
-	  h2 += yinc;
-	}
-
-	if ( vparts )
-	  h2 += yinc;
-	
-	if ( !vparts && hparts )  	
-	  w3 += xinc;
-    }
-
-   *ow = max( ( w1 + w2 ), w3 );
-   h2 =  max( h2, h3 );
-   *oh = h2 + h1;
 }
 
 
@@ -1117,7 +949,7 @@ wm_min( kind, ow, oh )
  * future multitasking system.
  *	
  */
-	WORD
+VOID
 wm_new()
 {
 	REG SPB	*sy;
@@ -1139,13 +971,11 @@ wm_new()
 
 	sy = ad_windspb;
 
-	if ( sy->sy_tas )	/* anybody owning the screen ? */
-	{	 
-	  while( sy->sy_tas )	/* in gemflag.c	*/
-	    unsync( sy );
-	}
-
-	return TRUE;
+	if ( !sy->sy_tas )	/* anybody owning the screen ? */
+	  return;		/* No ..		       */
+				
+	while( sy->sy_tas )	/* in gemflag.c	*/
+	  unsync( sy );
 }
 
 
@@ -1353,13 +1183,9 @@ WORD	caller;		/* WMOPEN: called by wm_open() */
     topw = handle;
 
     /* draw the untopped window if there is one */
-    if (twp) 
-    {
+    if (twp) {
 	activate(twp, NO);
     	w_clipdraw(twp, W_BOX, NULLPTR);
-	if ( twp->handle )		/* send untopped message */
-	    ap_sendmsg( wind_msg, WM_UNTOPPED, twp->owner->p_pid, twp->handle,
-		        0, 0, 0, 0 );
     }
 
     /* draw border of the newly topped window */
@@ -1437,8 +1263,9 @@ WORD	handle;		/* handle of window to be bottmed */
     w_drawchange(&dirty, handle,NIL);
 
     /* notify owner of newly topped window */
-    ap_sendmsg(wind_msg, WM_ONTOP, unnbwp->owner->p_pid, unnbwp->handle, 
-	       0, 0, 0, 0 );
+    ap_sendmsg(wind_msg, WM_TOPPED, unnbwp->owner->p_pid, unnbwp->handle, 
+	unnbwp->curr.g_x, unnbwp->curr.g_y, unnbwp->curr.g_w, 
+	unnbwp->curr.g_h);
 
     return TRUE;
 }
@@ -1705,8 +1532,7 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	    }
 	    else
 	    {
-	/* the won't fit in 16 bits, 'cause it's scaled by 1000: ++ERS 1/11/93 */
-		sz = ( (long)sz * wp->vslsz ) / 1000;
+		sz = ( sz * wp->vslsz ) / 1000;
 		if ( sz > ( ADJ3DPIX << 1 ) ) 	
 		  sz = sz - (ADJ3DPIX << 1);
 
@@ -1747,8 +1573,7 @@ REG GRECT   *rect;	/* pointer to window's coords and dimensions */
 	    } 	
 	    else
 	    {
-	/* the won't fit in 16 bits, 'cause it's scaled by 1000: ++ERS 1/11/93 */
-		sz = ((long) sz * wp->hslsz) / 1000;
+		sz = sz * wp->hslsz / 1000;
 			 
 		if ( sz > ( ADJ3DPIX << 1 ) ) 	
 		  sz = sz - (ADJ3DPIX << 1);
@@ -2062,23 +1887,22 @@ w_drawchange(dirty, skip,stop)
  *
  */
 VOID
-w_bld(wp, ob, type, parent, spec, is3d)
+w_bld(wp, ob, type, parent, spec)
 WINDOW	*wp;
 REG int	ob;
 int	type, parent;
 long	spec;
-WORD	is3d;
 {
     REG OBJECT  *obaddr;
 
     /* initialize object */
     obaddr = &(wp->obj[ob]);
     obaddr->ob_next = obaddr->ob_head = obaddr->ob_tail = NIL;
-    obaddr->ob_flags = is3d ? (IS3DOBJ|IS3DACT) : 0;
+    obaddr->ob_flags = 0;
     obaddr->ob_type = type;
     obaddr->ob_state = NORMAL;
     obaddr->ob_spec = spec;
-    if (type != G_BOXTEXT)
+    if (type != G_BOXTEXT && type != A3DBOXTEXT)
 	obaddr->ob_spec |= ((LONG)wtcolor[ob] & 0x0000ffffL);
 
     /* add object to tree */

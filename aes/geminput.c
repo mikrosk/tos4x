@@ -153,7 +153,6 @@ EXTERN THEGLO	D;
 	REG WORD	mx,my;			
 	PD		*m;
 	WINDOW		*wp, *srchwp();
-	GRECT		t;
 
 	m = gl_mowner;
 
@@ -168,28 +167,12 @@ EXTERN THEGLO	D;
 	     m = gl_cowner;
            else					/* if in menu bar then 	*/
 	   {					/* owned by ctrl mgr	*/
-	     m = ctl_pd;
-
-	     if ( !inside( mx, my, &gl_rmenu ) )
-	     {					/* Hit any window?	*/
-               wh = wm_find( mx, my );
-	       if ( wh && ( wh != NIL ) ) 	
-	       {
-	         wm_get( wh, WF_WORKXYWH, &t );
-
-	         if ( inside( mx, my, &t ) )
-	         {
-		    wp = srchwp( wh );
-		    if ( wp->type & 0x01 )
-		      m = wp->owner;
-	         }
-	       }
-	       else				/* hit window 0 background */
-	       {	
-	       	/* added Jul 23 91 for new window manager - ml. */
-	         m = srchwp(0)->owner;
-	       }
-	      }
+	     if ( inside( mx, my, &gl_rmenu ) )
+	       wh = NIL;
+	     else
+	       wh = wm_find( mx, my ) ? NIL : 0;
+	     wp = srchwp(0);
+	     m = ( wh == NIL ) ? ctl_pd : wp->owner;
 	    }
 	}
 
@@ -508,14 +491,11 @@ bchange(new, clicks)
 	WORD		clicks;
 {
 
-	gl_mowner = mowner( new );		/*   not own the mouse	*/
-#if 0
 	if ( gl_mowner != ctl_pd )		/* if control mgr. does-*/
 	  gl_mowner = mowner( new );		/*   not own the mouse	*/
 						/*   see if this button	*/
 						/*   event causes an	*/
 						/*   ownership change	*/
-#endif	
 
 						/* if the button went	*/
 						/*   down check to see	*/

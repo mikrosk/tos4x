@@ -285,9 +285,9 @@ fix_cicon()
 	UWORD	*header;	
 
 	header = rs_hdr;
-	if ( header[RT_VRSN] & 0x0004 ) /* if extended type */
+	if ( header[RT_VRSN] >= header[RS_SIZE] ) /* if extended type */
 	{
-	  ctable = rs_hdr + (LONG)header[RS_SIZE];
+	  ctable = rs_hdr + (LONG)header[RT_VRSN];
 	  if ( ctable[1] && ( ctable[1] != -1 ) )
 	    get_colo_rsc( ctable[1] + rs_hdr );
 	}
@@ -307,9 +307,9 @@ fix_objects()
 
 	header = rs_hdr;
  
-	if ( header[RT_VRSN] & 0x0004 )
+	if ( header[RT_VRSN] >= header[RS_SIZE] )
 	{
-	  ctable = rs_hdr + (LONG)header[RS_SIZE];    	
+	  ctable = rs_hdr + (LONG)header[RT_VRSN];    	
 	  ctable = ctable[1] + rs_hdr;
 	}
 	else
@@ -418,24 +418,8 @@ rs_sglobe(pglobal)
 rs_free(pglobal)
 	LONG		pglobal;
 {
-	UWORD		*header;
-	LONG		*ctable;
-
-	rs_sglobe(pglobal);	/* set global values */
-
-	header = rs_hdr;
- 
-	if ( header[RT_VRSN] & 0x0004 )	/* extended format */
-	{
-	  ctable = rs_hdr + (LONG)header[RS_SIZE];    	
-	  if ( ctable[1] && ( ctable[1] != -1 ) )
-	  {
-	    ctable = ctable[1] + rs_hdr;
-	    free_cicon( ctable );
-	  }
-	}
-
-	dos_free( rs_hdr );
+	rs_global = pglobal;
+	dos_free( LLGET(APP_LO1RESV) );
 	return(!DOS_ERR);
 
 }/* rs_free() */
@@ -517,11 +501,11 @@ rs_readit(pglobal, rsfname)
 	{
 						/* get size of resource	*/
 						
-	  if ( hdr_buff[RT_VRSN] & 0x0004 )	/* New format?		*/
+	  if ( hdr_buff[RT_VRSN] >= hdr_buff[RS_SIZE] )	/* New format?		*/
 	  {					/* seek to the 1st entry*/
 						/* of the table		*/
-	    if ( dos_lseek( fd, SMODE, (LONG)(hdr_buff[RS_SIZE]) ) 
-		 != hdr_buff[RS_SIZE] )
+	    if ( dos_lseek( fd, SMODE, (LONG)(hdr_buff[RT_VRSN]) ) 
+		 != hdr_buff[RT_VRSN] )
 	    {
 	      ret = FALSE;
 	      goto rs_exit;

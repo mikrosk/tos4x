@@ -2894,6 +2894,21 @@ DB_STUB = 0
 * Initialize the DSP & DSP XBIOS calls
 	jsr	_Dsp_Init(pc)
 
+* Initialize the sound system
+	clr.l	(sp)			; setmode(0) (8 bit stereo)
+	jsr	setmode(pc)
+	move.l	#0x00020080,(sp)	; soundcmd(LTGAIN, 0x80)
+	jsr	soundcmd(pc)
+	move.w	#3,(sp)			; soundcmd(RTGAIN, 0x80)
+	jsr	soundcmd(pc)
+	move.l	#0x00060003,(sp)	; soundcmd(SETPRESCALE, 3)
+	jsr	soundcmd(pc)
+	move.w	#4,(sp)			; soundcmd(ADDEROUT, 3)
+	jsr	soundcmd(pc)
+	move.w	#5,(sp)			; soundcmd(ADCINPUT, 3)
+	jsr	soundcmd(pc)
+	addq	#4,sp
+
 .endif
 
 	move.w	os_dosdate,_date	; set file system date

@@ -1529,11 +1529,8 @@ dsf_udpat()
     sp = INTIN;
     dp = &work_ptr->ud_patrn[0];
 
-    if (count == 16) {
+    if (count == 16)
 	work_ptr->multifill = 0; 	/* Single Plane Pattern */
-	for (i=0; i < count; i++)
-	    *dp++ = *sp++;
-    }
 
     else if (count == (v_planes * 16) && form_id != PIXPACKED) {
 	work_ptr->multifill = 1;	/* Valid Multi-plane pattern */

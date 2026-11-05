@@ -40,7 +40,7 @@ CERR=-j135i
 #135: Assignment to shorter data type (precision may be lost)
 # -w: short ints
 # -b0 -bn: no base reg, a4 is reg. var
-CMOD=-w -b0 -bn
+CMOD=-w -b0 -bn -v -cs
 # -d2: debug, include local symbols
 # -O: optimize
 # -mf: frames (link/unlk)

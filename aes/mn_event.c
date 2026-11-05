@@ -1058,20 +1058,14 @@ WORD		flag;		/* Blit To/From buffer and scrn*/
    WORD     pxy[8];		/* clipping array              */
    FDB      ObjMFDB;		/* MFDB                        */
    GRECT    clip;		/* Clipping rectangle ( GRECT )*/
-   WORD	    dummy;
 	
    ActiveTree( MTREE( MenuPtr ) );
 
-#if UNLINKED
    clip = MOBRECT( MenuPtr );	/* Get the clipping rectangle  */
    clip.g_x -= 1;		/* Adjust for boundaries       */
    clip.g_y -= 1;
    clip.g_w += 4;
    clip.g_h += 4;
-#endif
-
-   ob_gclip( MTREE( MenuPtr ), MPARENT( MenuPtr ), &dummy, &dummy,
-	     &clip.g_x, &clip.g_y, &clip.g_w, &clip.g_h );
 	
    rc_intersect( &gl_rfull, &clip );	/* clip to the work area*/
    gsx_sclip( &clip );			/* set the clip		*/

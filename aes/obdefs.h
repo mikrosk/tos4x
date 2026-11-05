@@ -95,8 +95,6 @@
 #define G_TITLE 32
 #define G_CICON	33
 
-#if 0
-/* no longer in effect; we use DRAW3D and ACT3D now: ++ERS 1/12/93 */
 /* New Object Drawing Types for the 3D-look (May 22 1992 - ml) */
 
 #define	X_3DIND		1	/* extended type for 3D indicator objects */
@@ -115,7 +113,6 @@
 #define A3DBUTTON	((X_3DACT << 8) | G_BUTTON)
 #define A3DBOXCHAR	((X_3DACT << 8) | G_BOXCHAR)
 #define A3DFBOXTEXT	((X_3DACT << 8) | G_FBOXTEXT)
-#endif
 
 /* 3D-object options for look-and-feel */
 #define	OPT1	1

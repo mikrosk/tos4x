@@ -236,7 +236,7 @@ mv_desk()
 	BYTE		dcolor;
 	MRETS		mk;
 	WORD		skip_flag;
-	LONG		old_f;		      /* cjg 09/24/92 */
+				      /* cjg 09/24/92 */
 
 	skip_flag = TRUE;
 	obj = get_tree( MNSYSTEM );	      /* Get config tree  */
@@ -306,20 +306,14 @@ mv_desk()
 	app = (APP*)0;
 	which = MFDOWN;
 
- 	old_f = f = 0;
+ 	f = 0;
 	fm_draw( MNSYSTEM, FALSE );		/* save the string	*/
 
 
 
-	for( f = 1; f <= 20; f++ )		/* cjg 09/24/92 */
-	{
-          if( app_key( ftab[f] )  )		/* ALL THIS.... */
-	  {
-	    old_f = f;
-	    break;
-	  }
-	}
-	f = 0;					/* cjg 09/24/92 */
+					/* cjg 09/24/92 */
+					/* ALL THIS.... */
+					/* cjg 09/24/92 */
 
 
 	goto ad_2;
@@ -444,8 +438,8 @@ p_2:
 	       goto ad_1;
 
 	    case MOK:
-	      s_defdir = (( dstart == SDAPP ) ? ( TRUE ) : ( FALSE ) );
-	      s_fullpath = (( istart == SIFULL ) ? ( TRUE ) : ( FALSE ));
+	      s_defdir = ( dtree[FSAPP].ob_state & CHECKED ) ? TRUE : FALSE;
+	      s_fullpath = ( dtree[ FSFULL ].ob_state & CHECKED ) ? TRUE : FALSE;
 	      goto ad_1;	 
 
 	    case MFUP:
@@ -457,9 +451,7 @@ cg_4:
 	          goto ad_3;  	
 	        else
 		{
-		  if( old_f )	/* cjg 09/24/92 */
-		    f = old_f;
-		  else
+		  /* cjg 09/24/92 */
 		    f++;
 		}
 	        wait_up();
@@ -483,7 +475,7 @@ ad_3:	          if ( !( xapp = app_key( ftab[f] ) ) )
 
 		    if( !skip_flag )			/* Silly thing  */
 		    {
-		       old_f = f;			/* cjg 09/24/92 */
+		       			/* cjg 09/24/92 */
 		       XSelect( obj, which );		/* cjg 08/06/92 */
 		    }
 		    app = xapp;
@@ -510,9 +502,7 @@ ad_3:	          if ( !( xapp = app_key( ftab[f] ) ) )
 	        }
 	        else
 		{
-		  if( old_f  )			/* cjg - 09/24/92 */
-		    f = old_f;
-		  else
+		  			/* cjg - 09/24/92 */
 		    f--;
 		}
 
@@ -1644,26 +1634,14 @@ WORD   *item;
     GRECT  brect;
     WORD   start;
     WORD   old_item;
-    WORD   length;
-    WORD   temp;
 
     obj1 = menu_addr;
     start = *item + 1;
 
     /* cjg 09/21/92 */
-    length = 0;
-    temp   = 0;
     /* Get the length of the largest string */
-    for( index = 1; index <= MAXMENU; index++ )
-    {
-	temp = strlen( obj1[ tb3[ index - 1 ] ].ob_spec );
-	if( temp > length )
-	   length = temp;
-    }
 
     /* Ensure a minimum width */
-    if( length < 30 )
-        length = 30;
 
     /* Initialize the ROOT */
     mtree[ ROOT ].ob_next   = -1;
@@ -1673,7 +1651,7 @@ WORD   *item;
     mtree[ ROOT ].ob_state  = SHADOWED;
     mtree[ ROOT ].ob_spec   = 0xFF1100L;
     mtree[ ROOT ].ob_x      = mtree[ ROOT ].ob_y = 0;
-    mtree[ ROOT ].ob_width  = length;  /* cjg 09/21/92  - was 30 */
+    mtree[ ROOT ].ob_width  = 30;  /* cjg 09/21/92  - was 30 */
     mtree[ ROOT ].ob_height = MAXMENU;
 
     for( index = 1; index <= MAXMENU; index++ )
@@ -1686,7 +1664,7 @@ WORD   *item;
 	   mtree[ index ].ob_spec   = obj1[tb3[index-1]].ob_spec;
 	   mtree[ index ].ob_x      = 0;
            mtree[ index ].ob_y      = ( index - 1 );
-	   mtree[ index ].ob_width  = length;   /* cjg 09/21/92 30; */
+	   mtree[ index ].ob_width  = 30;   /* cjg 09/21/92 30; */
 	   mtree[ index ].ob_height = 1;
 	   objc_add( mtree, ROOT, index );
     }
@@ -1694,7 +1672,7 @@ WORD   *item;
     for( index = ROOT; index <= MAXMENU; index++ )
        rsrc_obfix( mtree, index );
 
-    mtree[ MAXMENU ].ob_flags |= LASTOB;
+    mtree[ MAXMENU ].ob_flags = LASTOB;
     tree = &mtree[ ROOT ];
     menu_icheck( tree, start, TRUE );
 

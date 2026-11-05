@@ -164,7 +164,7 @@ lp_collect( )
 	
 	for ( i = 1; i <= obj[0].ob_tail; i++ )
 	{
- 	  if ( !(obj[i].ob_flags & HIDETREE) ) 
+ 	  if ( obj[i].ob_flags != HIDETREE ) 
 	  {
 	    if ( backid[i].i_path )
 	      lp_fill( backid[i].i_path, &backid[i].i_path );

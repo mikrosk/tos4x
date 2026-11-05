@@ -405,7 +405,6 @@ typedef	struct	window {
     UWORD   nxthndl;		/* next handle # in used */
     UWORD   parent;		/* handle # of parent window */
     UWORD   child;		/* handle # of 1st child window */
-    UWORD   type;		/* window's characteristics	*/
     UWORD   sibling;		/* handle # of next sibling window */
     MEMHDR  *wwhere;		/* ptr to memory this WINDOW resides in */
     struct  window *wnext;	/* ptr to next WINDOW in database */
@@ -442,7 +441,7 @@ typedef	struct	window {
 
 /* added Feb 25 92 to allow bottoming window - ml. */
 #define WF_BEVENT	24
-#define	WF_BOTTOM	25
+#define	WF_BOTTOM	21
 
 #define	WF_MENUBAR	99
 

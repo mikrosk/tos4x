@@ -199,13 +199,6 @@ s1b_cont:
 
 	addq.l	#2,a1			; a1 -> next plane
 	dbra	d6,s1b_loop
-
-.ifeq	P68030
-
-	movec.l	cacr,d6			; d2 <- cache control register
-	bset.l	#11,d6			; set "Clr DATA Cache" bit
-	movec.l	d6,cacr			; clear the data cache
-.endc
 	rts
 
 
@@ -255,13 +248,6 @@ smb_cont:
 
 	addq.l	#2,a1			; a1 -> next dst plane
 	dbra	d6,smb_loop
-
-.ifeq	P68030
-
-	movec.l	cacr,d6			; d2 <- cache control register
-	bset.l	#11,d6			; set "Clr DATA Cache" bit
-	movec.l	d6,cacr			; clear the data cache
-.endc
 	rts
 
 
@@ -326,13 +312,6 @@ sd2_cont:
 	add.w	d3,a0			 ; a0 -> start of next pattern plane
 	addq.l	#2,a1			 ; a1 -> next plane
 	dbra	d6,sd1_loop		 ; do next plane
-
-.ifeq	P68030
-
-	movec.l	cacr,d6			; d2 <- cache control register
-	bset.l	#11,d6			; set "Clr DATA Cache" bit
-	movec.l	d6,cacr			; clear the data cache
-.endc
 	rts
 
 	.end

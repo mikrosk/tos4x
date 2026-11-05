@@ -203,7 +203,7 @@ hctl_window(w_handle, mx, my)
 {
     GRECT	t, f;
     WORD	x, y, w, h;
-    WORD	wm, hm;
+    REG WORD	wm, hm;
     REG WORD	kind, gadget;
     WORD	xelev, yelev;
     REG WORD	message, cpt;
@@ -213,7 +213,7 @@ hctl_window(w_handle, mx, my)
     WORD	rets[6];
     LONG	bwait;
     PD		*p;
-    WORD	selst, nrmst, dummy;
+    WORD	selst, nrmst, dummy, dummy2;
 
     pwin = srchwp(w_handle);
 
@@ -229,9 +229,6 @@ hctl_window(w_handle, mx, my)
 	r_get(&pwin->curr, &x, &y, &w, &h);
 	kind = pwin->kind;		/* fix 10/21/85 */
 
-	ob_gclip( pwin->obj, gadget, &dummy, &dummy, &f.g_x, &f.g_y, 
-		  &f.g_w, &f.g_h );
-/*	 
 	f.g_w = pwin->obj[gadget].ob_width;
 	f.g_h = pwin->obj[gadget].ob_height;
     	ob_offset(pwin->obj, gadget, &f.g_x, &f.g_y);
@@ -239,7 +236,6 @@ hctl_window(w_handle, mx, my)
 	f.g_y -= ADJ3DPIX;
 	f.g_w += (ADJ3DPIX << 1);
 	f.g_h += (ADJ3DPIX << 1);	
-*/
 	gsx_sclip(&f);
 
 	switch(cpt) {
@@ -274,7 +270,12 @@ hctl_window(w_handle, mx, my)
 		    t.g_y -= y;
 		    t.g_w -= w;
 		    t.g_h -= h;
-		    wm_min( kind, &wm, &hm );
+		    wm = ((gl_wbox + ADJ3DPIX) << 1) << 1;
+		    hm = ((gl_hbox + ADJ3DPIX) << 1) << 1;
+		    if (kind & (LFARROW | RTARROW | HSLIDE))
+			wm = (gl_wbox + ADJ3DPIX) * 7;
+		    if (kind & (UPARROW | DNARROW | VSLIDE))
+			hm = (gl_hbox + ADJ3DPIX) * 7;
 		    gr_rubwind(x, y, wm, hm, &t, &w, &h);
 		    message = WM_SIZED;
 		}
@@ -348,10 +349,7 @@ hctl_window(w_handle, mx, my)
 	    wm_update(TRUE);	    /* take back the screen	*/
 	    if (gadget != W_HSLIDE && gadget != W_VSLIDE)
 	    {
-	        ob_gclip( pwin->obj, gadget, &dummy, &dummy, &f.g_x, &f.g_y, 
-		  &f.g_w, &f.g_h );
 
-/*
 		f.g_w = pwin->obj[gadget].ob_width;
 		f.g_h = pwin->obj[gadget].ob_height;
     		ob_offset(pwin->obj, gadget, &f.g_x, &f.g_y);
@@ -359,7 +357,6 @@ hctl_window(w_handle, mx, my)
 		f.g_y -= ADJ3DPIX;
 		f.g_w += (ADJ3DPIX << 1);
 		f.g_h += (ADJ3DPIX << 1);	
-*/
 		gsx_sclip(&f);
 		ob_change(pwin->obj, gadget, nrmst, TRUE);
 	    }
@@ -514,7 +511,7 @@ ct_chgown(ppd, pr)
 					/* post a button event 	*/
 					/*   in case the new	*/
 					/*   owner was waiting	*/
-/*	post_button(gl_mowner, button, 1);	*/
+	post_button(gl_mowner, button, 1);
 
 	gl_kowner = ppd;
 }

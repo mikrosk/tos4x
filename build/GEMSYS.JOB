@@ -1,22 +1,11 @@
-# MultiTOS 1.01 GEM.SYS in the six languages of its resources, run by C:\AUTO\RUNNER.PRG at boot
-# (commands: build/src/runner.c). S: is the repository, D: the work copy, M: the RAM disk the makeprg rules
-# use. makeprg rules one command at a time (Lattice make cannot run makeprg); the two aln lines of makeprg
-# go to ALN as command files (gemsys/AB.LNK, GEM.LNK; the TOS command line is too short). Each language
-# links its glue as _USARSC; after the link the symbol table is stripped (STRIP68.TOS; the releases have
-# none) and prgflags 7 7 is set as makeprg does. D:\MULTITOS\GEM_USA.SYS, GEM_GRM.SYS and GEM_FRE.SYS
-# must be Atari's English, German and French releases byte for byte (EXPECT.LST); GEM_ITA.SYS, GEM_SPA.SYS
-# and GEM_SWE.SYS have no Atari copy.
-
+# MultiTOS GEM.SYS 1.08, run by C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c).
+# S: is the repository, D: the work copy. First the AES binding library aesbin73 (+ index) from multitos/aesbind,
+# then makegem with Lattice 5.52, one make call per object (progress), then its gem.sys target;
+# D:\MULTITOS\GEM.SYS must be the 1.08 beta byte for byte (EXPECT.LST).
 echo copy the sources to D:
 rmtree D:\
-rmtree M:\
 cptree S:\MULTITOS D:\MULTITOS
-copy C:\GEMSYS\AB.LNK D:\MULTITOS\AB.LNK
-copy C:\GEMSYS\GEM.LNK D:\MULTITOS\GEM.LNK
-echo MAS rejects the "#" comment leader of the 1.1 $Log entry in gsx2.s and large.s 1.2 (3 lines each)
-subst D:\MULTITOS\GSX2.S \n# \n*
-subst D:\MULTITOS\LARGE.S \n# \n*
-
+setenv PATH=C:\UTIL;C:\LC\BIN;C:\SLAV
 echo AES binding library aesbin73: Alcyon C (cp68, c068 -f, c168) and MadMac 1.05 (mac -6) per member;
 echo the lost assembler of the original members made addq/moveq of these add/move forms (subst)
 cd D:\MULTITOS\AESBIND
@@ -627,605 +616,93 @@ x C:\BIN\AR68.PRG r aesbin73 apsearch.o rsfixit.o min.o max.o obgclip.o
 x C:\SLAV\DOINDEX.PRG aesbin73
 copy aesbin73 D:\MULTITOS\AESBIN73
 copy aesbin73.ndx D:\MULTITOS\AESBIN73.NDX
-setenv PATH=C:\BIN;C:\SLAV;C:\UTIL
 cd D:\MULTITOS
-
-echo OBJ gemstart.o
-x C:\BIN\MAS.TTP -us gemstart.s
-echo OBJ gemaints.oo
-x C:\BIN\CP68.TTP gemaints.c m:\gemaints.i
-x C:\BIN\C068.TTP m:\gemaints.i m:\gemaints.1 m:\gemaints.2 m:\gemaints.3 -f
-x C:\BIN\C168.TTP m:\gemaints.1 m:\gemaints.2 m:\gemaints.s
-x C:\BIN\OPTIMIZE.TOS m:\gemaints.s
-x C:\SLAV\MAC.PRG -6 m:\gemaints.s
-copy m:\gemaints.o gemaints.oo
-del m:\gemaints.*
-echo OBJ gemaplib.oo
-x C:\BIN\CP68.TTP gemaplib.c m:\gemaplib.i
-x C:\BIN\C068.TTP m:\gemaplib.i m:\gemaplib.1 m:\gemaplib.2 m:\gemaplib.3 -f
-x C:\BIN\C168.TTP m:\gemaplib.1 m:\gemaplib.2 m:\gemaplib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemaplib.s
-x C:\SLAV\MAC.PRG -6 m:\gemaplib.s
-copy m:\gemaplib.o gemaplib.oo
-del m:\gemaplib.*
-echo OBJ gemasync.oo
-x C:\BIN\CP68.TTP gemasync.c m:\gemasync.i
-x C:\BIN\C068.TTP m:\gemasync.i m:\gemasync.1 m:\gemasync.2 m:\gemasync.3 -f
-x C:\BIN\C168.TTP m:\gemasync.1 m:\gemasync.2 m:\gemasync.s
-x C:\BIN\OPTIMIZE.TOS m:\gemasync.s
-x C:\SLAV\MAC.PRG -6 m:\gemasync.s
-copy m:\gemasync.o gemasync.oo
-del m:\gemasync.*
-echo OBJ gembase.oo
-x C:\BIN\CP68.TTP gembase.c m:\gembase.i
-x C:\BIN\C068.TTP m:\gembase.i m:\gembase.1 m:\gembase.2 m:\gembase.3 -f
-x C:\BIN\C168.TTP m:\gembase.1 m:\gembase.2 m:\gembase.s
-x C:\BIN\OPTIMIZE.TOS m:\gembase.s
-x C:\SLAV\MAC.PRG -6 m:\gembase.s
-copy m:\gembase.o gembase.oo
-del m:\gembase.*
-echo OBJ gemcli.oo
-x C:\BIN\CP68.TTP gemcli.c m:\gemcli.i
-x C:\BIN\C068.TTP m:\gemcli.i m:\gemcli.1 m:\gemcli.2 m:\gemcli.3 -f
-x C:\BIN\C168.TTP m:\gemcli.1 m:\gemcli.2 m:\gemcli.s
-x C:\BIN\OPTIMIZE.TOS m:\gemcli.s
-x C:\SLAV\MAC.PRG -6 m:\gemcli.s
-copy m:\gemcli.o gemcli.oo
-del m:\gemcli.*
-echo OBJ gemdisp.o
-x C:\BIN\CP68.TTP gemdisp.c m:\gemdisp.i
-x C:\BIN\C068.TTP m:\gemdisp.i m:\gemdisp.1 m:\gemdisp.2 m:\gemdisp.3 -f
-x C:\BIN\C168.TTP m:\gemdisp.1 m:\gemdisp.2 m:\gemdisp.s
-x C:\SLAV\MAC.PRG -6 m:\gemdisp.s
-copy m:\gemdisp.o gemdisp.o
-del m:\gemdisp.*
-echo OBJ gemevlib.oo
-x C:\BIN\CP68.TTP gemevlib.c m:\gemevlib.i
-x C:\BIN\C068.TTP m:\gemevlib.i m:\gemevlib.1 m:\gemevlib.2 m:\gemevlib.3 -f
-x C:\BIN\C168.TTP m:\gemevlib.1 m:\gemevlib.2 m:\gemevlib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemevlib.s
-x C:\SLAV\MAC.PRG -6 m:\gemevlib.s
-copy m:\gemevlib.o gemevlib.oo
-del m:\gemevlib.*
-echo OBJ gemflag.oo
-x C:\BIN\CP68.TTP gemflag.c m:\gemflag.i
-x C:\BIN\C068.TTP m:\gemflag.i m:\gemflag.1 m:\gemflag.2 m:\gemflag.3 -f
-x C:\BIN\C168.TTP m:\gemflag.1 m:\gemflag.2 m:\gemflag.s
-x C:\BIN\OPTIMIZE.TOS m:\gemflag.s
-x C:\SLAV\MAC.PRG -6 m:\gemflag.s
-copy m:\gemflag.o gemflag.oo
-del m:\gemflag.*
-echo OBJ gemfmalt.oo
-x C:\BIN\CP68.TTP gemfmalt.c m:\gemfmalt.i
-x C:\BIN\C068.TTP m:\gemfmalt.i m:\gemfmalt.1 m:\gemfmalt.2 m:\gemfmalt.3 -f
-x C:\BIN\C168.TTP m:\gemfmalt.1 m:\gemfmalt.2 m:\gemfmalt.s
-x C:\BIN\OPTIMIZE.TOS m:\gemfmalt.s
-x C:\SLAV\MAC.PRG -6 m:\gemfmalt.s
-copy m:\gemfmalt.o gemfmalt.oo
-del m:\gemfmalt.*
-echo OBJ gemfmlib.oo
-x C:\BIN\CP68.TTP gemfmlib.c m:\gemfmlib.i
-x C:\BIN\C068.TTP m:\gemfmlib.i m:\gemfmlib.1 m:\gemfmlib.2 m:\gemfmlib.3 -f
-x C:\BIN\C168.TTP m:\gemfmlib.1 m:\gemfmlib.2 m:\gemfmlib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemfmlib.s
-x C:\SLAV\MAC.PRG -6 m:\gemfmlib.s
-copy m:\gemfmlib.o gemfmlib.oo
-del m:\gemfmlib.*
-echo OBJ gemfslib.oo
-x C:\BIN\CP68.TTP gemfslib.c m:\gemfslib.i
-x C:\BIN\C068.TTP m:\gemfslib.i m:\gemfslib.1 m:\gemfslib.2 m:\gemfslib.3 -f
-x C:\BIN\C168.TTP m:\gemfslib.1 m:\gemfslib.2 m:\gemfslib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemfslib.s
-x C:\SLAV\MAC.PRG -6 m:\gemfslib.s
-copy m:\gemfslib.o gemfslib.oo
-del m:\gemfslib.*
-echo OBJ geminit.oo
-x C:\BIN\CP68.TTP geminit.c m:\geminit.i
-x C:\BIN\C068.TTP m:\geminit.i m:\geminit.1 m:\geminit.2 m:\geminit.3 -f
-x C:\BIN\C168.TTP m:\geminit.1 m:\geminit.2 m:\geminit.s
-x C:\BIN\OPTIMIZE.TOS m:\geminit.s
-x C:\SLAV\MAC.PRG -6 m:\geminit.s
-copy m:\geminit.o geminit.oo
-del m:\geminit.*
-echo OBJ gemsigna.oo
-x C:\BIN\CP68.TTP gemsigna.c m:\gemsigna.i
-x C:\BIN\C068.TTP m:\gemsigna.i m:\gemsigna.1 m:\gemsigna.2 m:\gemsigna.3 -f
-x C:\BIN\C168.TTP m:\gemsigna.1 m:\gemsigna.2 m:\gemsigna.s
-x C:\BIN\OPTIMIZE.TOS m:\gemsigna.s
-x C:\SLAV\MAC.PRG -6 m:\gemsigna.s
-copy m:\gemsigna.o gemsigna.oo
-del m:\gemsigna.*
-echo OBJ gemmnlib.oo
-x C:\BIN\CP68.TTP gemmnlib.c m:\gemmnlib.i
-x C:\BIN\C068.TTP m:\gemmnlib.i m:\gemmnlib.1 m:\gemmnlib.2 m:\gemmnlib.3 -f
-x C:\BIN\C168.TTP m:\gemmnlib.1 m:\gemmnlib.2 m:\gemmnlib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemmnlib.s
-x C:\SLAV\MAC.PRG -6 m:\gemmnlib.s
-copy m:\gemmnlib.o gemmnlib.oo
-del m:\gemmnlib.*
-echo OBJ gemobed.oo
-x C:\BIN\CP68.TTP gemobed.c m:\gemobed.i
-x C:\BIN\C068.TTP m:\gemobed.i m:\gemobed.1 m:\gemobed.2 m:\gemobed.3 -f
-x C:\BIN\C168.TTP m:\gemobed.1 m:\gemobed.2 m:\gemobed.s
-x C:\BIN\OPTIMIZE.TOS m:\gemobed.s
-x C:\SLAV\MAC.PRG -6 m:\gemobed.s
-copy m:\gemobed.o gemobed.oo
-del m:\gemobed.*
-echo OBJ gemobjop.oo
-x C:\BIN\CP68.TTP gemobjop.c m:\gemobjop.i
-x C:\BIN\C068.TTP m:\gemobjop.i m:\gemobjop.1 m:\gemobjop.2 m:\gemobjop.3 -f
-x C:\BIN\C168.TTP m:\gemobjop.1 m:\gemobjop.2 m:\gemobjop.s
-x C:\BIN\OPTIMIZE.TOS m:\gemobjop.s
-x C:\SLAV\MAC.PRG -6 m:\gemobjop.s
-copy m:\gemobjop.o gemobjop.oo
-del m:\gemobjop.*
-echo OBJ gempd.oo
-x C:\BIN\CP68.TTP gempd.c m:\gempd.i
-x C:\BIN\C068.TTP m:\gempd.i m:\gempd.1 m:\gempd.2 m:\gempd.3 -f
-x C:\BIN\C168.TTP m:\gempd.1 m:\gempd.2 m:\gempd.s
-x C:\BIN\OPTIMIZE.TOS m:\gempd.s
-x C:\SLAV\MAC.PRG -6 m:\gempd.s
-copy m:\gempd.o gempd.oo
-del m:\gempd.*
-echo OBJ gemqueue.oo
-x C:\BIN\CP68.TTP gemqueue.c m:\gemqueue.i
-x C:\BIN\C068.TTP m:\gemqueue.i m:\gemqueue.1 m:\gemqueue.2 m:\gemqueue.3 -f
-x C:\BIN\C168.TTP m:\gemqueue.1 m:\gemqueue.2 m:\gemqueue.s
-x C:\BIN\OPTIMIZE.TOS m:\gemqueue.s
-x C:\SLAV\MAC.PRG -6 m:\gemqueue.s
-copy m:\gemqueue.o gemqueue.oo
-del m:\gemqueue.*
-echo OBJ gemrlist.oo
-x C:\BIN\CP68.TTP gemrlist.c m:\gemrlist.i
-x C:\BIN\C068.TTP m:\gemrlist.i m:\gemrlist.1 m:\gemrlist.2 m:\gemrlist.3 -f
-x C:\BIN\C168.TTP m:\gemrlist.1 m:\gemrlist.2 m:\gemrlist.s
-x C:\BIN\OPTIMIZE.TOS m:\gemrlist.s
-x C:\SLAV\MAC.PRG -6 m:\gemrlist.s
-copy m:\gemrlist.o gemrlist.oo
-del m:\gemrlist.*
-echo OBJ gemrom.oo
-x C:\BIN\CP68.TTP gemrom.c m:\gemrom.i
-x C:\BIN\C068.TTP m:\gemrom.i m:\gemrom.1 m:\gemrom.2 m:\gemrom.3 -f
-x C:\BIN\C168.TTP m:\gemrom.1 m:\gemrom.2 m:\gemrom.s
-x C:\BIN\OPTIMIZE.TOS m:\gemrom.s
-x C:\SLAV\MAC.PRG -6 m:\gemrom.s
-copy m:\gemrom.o gemrom.oo
-del m:\gemrom.*
-echo OBJ gemrslib.oo
-x C:\BIN\CP68.TTP gemrslib.c m:\gemrslib.i
-x C:\BIN\C068.TTP m:\gemrslib.i m:\gemrslib.1 m:\gemrslib.2 m:\gemrslib.3 -f
-x C:\BIN\C168.TTP m:\gemrslib.1 m:\gemrslib.2 m:\gemrslib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemrslib.s
-x C:\SLAV\MAC.PRG -6 m:\gemrslib.s
-copy m:\gemrslib.o gemrslib.oo
-del m:\gemrslib.*
-echo OBJ gemsclib.oo
-x C:\BIN\CP68.TTP gemsclib.c m:\gemsclib.i
-x C:\BIN\C068.TTP m:\gemsclib.i m:\gemsclib.1 m:\gemsclib.2 m:\gemsclib.3 -f
-x C:\BIN\C168.TTP m:\gemsclib.1 m:\gemsclib.2 m:\gemsclib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemsclib.s
-x C:\SLAV\MAC.PRG -6 m:\gemsclib.s
-copy m:\gemsclib.o gemsclib.oo
-del m:\gemsclib.*
-echo OBJ gemshlib.oo
-x C:\BIN\CP68.TTP gemshlib.c m:\gemshlib.i
-x C:\BIN\C068.TTP m:\gemshlib.i m:\gemshlib.1 m:\gemshlib.2 m:\gemshlib.3 -f
-x C:\BIN\C168.TTP m:\gemshlib.1 m:\gemshlib.2 m:\gemshlib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemshlib.s
-x C:\SLAV\MAC.PRG -6 m:\gemshlib.s
-copy m:\gemshlib.o gemshlib.oo
-del m:\gemshlib.*
-echo OBJ gemtcpip.oo
-x C:\BIN\CP68.TTP gemtcpip.c m:\gemtcpip.i
-x C:\BIN\C068.TTP m:\gemtcpip.i m:\gemtcpip.1 m:\gemtcpip.2 m:\gemtcpip.3 -f
-x C:\BIN\C168.TTP m:\gemtcpip.1 m:\gemtcpip.2 m:\gemtcpip.s
-x C:\BIN\OPTIMIZE.TOS m:\gemtcpip.s
-x C:\SLAV\MAC.PRG -6 m:\gemtcpip.s
-copy m:\gemtcpip.o gemtcpip.oo
-del m:\gemtcpip.*
-echo OBJ gemwmlib.oo
-x C:\BIN\CP68.TTP gemwmlib.c m:\gemwmlib.i
-x C:\BIN\C068.TTP m:\gemwmlib.i m:\gemwmlib.1 m:\gemwmlib.2 m:\gemwmlib.3 -f
-x C:\BIN\C168.TTP m:\gemwmlib.1 m:\gemwmlib.2 m:\gemwmlib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemwmlib.s
-x C:\SLAV\MAC.PRG -6 m:\gemwmlib.s
-copy m:\gemwmlib.o gemwmlib.oo
-del m:\gemwmlib.*
-echo OBJ romcart.oo
-x C:\BIN\CP68.TTP romcart.c m:\romcart.i
-x C:\BIN\C068.TTP m:\romcart.i m:\romcart.1 m:\romcart.2 m:\romcart.3 -f
-x C:\BIN\C168.TTP m:\romcart.1 m:\romcart.2 m:\romcart.s
-x C:\BIN\OPTIMIZE.TOS m:\romcart.s
-x C:\SLAV\MAC.PRG -6 m:\romcart.s
-copy m:\romcart.o romcart.oo
-del m:\romcart.*
-echo OBJ apgrlib.oo
-x C:\BIN\CP68.TTP apgrlib.c m:\apgrlib.i
-x C:\BIN\C068.TTP m:\apgrlib.i m:\apgrlib.1 m:\apgrlib.2 m:\apgrlib.3 -f
-x C:\BIN\C168.TTP m:\apgrlib.1 m:\apgrlib.2 m:\apgrlib.s
-x C:\BIN\OPTIMIZE.TOS m:\apgrlib.s
-x C:\SLAV\MAC.PRG -6 m:\apgrlib.s
-copy m:\apgrlib.o apgrlib.oo
-del m:\apgrlib.*
-echo OBJ apgsxif.oo
-x C:\BIN\CP68.TTP apgsxif.c m:\apgsxif.i
-x C:\BIN\C068.TTP m:\apgsxif.i m:\apgsxif.1 m:\apgsxif.2 m:\apgsxif.3 -f
-x C:\BIN\C168.TTP m:\apgsxif.1 m:\apgsxif.2 m:\apgsxif.s
-x C:\BIN\OPTIMIZE.TOS m:\apgsxif.s
-x C:\SLAV\MAC.PRG -6 m:\apgsxif.s
-copy m:\apgsxif.o apgsxif.oo
-del m:\apgsxif.*
-echo OBJ gembind.oo
-x C:\BIN\CP68.TTP gembind.c m:\gembind.i
-x C:\BIN\C068.TTP m:\gembind.i m:\gembind.1 m:\gembind.2 m:\gembind.3 -f
-x C:\BIN\C168.TTP m:\gembind.1 m:\gembind.2 m:\gembind.s
-x C:\BIN\OPTIMIZE.TOS m:\gembind.s
-x C:\SLAV\MAC.PRG -6 m:\gembind.s
-copy m:\gembind.o gembind.oo
-del m:\gembind.*
-echo OBJ gemgrlib.oo
-x C:\BIN\CP68.TTP gemgrlib.c m:\gemgrlib.i
-x C:\BIN\C068.TTP m:\gemgrlib.i m:\gemgrlib.1 m:\gemgrlib.2 m:\gemgrlib.3 -f
-x C:\BIN\C168.TTP m:\gemgrlib.1 m:\gemgrlib.2 m:\gemgrlib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemgrlib.s
-x C:\SLAV\MAC.PRG -6 m:\gemgrlib.s
-copy m:\gemgrlib.o gemgrlib.oo
-del m:\gemgrlib.*
-echo OBJ gemgsxif.oo
-x C:\BIN\CP68.TTP gemgsxif.c m:\gemgsxif.i
-x C:\BIN\C068.TTP m:\gemgsxif.i m:\gemgsxif.1 m:\gemgsxif.2 m:\gemgsxif.3 -f
-x C:\BIN\C168.TTP m:\gemgsxif.1 m:\gemgsxif.2 m:\gemgsxif.s
-x C:\BIN\OPTIMIZE.TOS m:\gemgsxif.s
-x C:\SLAV\MAC.PRG -6 m:\gemgsxif.s
-copy m:\gemgsxif.o gemgsxif.oo
-del m:\gemgsxif.*
-echo OBJ gemoblib.oo
-x C:\BIN\CP68.TTP gemoblib.c m:\gemoblib.i
-x C:\BIN\C068.TTP m:\gemoblib.i m:\gemoblib.1 m:\gemoblib.2 m:\gemoblib.3 -f
-x C:\BIN\C168.TTP m:\gemoblib.1 m:\gemoblib.2 m:\gemoblib.s
-x C:\BIN\OPTIMIZE.TOS m:\gemoblib.s
-x C:\SLAV\MAC.PRG -6 m:\gemoblib.s
-copy m:\gemoblib.o gemoblib.oo
-del m:\gemoblib.*
-echo OBJ gsx2.o
-x C:\BIN\MAS.TTP -us gsx2.s
-echo OBJ aestrap.o
-x C:\BIN\MAS.TTP -us aestrap.s
-echo OBJ aesdispa.o
-x C:\BIN\MAS.TTP -us aesdispa.s
-echo OBJ dosbind.oo
-x C:\BIN\CP68.TTP dosbind.c m:\dosbind.i
-x C:\BIN\C068.TTP m:\dosbind.i m:\dosbind.1 m:\dosbind.2 m:\dosbind.3 -f
-x C:\BIN\C168.TTP m:\dosbind.1 m:\dosbind.2 m:\dosbind.s
-x C:\BIN\OPTIMIZE.TOS m:\dosbind.s
-x C:\SLAV\MAC.PRG -6 m:\dosbind.s
-copy m:\dosbind.o dosbind.oo
-del m:\dosbind.*
-echo OBJ large.o
-x C:\BIN\MAS.TTP -us large.s
-echo OBJ utility.oo
-x C:\BIN\CP68.TTP utility.c m:\utility.i
-x C:\BIN\C068.TTP m:\utility.i m:\utility.1 m:\utility.2 m:\utility.3 -f
-x C:\BIN\C168.TTP m:\utility.1 m:\utility.2 m:\utility.s
-x C:\BIN\OPTIMIZE.TOS m:\utility.s
-x C:\SLAV\MAC.PRG -6 m:\utility.s
-copy m:\utility.o utility.oo
-del m:\utility.*
-echo OBJ interrup.o
-x C:\BIN\MAS.TTP -us interrup.s
-echo OBJ traps.o
-x C:\BIN\MAS.TTP -us traps.s
-echo OBJ gemctrl.oo
-x C:\BIN\CP68.TTP gemctrl.c m:\gemctrl.i
-x C:\BIN\C068.TTP m:\gemctrl.i m:\gemctrl.1 m:\gemctrl.2 m:\gemctrl.3 -f
-x C:\BIN\C168.TTP m:\gemctrl.1 m:\gemctrl.2 m:\gemctrl.s
-x C:\BIN\OPTIMIZE.TOS m:\gemctrl.s
-x C:\SLAV\MAC.PRG -6 m:\gemctrl.s
-copy m:\gemctrl.o gemctrl.oo
-del m:\gemctrl.*
-echo OBJ ctrlbind.oo
-x C:\BIN\CP68.TTP ctrlbind.c m:\ctrlbind.i
-x C:\BIN\C068.TTP m:\ctrlbind.i m:\ctrlbind.1 m:\ctrlbind.2 m:\ctrlbind.3 -f
-x C:\BIN\C168.TTP m:\ctrlbind.1 m:\ctrlbind.2 m:\ctrlbind.s
-x C:\BIN\OPTIMIZE.TOS m:\ctrlbind.s
-x C:\SLAV\MAC.PRG -6 m:\ctrlbind.s
-copy m:\ctrlbind.o ctrlbind.oo
-del m:\ctrlbind.*
-echo OBJ mn_event.oo
-x C:\BIN\CP68.TTP mn_event.c m:\mn_event.i
-x C:\BIN\C068.TTP m:\mn_event.i m:\mn_event.1 m:\mn_event.2 m:\mn_event.3 -f
-x C:\BIN\C168.TTP m:\mn_event.1 m:\mn_event.2 m:\mn_event.s
-x C:\BIN\OPTIMIZE.TOS m:\mn_event.s
-x C:\SLAV\MAC.PRG -6 m:\mn_event.s
-copy m:\mn_event.o mn_event.oo
-del m:\mn_event.*
-echo OBJ mn_mbar.oo
-x C:\BIN\CP68.TTP mn_mbar.c m:\mn_mbar.i
-x C:\BIN\C068.TTP m:\mn_mbar.i m:\mn_mbar.1 m:\mn_mbar.2 m:\mn_mbar.3 -f
-x C:\BIN\C168.TTP m:\mn_mbar.1 m:\mn_mbar.2 m:\mn_mbar.s
-x C:\BIN\OPTIMIZE.TOS m:\mn_mbar.s
-x C:\SLAV\MAC.PRG -6 m:\mn_mbar.s
-copy m:\mn_mbar.o mn_mbar.oo
-del m:\mn_mbar.*
-echo OBJ mn_popup.oo
-x C:\BIN\CP68.TTP mn_popup.c m:\mn_popup.i
-x C:\BIN\C068.TTP m:\mn_popup.i m:\mn_popup.1 m:\mn_popup.2 m:\mn_popup.3 -f
-x C:\BIN\C168.TTP m:\mn_popup.1 m:\mn_popup.2 m:\mn_popup.s
-x C:\BIN\OPTIMIZE.TOS m:\mn_popup.s
-x C:\SLAV\MAC.PRG -6 m:\mn_popup.s
-copy m:\mn_popup.o mn_popup.oo
-del m:\mn_popup.*
-echo OBJ mn_tools.oo
-x C:\BIN\CP68.TTP mn_tools.c m:\mn_tools.i
-x C:\BIN\C068.TTP m:\mn_tools.i m:\mn_tools.1 m:\mn_tools.2 m:\mn_tools.3 -f
-x C:\BIN\C168.TTP m:\mn_tools.1 m:\mn_tools.2 m:\mn_tools.s
-x C:\BIN\OPTIMIZE.TOS m:\mn_tools.s
-x C:\SLAV\MAC.PRG -6 m:\mn_tools.s
-copy m:\mn_tools.o mn_tools.oo
-del m:\mn_tools.*
-echo OBJ mn_index.oo
-x C:\BIN\CP68.TTP mn_index.c m:\mn_index.i
-x C:\BIN\C068.TTP m:\mn_index.i m:\mn_index.1 m:\mn_index.2 m:\mn_index.3 -f
-x C:\BIN\C168.TTP m:\mn_index.1 m:\mn_index.2 m:\mn_index.s
-x C:\BIN\OPTIMIZE.TOS m:\mn_index.s
-x C:\SLAV\MAC.PRG -6 m:\mn_index.s
-copy m:\mn_index.o mn_index.oo
-del m:\mn_index.*
-echo OBJ mn_menu.oo
-x C:\BIN\CP68.TTP mn_menu.c m:\mn_menu.i
-x C:\BIN\C068.TTP m:\mn_menu.i m:\mn_menu.1 m:\mn_menu.2 m:\mn_menu.3 -f
-x C:\BIN\C168.TTP m:\mn_menu.1 m:\mn_menu.2 m:\mn_menu.s
-x C:\BIN\OPTIMIZE.TOS m:\mn_menu.s
-x C:\SLAV\MAC.PRG -6 m:\mn_menu.s
-copy m:\mn_menu.o mn_menu.oo
-del m:\mn_menu.*
-echo OBJ mn_submn.oo
-x C:\BIN\CP68.TTP mn_submn.c m:\mn_submn.i
-x C:\BIN\C068.TTP m:\mn_submn.i m:\mn_submn.1 m:\mn_submn.2 m:\mn_submn.3 -f
-x C:\BIN\C168.TTP m:\mn_submn.1 m:\mn_submn.2 m:\mn_submn.s
-x C:\BIN\OPTIMIZE.TOS m:\mn_submn.s
-x C:\SLAV\MAC.PRG -6 m:\mn_submn.s
-copy m:\mn_submn.o mn_submn.oo
-del m:\mn_submn.*
-echo OBJ deskstar.o
-x C:\BIN\MAS.TTP -us deskstar.s
-echo OBJ deskact.o
-x C:\BIN\CP68.TTP deskact.c m:\deskact.i
-x C:\BIN\C068.TTP m:\deskact.i m:\deskact.1 m:\deskact.2 m:\deskact.3 -f
-x C:\BIN\C168.TTP m:\deskact.1 m:\deskact.2 m:\deskact.s
-x C:\SLAV\MAC.PRG -6 m:\deskact.s
-copy m:\deskact.o deskact.o
-del m:\deskact.*
-echo OBJ deskapp.o
-x C:\BIN\CP68.TTP deskapp.c m:\deskapp.i
-x C:\BIN\C068.TTP m:\deskapp.i m:\deskapp.1 m:\deskapp.2 m:\deskapp.3 -f
-x C:\BIN\C168.TTP m:\deskapp.1 m:\deskapp.2 m:\deskapp.s
-x C:\SLAV\MAC.PRG -6 m:\deskapp.s
-copy m:\deskapp.o deskapp.o
-del m:\deskapp.*
-echo OBJ deskvdi.o
-x C:\BIN\CP68.TTP deskvdi.c m:\deskvdi.i
-x C:\BIN\C068.TTP m:\deskvdi.i m:\deskvdi.1 m:\deskvdi.2 m:\deskvdi.3 -f
-x C:\BIN\C168.TTP m:\deskvdi.1 m:\deskvdi.2 m:\deskvdi.s
-x C:\SLAV\MAC.PRG -6 m:\deskvdi.s
-copy m:\deskvdi.o deskvdi.o
-del m:\deskvdi.*
-echo OBJ deskbutt.o
-x C:\BIN\CP68.TTP deskbutt.c m:\deskbutt.i
-x C:\BIN\C068.TTP m:\deskbutt.i m:\deskbutt.1 m:\deskbutt.2 m:\deskbutt.3 -f
-x C:\BIN\C168.TTP m:\deskbutt.1 m:\deskbutt.2 m:\deskbutt.s
-x C:\SLAV\MAC.PRG -6 m:\deskbutt.s
-copy m:\deskbutt.o deskbutt.o
-del m:\deskbutt.*
-echo OBJ deskdir.o
-x C:\BIN\CP68.TTP deskdir.c m:\deskdir.i
-x C:\BIN\C068.TTP m:\deskdir.i m:\deskdir.1 m:\deskdir.2 m:\deskdir.3 -f
-x C:\BIN\C168.TTP m:\deskdir.1 m:\deskdir.2 m:\deskdir.s
-x C:\SLAV\MAC.PRG -6 m:\deskdir.s
-copy m:\deskdir.o deskdir.o
-del m:\deskdir.*
-echo OBJ deskdisk.o
-x C:\BIN\CP68.TTP deskdisk.c m:\deskdisk.i
-x C:\BIN\C068.TTP m:\deskdisk.i m:\deskdisk.1 m:\deskdisk.2 m:\deskdisk.3 -f
-x C:\BIN\C168.TTP m:\deskdisk.1 m:\deskdisk.2 m:\deskdisk.s
-x C:\SLAV\MAC.PRG -6 m:\deskdisk.s
-copy m:\deskdisk.o deskdisk.o
-del m:\deskdisk.*
-echo OBJ deskfile.o
-x C:\BIN\CP68.TTP deskfile.c m:\deskfile.i
-x C:\BIN\C068.TTP m:\deskfile.i m:\deskfile.1 m:\deskfile.2 m:\deskfile.3 -f
-x C:\BIN\C168.TTP m:\deskfile.1 m:\deskfile.2 m:\deskfile.s
-x C:\SLAV\MAC.PRG -6 m:\deskfile.s
-copy m:\deskfile.o deskfile.o
-del m:\deskfile.*
-echo OBJ deskinf.o
-x C:\BIN\CP68.TTP deskinf.c m:\deskinf.i
-x C:\BIN\C068.TTP m:\deskinf.i m:\deskinf.1 m:\deskinf.2 m:\deskinf.3 -f
-x C:\BIN\C168.TTP m:\deskinf.1 m:\deskinf.2 m:\deskinf.s
-x C:\SLAV\MAC.PRG -6 m:\deskinf.s
-copy m:\deskinf.o deskinf.o
-del m:\deskinf.*
-echo OBJ deskins.o
-x C:\BIN\CP68.TTP deskins.c m:\deskins.i
-x C:\BIN\C068.TTP m:\deskins.i m:\deskins.1 m:\deskins.2 m:\deskins.3 -f
-x C:\BIN\C168.TTP m:\deskins.1 m:\deskins.2 m:\deskins.s
-x C:\SLAV\MAC.PRG -6 m:\deskins.s
-copy m:\deskins.o deskins.o
-del m:\deskins.*
-echo OBJ deskmem.o
-x C:\BIN\CP68.TTP deskmem.c m:\deskmem.i
-x C:\BIN\C068.TTP m:\deskmem.i m:\deskmem.1 m:\deskmem.2 m:\deskmem.3 -f
-x C:\BIN\C168.TTP m:\deskmem.1 m:\deskmem.2 m:\deskmem.s
-x C:\SLAV\MAC.PRG -6 m:\deskmem.s
-copy m:\deskmem.o deskmem.o
-del m:\deskmem.*
-echo OBJ deskmenu.o
-x C:\BIN\CP68.TTP deskmenu.c m:\deskmenu.i
-x C:\BIN\C068.TTP m:\deskmenu.i m:\deskmenu.1 m:\deskmenu.2 m:\deskmenu.3 -f
-x C:\BIN\C168.TTP m:\deskmenu.1 m:\deskmenu.2 m:\deskmenu.s
-x C:\SLAV\MAC.PRG -6 m:\deskmenu.s
-copy m:\deskmenu.o deskmenu.o
-del m:\deskmenu.*
-echo OBJ deskmisc.o
-x C:\BIN\CP68.TTP deskmisc.c m:\deskmisc.i
-x C:\BIN\C068.TTP m:\deskmisc.i m:\deskmisc.1 m:\deskmisc.2 m:\deskmisc.3 -f
-x C:\BIN\C168.TTP m:\deskmisc.1 m:\deskmisc.2 m:\deskmisc.s
-x C:\SLAV\MAC.PRG -6 m:\deskmisc.s
-copy m:\deskmisc.o deskmisc.o
-del m:\deskmisc.*
-echo OBJ deskmn.o
-x C:\BIN\CP68.TTP deskmn.c m:\deskmn.i
-x C:\BIN\C068.TTP m:\deskmn.i m:\deskmn.1 m:\deskmn.2 m:\deskmn.3 -f
-x C:\BIN\C168.TTP m:\deskmn.1 m:\deskmn.2 m:\deskmn.s
-x C:\SLAV\MAC.PRG -6 m:\deskmn.s
-copy m:\deskmn.o deskmn.o
-del m:\deskmn.*
-echo OBJ deskopen.o
-x C:\BIN\CP68.TTP deskopen.c m:\deskopen.i
-x C:\BIN\C068.TTP m:\deskopen.i m:\deskopen.1 m:\deskopen.2 m:\deskopen.3 -f
-x C:\BIN\C168.TTP m:\deskopen.1 m:\deskopen.2 m:\deskopen.s
-x C:\SLAV\MAC.PRG -6 m:\deskopen.s
-copy m:\deskopen.o deskopen.o
-del m:\deskopen.*
-echo OBJ deskpref.o
-x C:\BIN\CP68.TTP deskpref.c m:\deskpref.i
-x C:\BIN\C068.TTP m:\deskpref.i m:\deskpref.1 m:\deskpref.2 m:\deskpref.3 -f
-x C:\BIN\C168.TTP m:\deskpref.1 m:\deskpref.2 m:\deskpref.s
-x C:\SLAV\MAC.PRG -6 m:\deskpref.s
-copy m:\deskpref.o deskpref.o
-del m:\deskpref.*
-echo OBJ desksele.o
-x C:\BIN\CP68.TTP desksele.c m:\desksele.i
-x C:\BIN\C068.TTP m:\desksele.i m:\desksele.1 m:\desksele.2 m:\desksele.3 -f
-x C:\BIN\C168.TTP m:\desksele.1 m:\desksele.2 m:\desksele.s
-x C:\SLAV\MAC.PRG -6 m:\desksele.s
-copy m:\desksele.o desksele.o
-del m:\desksele.*
-echo OBJ deskshel.o
-x C:\BIN\CP68.TTP deskshel.c m:\deskshel.i
-x C:\BIN\C068.TTP m:\deskshel.i m:\deskshel.1 m:\deskshel.2 m:\deskshel.3 -f
-x C:\BIN\C168.TTP m:\deskshel.1 m:\deskshel.2 m:\deskshel.s
-x C:\SLAV\MAC.PRG -6 m:\deskshel.s
-copy m:\deskshel.o deskshel.o
-del m:\deskshel.*
-echo OBJ deskshow.o
-x C:\BIN\CP68.TTP deskshow.c m:\deskshow.i
-x C:\BIN\C068.TTP m:\deskshow.i m:\deskshow.1 m:\deskshow.2 m:\deskshow.3 -f
-x C:\BIN\C168.TTP m:\deskshow.1 m:\deskshow.2 m:\deskshow.s
-x C:\SLAV\MAC.PRG -6 m:\deskshow.s
-copy m:\deskshow.o deskshow.o
-del m:\deskshow.*
-echo OBJ deskvari.o
-x C:\BIN\CP68.TTP deskvari.c m:\deskvari.i
-x C:\BIN\C068.TTP m:\deskvari.i m:\deskvari.1 m:\deskvari.2 m:\deskvari.3 -f
-x C:\BIN\C168.TTP m:\deskvari.1 m:\deskvari.2 m:\deskvari.s
-x C:\SLAV\MAC.PRG -6 m:\deskvari.s
-copy m:\deskvari.o deskvari.o
-del m:\deskvari.*
-echo OBJ desktop.o
-x C:\BIN\CP68.TTP desktop.c m:\desktop.i
-x C:\BIN\C068.TTP m:\desktop.i m:\desktop.1 m:\desktop.2 m:\desktop.3 -f
-x C:\BIN\C168.TTP m:\desktop.1 m:\desktop.2 m:\desktop.s
-x C:\SLAV\MAC.PRG -6 m:\desktop.s
-copy m:\desktop.o desktop.o
-del m:\desktop.*
-echo OBJ deskupda.o
-x C:\BIN\CP68.TTP deskupda.c m:\deskupda.i
-x C:\BIN\C068.TTP m:\deskupda.i m:\deskupda.1 m:\deskupda.2 m:\deskupda.3 -f
-x C:\BIN\C168.TTP m:\deskupda.1 m:\deskupda.2 m:\deskupda.s
-x C:\SLAV\MAC.PRG -6 m:\deskupda.s
-copy m:\deskupda.o deskupda.o
-del m:\deskupda.*
-echo OBJ deskwin.o
-x C:\BIN\CP68.TTP deskwin.c m:\deskwin.i
-x C:\BIN\C068.TTP m:\deskwin.i m:\deskwin.1 m:\deskwin.2 m:\deskwin.3 -f
-x C:\BIN\C168.TTP m:\deskwin.1 m:\deskwin.2 m:\deskwin.s
-x C:\SLAV\MAC.PRG -6 m:\deskwin.s
-copy m:\deskwin.o deskwin.o
-del m:\deskwin.*
-echo OBJ desksear.o
-x C:\BIN\CP68.TTP desksear.c m:\desksear.i
-x C:\BIN\C068.TTP m:\desksear.i m:\desksear.1 m:\desksear.2 m:\desksear.3 -f
-x C:\BIN\C168.TTP m:\desksear.1 m:\desksear.2 m:\desksear.s
-x C:\SLAV\MAC.PRG -6 m:\desksear.s
-copy m:\desksear.o desksear.o
-del m:\desksear.*
-echo OBJ nosbind.o
-x C:\BIN\MAS.TTP -us nosbind.s
-echo OBJ kballoc.o
-x C:\BIN\CP68.TTP kballoc.c m:\kballoc.i
-x C:\BIN\C068.TTP m:\kballoc.i m:\kballoc.1 m:\kballoc.2 m:\kballoc.3 -f
-x C:\BIN\C168.TTP m:\kballoc.1 m:\kballoc.2 m:\kballoc.s
-x C:\SLAV\MAC.PRG -6 m:\kballoc.s
-copy m:\kballoc.o kballoc.o
-del m:\kballoc.*
-
-echo link with the MultiTOS ALN: ab.lnk once, then for each language its glue, gem.lnk, strip the
-echo symbol table and prgflags (it waits for Return)
-x C:\MTOS\ALN.TOS -c ab.lnk
-
-echo English: glue.usa with NEWGLUE.PRG, one session swe, usa (the bytes newglue never writes keep the
-echo previous country's glue)
-type swe\rusa\rexit\r
-x C:\GLUE\NEWGLUE.PRG
-x C:\MTOS\ALN.TOS -c gem.lnk
-x C:\SLAV\STRIP68.TOS gem.sys
+echo resource glue: superglu -c <country> packs gem<c>.rsc, desk<c>.rsc and desk<c>.inf into glue.<c>
+echo (the glue rules of makegem pass $GLUEOPT as make expands it, so they are not used)
+x C:\MTOS\SUPERGLU.PRG -c usa
+x C:\MTOS\SUPERGLU.PRG -c grm
+x C:\MTOS\SUPERGLU.PRG -c fre
+x C:\MTOS\SUPERGLU.PRG -c ita
+x C:\MTOS\SUPERGLU.PRG -c spa
+echo GEM.SYS: makegem with Lattice 5.52; makegem links with .\aln, the MultiTOS ALN
+copy C:\MTOS\ALN.TOS D:\MULTITOS\ALN.TOS
+x make -f makegem gemstart.o
+x make -f makegem gemctrl.o
+x make -f makegem ctrlbind.o
+x make -f makegem mn_event.o
+x make -f makegem mn_mbar.o
+x make -f makegem mn_popup.o
+x make -f makegem mn_tools.o
+x make -f makegem mn_index.o
+x make -f makegem mn_menu.o
+x make -f makegem mn_submn.o
+x make -f makegem mn_slide.o
+x make -f makegem gemaints.o
+x make -f makegem gemaplib.o
+x make -f makegem gembase.o
+x make -f makegem gemcli.o
+x make -f makegem gemdisp.o
+x make -f makegem gemevlib.o
+x make -f makegem gemflag.o
+x make -f makegem gemfmalt.o
+x make -f makegem gemfmlib.o
+x make -f makegem gemfslib.o
+x make -f makegem gemsigna.o
+x make -f makegem gemobjop.o
+x make -f makegem gemqueue.o
+x make -f makegem gemrlist.o
+x make -f makegem deskrom.o
+x make -f makegem gemsclib.o
+x make -f makegem gemshlib.o
+x make -f makegem gemwmlib.o
+x make -f makegem romcart.o
+x make -f makegem apgrlib.o
+x make -f makegem apgsxif.o
+x make -f makegem gembind.o
+x make -f makegem gemgrlib.o
+x make -f makegem gemgsxif.o
+x make -f makegem dosbind.o
+x make -f makegem utility.o
+x make -f makegem gemmnlib.o
+x make -f makegem gemasync.o
+x make -f makegem gemrslib.o
+x make -f makegem geminit.o
+x make -f makegem gemobed.o
+x make -f makegem gemoblib.o
+x make -f makegem gempd.o
+x make -f makegem gsx2.o
+x make -f makegem aestrap.o
+x make -f makegem aesdispa.o
+x make -f makegem large.o
+x make -f makegem interrup.o
+x make -f makegem traps.o
+x make -f makegem lattice.o
+x make -f makegem deskact.o
+x make -f makegem deskapp.o
+x make -f makegem deskvdi.o
+x make -f makegem deskbutt.o
+x make -f makegem deskdir.o
+x make -f makegem deskdisk.o
+x make -f makegem deskfile.o
+x make -f makegem deskinf.o
+x make -f makegem deskins.o
+x make -f makegem deskmenu.o
+x make -f makegem deskmisc.o
+x make -f makegem deskmn.o
+x make -f makegem deskopen.o
+x make -f makegem deskpref.o
+x make -f makegem desksele.o
+x make -f makegem deskshel.o
+x make -f makegem deskshow.o
+x make -f makegem deskvari.o
+x make -f makegem deskupda.o
+x make -f makegem desksear.o
+x make -f makegem kballoc.o
+x make -f makegem deskstar.o
+x make -f makegem deskmem.o
+x make -f makegem deskwin.o
+x make -f makegem desktop.o
+echo prgflags waits for Return when it is done
 key
-x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
-copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_USA.SYS
-
-echo German: glue.grm with NEWGLUE.PRG, a session of grm alone (the bytes newglue never writes stay
-echo as the fresh buffer has them, zero)
-type grm\rexit\r
-x C:\GLUE\NEWGLUE.PRG
-subst D:\MULTITOS\GEM.LNK glue.usa\s_USARSC glue.grm\s_USARSC
-x C:\MTOS\ALN.TOS -c gem.lnk
-x C:\SLAV\STRIP68.TOS gem.sys
-key
-x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
-copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_GRM.SYS
-
-echo French: glue.fre with NEWGLUE.PRG, a session of fre alone
-type fre\rexit\r
-x C:\GLUE\NEWGLUE.PRG
-subst D:\MULTITOS\GEM.LNK glue.grm\s_USARSC glue.fre\s_USARSC
-x C:\MTOS\ALN.TOS -c gem.lnk
-x C:\SLAV\STRIP68.TOS gem.sys
-key
-x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
-copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_FRE.SYS
-
-echo Italian: glue.ita with NEWGLUE.PRG, a session of ita alone
-type ita\rexit\r
-x C:\GLUE\NEWGLUE.PRG
-subst D:\MULTITOS\GEM.LNK glue.fre\s_USARSC glue.ita\s_USARSC
-x C:\MTOS\ALN.TOS -c gem.lnk
-x C:\SLAV\STRIP68.TOS gem.sys
-key
-x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
-copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_ITA.SYS
-
-echo Spanish: glue.spa with NEWGLUE.PRG, a session of spa alone
-type spa\rexit\r
-x C:\GLUE\NEWGLUE.PRG
-subst D:\MULTITOS\GEM.LNK glue.ita\s_USARSC glue.spa\s_USARSC
-x C:\MTOS\ALN.TOS -c gem.lnk
-x C:\SLAV\STRIP68.TOS gem.sys
-key
-x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
-copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_SPA.SYS
-
-echo Swedish: glue.swe with NEWGLUE.PRG, a session of swe alone
-type swe\rexit\r
-x C:\GLUE\NEWGLUE.PRG
-subst D:\MULTITOS\GEM.LNK glue.spa\s_USARSC glue.swe\s_USARSC
-x C:\MTOS\ALN.TOS -c gem.lnk
-x C:\SLAV\STRIP68.TOS gem.sys
-key
-x C:\SLAV\PRGFLAGS.TTP 7 7 gem.sys
-copy D:\MULTITOS\GEM.SYS D:\MULTITOS\GEM_SWE.SYS
-
-del D:\MULTITOS\GEM.SYS
-
-echo compare with the expected checksums
+x make -f makegem gem.sys
 check C:\EXPECT.LST

@@ -1,11 +1,13 @@
 #!/bin/sh
-# Build TOS 4 (the ROM) or MultiTOS GEM.SYS in Hatari with the original Atari tools.
-#   build/build.sh tos|gemsys            without a window: progress on stdout, Hatari exits when done
-#   build/build.sh tos|gemsys -w         in a Hatari window (Hatari waits for a key at the end)
-#   build/build.sh tos -b <image>        then boot the built ROM and <image> (boot.sh) and compare
-# The job is TOS.JOB or GEMSYS.JOB, its expected checksums TOS.LST or GEMSYS.LST; they are copied
-# to drives/c/BUILD.JOB and drives/c/EXPECT.LST, which the runner reads.  Starting Hatari by hand
-# from build/ works too, after that copy:  hatari --configfile hatari.cfg
+# Build TOS 4 with the single-TOS AES or with the MultiAES, or MultiTOS GEM.SYS, in Hatari with the
+# original Atari tools.
+#   build/build.sh tos|multitos|gemsys|desk    without a window: progress on stdout, Hatari exits when done
+#   build/build.sh tos|multitos|gemsys|desk -w in a Hatari window (Hatari waits for a key at the end)
+#   build/build.sh tos|multitos -b <image>     then boot the built ROM and <image> (boot.sh) and compare
+# The job is TOS.JOB, MULTITOS.JOB, GEMSYS.JOB or DESK.JOB, its expected checksums TOS.LST,
+# MULTITOS.LST, GEMSYS.LST or DESK.LST; they are copied to drives/c/BUILD.JOB and
+# drives/c/EXPECT.LST, which the runner reads.  Starting Hatari by hand from build/ works too,
+# after that copy:  hatari --configfile hatari.cfg
 # HATARI names the emulator binary (default: hatari).  Outputs land in build/drives/d (the ROM
 # in build/drives/d/rom/tos.img, GEM.SYS in build/drives/d/multitos/gem.sys), the log in
 # build/drives/c/build.log.  check C:\EXPECT.LST must find every file identical, the ROM or
@@ -13,12 +15,14 @@
 case "$1" in
 tos) job=TOS ;;
 gemsys) job=GEMSYS ;;
-*) echo "usage: build.sh tos|gemsys [-w] | build.sh tos -b <reference image>" >&2; exit 2 ;;
+multitos) job=MULTITOS ;;
+desk) job=DESK ;;
+*) echo "usage: build.sh tos|multitos|gemsys|desk [-w] | build.sh tos|multitos -b <reference image>" >&2; exit 2 ;;
 esac
 shift
 ref=
 if [ "$1" = -b ]; then
-	[ -f "$2" ] || { echo "usage: build.sh tos -b <reference image>" >&2; exit 2; }
+	[ -f "$2" ] || { echo "usage: build.sh tos|multitos -b <reference image>" >&2; exit 2; }
 	ref=$(cd "$(dirname "$2")" && pwd)/$(basename "$2")
 fi
 cd "$(dirname "$0")" || exit 1

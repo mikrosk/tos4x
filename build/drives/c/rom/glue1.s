@@ -1,5 +1,5 @@
-; Common blocks of allbios.owu and smvdi.o as .bss, in the order aln allocates them,
-; then endos (start of the AES bss).  tos404.img has them between the GEMDOS and AES bss.
+; Common blocks of allbios.awu as .bss, in the order aln allocates them, then endos (start of
+; the AES bss). tos492.img has them between the GEMDOS and AES bss.
 	.globl	_seed
 	.globl	_PR
 	.globl	_prtbyt
@@ -18,7 +18,6 @@
 	.globl	_rasword
 	.globl	_plnword
 	.globl	_quality
-	.globl	_virt_wo
 	.globl	_pixword
 	.globl	_green
 	.globl	_plzword
@@ -27,10 +26,7 @@
 	.globl	_invid
 	.globl	_color
 	.globl	_cksum
-	.globl	_ram8x8
 	.globl	_red
-	.globl	_ram16x3
-	.globl	_ram8x16
 	.globl	_a
 	.globl	_dsbtab
 	.globl	_huepal
@@ -77,7 +73,6 @@ _pixincr:	ds.b	2
 _rasword:	ds.b	4
 _plnword:	ds.b	4
 _quality:	ds.b	2
-_virt_wo:	ds.b	1204
 _pixword:	ds.b	4
 _green:	ds.b	2
 _plzword:	ds.b	4
@@ -86,10 +81,7 @@ _index:	ds.b	2
 _invid:	ds.b	2
 _color:	ds.b	2
 _cksum:	ds.b	24
-_ram8x8:	ds.b	90
 _red:	ds.b	2
-_ram16x3:	ds.b	90
-_ram8x16:	ds.b	90
 _a:	ds.b	30
 _dsbtab:	ds.b	72
 _huepal:	ds.b	32

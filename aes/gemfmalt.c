@@ -298,11 +298,25 @@ fm_alert(defbut, palstr)
 	WORD		ratalert;		/* CHANGED 5/10 LKW	*/
 	WORD		x,y;		/* save the button height */
 	WORD		x1,y1,w,h;
+	UWORD		color;
+	LONG		spec;
 					/* 7/16/92		  */
 
 						/* init tree pointer	*/
 	rs_gaddr(ad_sysglo, R_TREE, ALERT, &addr);
 	tree = addr;
+
+	spec = LLGET( OB_SPEC(ROOT) );
+	spec &= 0xFFFFFF80L;
+	spec |= 0x40L;		/* 70 means "solid" (was 0x40L, "dithered") */
+
+	if ( gl_alrtcol >= gl_ws.ws_ncolors )
+	  color = WHITE;
+	else
+	  color = gl_alrtcol;
+ 
+	spec |= ( color & 0x000F );
+ 	LLSET( OB_SPEC(ROOT), spec ); 
 
 	LWSET( OB_TYPE( 1 ), G_IMAGE );
 	rs_gaddr( ad_sysglo, R_BIPDATA, NOTEBB, &plong );

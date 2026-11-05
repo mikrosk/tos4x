@@ -97,7 +97,7 @@ GLOBAL WORD		gl_my;		/* 3/12/86	*/
 ap_init( pglobal )
 	LONG	pglobal;
 {
-	LLSET(pglobal, 0x03300001L);	/* version 3.40		*/
+	LLSET(pglobal, 0x03310001L);	/* version 3.40		*/
 	LWSET(pglobal+4, rlr->p_pid);
 	LWSET(pglobal+20, gl_nplanes);
 	LLSET(pglobal+22, &D);

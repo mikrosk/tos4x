@@ -418,7 +418,7 @@ ONLY_LONGFRAME	equ	TT
 
 .if SPARROW
 vershi		equ	$04
-verslo		equ	$00
+verslo		equ	$01
 .else
 
 .if TT
@@ -2901,7 +2901,15 @@ DB_STUB = 0
 	jsr	_Dsp_Init(pc)
 
 * Initialize the sound system
-	clr.l	(sp)			; setmode(0) (8 bit stereo)
+	moveq	#8,d0			; src=dmaplay, dst=DAC
+	move.l	d0,-(sp)
+
+	clr.l	-(sp)
+	move.w	#1,-(sp)		; use protocol
+	jsr	devconnect(pc)
+	addq	#6,sp			; leave 2 words on stack
+	
+	clr.w	(sp)			; setmode(0) (8 bit stereo)
 	jsr	setmode(pc)
 	move.l	#0x00020080,(sp)	; soundcmd(LTGAIN, 0x80)
 	jsr	soundcmd(pc)

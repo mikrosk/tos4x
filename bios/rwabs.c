@@ -358,6 +358,7 @@ WORD dev;
     LONG ret, floprd(), critic();
 #if CKSECTS
     char *ckptr;
+    int ckoff;
 #endif
 
     if (dev >= 2)			/* only floppies here */
@@ -439,8 +440,9 @@ critical:    ret = critic((WORD)ret, dev);
 #if CKSECTS
     /* compute checksums */
     ckptr = dskbufp;
+    ckoff = dev ? CKSECTS : 0;
     for (i=0; i<CKSECTS; i++) {
-	cksum[i] = checksum(ckptr,0x100);
+	cksum[i+ckoff] = checksum(ckptr,0x100);
 	ckptr += 0x200;
     }
 #endif
@@ -757,6 +759,7 @@ WORD recno, dev, count;
 #if CKSECTS
     char *ckptr;
     register int i;
+    int ckoff;
 #endif
 
     p = &dsbtab[dev];
@@ -794,8 +797,9 @@ WORD recno, dev, count;
 
 	if ((rw & 1) && (!(track | side)) && (sect < CKSECTS)) {
 	    ckptr = bf;
-	    for (i=0; i<cnt; i++) {
-		cksum[sect+i] = checksum(ckptr,0x100);
+	    ckoff = dev ? CKSECTS : 0;
+	    for (i=0; i<cnt && sect+i<CKSECTS; i++) {
+		cksum[sect+ckoff+i] = checksum(ckptr,0x100);
 		ckptr += 0x200;
 	    }
 	}

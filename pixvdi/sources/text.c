@@ -39,7 +39,7 @@
 *******************************************************************************
 */
 
-
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -54,8 +54,10 @@ EXTERN WORD clip_line();
 EXTERN WORD MONO8XHT();
 EXTERN VOID TRNSFONT();
 
-d_gtext()
+VOID
+d_gtext( VOID )
 {
+	REG VDIVARS	*la = LA;
     WORD monotest;
     WORD count;
     WORD i, j;
@@ -73,16 +75,37 @@ d_gtext()
     WORD temp;
     REG struct font_head *fnt_ptr;
     REG WORD *pointer;
+    REG ATTRIBUTE *work_ptr;
 
     if ( (count = CONTRL[3]) > 0 ) {
-	oldWrtMode = WRT_MODE;
-
-	fnt_ptr = CUR_FONT;	/* Get current font pointer in register */
+	work_ptr = cur_work;
 
 	if((justified = (*CONTRL == 11)))
 	    monotest = -1;
-	else
+	else {
+	    font_ring[2] = work_ptr->loaded_fonts;
+	    DDA_INC = work_ptr->dda_inc;
+	    T_SCLSTS = work_ptr->t_sclsts;
+	    DOUBLE = work_ptr->scaled;
+	    CUR_FONT = work_ptr->cur_font;
+	    MONO_STATUS = MONOSPACE & CUR_FONT->flags;
+	    SCRPT2 = work_ptr->scrpt2;
+	    SCRTCHP = work_ptr->scrtchp;
+	    STYLE = work_ptr->style;
+	    h_align = work_ptr->h_align;
+	    v_align = work_ptr->v_align;
+	    CHUP = work_ptr->chup;
 	    monotest = STYLE;
+	}
+
+	CLIP = work_ptr->clip;
+	XMN_CLIP = work_ptr->xmn_clip;
+	YMN_CLIP = work_ptr->ymn_clip;
+	XMX_CLIP = work_ptr->xmx_clip;
+	YMX_CLIP = work_ptr->ymx_clip;
+	oldWrtMode = WRT_MODE = work_ptr->wrt_mode;
+
+	fnt_ptr = CUR_FONT;	/* Get current font pointer in register */
 
 	if (STYLE & THICKEN)
     	    WEIGHT = fnt_ptr->thicken;
@@ -251,7 +274,7 @@ d_gtext()
 
 
 
-	TEXT_FG = cur_work->text_color;
+	TEXT_FG = work_ptr->text_color;
 
 	DELY = fnt_ptr->form_height;
 
@@ -378,9 +401,10 @@ d_gtext()
     } /* if CONTRL[3] */
 } 
 
-
-text_init()
+VOID 
+text_init( VOID )
 {
+	REG VDIVARS	*la = LA;
     WORD i, j;
     WORD id_save;
     REG struct font_head *fnt_ptr, **chain_ptr;
@@ -394,8 +418,8 @@ text_init()
     /* since it contains the font which varies with the screen resolution.   */
 
     font_ring[0] = &first;
-    font_ring[2] = NULLPTR;
-    font_ring[3] = NULLPTR;
+    font_ring[2] = NULL;
+    font_ring[3] = NULL;
 
     id_save = first.font_id;
 
@@ -445,12 +469,15 @@ text_init()
     CUR_FONT = def_font;
 }
 
-dst_height()
+VOID
+dst_height( VOID )
 {
+	REG VDIVARS	*la = LA;
     struct font_head **chain_ptr;
     REG struct font_head *test_font, *single_font;
     REG WORD *pointer, font_id, test_height;
 
+    CUR_FONT = cur_work->cur_font;
     font_id = CUR_FONT->font_id;
     cur_work->pts_mode = FALSE;
 
@@ -520,8 +547,9 @@ BYTE *source, *dest;
 	*dptr++ = *sptr++;
 }
 
-VOID make_header()
+VOID make_header( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG ATTRIBUTE   *work_ptr;
     REG FONT_HEAD   *source_font, *dest_font;
 
@@ -610,17 +638,21 @@ VOID make_header()
 	
     work_ptr->scaled   = TRUE;
     work_ptr->cur_font = CUR_FONT = dest_font;
+    T_SCLSTS = work_ptr->t_sclsts;
+    DOUBLE = work_ptr->scaled;
 }
 
-
-dst_point()
+VOID
+dst_point( VOID )
 
 {
+	REG VDIVARS	*la = LA;
     WORD font_id;
     struct font_head **chain_ptr, *double_font;
     REG struct font_head *test_font, *single_font;
     REG WORD *pointer, test_height, height;
 
+    CUR_FONT = cur_work->cur_font;
     font_id = CUR_FONT->font_id;
     cur_work->pts_mode = TRUE;
 
@@ -687,13 +719,16 @@ dst_point()
     FLIP_Y = 1;
 } 
 
-dst_style()
+VOID
+dst_style( VOID )
 {
-    INTOUT[0] = cur_work->style = INTIN[0] & INQ_TAB[2];
+	REG VDIVARS	*la = LA;
+    INTOUT[0] = STYLE = cur_work->style = INTIN[0] & INQ_TAB[2];
     CONTRL[4]=1;
 } 
 
-dst_alignment()
+VOID
+dst_alignment( VOID )
 {
     REG WORD	    a, *int_out, *int_in;
     REG ATTRIBUTE   *work_ptr;
@@ -704,28 +739,33 @@ dst_alignment()
     a = *int_in++;
     if ( a<0 || a>2 )
 	a = 0;
-    work_ptr->h_align = *int_out++ = a;
+    h_align = work_ptr->h_align = *int_out++ = a;
 
     a = *int_in;
     if ( a<0 || a>5 )
 	a = 0;
-    work_ptr->v_align = *int_out = a;
+    v_align = work_ptr->v_align = *int_out = a;
 
     CONTRL[4] = 2;
 } 
 
-dst_rotation()
+VOID
+dst_rotation( VOID )
 {
-    INTOUT[0] = cur_work->chup = ((INTIN[0] + 450) / 900) * 900;
+	REG VDIVARS	*la = LA;
+    INTOUT[0] = CHUP = cur_work->chup = ((INTIN[0] + 450) / 900) * 900;
     CONTRL[4] = 1;
 }
 
-dst_font()
+VOID
+dst_font( VOID )
 {
+	REG VDIVARS	*la = LA;
     WORD *old_intin, point, *old_ptsout, dummy[4], *old_ptsin;
     REG WORD face;
     REG struct font_head *test_font, **chain_ptr;
 
+    CUR_FONT = cur_work->cur_font;
     test_font = CUR_FONT;
     point = test_font->point;
     dummy[1] = test_font->top;
@@ -771,8 +811,10 @@ dst_font()
     INTOUT[0]  = CUR_FONT->font_id;
 }
 
-dst_color()
+VOID
+dst_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD r;
 
     r = INTIN[0];
@@ -785,15 +827,15 @@ dst_color()
     cur_work->text_color = MAP_COL[ r ];
 }
 
-
-dqt_attributes()
+VOID
+dqt_attributes( VOID )
 {
     REG WORD	    *pointer, temp;
     REG FONT_HEAD   *fnt_ptr;
     REG ATTRIBUTE   *work_ptr;
 
     work_ptr = cur_work;
-    fnt_ptr  = CUR_FONT;
+    fnt_ptr  = work_ptr->cur_font;
 
     pointer      = INTOUT;
     *pointer++   = fnt_ptr->font_id;			/* INTOUT[0] */
@@ -816,15 +858,18 @@ dqt_attributes()
     FLIP_Y = 1;
 }
 
-dqt_extent()
+VOID
+dqt_extent( VOID )
 {
     REG WORD i, chr, table_start;
     REG WORD *pointer;
     REG struct font_head *fnt_ptr;
+    REG ATTRIBUTE *work_ptr;
 
     WORD cnt;
 
-    fnt_ptr = CUR_FONT;
+    work_ptr = cur_work;
+    fnt_ptr = work_ptr->cur_font;
     pointer = INTIN;
 
     width = 0;
@@ -838,23 +883,23 @@ dqt_extent()
 
 
 
-    if (DOUBLE)
-	if (DDA_INC == 0xFFFF)
+    if (work_ptr->scaled)
+	if (work_ptr->dda_inc == 0xFFFF)
 	    width *= 2;
 	else
 	    width = ACT_SIZ( width );
 
-    if ((STYLE & THICKEN) && !(fnt_ptr->flags & MONOSPACE))
+    if ((work_ptr->style & THICKEN) && !(fnt_ptr->flags & MONOSPACE))
 	width += cnt * fnt_ptr->thicken;
 
-    if (STYLE & SKEW)
+    if (work_ptr->style & SKEW)
 	width += fnt_ptr->left_offset + fnt_ptr->right_offset;
 
 
     height = fnt_ptr->top + fnt_ptr->bottom + 1;
 
 
-    if (STYLE & OUTLINE) {  /* include OUTLINE in calculations. jde 23aug85 */ 
+    if (work_ptr->style & OUTLINE) {  /* include OUTLINE in calculations. jde 23aug85 */ 
 	width  += cnt * 2;  /* OUTLINE is always a one pixel outline	    */
 	height += 2;
     }
@@ -863,7 +908,7 @@ dqt_extent()
     CONTRL[2] = 4;
 
     pointer = PTSOUT;
-    switch (CHUP)
+    switch (work_ptr->chup)
     {
     case 0:
 	*pointer++ = 0;
@@ -912,13 +957,17 @@ dqt_extent()
     FLIP_Y = 1;
 }
 
-dqt_width()
+VOID
+dqt_width( VOID)
 {
+	REG VDIVARS	*la = LA;
     REG WORD  k;
     REG WORD *pointer;
     REG struct font_head *fnt_ptr;
+    REG ATTRIBUTE *work_ptr;
 
-    fnt_ptr = CUR_FONT;
+    work_ptr = cur_work;
+    fnt_ptr = CUR_FONT = work_ptr->cur_font;
     pointer = PTSOUT;
 
     /* Set that there is no horizontal offset */
@@ -934,8 +983,8 @@ dqt_width()
 	INTOUT[0] = k;
 	k -= fnt_ptr->first_ade;
  	*(pointer) = fnt_ptr->off_table[k+1] - fnt_ptr->off_table[k];
- 	if (DOUBLE)
-	    if ( DDA_INC == 0xFFFF )
+ 	if (work_ptr->scaled)
+	    if ( work_ptr->dda_inc == 0xFFFF )
 		*pointer *= 2;
 	    else
 		*pointer = ACT_SIZ( *pointer );
@@ -952,8 +1001,10 @@ dqt_width()
     FLIP_Y = 1;
 }
 
-dqt_name()
+VOID
+dqt_name( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD i, element;
     REG BYTE *name;
     REG WORD *int_out;
@@ -962,6 +1013,7 @@ dqt_name()
     WORD font_id;
     struct font_head **chain_ptr;
 
+    font_ring[2] = cur_work->loaded_fonts;
     element = INTIN[0];
     chain_ptr = font_ring;
     i = 0;
@@ -995,12 +1047,14 @@ found_element:
 
 } 
 
-dqt_fontinfo()
+VOID
+dqt_fontinfo( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD *pointer;
     REG struct font_head *fnt_ptr;
 
-    fnt_ptr = CUR_FONT;
+    fnt_ptr = cur_work->cur_font;
 
     pointer = INTOUT;
     *pointer++   = fnt_ptr->first_ade;
@@ -1038,14 +1092,17 @@ dqt_fontinfo()
     FLIP_Y = 1;
 }
 
-d_justified()
+VOID
+d_justified( VOID )
 {
+	REG VDIVARS	*la = LA;
     WORD spaces;
     WORD expand, sav_cnt;
     WORD interword, interchar;
     WORD cnt, *old_intin, *old_ptsout, extent[8], max_x;
     REG WORD i, direction, delword, delchar;
     REG WORD *pointer;
+    REG ATTRIBUTE *work_ptr;
 
     pointer = (CONTRL+3);
     cnt = *pointer = (sav_cnt =  *pointer) - 2;
@@ -1058,6 +1115,16 @@ d_justified()
     INTIN = pointer;
     old_ptsout = PTSOUT;
     PTSOUT = extent;
+
+    work_ptr = cur_work;
+    CUR_FONT = work_ptr->cur_font;
+    DDA_INC = work_ptr->dda_inc;
+    T_SCLSTS = work_ptr->t_sclsts;
+    DOUBLE = work_ptr->scaled;
+    STYLE = work_ptr->style;
+    h_align = work_ptr->h_align;
+    v_align = work_ptr->v_align;
+    CHUP = work_ptr->chup;
 
     for (i = 0, spaces = 0 ; i < cnt ; i++)
         if ( *(pointer++) == 32)
@@ -1189,8 +1256,10 @@ d_justified()
     INTIN = old_intin;
 }
 
-dt_loadfont()
+VOID 
+dt_loadfont( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD id, count, *control;
 
     REG FONT_HEAD   *first_font;
@@ -1252,14 +1321,16 @@ dt_loadfont()
    INTOUT[0] = count;
 }
 
-dt_unloadfont()
+VOID
+dt_unloadfont( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG ATTRIBUTE   *work_ptr;
 
     /* Since we always unload all fonts, this is easy. */
 
     work_ptr = cur_work;
-    work_ptr->loaded_fonts = NULLPTR;		/* No fonts installed */
+    work_ptr->loaded_fonts = NULL;		/* No fonts installed */
   
     work_ptr->scrpt2 = scrtsiz;		/* Reset pointers to default buffers */
     work_ptr->scrtchp = deftxbu;

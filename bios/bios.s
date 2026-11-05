@@ -3024,7 +3024,7 @@ mapinit:
 
 ttscu1		equ	$ffff8e09
 
-	moveq	#1,d0			; pre-load d0 for STPLUS
+	move.w	#3,d0			; pre-load d0 for STPLUS
 	move.l	sp,a1
 	move.l	$8,a2
 	move.l	#mapierr,$8

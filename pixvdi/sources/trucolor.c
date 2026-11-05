@@ -10,6 +10,7 @@
 ********************************************************************************
 */
 
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -25,8 +26,10 @@
 #define PIXMASK		    0x200			/* pix control in XGA */
 
 /*----------------------------------------------------------------------------*/
-vs_32_color()
+VOID
+vs_32_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     register WORD	*ptr = INTIN;
     register WORD	*rgb;
     register WORD	pen;
@@ -90,8 +93,10 @@ vs_32_color()
     pal_map[pen] = total;		    /* set the virtual RGB            */
 }
 /*----------------------------------------------------------------------------*/
-vq_32_color()
+VOID
+vq_32_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     register WORD   i;
     register WORD   *ptr = INTIN;			/* col index val      */
     register WORD   *rgb;				
@@ -139,8 +144,10 @@ vq_32_color()
     }
 }
 /*----------------------------------------------------------------------------*/
-vs_16_color()
+VOID
+vs_16_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     register WORD	*ptr = INTIN;
     register WORD	*rgb;
     register WORD	pen;
@@ -217,8 +224,10 @@ vs_16_color()
     *ptr = (WORD) total;		    /* just in case 1st word is used  */
 }
 /*----------------------------------------------------------------------------*/
-vq_16_color()
+VOID
+vq_16_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     register WORD   i;
     register WORD   *ptr = INTIN;			/* col index val      */
     register WORD   *rgb;				

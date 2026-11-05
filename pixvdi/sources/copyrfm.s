@@ -132,9 +132,10 @@ _COPY_RFM:
 
 *   test for legal logic ops and set color (if op 16)
 
-	move.l  _lineAVar,a1		; a1 -> linea var struct
-	move.l	_INTIN(a1),a2		; a2 -> INTIN array
+	move.l	_pblock,a2
+	move.l	PB_INTIN(a2),a2		; a2 -> INTIN array
 	move.w	I_LOG_OP(a2),d2		; d2 <- logic op #
+	move.l  _lineAVar,a1		; a1 -> linea var struct
 
 
 *   pattern ?
@@ -162,7 +163,8 @@ no_pattern:
 
 *   setup planes for each MFDB
 
-	move.l	_CONTRL(a1),a3		; a3 -> CONTRL array
+	move.l	_pblock,a3
+	move.l	PB_CONTRL(a3),a3		; a3 -> CONTRL array
 
 	move.l	C_MFDB_S(a3),a5		; a5 -> source MFDB
 	move.l	C_MFDB_D(a3),a4		; a4 -> destination MFDB
@@ -344,7 +346,8 @@ the_clipper:
 
 *   stoke up the stack frame
 
-	move.l	_PTSIN(a1),a2		; a2 -> PTSIN array
+	move.l	_pblock,a2
+	move.l	PB_PTSIN(a2),a2		; a2 -> PTSIN array
 
 	tst.w	_CLIP(a1)
 	beq	dont_clip		; if clipping disabled, skip the clip
@@ -493,7 +496,8 @@ max_save:
 bad_parameter:
 
 	move.l  _lineAVar,a1		; a1 -> linea var struct
-	move.l	_CONTRL(a1),a0
+	move.l	_pblock,a0
+	move.l	PB_CONTRL(a0),a0
 	clr.w	4(a0)			; number of output verticies
 	clr.w	8(a0)			; length of intout array
 

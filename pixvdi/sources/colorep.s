@@ -52,7 +52,8 @@ LUT_ADDR	equ	$FF8240		; lookup table address
 _st_vs_color:
 	move.l  _lineAVar,a2		; a2 -> linea var struct
 	movem.w	d3-d4,-(sp)		; save d3
-	move.l	_INTIN(a2),a0
+	move.l	_pblock,a0
+	move.l	PB_INTIN(a0),a0
 	move.w	(a0)+,d0		; d0 <- color index
 	move.w	_v_planes(a2),d1	; a0 -> first intensity component
 
@@ -199,16 +200,17 @@ mp0:
 
 
 _st_vq_color:
-	move.l  _lineAVar,a2		; a2 -> linea var struct
+	move.l  _pblock,a2		; a2 -> parameter block
 	move.l	d4,-(sp)
-	move.l	_CONTRL(a2),a0
+	move.l	PB_CONTRL(a2),a0
 	move.w	#4,8(a0)		; contrl(4) <- length of intout array = 4
 
-	move.l	_INTIN(a2),a0
+	move.l	PB_INTIN(a2),a0
 	move.w	(a0)+,d0		; d0 <- color index
 	move.w	(a0),d2			; d2 <- color value format flag
 
-	move.l	_INTOUT(a2),a0		; a0 -> output array
+	move.l	PB_INTOUT(a2),a0		; a0 -> output array
+	move.l  _lineAVar,a2		; a2 -> linea var struct
 
 	move.w	_v_planes(a2),d1		
 	move.b	max_ndx-1(pc,d1.w),d4	; is index in range?

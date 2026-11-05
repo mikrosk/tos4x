@@ -126,20 +126,11 @@ clip_done:	move.w	_v_lin_wr(a4),d7	; d4 <- screen line wrap
 		move.l	(a4,d0.w),d0		; d0 <- desired foreground col
 
 		cmp.w	#16,_v_planes(a4)
-		beq	cur_d_16		; go to 16 bit cursor display
-		blt	cur_d_8			; go to 8 bit cursor display
 
-cur_d_32:	tst.w	C_PLANES(a0)		; test writing mode
-		bmi	x_ms32_row		; branch to xor mode
-		bra	s_ms32_row		; branch to standard mode
 		
 cur_d_16:	tst.w	C_PLANES(a0)		; test writing mode
 		bmi	x_ms16_row		; branch to xor mode
-		bra	s_ms16_row		; branch to standard mode
 
-cur_d_8:	tst.w	C_PLANES(a0)		; test writing mode
-		bmi	x_ms8_row		; branch to xor mode
-		bra	s_ms8_row		; branch to standard mode
 
 ;
 ;	a1.l	points to destination
@@ -163,35 +154,9 @@ cur_d_8:	tst.w	C_PLANES(a0)		; test writing mode
 ;		 1      0	FG color
 ;		 1	1	FG color
 ;
-s_ms32_row:	move.w	(a5)+,d4	; d4 <- mask word
-		move.w	(a5)+,d5	; d5 <- data word
-		lsl.w	d3,d4		; shift to appropriate pos	
-		lsl.w	d3,d5		; shift to appropriate pos	
-		move.w	a3,d6		; d6 <- column counter - 1
 
-s_ms32_col:	move.l	(a1),(a2)+	; save the dst
-		lsl.w	d5		; shift out the data form
-		bcc	s_ms32_bg	; branch if we are not setting the fg
-		lsl.w	d4		; shift out the mask form
-		move.l	d0,(a1)+	; set the dst with fg color
-		dbra	d6,s_ms32_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,s_ms32_row	; do next row
-		rts
 	
-s_ms32_bg:	lsl.w	d4		; shift out the mask form
-		bcc	s_ms32_dst	; if mask 0 branch and don't change dst
-		move.l	d1,(a1)+	; set the dst with bg color
-		dbra	d6,s_ms32_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,s_ms32_row	; do next row
-		rts
 
-s_ms32_dst:	addq.l	#4,a1		; advance to next pixel
-		dbra	d6,s_ms32_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,s_ms32_row	; do next row
-		rts
 
 ;
 ; XOR mode 32 bit mode (logic is the same in all pix modes)
@@ -203,42 +168,10 @@ s_ms32_dst:	addq.l	#4,a1		; advance to next pixel
 ;		 1      0	invert Destination
 ;		 1	1	FG color
 ;
-x_ms32_row:	move.w	(a5)+,d4	; d4 <- mask word
-		move.w	(a5)+,d5	; d5 <- data word
-		lsl.w	d3,d4		; shift to appropriate pos	
-		lsl.w	d3,d5		; shift to appropriate pos	
-		move.w	a3,d6		; d6 <- column counter - 1
 
-x_ms32_col:	move.l	(a1),(a2)+	; save the dst
-		lsl.w	d5		; shift out the data form
-		bcc	x_ms32_bg	; branch if we are not setting the fg
-		lsl.w	d4		; shift out the mask form
-		bcs	x_ms32_fg	; branch to set to foreground color
-		not.l	(a1)+		; not the dest
-		dbra	d6,x_ms32_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,x_ms32_row	; do next row
-		rts
 
-x_ms32_fg:	move.l	d0,(a1)+	; set the dst with fg color
-		dbra	d6,x_ms32_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,x_ms32_row	; do next row
-		rts
 	
-x_ms32_bg:	lsl.w	d4		; shift out the mask form
-		bcc	x_ms32_dst	; if mask 0 branch and don't change dst
-		move.l	d1,(a1)+	; set the dst with bg color
-		dbra	d6,x_ms32_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,x_ms32_row	; do next row
-		rts
 
-x_ms32_dst:	addq.l	#4,a1		; advance to next pixel
-		dbra	d6,x_ms32_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,x_ms32_row	; do next row
-		rts
 
 ;
 ; standard mode 16 bit mode
@@ -316,75 +249,17 @@ x_ms16_dst:	addq.w	#2,a1		; advance to next pixel
 ;
 ; standard mode 8 bit mode
 ;
-s_ms8_row:	move.w	(a5)+,d4	; d4 <- mask word
-		move.w	(a5)+,d5	; d5 <- data word
-		lsl.w	d3,d4		; shift to appropriate pos	
-		lsl.w	d3,d5		; shift to appropriate pos	
-		move.w	a3,d6		; d6 <- row counter - 1
 
-s_ms8_col:	move.b	(a1),(a2)+	; save the dst
-		lsl.w	d5		; shift out the data form
-		bcc	s_ms8_bg	; branch if we are not setting the fg
-		lsl.w	d4		; shift out the mask form
-		move.b	d0,(a1)+	; set the dst with fg color
-		dbra	d6,s_ms8_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,s_ms8_row	; do next row
-		rts
 	
-s_ms8_bg:	lsl.w	d4		; shift out the mask form
-		bcc	s_ms8_dst	; if mask 0 branch and don't change dst
-		move.b	d1,(a1)+	; set the dst with bg color
-		dbra	d6,s_ms8_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,s_ms8_row	; do next row
-		rts
 
-s_ms8_dst:	addq.l	#1,a1		; advance to next pixel
-		dbra	d6,s_ms8_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,s_ms8_row	; do next row
-		rts
 
 ;
 ; XOR mode 8 bit mode
 ;
-x_ms8_row:	move.w	(a5)+,d4	; d4 <- mask word
-		move.w	(a5)+,d5	; d5 <- data word
-		lsl.w	d3,d4		; shift to appropriate pos	
-		lsl.w	d3,d5		; shift to appropriate pos	
-		move.w	a3,d6		; d6 <- column counter - 1
 
-x_ms8_col:	move.b	(a1),(a2)+	; save the dst
-		lsl.w	d5		; shift out the data form
-		bcc	x_ms8_bg	; branch if we are not setting the fg
-		lsl.w	d4		; shift out the mask form
-		bcs	x_ms8_fg	; branch to set to foreground color
-		not.b	(a1)+		; not the dest
-		dbra	d6,x_ms8_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,x_ms8_row	; do next row
-		rts
 
-x_ms8_fg:	move.b	d0,(a1)+	; set the dst with fg color
-		dbra	d6,x_ms8_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,x_ms8_row	; do next row
-		rts
 	
-x_ms8_bg:	lsl.w	d4		; shift out the mask form
-		bcc	x_ms8_dst	; if mask 0 branch and don't change dst
-		move.b	d1,(a1)+	; set the dst with bg color
-		dbra	d6,x_ms8_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,x_ms8_row	; do next row
-		rts
 
-x_ms8_dst:	addq.l	#1,a1		; advance to next pixel
-		dbra	d6,x_ms8_col	; do next col
-		add.w	d7,a1		; a1 -> to next row
-		dbra	d2,x_ms8_row	; do next row
-		rts
 
 *******************************************************************************
 *
@@ -418,7 +293,6 @@ px_cur_replace:	move.l  _lineAVar,a5		; a5 -> linea var struct
 
 		cmp.w	#16,_v_planes(a5)
 		beq	r_ms16_row		; go to 16 bit cursor replace
-		blt	r_ms8_row		; go to 8 bit cursor replace
 
 ;
 ;	a0.l	points to the destination
@@ -429,11 +303,6 @@ px_cur_replace:	move.l  _lineAVar,a5		; a5 -> linea var struct
 ;	d3.w	offset in bytes to next row
 ;	
 
-r_ms32_row:	move.w	d0,d1
-r_ms32_col:	move.l	(a2)+,(a0)+	; save the dst
-		dbra	d1,r_ms32_col	; do next col
-		add.w	d3,a0		; a0 -> to next row
-		dbra	d2,r_ms32_row	; d0 next row
 hang_it_up:	rts
 	
 r_ms16_row:	move.w	d0,d1
@@ -443,11 +312,5 @@ r_ms16_col:	move.w	(a2)+,(a0)+	; save the dst
 		dbra	d2,r_ms16_row	; d0 next row
 		rts
 	
-r_ms8_row:	move.w	d0,d1
-r_ms8_col:	move.b	(a2)+,(a0)+	; save the dst
-		dbra	d1,r_ms8_col	; do next col
-		add.w	d3,a0		; a0 -> to next row
-		dbra	d2,r_ms8_row	; d0 next row
-		rts
 	
 		.end

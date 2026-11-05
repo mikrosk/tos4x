@@ -339,7 +339,6 @@ do_cpt:
 	       if ( kind & SIZER )	/* fix 10/21/85	*/
 	       {
 	         GRECT t;
-		 long ssp;
 
 		 obj[cpt].ob_state |= SELECTED;		  
 		 c_clipdraw( pwin, cpt, NULLPTR );
@@ -355,15 +354,7 @@ do_cpt:
 		 t.g_y -= y;
 		 t.g_w -= w;
 		 t.g_h -= h;
-/* kludge: we really ought to make a graf_rubwind AES call, so that
- * SCREEN can go through trap #2 to get at it. Until we do, we'll have
- * to make sure we're in supervisor mode before doing this stuff
- */
-		 ssp = Super(0L);
-		 waitforaes();
-		 gr_rubwind(x, y, wm, hm, &t, &w, &h);
-		 releaes();
-		 Super(ssp);
+		 graf_rwind(x, y, wm, hm, &t, &w, &h);
 #endif
 		 if ( ( mx != cu_xrat ) || ( my != cu_yrat ) )
 		   message = WM_SIZED;
@@ -484,10 +475,11 @@ do_cpt:
 
 	    kind = TRUE;
 	
-	    real.g_w = obj[cpt].ob_width;
-	    real.g_h = obj[cpt].ob_height; 	
+	    real.g_w = obj[cpt].ob_width + (ADJ3DPIX << 1);
+	    real.g_h = obj[cpt].ob_height + (ADJ3DPIX << 1); 	
 	    objc_offset( obj, cpt, &real.g_x, &real.g_y );
-	    
+	    real.g_x -= ADJ3DPIX;
+	    real.g_y -= ADJ3DPIX;
 	    do
 	    {
 	      if ( buttonset )	/* Genuine ARROW messages	*/

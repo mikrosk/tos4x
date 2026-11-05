@@ -16,6 +16,9 @@
 *******************************************************************************
 */
 
+#ifndef _VARDEFS_H_
+#define _VARDEFS_H_
+
 #define     angle		la->_angle
 #define     beg_ang		la->begAng
 #define     CUR_FONT		la->curFont
@@ -50,7 +53,7 @@
 #define	    SIZ_TAB		la->sizTab
 #define	    TERM_CH		la->termCh
 #define	    chc_mode		la->chcMode
-#define	    cur_work		la->curWork
+#define	    cur_work		curWork
 #define	    def_font		la->defFont
 #define	    font_ring		la->fontRing
 #define	    ini_font_count	la->iniFontCount
@@ -64,11 +67,11 @@
 #define	    bytes_lin		la->bytesLin
 #define	    v_planes		la->vPlanes
 #define	    v_lin_wr		la->vLinWr
-#define	    CONTRL		la->contrl
-#define	    INTIN		la->intin
-#define	    PTSIN		la->ptsin
-#define	    INTOUT		la->intout
-#define	    PTSOUT		la->ptsout
+#define	    CONTRL		pblock->contrl
+#define	    INTIN		pblock->intin
+#define	    PTSIN		pblock->ptsin
+#define	    INTOUT		pblock->intout
+#define	    PTSOUT		pblock->ptsout
 #define	    FG_BP_1		la->fgBp1
 #define	    FG_BP_2		la->fgBp2
 #define	    FG_BP_3		la->fgBp3
@@ -130,3 +133,5 @@
 #define	    vl_col_fg		la->vlcolFg
 #define	    pal_map		la->palMap
 #define	    V_PRIMITIVES	la->primitives
+
+#endif

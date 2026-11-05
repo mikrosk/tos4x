@@ -42,7 +42,7 @@ VOID vqi_mode( VOID );
 VOID vsf_perimeter( VOID );
 VOID vsl_udsty( VOID );
 VOID s_clip( VOID );
-VOID arb_corner( WORD *corners,WORD *type );
+VOID arb_corner( WORD *corners,WORD type );
 VOID dro_cpyfm( VOID );
 VOID drt_cpyfm( VOID );
 VOID dr_trn_fm( VOID );

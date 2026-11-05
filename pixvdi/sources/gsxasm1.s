@@ -82,9 +82,10 @@ FRAG_LEN	equ	 MAX_PLANES*4+4 ; space for fragment of 16 planes
 *******************************************************************************
 
 
-_vec_len:	move.w	4(sp),d0	; d0 <- dX
+_vec_len:	movem.l	d3-d4,-(sp)
+		move.w	12(sp),d0	; d0 <- dX
 		muls	d0,d0		; d0 <- dX**2
-		move.w	6(sp),d1	; d1 <- dY
+		move.w	14(sp),d1	; d1 <- dY
 		muls	d1,d1		; d1 <- dY**2
 		add.l	d0,d1		; d1 <- dX**2 + dY**2
 		beq	vl_out		; quit on null length
@@ -134,6 +135,7 @@ srch_lp:	move.w	d2,d1		; d1 <- upper bound
 		bcs	lo_adjust	; if candidate too small, branch.
 
 		move.w	d4,d0		; d0 <- exactly the square root
+		movem.l	(sp)+,d3-d4
 		rts
 
 
@@ -145,7 +147,8 @@ lo_adjust:	move.w	d4,d3		; d3 <- new lower bound
 
 srch_end:	move.w	d3,d0		; no match: use the lower bound
 
-vl_out:		rts
+vl_out:		movem.l	(sp)+,d3-d4
+		rts
 
 
 
@@ -178,13 +181,15 @@ x2		equ	4
 y2		equ	6
 
 
-_CLC_FLIT:	move.l  _lineAVar,a2	; a2 -> linea var struct
-		move.l	_CONTRL(a2),a0
+_CLC_FLIT:	movem.l	d2-d7/a2-a6,-(sp)
+		move.l	_pblock,a2	; a2 -> parameter block
+		move.l	PB_CONTRL(a2),a0
 		move.w	2(a0),d0	; d0 <- number of vectors
 		subq.w	#1,d0		; d0 <- dbra counter
 
-		move.l	_PTSIN(a2),a0		; a0 -> array of vertices
+		move.l	PB_PTSIN(a2),a0		; a0 -> array of vertices
 		lea	_fill_buffer,a1		; a1 -> array of X coordinates
+		move.l  _lineAVar,a2	; a2 -> linea var struct
 		clr.w	fil_intersect(a2)	; init cnt of fill intrsctions
 
 flit_lp:	move.w	y2(a0),d1	; d1 <- Y coordinate of 2nd endpoint
@@ -237,6 +242,7 @@ no_fill_int:	lea	4(a0),a0		; a0 -> next pair of endpoints
 
 sort_fill_int:	move.w	fil_intersect(a2),d0	; d0 <- intersections
 		bne	sfi_cont
+		movem.l	(sp)+,d2-d7/a2-a6
 		rts				; quit if nothing to sort
 
 sfi_cont:	lea	_fill_buffer,a0		; a0 -> list of intersections
@@ -260,6 +266,7 @@ draw_lp:	move.w	(a1)+,_X1(a2)	; grab a pair of X intersections.
 		move.l	(sp)+,a1	; a1 -> next pair of points
 		move.w	(sp)+,d0	; d0 <- dbra pair counter
 		dbra	d0,draw_lp
+		movem.l	(sp)+,d2-d7/a2-a6
 		rts
 
 
@@ -292,6 +299,7 @@ drc_2:		move.w	d0,-(sp)	; save the dbra count
 		move.l	(sp)+,a1	; a1 -> next point pair
 		move.w	(sp)+,d0	; d0 <- dbra count
 drc_end:	dbra	d0,dr_clip
+		movem.l	(sp)+,d2-d7/a2-a6
 		rts
 
 
@@ -501,10 +509,13 @@ shf_tab:   *    1 2   4       8		; number of planes
 *******************************************************************************
 
 
-_ABLINE:	move.l	_lineAVar,a4		; a4 -> base of LineA variables
+_ABLINE:	movem.l	d2-d7/a2-a6,-(sp)
+		move.l	_lineAVar,a4		; a4 -> base of LineA variables
 		move.l	V_ROUTINES(a4),a5	; load vectrd list of primitives
 		move.l	V_ABLINE(a5),a5		; vec to vert line primitive
-		jmp	(a5)			; sft: "aline"  hrd: "hb_vline"
+		jsr	(a5)			; sft: "aline"  hrd: "hb_vline"
+		movem.l	(sp)+,d2-d7/a2-a6
+		rts
 
 ST_ABLINE:	move.l	_lineAVar,a4	; a4 -> base of LineA variables
 		moveq.l	#2,d0		; d0 <- XOR writing mode code
@@ -1047,10 +1058,13 @@ rf_tab:	dc.w	$7FFF,$3FFF,$1FFF,$0FFF	; right fringe list	0:NEW 1:OLD
 
 
 _HABLINE:
+	movem.l	d2-d7/a2-a6,-(sp)
 	move.l	_lineAVar,a4		; a4 -> base of LineA variables
 	move.l	V_ROUTINES(a4),a0	; load vectrd list of primitives
 	move.l	V_HABLINE(a0),a0	; vec to vert line primitive
-	jmp	(a0)			; sft: "aline"  hrd: "hb_vline"
+	jsr	(a0)			; sft: "aline"  hrd: "hb_vline"
+	movem.l	(sp)+,d2-d7/a2-a6
+	rts
 
 ST_HABLINE:
 

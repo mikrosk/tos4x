@@ -435,6 +435,7 @@ int mode;
 
     DBCMD(1,"print xfmalloc amt: -x (lpeek (`a6 + 8)) mode: -x (wpeek (`a6 + c));_c");
 
+    mode &= 3;
     if (amount == 0xffffffffL) return mbiggest(&pmd,mode);
     else {
 	ret = ffit(amount,&pmd,mode);

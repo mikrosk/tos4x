@@ -829,7 +829,7 @@ extend:
 		    cl2 = rover;
 		    goto gotone;
 		}
-		if (++rover > lastcl) rover = 0;
+		if (++rover >= lastcl) rover = 2;
 	    }
 	    DBCMD(4,"print slowcl, no free space;_c");
 	    return 0;

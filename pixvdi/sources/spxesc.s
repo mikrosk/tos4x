@@ -50,30 +50,6 @@ spx_cell:	move.w	v_fnt_wr(a4),d2		; d2 <- src width (in bytes)
 		move.l	a0,a2			; a2 -> font data
 		move.l	a1,a3			; a3 -> dst
 		cmp.w	#16,_v_planes(a4)	; see how many bit per pixel
-		beq	spx_16_cell		; do 16 bits per pixel case
-		blt	spx_8_cell		; do 8 bits per pixel case
-
-;
-; 24/32 bits per pixel case
-;
-new_32_line:	move.w	(a2),d0			; d0 <- font data
-curr_32_line:	lsl.w	d0			; if shifted out bit was set
-		bcs	cell_32_fg		; then splat foreground
-		move.l	d7,(a3)+		; set dst to background color
-		dbra	d5,curr_32_line		; cont with current cell line
-		move.w	d1,d5			; d5 <- width of cell
-		add.w	d2,a2			; point to next line of cell
-		add.w	d3,a3			; point to next line of dest
-		dbra	d4,new_32_line		; do next line of the cell
-		rts
-
-cell_32_fg:	move.l	d6,(a3)+		; set dst to foreground color
-		dbra	d5,curr_32_line		; cont with current cell line
-		move.w	d1,d5			; d5 <- width of cell
-		add.w	d2,a2			; point to next line of cell
-		add.w	d3,a3			; point to next line of dest
-		dbra	d4,new_32_line		; do next line of the cell
-		rts
 
 ;
 ; 16 bits per pixel case
@@ -101,32 +77,6 @@ cell_16_fg:	move.w	d6,(a3)+		; set dst to foreground color
 		dbra	d4,new_16_line		; do next line of the cell
 		rts
 
-;
-; 8 bits per pixel case
-;
-spx_8_cell:	addq.w	#1,d5			; d5 <- cell width
-		lsr.w	#2,d5			; adjust wrap for postincrmnt
-		add.w	d5,d3			;    for the byte case
-		move.w	d1,d5			; restore counter back
-
-new_8_line:	move.w	(a2),d0			; d0 <- font data
-curr_8_line:	lsl.w	d0			; if shifted out bit was set
-		bcs	cell_8_fg		; then splat foreground
-		move.b	d7,(a3)+		; set dst to background color
-		dbra	d5,curr_8_line		; cont with current cell line
-		move.w	d1,d5			; d5 <- width of cell
-		add.w	d2,a2			; point to next line of cell
-		add.w	d3,a3			; point to next line of dest
-		dbra	d4,new_8_line		; do next line of the cell
-		rts
-
-cell_8_fg:	move.b	d6,(a3)+		; set dst to foreground color
-		dbra	d5,curr_8_line		; cont with current cell line
-		move.w	d1,d5			; d5 <- width of cell
-		add.w	d2,a2			; point to next line of cell
-		add.w	d3,a3			; point to next line of dest
-		dbra	d4,new_8_line		; do next line of the cell
-		rts
 
 
 
@@ -292,16 +242,7 @@ spx_blank:	move.w	d0,d4			; d4 <- X min
 		move.l	vl_col_bg(a4),d5	; d5 <- background color
 		cmp.w	#16,_v_planes(a4)	; see how many bits per pixel
 		beq	px16BlLine		; branches to 16 bits per pix
-		blt	px8BlLine		; branches to 16 bits per pix
 		
-;
-; Blank out 32 bit case
-;
-px32BlLine:	move.w	a2,d4			; d4 <- # of pixels to clr - 1
-blankLongs:	move.l	d5,(a3)+		; 
-		dbra	d4,blankLongs
-		add.w	d7,a3			; point into next scanline
-		dbra	d6,px32BlLine		; do next line
 		rts
 ;
 ; Blank out 16 bit case
@@ -311,15 +252,6 @@ blankWords:	move.w	d5,(a3)+		;
 		dbra	d4,blankWords
 		add.w	d7,a3			; point into next scanline
 		dbra	d6,px16BlLine		; do next line
-		rts
-;
-; Blank out 8 bit case
-;
-px8BlLine:	move.w	a2,d4			; d4 <- # of pixels to clr - 1
-blankBytes:	move.b	d5,(a3)+		; 
-		dbra	d4,blankBytes
-		add.w	d7,a3			; point into next scanline
-		dbra	d6,px8BlLine		; do next line
 		rts
 
 
@@ -353,14 +285,7 @@ spx_neg_cell:	move.w	_v_lin_wr(a4),d4
 
 		cmp.w	#16,_v_planes(a4)	; see how many bit per pixel
 		beq	neg_16_loop		; do 16 bits per pixel case
-		blt	neg_8_loop		; do 8 bits per pixel case
 
-neg_32_loop:	move.l	a1,a2			; a2 -> start of curr line
-		move.w	d6,d7			; cell width - 1
-neg_long:	not.l	(a2)+			; neg curr pix
-		dbra	d7,neg_long
-		add.w	d4,a1			; point to next scan line
-		dbra	d5,neg_32_loop		; do next line
 		rts
 
 neg_16_loop:	move.l	a1,a2			; a2 -> start of curr line
@@ -371,13 +296,6 @@ neg_word:	not.w	(a2)+			; neg curr pix
 		dbra	d5,neg_16_loop		; do next line
 		rts
 
-neg_8_loop:	move.l	a1,a2			; a2 -> start of curr line
-		move.w	d6,d7			; cell width - 1
-neg_byte:	not.b	(a2)+			; neg curr pix
-		dbra	d7,neg_byte
-		add.w	d4,a1			; point to next scan line
-		dbra	d5,neg_8_loop		; do next line
-		rts
 
 
 

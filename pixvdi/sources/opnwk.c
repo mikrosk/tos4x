@@ -10,6 +10,7 @@
 *******************************************************************************
 */
 
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -34,8 +35,9 @@ extern	FONT_HEAD	f8x16, f8x8, f16x32;
 /* 
  * v_opnwk():	OPEN_WORKSTATION:
  */
-VOID v_opnwk()
+VOID v_opnwk( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD	i, *sp, *dp, videoMode;
 
 	if (INTIN[0] == SETMODEFLAG) {
@@ -87,7 +89,7 @@ VOID v_opnwk()
 
 	CONTRL[6] = virt_work.handle = 1;
 	cur_work = &virt_work;
-	virt_work.next_work = NULLPTR;
+	virt_work.next_work = NULL;
 	
 	line_cw = -1;				/* invalidate curr line width */
 	text_init();				/* initialize the SIZ_TAB info*/
@@ -117,6 +119,7 @@ VOID v_opnwk()
 SCREENDEF *FindDevice(devId)
 WORD	devId;
 {
+	REG VDIVARS	*la = LA;
     REG SCREENDEF   *dev;
     REG WORD	    i, curRez;
 
@@ -156,9 +159,11 @@ WORD	devId;
 /* 
  * This function is here for soft loaded vdi. We init the CUR_DEV if we can.
  */
+VOID
 SetCurDevice(curRez)
 WORD	curRez;
 {
+	REG VDIVARS	*la = LA;
     REG SCREENDEF   *dev;
     REG WORD	    i, devId;
 
@@ -171,7 +176,8 @@ WORD	curRez;
     }
 }
 /*----------------------------------------------------------------------------*/
-InitFonts()
+VOID
+InitFonts( VOID )
 {
     /* 
      * copy the font headers to ram so they can be altered
@@ -181,8 +187,10 @@ InitFonts()
     ram16x32 = f16x32;
 }
 /*----------------------------------------------------------------------------*/
-InitDevTabInqTab()
+VOID 
+InitDevTabInqTab( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG SCREENDEF	*dev;
 
     dev = CUR_DEV;			    /* init current dev pointer   */

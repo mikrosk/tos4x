@@ -44,7 +44,7 @@
 *************************************************************************
 */
 
-
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -58,7 +58,8 @@
 /*
  * S_LINE_TYPE: 
  */
-vsl_type()
+VOID
+vsl_type( VOID )
 {
    REG WORD li;
 
@@ -74,8 +75,10 @@ vsl_type()
 /* 
  * S_LINE_WIDTH:
  */
-vsl_width()
+VOID
+vsl_width( VOID )
 {
+	REG VDIVARS	*la = LA;
   REG WORD w, *pts_out;
 
   /* Limit the requested line width to a reasonable value. */
@@ -101,7 +104,8 @@ vsl_width()
 /*
  * S_END_STYLE:
  */
-vsl_ends()
+VOID
+vsl_ends( VOID )
 {
   REG WORD	    lb, le;
   REG WORD	    *pointer;
@@ -127,8 +131,10 @@ vsl_ends()
 /* 
  * S_LINE_COLOR:
  */
-vsl_color()
+VOID
+vsl_color( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD lc;
 	
 	*(CONTRL+4) = 1;
@@ -144,8 +150,10 @@ vsl_color()
 /* 
  * S_MARKER_SCALE
  */
-vsm_height()
+VOID
+vsm_height( VOID )
 {
+	REG VDIVARS	*la = LA;
   REG WORD	    h, *pts_out;
   REG ATTRIBUTE	    *work_ptr;
 
@@ -174,7 +182,8 @@ vsm_height()
 /*
  * S_MARK_TYPE
  */
-vsm_type()
+VOID
+vsm_type( VOID )
 {
     REG WORD i;
 
@@ -187,8 +196,10 @@ vsm_type()
 /*
  * S_MARK_COLOR
  */
-vsm_color()
+VOID
+vsm_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD i;
 
     i = INTIN[0];
@@ -201,7 +212,8 @@ vsm_color()
 /*
  * S_FILL_STYLE:
  */
-vsf_interior()
+VOID 
+vsf_interior( VOID )
 {
     REG WORD fs;
 
@@ -216,7 +228,8 @@ vsf_interior()
 /* 
  * S_FILL_INDEX:
  */
-vsf_style()
+VOID
+vsf_style( VOID )
 {
     REG WORD fi;
     REG ATTRIBUTE   *work_ptr;
@@ -242,8 +255,10 @@ vsf_style()
 /*
  * S_FILL_COLOR:
  */
-vsf_color()
+VOID
+vsf_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD fc;
 
     *(CONTRL+4)=1;
@@ -258,8 +273,10 @@ vsf_color()
 /*
  * LOCATOR_INPUT
  */
-v_locator()
+VOID
+v_locator( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD motion, button;
 	REG WORD *pointer;
 	REG WORD x, y; 
@@ -338,8 +355,10 @@ v_locator()
 /*
  * SHOW CURSOR
  */
-v_show_c()
+VOID
+v_show_c( VOID ) 
 {
+	REG VDIVARS	*la = LA;
     /* DIS_CUR will trash all registers but FP and SP */
 
     if ( !*INTIN && HIDE_CNT )
@@ -351,7 +370,8 @@ v_show_c()
 /*
  * HIDE CURSOR
  */
-v_hide_c()
+VOID
+v_hide_c( VOID )
 {
     HIDE_CUR();
 }
@@ -380,15 +400,18 @@ v_hide_c()
 /* 
  * VALUATOR_INPUT: 
  */
-v_valuator()
+VOID
+v_valuator( VOID )
 {
 }
 /*--------------------------------------------------------------------------*/
 /*
  * CHOICE_INPUT:
  */
-v_choice()
+VOID
+v_choice( VOID )
 {
+	REG VDIVARS	*la = LA;
 	WORD	i;
 
 	if ( chc_mode == 0 )
@@ -411,8 +434,10 @@ v_choice()
 /*
  * STRING_INPUT:
  */
-v_string()
+VOID
+v_string( VOID )
 {
+	REG VDIVARS	*la = LA;
 	WORD	i, j, mask;
 
 	mask = 0x00ff;
@@ -446,7 +471,8 @@ v_string()
 /*
  * Return Shift, Control, Alt State
  */
-vq_key_s()
+VOID 
+vq_key_s( VOID )
 {
 	CONTRL[4] = 1;
 	INTOUT[0] = GSHIFT_S();
@@ -455,7 +481,8 @@ vq_key_s()
 /*
  * SET_WRITING_MODE:
  */
-vswr_mode()
+VOID
+vswr_mode( VOID )
 {
     REG WORD wm;
 
@@ -470,8 +497,10 @@ vswr_mode()
 /*
  * SET_INPUT_MODE:
  */
-vsin_mode()
+VOID
+vsin_mode( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD i, *int_in;
 
 	CONTRL[4] = 1;
@@ -505,8 +534,10 @@ vsin_mode()
 /*
  * INQUIRE INPUT MODE:
  */
-vqi_mode()
+VOID
+vqi_mode( VOID )
 {
+	REG VDIVARS	*la = LA;
 	REG WORD *int_out;
 
 	*(CONTRL+4) = 1;
@@ -538,7 +569,8 @@ vqi_mode()
 /*
  * ST_FILLPERIMETER:
  */
-vsf_perimeter()
+VOID
+vsf_perimeter( VOID )
 {
     REG WORD	    *int_out;
     REG ATTRIBUTE   *work_ptr;
@@ -560,7 +592,8 @@ vsf_perimeter()
 /* 
  * ST_UD_LINE_STYLE:
  */
-vsl_udsty()
+VOID
+vsl_udsty( VOID )
 {
     cur_work->ud_ls = *INTIN;
 }
@@ -568,12 +601,15 @@ vsl_udsty()
 /*
  * Set Clip Region
  */
-s_clip()
+VOID
+s_clip( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	    *xy, rtemp;
     REG ATTRIBUTE   *work_ptr;
 
     work_ptr = cur_work;
+    cpy_pts();
     if ( (work_ptr->clip = *INTIN) != 0)
     {
 	xy = PTSIN;
@@ -599,8 +635,10 @@ s_clip()
 	work_ptr->xmx_clip = xres;
 	work_ptr->ymx_clip = yres;
    }  /* End else:  clipping turned off. */
+    rst_pts();
 }
 /*--------------------------------------------------------------------------*/
+VOID
 arb_corner(corners, type)
 WORD *corners, type;
 {
@@ -636,24 +674,52 @@ WORD *corners, type;
     }  /* End if:  "y" values need to be swapped. */
 }
 /*--------------------------------------------------------------------------*/
-dro_cpyfm()
+VOID
+dro_cpyfm( VOID )
 {
+	REG VDIVARS	*la = LA;
+	REG ATTRIBUTE	*work_ptr = cur_work;
+    CLIP = work_ptr->clip;
+    XMN_CLIP = work_ptr->xmn_clip;
+    YMN_CLIP = work_ptr->ymn_clip;
+    XMX_CLIP = work_ptr->xmx_clip;
+    YMX_CLIP = work_ptr->ymx_clip;
+    WRT_MODE = work_ptr->wrt_mode;
+    PATPTR = work_ptr->patptr;
+    PATMSK = work_ptr->patmsk;
+  cpy_pts();
   arb_corner(PTSIN, ULLR);
   arb_corner((PTSIN+4), ULLR);
   COPYTRAN = 0;
   COPY_RFM();
+  rst_pts();
 }
 /*--------------------------------------------------------------------------*/
-drt_cpyfm()
+VOID
+drt_cpyfm( VOID )
 {
+	REG VDIVARS	*la = LA;
+	REG ATTRIBUTE	*work_ptr = cur_work;
+    CLIP = work_ptr->clip;
+    XMN_CLIP = work_ptr->xmn_clip;
+    YMN_CLIP = work_ptr->ymn_clip;
+    XMX_CLIP = work_ptr->xmx_clip;
+    YMX_CLIP = work_ptr->ymx_clip;
+    WRT_MODE = work_ptr->wrt_mode;
+    PATPTR = work_ptr->patptr;
+    PATMSK = work_ptr->patmsk;
+  cpy_pts();
   arb_corner(PTSIN, ULLR);
   arb_corner((PTSIN+4), ULLR);
   COPYTRAN = 0xFFFF;
   COPY_RFM();
+  rst_pts();
 }
 /*--------------------------------------------------------------------------*/
-dr_trn_fm()
+VOID
+dr_trn_fm( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG FDB	*src, *dst;
     REG WORD    sFormat, dFormat;
     REG LONG    *cntrlS, *cntrlD;
@@ -801,9 +867,28 @@ dr_trn_fm()
 	
 }
 /*--------------------------------------------------------------------------*/
-dr_recfl()
+VOID
+dr_recfl( VOID )
 {
+	REG VDIVARS	*la = LA;
   REG WORD *pts_in;
+  REG ATTRIBUTE *work_ptr = cur_work;
+
+  if (*CONTRL != 11) {		/* v_bar has set these up already */
+	CLIP = work_ptr->clip;
+	XMN_CLIP = work_ptr->xmn_clip;
+	YMN_CLIP = work_ptr->ymn_clip;
+	XMX_CLIP = work_ptr->xmx_clip;
+	YMX_CLIP = work_ptr->ymx_clip;
+	WRT_MODE = work_ptr->wrt_mode;
+	PATPTR = work_ptr->patptr;
+	PATMSK = work_ptr->patmsk;
+	if (work_ptr->fill_style == 4)
+	    MULTIFILL = work_ptr->multifill;
+	else
+	    MULTIFILL = 0;
+	cpy_pts();
+  }
 
   /* Perform arbitrary corner fix-ups and invoke the rectangle fill routine */
 
@@ -817,5 +902,8 @@ dr_recfl()
   Y2 = *pts_in;
 
   RECTFILL();
+
+  if (*CONTRL != 11)
+	rst_pts();
 }
 /*--------------------------------------------------------------------------*/

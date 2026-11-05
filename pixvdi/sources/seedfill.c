@@ -40,6 +40,7 @@
 *******************************************************************************
 */
 
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -58,14 +59,18 @@
 
 extern  BOOLEAN retfalse();         /* routine for continuing fill  */
 
-d_contourfill()
+VOID
+d_contourfill( VOID )
 {
+	REG VDIVARS	*la = LA;
     quitfill = &retfalse;
     seedfill();
 }
 
-seedfill()
+VOID
+seedfill( VOID )
 { 
+	REG VDIVARS	*la = LA;
     REG WORD        *q;
     REG BOOLEAN     gotseed, leftseed;
     REG WORD        leftoldy;       /* the previous scan line tmp   */
@@ -80,6 +85,11 @@ seedfill()
     WORD            xleft;          /* temporary endpoints          */
     WORD            xright;         /*                              */
     BOOLEAN         collision, leftcollision;
+
+    XMN_CLIP = cur_work->xmn_clip;
+    YMN_CLIP = cur_work->ymn_clip;
+    XMX_CLIP = cur_work->xmx_clip;
+    YMX_CLIP = cur_work->ymx_clip;
 
     q = Q;
     
@@ -200,8 +210,10 @@ START:
 /*
  * move Qtop down to remove unused seeds
  */   
-crunch_Q()
+VOID
+crunch_Q( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD    *q = Q;
     REG WORD    qTop = Qtop;
 
@@ -274,8 +286,10 @@ BOOLEAN     *collide;
 
 } /* get_seed */
 
-v_get_pixel()
+VOID
+v_get_pixel( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG LONG pel, *tmpPtr;
     REG WORD *int_out;
 

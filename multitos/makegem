@@ -69,8 +69,7 @@ MASDEFINES = '-D=DESKPRG=0'
 # '#ifdef OUR_OPTIMIZER_WORKS'
 
 OPT	= -O
-#CMODEL	= -w -b0 -bn -r0 -v -rs -m3 -z2 -cf
-CMODEL	= -w -b0 -bn -r0 -v -rs -m0 -z2 -cf
+CMODEL	= -w -b0 -bn -r0 -v -rs -m3 -z2 -cf
 CFLAGS	= $(DEFINES) $(CMODEL) $(OPT)
 
 ##LCC_OPT=-C -cefishtu -q- -v -.
@@ -148,7 +147,7 @@ AESOBJ =	gemaints.o gemaplib.o gembase.o gemcli.o\
 		gemmnlib.o gemasync.o \
 		gemrslib.o geminit.o \
 		gemobed.o gemoblib.o gempd.o \
-		gsx2.o aestrap.o aesdispa.o large.o lattice.o\
+		gsx2.o aestrap.o aesdispa.o large.o\
 		interrup.o traps.o
 
 
@@ -318,6 +317,5 @@ gsx2.o:
 aestrap.o:
 aesdispa.o:
 large.o:
-lattice.o:
 interrup.o:
 traps.o:

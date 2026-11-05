@@ -1125,7 +1125,6 @@ upda_x:
 upda_xx:
 	unlk	a4
 
-	movem.l	(sp)+,a5-a6		*** jde 18jun86 ***
 	rts
 *
 *

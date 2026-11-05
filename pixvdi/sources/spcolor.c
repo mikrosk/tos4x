@@ -10,6 +10,7 @@
 ********************************************************************************
 */
 
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -23,8 +24,10 @@
 #define GETRGB(a, b, c)	    trap14(94, a, b, c)
 
 /*----------------------------------------------------------------------------*/
-sp_vs_color()
+VOID
+sp_vs_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     register WORD	*ptr = INTIN;
     register WORD	*rgb;
     register WORD	j, pen;
@@ -88,8 +91,10 @@ sp_vs_color()
     SETRGB(pen, 1, &RGB);		    /* set the RGB	              */
 }
 /*----------------------------------------------------------------------------*/
-sp_vq_color()
+VOID
+sp_vq_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     register WORD   i, j;
     register WORD   *ptr = INTIN;			/* col index val      */
     register WORD   *rgb;				

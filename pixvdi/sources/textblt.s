@@ -163,10 +163,12 @@ sz_sm_2:
 
 _TEXT_BL:
 
-	movem.l	a5-a6,-(sp)
+	movem.l	d2-d7/a2-a6,-(sp)
 	move.l  _lineAVar,a6		; a6 -> linea var struct
 	move.l	V_ROUTINES(a6),a4	; a4 -> list of vectored routines
 	move.l	V_TEXT(a4),a4		; vector to desired text primitive
-	jmp	(a4)
+	jsr	(a4)
+	movem.l	(sp)+,d2-d7/a2-a6
+	rts
 
 	.end

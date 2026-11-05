@@ -52,7 +52,13 @@
 *    the appropriate primitive graphics routine.			*
 *************************************************************************
 
-line1010:	move.l	2(sp),a1	; fetch pc off stack.
+line1010:	move.l	#_lapblock,_pblock	; line A calls use their own block
+		move.l	_lineAVar,a0
+		move.l	_pblock,a1
+		move.l	_CONTRL(a0),PB_CONTRL(a1)
+		move.l	_INTIN(a0),PB_INTIN(a1)
+		move.l	_PTSIN(a0),PB_PTSIN(a1)
+		move.l	2(sp),a1	; fetch pc off stack.
 		move.w	(a1),d2		; fetch 1010 instruction.
 		and.w	#$0FFF,d2	; remove the 1010.
 		addq.l	#2,a1		; increment pc.
@@ -68,6 +74,11 @@ la_out:		rte
 *
 var_base:	move.l	_lineAVar,a0	; return the base address of line 1010.
 		move.l	a0,d0		; for "C".
+		move.l	#_lapblock,_pblock	; line A calls use their own block
+		move.l	_pblock,a1
+		move.l	_CONTRL(a0),PB_CONTRL(a1)
+		move.l	_INTIN(a0),PB_INTIN(a1)
+		move.l	_PTSIN(a0),PB_PTSIN(a1)
 		lea	fonts,a1	; and a ptr to the first font header.
 		lea	atab,a2		; and a ptr to the array of pointers.
 		rts

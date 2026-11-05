@@ -9,7 +9,7 @@
 * $Log:	ttc.c,v $
 *******************************************************************************
 */
-
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -37,9 +37,11 @@
 #define	_1280x960   6                           /* 1280x960x1 monochrome mode */
 #define	_320x480    7                           /* 320x480x8 video mode       */
 
-extern	WORD	    trap14();
+extern	LONG	    trap14();
 extern	WORD	    tt_vq_color(), tt_vs_color();
 extern	WORD	    sp_vq_color(), sp_vs_color();
+
+static	VDIPB	    init_pb;		/* parameter block for internal calls */
 
 #define GetRez()	trap14(4)
 #define	ESetBank(a)	trap14(82, a)
@@ -47,8 +49,10 @@ extern	WORD	    sp_vq_color(), sp_vs_color();
 #define	SETRGB(a, b, c)	trap14(93, a, b, c)
 
 /*----------------------------------------------------------------------------*/
-init_st_tt_sp()
+VOID
+init_st_tt_sp( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG LONG	*cookiePtr, cookieVal, *palMapPtr, i;
 
     palMapPtr = pal_map;
@@ -90,9 +94,12 @@ init_st_tt_sp()
     }
 }
 /*----------------------------------------------------------------------------*/
-InitST()
+VOID 
+InitST( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	*sp, *dp, i;
+    VDIPB	*old_pblock;
     WORD	*old_intin, *old_intout, *old_contrl;
     WORD	new_contrl[7], new_intin[2], new_intout[4];
 
@@ -106,6 +113,8 @@ InitST()
     }
 
     /* set up the REQ_COL array */
+    old_pblock = pblock;
+    pblock = &init_pb;
     old_intin = INTIN;
     old_intout = INTOUT;
     old_contrl = CONTRL;
@@ -129,11 +138,15 @@ InitST()
     CONTRL = old_contrl;
     INTIN = old_intin;
     INTOUT = old_intout;
+    pblock = old_pblock;
 }
 /*----------------------------------------------------------------------------*/
-InitTT()
+VOID
+InitTT( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	*sp, *dp, i, j, temp;
+    VDIPB	*old_pblock;
     WORD	*old_intin, *old_intout, *old_contrl;
     WORD	new_contrl[7], new_intin[2], new_intout[4];
 
@@ -142,6 +155,8 @@ InitTT()
     ESetBank(0);				/* init to bank zero	      */
     InitTTLut();				/* initialize color lut	      */
 
+    old_pblock = pblock;
+    pblock = &init_pb;
     old_intin = INTIN;
     old_intout = INTOUT;
     old_contrl = CONTRL;
@@ -226,10 +241,13 @@ InitTT()
     CONTRL = old_contrl;
     INTIN = old_intin;
     INTOUT = old_intout;
+    pblock = old_pblock;
 }
 /*----------------------------------------------------------------------------*/
-InitSTSpLut()
+VOID
+InitSTSpLut( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	count;
     
     count = (CUR_DEV->maxPen > 16) ? 256 : 16;
@@ -244,8 +262,10 @@ InitSTSpLut()
 /*
  * Initialize the virtual pen values for the gsx mode.
  */
-Init16Pal()
+VOID
+Init16Pal( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG LONG	R, G, B;
     REG	WORD	i, temp, *palMapPtr, *lutPtr;
     
@@ -290,8 +310,10 @@ Init16Pal()
     *lutPtr = 0xffff;
 }
 /*----------------------------------------------------------------------------*/
-Init32Pal()
+VOID
+Init32Pal( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG LONG	R, G, B, *palMapPtr;
     REG WORD	i, temp;
 
@@ -302,13 +324,18 @@ Init32Pal()
     InitColReqArray();
 }
 /*----------------------------------------------------------------------------*/
-InitColReqArray()
+VOID
+InitColReqArray( VOID )
 {
+	REG VDIVARS	*la = LA;
     REG WORD	*sp, *dp, i, temp;
+    VDIPB	*old_pblock;
     WORD	*old_intin, *old_intout, *old_contrl;
     WORD	new_contrl[7], new_intin[2], new_intout[4];
 
     /* set up the REQ_COL array */
+    old_pblock = pblock;
+    pblock = &init_pb;
     old_intin = INTIN;
     old_intout = INTOUT;
     old_contrl = CONTRL;
@@ -342,9 +369,11 @@ InitColReqArray()
     CONTRL = old_contrl;
     INTIN = old_intin;
     INTOUT = old_intout;
+    pblock = old_pblock;
 }
 /*----------------------------------------------------------------------------*/
-InitTTLut()
+VOID
+InitTTLut( VOID )
 {
     REG	WORD	i, *lutPtr;
 

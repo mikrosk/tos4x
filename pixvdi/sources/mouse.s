@@ -288,7 +288,8 @@ vblank_exit:	rts
 *******************************************************************************
 
 _VEX_BUTV:	move.l  _lineAVar,a1		; a1 -> linea var struct
-		move.l	_CONTRL(a1),a0		; point to contrl array
+		move.l	_pblock,a0
+		move.l	PB_CONTRL(a0),a0		; point to contrl array
 		move.l	user_but(a1),18(a0)	; store old pointer in contrl
 		move.l	14(a0),user_but(a1)	; store new routine address
 		rts
@@ -304,7 +305,8 @@ _VEX_BUTV:	move.l  _lineAVar,a1		; a1 -> linea var struct
 *******************************************************************************
 
 _VEX_MOTV:	move.l  _lineAVar,a1		; a1 -> linea var struct
-		move.l	_CONTRL(a1),a0		; point to contrl array
+		move.l	_pblock,a0
+		move.l	PB_CONTRL(a0),a0		; point to contrl array
 		move.l	user_mot(a1),18(a0)	; save old routine pointer
 		move.l	14(a0),user_mot(a1)	; store new routine address
 		rts
@@ -320,7 +322,8 @@ _VEX_MOTV:	move.l  _lineAVar,a1		; a1 -> linea var struct
 *******************************************************************************
 
 _VEX_CURV:	move.l  _lineAVar,a1		; a1 -> linea var struct
-		move.l	_CONTRL(a1),a0		; point to contrl array
+		move.l	_pblock,a0
+		move.l	PB_CONTRL(a0),a0		; point to contrl array
 		move.l	user_cur(a1),18(a0)	; save old routine pointer
 		move.l	14(a0),user_cur(a1) 	; store new routine address
 		rts
@@ -982,7 +985,8 @@ hang_it_up:	rts
 *   Replace cursor with data in save_block when
 *   HIDE_CNT transitions from 0 to 1
 
-_HIDE_CUR:	move.l  _lineAVar,a5		; a5 -> linea var structww	
+_HIDE_CUR:	move.l	a5,-(sp)
+		move.l  _lineAVar,a5		; a5 -> linea var structww	
 		lea	_HIDE_CNT(a5),a2
 		addq.w	#1,(a2)			; increment hide count
 		cmp.w	#1,(a2)			; count =1 => hide the cursor
@@ -993,7 +997,8 @@ _HIDE_CUR:	move.l  _lineAVar,a5		; a5 -> linea var structww
 		bsr	cur_replace		; turn it off
 		move.l	(sp)+,a6
 
-hid_cur1:	rts
+hid_cur1:	move.l	(sp)+,a5
+		rts
 
 
 * DISPLAY CURSOR
@@ -1002,7 +1007,8 @@ hid_cur1:	rts
 *   cursor form. If HIDE_CNT < 0 , reset it to 0 but don't
 *   redisplay cursor.
 
-_DIS_CUR:	move.l  _lineAVar,a5		; a5 -> linea var structww
+_DIS_CUR:	move.l	a5,-(sp)
+		move.l  _lineAVar,a5		; a5 -> linea var structww
 		cmp.w	#1,_HIDE_CNT(a5)	; If cur is to be redisplayed,
 		bgt	dec_hide_cnt		; perform the operation prior to
 		blt	fix_neg			; decrementing semaphore to 0
@@ -1035,9 +1041,11 @@ _DIS_CUR:	move.l  _lineAVar,a5		; a5 -> linea var structww
 		move.l	(sp)+,a6
 
 dec_hide_cnt:	subq.w	#1,_HIDE_CNT(a5)	; decrement the redraw semaphore
+		move.l	(sp)+,a5
 		rts
 
 fix_neg:	clr.w	_HIDE_CNT(a5)		; this should never be executed.
+		move.l	(sp)+,a5
 		rts				; it's just paranoia in action.
 
 
@@ -1057,7 +1065,8 @@ fix_neg:	clr.w	_HIDE_CNT(a5)		; this should never be executed.
 _XFM_CRFM:	move.l  _lineAVar,a2		; a2 -> linea var struct
 		addq.b	#1,mouse_flag(a2)	; deny access to mouse_cdb
 
-		move.l	_INTIN(a2),a0		; a0 -> new cur def block
+		move.l	_pblock,a0
+		move.l	PB_INTIN(a0),a0		; a0 -> new cur def block
 		lea	mouse_cdb(a2),a1	; a1 -> cdb buffer 
 
 		move.w	(a0)+,d0		; Get x hot spot
@@ -1153,9 +1162,10 @@ _SET_CUR:	move.l  _lineAVar,a1		; a1 -> linea var struct
 *	mouse position and button state
 
 _vq_mouse_status:
+		move.l  _pblock,a2
+		move.l	PB_INTOUT(a2),a0		; a0 -> INTOUT[0]
+		move.l	PB_PTSOUT(a2),a1		; a1 -> PTSOUT[0]
 		move.l  _lineAVar,a2		; a2 -> linea var struct
-		move.l	_INTOUT(a2),a0		; a0 -> INTOUT[0]
-		move.l	_PTSOUT(a2),a1		; a1 -> PTSOUT[0]
 
 		move.w	 SR,d0
 		or.w	 #$0700,SR		; >>>> BEGIN ATOM <<<<
@@ -1165,7 +1175,8 @@ _vq_mouse_status:
 
 		move.w	 d0,SR			; >>>>  END ATOM  <<<<
 
-		move.l	_CONTRL(a2),a0
+		move.l	_pblock,a0
+		move.l	PB_CONTRL(a0),a0
 		moveq.l	 #1,d0
 		move.w	 d0,4(a0)		; CONTRL[2] <- INTOUT length
 		move.w	 d0,8(a0)		; CONTRL[4] <- PTSOUT length

@@ -34,6 +34,7 @@
 ********************************************************************************
 */
 
+#include	"proto.h"
 #include	"portab.h"
 #include	"fontdef.h"
 #include	"attrdef.h"
@@ -61,8 +62,10 @@ static short    pcnt_tab[] = {   0,  67, 133, 200, 267, 333, 400,  467,
                                533, 600, 667, 733, 800, 867, 933, 1000};
 
 /*----------------------------------------------------------------------------*/
-tt_vs_color()
+VOID
+tt_vs_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     register short    *ptr = INTIN;
     register short    *rgb;
     register short    j, pen;
@@ -159,8 +162,10 @@ tt_vs_color()
     LUTADR[pen] = total;				/* register <- total  */
 }
 /*----------------------------------------------------------------------------*/
-tt_vq_color()
+VOID
+tt_vq_color( VOID )
 {
+	REG VDIVARS	*la = LA;
     register short    i, j;
     register short    *ptr = INTIN;			/* col index val      */
     register short    *rgb;				

@@ -33,4 +33,4 @@
 	ATTRIBUTE   virt_work;			/* attribute areas for workstations */
 static	VDIVARS	    line1010Vars;
 	WORD        *lineAVar = &line1010Vars.vPlanes;
-	VDIVARS	    *la = &line1010Vars;
+	VDIVARS	    *LA = &line1010Vars;

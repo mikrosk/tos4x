@@ -78,7 +78,7 @@ SMSCREEN	=	-l -v -u -y $(DIR) -o smscreen.prg jin.o alone.o vdivtg.o
 # -cf	force prototype checking
 # NOTE: 3 files do not like the optimizer: deskdisk.c gemfslib.c deskfile.c
 
-CMODEL	= -w -b0 -bn -r0 -v -rs -m3 -z2 -cf #-O
+CMODEL	= -w -b0 -bn -r0 -v -rs -m3 -z2 -cf -O
 CFLAGS	= $(DEFINES) $(CMODEL)  
 
 # Flags for just linking, see target
@@ -132,7 +132,7 @@ SFILES	=	$(DIR)\alone.o    $(DIR)\blastman.o $(DIR)\blitinit.o \
 
 CFILES	=	$(DIR)\cbssdefs.o $(DIR)\font6x6.o  $(DIR)\font8x16.o \
 		$(DIR)\font8x8.o  $(DIR)\fnt16x32.o $(DIR)\isin.o \
-		$(DIR)\jmptbl.o   $(DIR)\monobj.o   $(DIR)\monout.o \
+		$(DIR)\monobj.o   $(DIR)\monout.o \
 		$(DIR)\seedfill.o $(DIR)\tables.o   $(DIR)\text.o \
 		$(DIR)\devices.o  $(DIR)\opnwk.o    $(DIR)\init.o \
 		$(DIR)\ttcolor.o  $(DIR)\spcolor.o  $(DIR)\spxtxtbl.o \

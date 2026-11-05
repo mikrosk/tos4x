@@ -418,7 +418,7 @@ ONLY_LONGFRAME	equ	TT
 
 .if SPARROW
 vershi		equ	$04
-verslo		equ	$01
+verslo		equ	$02
 .else
 
 .if TT

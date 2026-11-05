@@ -1,9 +1,9 @@
-# POSIX cksum of what the TOS 4.92 build must reproduce byte for byte: the five resource glue blocks the AES
-# data holds (as in tos492.img at 0x67154, 0x6e7ba, 0x760f6, 0x7dab8, 0x85450) and TOS.IMG of the 4.92 beta
-# boot floppy (tos492.img, md5 2f9d07875dc499ec97e80ebe154be0ac) for D:\ROM\TOS.IMG.
+# POSIX cksum of what the TOS 4.92 ROM build must reproduce byte for byte: the five resource glue blocks the AES
+# data holds (as in tos492.img at 0x67154, 0x6e7ba, 0x760f6, 0x7dab8, 0x85450) and the ROM this job made
+# first (md5 96967cdb805bd477ebc5b4db9c3085c2) for D:\ROM\TOS.IMG; Atari made no 4.92 ROM.
 584808728 30309 D:\MULTITOS\GLUE.USA
 3729169207 31036 D:\MULTITOS\GLUE.GRM
 2045760784 31169 D:\MULTITOS\GLUE.FRE
 1938511982 31128 D:\MULTITOS\GLUE.ITA
 550906232 30623 D:\MULTITOS\GLUE.SPA
-1544815541 512788 D:\ROM\TOS.IMG
+3504714192 524288 D:\ROM\TOS.IMG

@@ -1,0 +1,3 @@
+# POSIX cksum of the files the TOS 2.07 build must reproduce byte for byte: TOS 2.07
+# (tos207.rom, md5 f62bc9777f28bc6876422738758db365) for D:\ROM\TOS.IMG.
+4075129247 262144 D:\ROM\TOS.IMG

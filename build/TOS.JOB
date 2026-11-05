@@ -1,0 +1,668 @@
+# TOS 2.07 build, run by C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c).
+# S: is the repository, D: the work copy, M: the RAM disk.
+# BIOS: the Atari BIOS of 1992-02-29 (makefile 2.15, Sparrow/USA ROM objects).
+# VDI, GEMDOS (bdos), AES, desktop: the TOS 2.06 sources; every module is compiled as the tos3x build
+# does it, with the original Alcyon tools; CP68 takes one include directory: D:\COMMON\.
+# D:\ROM\TOS.IMG must be TOS 2.07 byte for byte (EXPECT.LST, from TOS.LST).
+
+echo copy the sources to D:
+rmtree D:\
+rmtree M:\
+cptree S:\BIOS D:\BIOS
+# the 2.07 ROM waits in a delay loop before it reads SPAR_CONF; no startup.s revision has the loop
+# (a working-file edit between 2.92 and 2.93), so the job adds it
+subst D:\BIOS\STARTUP.S \tmoveq\t#0,d1\r\n\tmove.b\tSPAR_CONF,d0 \tmove.w\t#3,d0\r\n\tmove.w\t#-1,d1\r\nspdelay:\r\n\tdbra\td1,spdelay\r\n\tdbra\td0,spdelay\r\n\tmoveq\t#0,d1\r\n\tmove.b\tSPAR_CONF,d0
+# makefile 2.15 assembles m68030.s (M68030 equ 1), which no revision holds
+copy C:\SPARROW\M68030.S D:\BIOS\M68030.S
+cptree S:\COMMON D:\COMMON
+cptree S:\VDI D:\VDI
+cptree S:\BDOS D:\BDOS
+cptree S:\AES D:\AES
+cptree S:\DESK D:\DESK
+cptree C:\ROM D:\ROM
+copy C:\SLAV\AS68SYMB.DAT M:\AS68SYMB.DAT
+
+echo BIOS (Lattice make, makefile 2.15)
+setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
+echo the surviving MAS versions reject clr.l An; tos207.rom holds suba.l An,An there
+subst D:\BIOS\STARTUP.S clr.l\ta5 suba.l\ta5,a5
+subst D:\BIOS\STARTUP.S clr.l\ta0 suba.l\ta0,a0
+subst D:\BIOS\XINOUT.S clr.l\ta5 suba.l\ta5,a5
+echo the makefile names the AS68 symbol file c:\alcyon\lib\oas68sym.dat; here it is M:\AS68SYMB.DAT
+subst D:\BIOS\MAKEFILE c:\\alcyon\\lib\\oas68sym.dat M:\\
+echo HiSoft make applies the .c.o rule of makefile 2.15 only with a .SUFFIXES line
+subst D:\BIOS\MAKEFILE \r\n.c.o: \r\n.SUFFIXES:\s.o\s.c\r\n.c.o:
+cd D:\BIOS
+echo one target per make call: the runner command line is short
+x make startup.wo
+x make dmaread.w
+x make clock.w
+x make bios.wu
+x make flop.w
+x make prtblk.o
+x make rwabs.o
+x make xinout.o
+x make memtest.o
+x mac version.s
+
+setenv PATH=C:\BIN;C:\SLAV;C:\UTIL
+
+echo VDI
+cd D:\VDI
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ escape.s escape.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ escape.i
+del escape.i
+x C:\BIN\CP68.TTP -I D:\COMMON\ font6x6.c font6x6.i
+x C:\BIN\C068.TTP font6x6.i font6x6.1 font6x6.2 font6x6.3 -f
+x C:\BIN\C168.TTP font6x6.1 font6x6.2 font6x6.s
+x C:\BIN\OPTIMIZE.TOS font6x6.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ font6x6.s
+del font6x6.i font6x6.1 font6x6.2 font6x6.3 font6x6.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ font8x8.c font8x8.i
+x C:\BIN\C068.TTP font8x8.i font8x8.1 font8x8.2 font8x8.3 -f
+x C:\BIN\C168.TTP font8x8.1 font8x8.2 font8x8.s
+x C:\BIN\OPTIMIZE.TOS font8x8.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ font8x8.s
+del font8x8.i font8x8.1 font8x8.2 font8x8.3 font8x8.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ font8x16.c font8x16.i
+x C:\BIN\C068.TTP font8x16.i font8x16.1 font8x16.2 font8x16.3 -f
+x C:\BIN\C168.TTP font8x16.1 font8x16.2 font8x16.s
+x C:\BIN\OPTIMIZE.TOS font8x16.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ font8x16.s
+del font8x16.i font8x16.1 font8x16.2 font8x16.3 font8x16.s
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ entry.s entry.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ entry.i
+del entry.i
+x C:\BIN\CP68.TTP -I D:\COMMON\ tables.c tables.i
+x C:\BIN\C068.TTP tables.i tables.1 tables.2 tables.3 -f
+x C:\BIN\C168.TTP tables.1 tables.2 tables.s
+x C:\BIN\OPTIMIZE.TOS tables.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ tables.s
+del tables.i tables.1 tables.2 tables.3 tables.s
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ line1010.s line1010.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ line1010.i
+del line1010.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ gsxasm1.s gsxasm1.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gsxasm1.i
+del gsxasm1.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ allgem.s allgem.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ allgem.i
+del allgem.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ blitinit.s blitinit.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ blitinit.i
+del blitinit.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ routines.s routines.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ routines.i
+del routines.i
+x C:\BIN\CP68.TTP -I D:\COMMON\ jmptbl.c jmptbl.i
+x C:\BIN\C068.TTP jmptbl.i jmptbl.1 jmptbl.2 jmptbl.3 -f
+x C:\BIN\C168.TTP jmptbl.1 jmptbl.2 jmptbl.s
+x C:\BIN\OPTIMIZE.TOS jmptbl.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ jmptbl.s
+del jmptbl.i jmptbl.1 jmptbl.2 jmptbl.3 jmptbl.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ isin.c isin.i
+x C:\BIN\C068.TTP isin.i isin.1 isin.2 isin.3 -f
+x C:\BIN\C168.TTP isin.1 isin.2 isin.s
+x C:\BIN\OPTIMIZE.TOS isin.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ isin.s
+del isin.i isin.1 isin.2 isin.3 isin.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ monobj.c monobj.i
+x C:\BIN\C068.TTP monobj.i monobj.1 monobj.2 monobj.3 -f
+x C:\BIN\C168.TTP monobj.1 monobj.2 monobj.s
+x C:\BIN\OPTIMIZE.TOS monobj.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ monobj.s
+del monobj.i monobj.1 monobj.2 monobj.3 monobj.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ opnwk.c opnwk.i
+x C:\BIN\C068.TTP opnwk.i opnwk.1 opnwk.2 opnwk.3 -f
+x C:\BIN\C168.TTP opnwk.1 opnwk.2 opnwk.s
+x C:\BIN\OPTIMIZE.TOS opnwk.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ opnwk.s
+del opnwk.i opnwk.1 opnwk.2 opnwk.3 opnwk.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ monout.c monout.i
+x C:\BIN\C068.TTP monout.i monout.1 monout.2 monout.3 -f
+x C:\BIN\C168.TTP monout.1 monout.2 monout.s
+x C:\BIN\OPTIMIZE.TOS monout.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ monout.s
+del monout.i monout.1 monout.2 monout.3 monout.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ text.c text.i
+x C:\BIN\C068.TTP text.i text.1 text.2 text.3 -f
+x C:\BIN\C168.TTP text.1 text.2 text.s
+x C:\BIN\OPTIMIZE.TOS text.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ text.s
+del text.i text.1 text.2 text.3 text.s
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ textblt.s textblt.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ textblt.i
+del textblt.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ hbtxtblt.s hbtxtblt.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ hbtxtblt.i
+del hbtxtblt.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ mono.s mono.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ mono.i
+del mono.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ hbmono.s hbmono.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ hbmono.i
+del hbmono.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ gsxasm2.s gsxasm2.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gsxasm2.i
+del gsxasm2.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ hbrect.s hbrect.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ hbrect.i
+del hbrect.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ mouse.s mouse.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ mouse.i
+del mouse.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ copyrfm.s copyrfm.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ copyrfm.i
+del copyrfm.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ blastman.s blastman.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ blastman.i
+del blastman.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ hbbitblt.s hbbitblt.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ hbbitblt.i
+del hbbitblt.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ blaster.s blaster.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ blaster.i
+del blaster.i
+x C:\BIN\CP68.TTP -I D:\COMMON\ seedfill.c seedfill.i
+x C:\BIN\C068.TTP seedfill.i seedfill.1 seedfill.2 seedfill.3 -f
+x C:\BIN\C168.TTP seedfill.1 seedfill.2 seedfill.s
+x C:\BIN\OPTIMIZE.TOS seedfill.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ seedfill.s
+del seedfill.i seedfill.1 seedfill.2 seedfill.3 seedfill.s
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ xfrmform.s xfrmform.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ xfrmform.i
+del xfrmform.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ stcolor.s stcolor.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ stcolor.i
+del stcolor.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ sbblit.s sbblit.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ sbblit.i
+del sbblit.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ sbfrag.s sbfrag.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ sbfrag.i
+del sbfrag.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ sbescape.s sbescape.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ sbescape.i
+del sbescape.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ sbhline.s sbhline.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ sbhline.i
+del sbhline.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ sbvline.s sbvline.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ sbvline.i
+del sbvline.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ sbmono.s sbmono.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ sbmono.i
+del sbmono.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ sbtxtblt.s sbtxtblt.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ sbtxtblt.i
+del sbtxtblt.i
+x C:\BIN\CP68.TTP -I D:\COMMON\ cbssdefs.c cbssdefs.i
+x C:\BIN\C068.TTP cbssdefs.i cbssdefs.1 cbssdefs.2 cbssdefs.3 -f
+x C:\BIN\C168.TTP cbssdefs.1 cbssdefs.2 cbssdefs.s
+x C:\BIN\OPTIMIZE.TOS cbssdefs.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ cbssdefs.s
+del cbssdefs.i cbssdefs.1 cbssdefs.2 cbssdefs.3 cbssdefs.s
+
+echo GEMDOS (bdos)
+cd D:\BDOS
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ osinit.s osinit.i
+x C:\BIN\MAS.TTP -us osinit.i -O=osinit.o
+del osinit.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ lmul.s lmul.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ lmul.i
+del lmul.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ ldiv.s ldiv.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ ldiv.i
+del ldiv.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ xfer.s xfer.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ xfer.i
+del xfer.i
+x C:\BIN\CP68.TTP -I D:\COMMON\ console.c console.i
+x C:\BIN\C068.TTP console.i console.1 console.2 console.3 -f
+x C:\BIN\C168.TTP console.1 console.2 console.s
+x C:\BIN\OPTIMIZE.TOS console.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ console.s
+del console.i console.1 console.2 console.3 console.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ fsfat.c fsfat.i
+x C:\BIN\C068.TTP fsfat.i fsfat.1 fsfat.2 fsfat.3 -f
+x C:\BIN\C168.TTP fsfat.1 fsfat.2 fsfat.s
+x C:\BIN\OPTIMIZE.TOS fsfat.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ fsfat.s
+del fsfat.i fsfat.1 fsfat.2 fsfat.3 fsfat.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ fsglob.c fsglob.i
+x C:\BIN\C068.TTP fsglob.i fsglob.1 fsglob.2 fsglob.3 -f
+x C:\BIN\C168.TTP fsglob.1 fsglob.2 fsglob.s
+x C:\BIN\OPTIMIZE.TOS fsglob.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ fsglob.s
+del fsglob.i fsglob.1 fsglob.2 fsglob.3 fsglob.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ fsdir.c fsdir.i
+x C:\BIN\C068.TTP fsdir.i fsdir.1 fsdir.2 fsdir.3 -f
+x C:\BIN\C168.TTP fsdir.1 fsdir.2 fsdir.s
+x C:\BIN\OPTIMIZE.TOS fsdir.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ fsdir.s
+del fsdir.i fsdir.1 fsdir.2 fsdir.3 fsdir.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ fsopnclo.c fsopnclo.i
+x C:\BIN\C068.TTP fsopnclo.i fsopnclo.1 fsopnclo.2 fsopnclo.3 -f
+x C:\BIN\C168.TTP fsopnclo.1 fsopnclo.2 fsopnclo.s
+x C:\BIN\OPTIMIZE.TOS fsopnclo.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ fsopnclo.s
+del fsopnclo.i fsopnclo.1 fsopnclo.2 fsopnclo.3 fsopnclo.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ fshand.c fshand.i
+x C:\BIN\C068.TTP fshand.i fshand.1 fshand.2 fshand.3 -f
+x C:\BIN\C168.TTP fshand.1 fshand.2 fshand.s
+x C:\BIN\OPTIMIZE.TOS fshand.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ fshand.s
+del fshand.i fshand.1 fshand.2 fshand.3 fshand.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ fsmain.c fsmain.i
+x C:\BIN\C068.TTP fsmain.i fsmain.1 fsmain.2 fsmain.3 -f
+x C:\BIN\C168.TTP fsmain.1 fsmain.2 fsmain.s
+x C:\BIN\OPTIMIZE.TOS fsmain.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ fsmain.s
+del fsmain.i fsmain.1 fsmain.2 fsmain.3 fsmain.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ fssupp.c fssupp.i
+x C:\BIN\C068.TTP fssupp.i fssupp.1 fssupp.2 fssupp.3 -f
+x C:\BIN\C168.TTP fssupp.1 fssupp.2 fssupp.s
+x C:\BIN\OPTIMIZE.TOS fssupp.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ fssupp.s
+del fssupp.i fssupp.1 fssupp.2 fssupp.3 fssupp.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ proc.c proc.i
+x C:\BIN\C068.TTP proc.i proc.1 proc.2 proc.3 -f
+x C:\BIN\C168.TTP proc.1 proc.2 proc.s
+x C:\BIN\OPTIMIZE.TOS proc.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ proc.s
+del proc.i proc.1 proc.2 proc.3 proc.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ umem.c umem.i
+x C:\BIN\C068.TTP umem.i umem.1 umem.2 umem.3 -f
+x C:\BIN\C168.TTP umem.1 umem.2 umem.s
+x C:\BIN\OPTIMIZE.TOS umem.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ umem.s
+del umem.i umem.1 umem.2 umem.3 umem.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ osmem.c osmem.i
+x C:\BIN\C068.TTP osmem.i osmem.1 osmem.2 osmem.3 -f
+x C:\BIN\C168.TTP osmem.1 osmem.2 osmem.s
+x C:\BIN\OPTIMIZE.TOS osmem.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ osmem.s
+del osmem.i osmem.1 osmem.2 osmem.3 osmem.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ bdosmain.c bdosmain.i
+x C:\BIN\C068.TTP bdosmain.i bdosmain.1 bdosmain.2 bdosmain.3 -f
+x C:\BIN\C168.TTP bdosmain.1 bdosmain.2 bdosmain.s
+x C:\BIN\OPTIMIZE.TOS bdosmain.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ bdosmain.s
+del bdosmain.i bdosmain.1 bdosmain.2 bdosmain.3 bdosmain.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ sup.c sup.i
+x C:\BIN\C068.TTP sup.i sup.1 sup.2 sup.3 -f
+x C:\BIN\C168.TTP sup.1 sup.2 sup.s
+x C:\BIN\OPTIMIZE.TOS sup.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ sup.s
+del sup.i sup.1 sup.2 sup.3 sup.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ time.c time.i
+x C:\BIN\C068.TTP time.i time.1 time.2 time.3 -f
+x C:\BIN\C168.TTP time.1 time.2 time.s
+x C:\BIN\OPTIMIZE.TOS time.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ time.s
+del time.i time.1 time.2 time.3 time.s
+
+echo AES
+cd D:\AES
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ gemjstrt.s gemjstrt.i
+x C:\BIN\MAS.TTP -us gemjstrt.i -O=gemjstrt.o
+del gemjstrt.i
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemaints.c gemaints.i
+x C:\BIN\C068.TTP gemaints.i gemaints.1 gemaints.2 gemaints.3 -f
+x C:\BIN\C168.TTP gemaints.1 gemaints.2 gemaints.s
+x C:\BIN\OPTIMIZE.TOS gemaints.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemaints.s
+del gemaints.i gemaints.1 gemaints.2 gemaints.3 gemaints.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemaplib.c gemaplib.i
+x C:\BIN\C068.TTP gemaplib.i gemaplib.1 gemaplib.2 gemaplib.3 -f
+x C:\BIN\C168.TTP gemaplib.1 gemaplib.2 gemaplib.s
+x C:\BIN\OPTIMIZE.TOS gemaplib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemaplib.s
+del gemaplib.i gemaplib.1 gemaplib.2 gemaplib.3 gemaplib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemasync.c gemasync.i
+x C:\BIN\C068.TTP gemasync.i gemasync.1 gemasync.2 gemasync.3 -f
+x C:\BIN\C168.TTP gemasync.1 gemasync.2 gemasync.s
+x C:\BIN\OPTIMIZE.TOS gemasync.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemasync.s
+del gemasync.i gemasync.1 gemasync.2 gemasync.3 gemasync.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gembase.c gembase.i
+x C:\BIN\C068.TTP gembase.i gembase.1 gembase.2 gembase.3 -f
+x C:\BIN\C168.TTP gembase.1 gembase.2 gembase.s
+x C:\BIN\OPTIMIZE.TOS gembase.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gembase.s
+del gembase.i gembase.1 gembase.2 gembase.3 gembase.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gembind.c gembind.i
+x C:\BIN\C068.TTP gembind.i gembind.1 gembind.2 gembind.3 -f
+x C:\BIN\C168.TTP gembind.1 gembind.2 gembind.s
+x C:\BIN\OPTIMIZE.TOS gembind.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gembind.s
+del gembind.i gembind.1 gembind.2 gembind.3 gembind.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemcli.c gemcli.i
+x C:\BIN\C068.TTP gemcli.i gemcli.1 gemcli.2 gemcli.3 -f
+x C:\BIN\C168.TTP gemcli.1 gemcli.2 gemcli.s
+x C:\BIN\OPTIMIZE.TOS gemcli.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemcli.s
+del gemcli.i gemcli.1 gemcli.2 gemcli.3 gemcli.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemctrl.c gemctrl.i
+x C:\BIN\C068.TTP gemctrl.i gemctrl.1 gemctrl.2 gemctrl.3 -f
+x C:\BIN\C168.TTP gemctrl.1 gemctrl.2 gemctrl.s
+x C:\BIN\OPTIMIZE.TOS gemctrl.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemctrl.s
+del gemctrl.i gemctrl.1 gemctrl.2 gemctrl.3 gemctrl.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemdisp.c gemdisp.i
+x C:\BIN\C068.TTP gemdisp.i gemdisp.1 gemdisp.2 gemdisp.3 -f
+x C:\BIN\C168.TTP gemdisp.1 gemdisp.2 gemdisp.s
+x C:\BIN\OPTIMIZE.TOS gemdisp.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemdisp.s
+del gemdisp.i gemdisp.1 gemdisp.2 gemdisp.3 gemdisp.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemevlib.c gemevlib.i
+x C:\BIN\C068.TTP gemevlib.i gemevlib.1 gemevlib.2 gemevlib.3 -f
+x C:\BIN\C168.TTP gemevlib.1 gemevlib.2 gemevlib.s
+x C:\BIN\OPTIMIZE.TOS gemevlib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemevlib.s
+del gemevlib.i gemevlib.1 gemevlib.2 gemevlib.3 gemevlib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemflag.c gemflag.i
+x C:\BIN\C068.TTP gemflag.i gemflag.1 gemflag.2 gemflag.3 -f
+x C:\BIN\C168.TTP gemflag.1 gemflag.2 gemflag.s
+x C:\BIN\OPTIMIZE.TOS gemflag.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemflag.s
+del gemflag.i gemflag.1 gemflag.2 gemflag.3 gemflag.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemfmalt.c gemfmalt.i
+x C:\BIN\C068.TTP gemfmalt.i gemfmalt.1 gemfmalt.2 gemfmalt.3 -f
+x C:\BIN\C168.TTP gemfmalt.1 gemfmalt.2 gemfmalt.s
+x C:\BIN\OPTIMIZE.TOS gemfmalt.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemfmalt.s
+del gemfmalt.i gemfmalt.1 gemfmalt.2 gemfmalt.3 gemfmalt.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemfmlib.c gemfmlib.i
+x C:\BIN\C068.TTP gemfmlib.i gemfmlib.1 gemfmlib.2 gemfmlib.3 -f
+x C:\BIN\C168.TTP gemfmlib.1 gemfmlib.2 gemfmlib.s
+x C:\BIN\OPTIMIZE.TOS gemfmlib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemfmlib.s
+del gemfmlib.i gemfmlib.1 gemfmlib.2 gemfmlib.3 gemfmlib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemfslib.c gemfslib.i
+x C:\BIN\C068.TTP gemfslib.i gemfslib.1 gemfslib.2 gemfslib.3 -f
+x C:\BIN\C168.TTP gemfslib.1 gemfslib.2 gemfslib.s
+x C:\BIN\OPTIMIZE.TOS gemfslib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemfslib.s
+del gemfslib.i gemfslib.1 gemfslib.2 gemfslib.3 gemfslib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemglobe.c gemglobe.i
+x C:\BIN\C068.TTP gemglobe.i gemglobe.1 gemglobe.2 gemglobe.3 -f
+x C:\BIN\C168.TTP gemglobe.1 gemglobe.2 gemglobe.s
+x C:\BIN\OPTIMIZE.TOS gemglobe.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemglobe.s
+del gemglobe.i gemglobe.1 gemglobe.2 gemglobe.3 gemglobe.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ geminit.c geminit.i
+x C:\BIN\C068.TTP geminit.i geminit.1 geminit.2 geminit.3 -f
+x C:\BIN\C168.TTP geminit.1 geminit.2 geminit.s
+x C:\BIN\OPTIMIZE.TOS geminit.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ geminit.s
+del geminit.i geminit.1 geminit.2 geminit.3 geminit.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ geminput.c geminput.i
+x C:\BIN\C068.TTP geminput.i geminput.1 geminput.2 geminput.3 -f
+x C:\BIN\C168.TTP geminput.1 geminput.2 geminput.s
+x C:\BIN\OPTIMIZE.TOS geminput.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ geminput.s
+del geminput.i geminput.1 geminput.2 geminput.3 geminput.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemmnlib.c gemmnlib.i
+x C:\BIN\C068.TTP gemmnlib.i gemmnlib.1 gemmnlib.2 gemmnlib.3 -f
+x C:\BIN\C168.TTP gemmnlib.1 gemmnlib.2 gemmnlib.s
+x C:\BIN\OPTIMIZE.TOS gemmnlib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemmnlib.s
+del gemmnlib.i gemmnlib.1 gemmnlib.2 gemmnlib.3 gemmnlib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemobed.c gemobed.i
+x C:\BIN\C068.TTP gemobed.i gemobed.1 gemobed.2 gemobed.3 -f
+x C:\BIN\C168.TTP gemobed.1 gemobed.2 gemobed.s
+x C:\BIN\OPTIMIZE.TOS gemobed.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemobed.s
+del gemobed.i gemobed.1 gemobed.2 gemobed.3 gemobed.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemobjop.c gemobjop.i
+x C:\BIN\C068.TTP gemobjop.i gemobjop.1 gemobjop.2 gemobjop.3 -f
+x C:\BIN\C168.TTP gemobjop.1 gemobjop.2 gemobjop.s
+x C:\BIN\OPTIMIZE.TOS gemobjop.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemobjop.s
+del gemobjop.i gemobjop.1 gemobjop.2 gemobjop.3 gemobjop.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gempd.c gempd.i
+x C:\BIN\C068.TTP gempd.i gempd.1 gempd.2 gempd.3 -f
+x C:\BIN\C168.TTP gempd.1 gempd.2 gempd.s
+x C:\BIN\OPTIMIZE.TOS gempd.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gempd.s
+del gempd.i gempd.1 gempd.2 gempd.3 gempd.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemqueue.c gemqueue.i
+x C:\BIN\C068.TTP gemqueue.i gemqueue.1 gemqueue.2 gemqueue.3 -f
+x C:\BIN\C168.TTP gemqueue.1 gemqueue.2 gemqueue.s
+x C:\BIN\OPTIMIZE.TOS gemqueue.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemqueue.s
+del gemqueue.i gemqueue.1 gemqueue.2 gemqueue.3 gemqueue.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemrom.c gemrom.i
+x C:\BIN\C068.TTP gemrom.i gemrom.1 gemrom.2 gemrom.3 -f
+x C:\BIN\C168.TTP gemrom.1 gemrom.2 gemrom.s
+x C:\BIN\OPTIMIZE.TOS gemrom.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemrom.s
+del gemrom.i gemrom.1 gemrom.2 gemrom.3 gemrom.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemrslib.c gemrslib.i
+x C:\BIN\C068.TTP gemrslib.i gemrslib.1 gemrslib.2 gemrslib.3 -f
+x C:\BIN\C168.TTP gemrslib.1 gemrslib.2 gemrslib.s
+x C:\BIN\OPTIMIZE.TOS gemrslib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemrslib.s
+del gemrslib.i gemrslib.1 gemrslib.2 gemrslib.3 gemrslib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemsclib.c gemsclib.i
+x C:\BIN\C068.TTP gemsclib.i gemsclib.1 gemsclib.2 gemsclib.3 -f
+x C:\BIN\C168.TTP gemsclib.1 gemsclib.2 gemsclib.s
+x C:\BIN\OPTIMIZE.TOS gemsclib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemsclib.s
+del gemsclib.i gemsclib.1 gemsclib.2 gemsclib.3 gemsclib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemshlib.c gemshlib.i
+x C:\BIN\C068.TTP gemshlib.i gemshlib.1 gemshlib.2 gemshlib.3 -f
+x C:\BIN\C168.TTP gemshlib.1 gemshlib.2 gemshlib.s
+x C:\BIN\OPTIMIZE.TOS gemshlib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemshlib.s
+del gemshlib.i gemshlib.1 gemshlib.2 gemshlib.3 gemshlib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemwmlib.c gemwmlib.i
+x C:\BIN\C068.TTP gemwmlib.i gemwmlib.1 gemwmlib.2 gemwmlib.3 -f
+x C:\BIN\C168.TTP gemwmlib.1 gemwmlib.2 gemwmlib.s
+x C:\BIN\OPTIMIZE.TOS gemwmlib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemwmlib.s
+del gemwmlib.i gemwmlib.1 gemwmlib.2 gemwmlib.3 gemwmlib.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemwrect.c gemwrect.i
+x C:\BIN\C068.TTP gemwrect.i gemwrect.1 gemwrect.2 gemwrect.3 -f
+x C:\BIN\C168.TTP gemwrect.1 gemwrect.2 gemwrect.s
+x C:\BIN\OPTIMIZE.TOS gemwrect.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemwrect.s
+del gemwrect.i gemwrect.1 gemwrect.2 gemwrect.3 gemwrect.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ romcart.c romcart.i
+x C:\BIN\C068.TTP romcart.i romcart.1 romcart.2 romcart.3 -f
+x C:\BIN\C168.TTP romcart.1 romcart.2 romcart.s
+x C:\BIN\OPTIMIZE.TOS romcart.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ romcart.s
+del romcart.i romcart.1 romcart.2 romcart.3 romcart.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ gemoblib.c gemoblib.i
+x C:\BIN\C068.TTP gemoblib.i gemoblib.1 gemoblib.2 gemoblib.3 -f
+x C:\BIN\C168.TTP gemoblib.1 gemoblib.2 gemoblib.s
+x C:\BIN\OPTIMIZE.TOS gemoblib.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemoblib.s
+del gemoblib.i gemoblib.1 gemoblib.2 gemoblib.3 gemoblib.s
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ apgrlib.s apgrlib.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ apgrlib.i
+del apgrlib.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ apgsxif.s apgsxif.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ apgsxif.i
+del apgsxif.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ gemgrlib.s gemgrlib.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemgrlib.i
+del gemgrlib.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ gemgsxif.s gemgsxif.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gemgsxif.i
+del gemgsxif.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ gsx2.s gsx2.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ gsx2.i
+del gsx2.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ jbind.s jbind.i
+x C:\BIN\MAS.TTP -us jbind.i -O=jbind.o
+del jbind.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ jdispa.s jdispa.i
+x C:\BIN\MAS.TTP -us jdispa.i -O=jdispa.o
+del jdispa.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ jdos.s jdos.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ jdos.i
+del jdos.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ large.s large.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ large.i
+del large.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ optimize.s optimize.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ optimize.i
+del optimize.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ ratrbp.s ratrbp.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ ratrbp.i
+del ratrbp.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ trap14.s trap14.i
+x C:\BIN\MAS.TTP -us trap14.i -O=trap14.o
+del trap14.i
+
+echo desktop
+cd D:\DESK
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskact.c deskact.i
+x C:\BIN\C068.TTP deskact.i deskact.1 deskact.2 deskact.3 -f
+x C:\BIN\C168.TTP deskact.1 deskact.2 deskact.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskact.s
+del deskact.i deskact.1 deskact.2 deskact.3 deskact.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskapp.c deskapp.i
+x C:\BIN\C068.TTP deskapp.i deskapp.1 deskapp.2 deskapp.3 -f
+x C:\BIN\C168.TTP deskapp.1 deskapp.2 deskapp.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskapp.s
+del deskapp.i deskapp.1 deskapp.2 deskapp.3 deskapp.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskbind.c deskbind.i
+x C:\BIN\C068.TTP deskbind.i deskbind.1 deskbind.2 deskbind.3 -f
+x C:\BIN\C168.TTP deskbind.1 deskbind.2 deskbind.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskbind.s
+del deskbind.i deskbind.1 deskbind.2 deskbind.3 deskbind.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskbutt.c deskbutt.i
+x C:\BIN\C068.TTP deskbutt.i deskbutt.1 deskbutt.2 deskbutt.3 -f
+x C:\BIN\C168.TTP deskbutt.1 deskbutt.2 deskbutt.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskbutt.s
+del deskbutt.i deskbutt.1 deskbutt.2 deskbutt.3 deskbutt.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskdir.c deskdir.i
+x C:\BIN\C068.TTP deskdir.i deskdir.1 deskdir.2 deskdir.3 -f
+x C:\BIN\C168.TTP deskdir.1 deskdir.2 deskdir.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskdir.s
+del deskdir.i deskdir.1 deskdir.2 deskdir.3 deskdir.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskdisk.c deskdisk.i
+x C:\BIN\C068.TTP deskdisk.i deskdisk.1 deskdisk.2 deskdisk.3 -f
+x C:\BIN\C168.TTP deskdisk.1 deskdisk.2 deskdisk.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskdisk.s
+del deskdisk.i deskdisk.1 deskdisk.2 deskdisk.3 deskdisk.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskfile.c deskfile.i
+x C:\BIN\C068.TTP deskfile.i deskfile.1 deskfile.2 deskfile.3 -f
+x C:\BIN\C168.TTP deskfile.1 deskfile.2 deskfile.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskfile.s
+del deskfile.i deskfile.1 deskfile.2 deskfile.3 deskfile.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskinf.c deskinf.i
+x C:\BIN\C068.TTP deskinf.i deskinf.1 deskinf.2 deskinf.3 -f
+x C:\BIN\C168.TTP deskinf.1 deskinf.2 deskinf.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskinf.s
+del deskinf.i deskinf.1 deskinf.2 deskinf.3 deskinf.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskins.c deskins.i
+x C:\BIN\C068.TTP deskins.i deskins.1 deskins.2 deskins.3 -f
+x C:\BIN\C168.TTP deskins.1 deskins.2 deskins.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskins.s
+del deskins.i deskins.1 deskins.2 deskins.3 deskins.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskmem.c deskmem.i
+x C:\BIN\C068.TTP deskmem.i deskmem.1 deskmem.2 deskmem.3 -f
+x C:\BIN\C168.TTP deskmem.1 deskmem.2 deskmem.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskmem.s
+del deskmem.i deskmem.1 deskmem.2 deskmem.3 deskmem.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskmenu.c deskmenu.i
+x C:\BIN\C068.TTP deskmenu.i deskmenu.1 deskmenu.2 deskmenu.3 -f
+x C:\BIN\C168.TTP deskmenu.1 deskmenu.2 deskmenu.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskmenu.s
+del deskmenu.i deskmenu.1 deskmenu.2 deskmenu.3 deskmenu.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskmisc.c deskmisc.i
+x C:\BIN\C068.TTP deskmisc.i deskmisc.1 deskmisc.2 deskmisc.3 -f
+x C:\BIN\C168.TTP deskmisc.1 deskmisc.2 deskmisc.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskmisc.s
+del deskmisc.i deskmisc.1 deskmisc.2 deskmisc.3 deskmisc.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskopen.c deskopen.i
+x C:\BIN\C068.TTP deskopen.i deskopen.1 deskopen.2 deskopen.3 -f
+x C:\BIN\C168.TTP deskopen.1 deskopen.2 deskopen.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskopen.s
+del deskopen.i deskopen.1 deskopen.2 deskopen.3 deskopen.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskpref.c deskpref.i
+x C:\BIN\C068.TTP deskpref.i deskpref.1 deskpref.2 deskpref.3 -f
+x C:\BIN\C168.TTP deskpref.1 deskpref.2 deskpref.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskpref.s
+del deskpref.i deskpref.1 deskpref.2 deskpref.3 deskpref.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ desksear.c desksear.i
+x C:\BIN\C068.TTP desksear.i desksear.1 desksear.2 desksear.3 -f
+x C:\BIN\C168.TTP desksear.1 desksear.2 desksear.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ desksear.s
+del desksear.i desksear.1 desksear.2 desksear.3 desksear.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ desksele.c desksele.i
+x C:\BIN\C068.TTP desksele.i desksele.1 desksele.2 desksele.3 -f
+x C:\BIN\C168.TTP desksele.1 desksele.2 desksele.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ desksele.s
+del desksele.i desksele.1 desksele.2 desksele.3 desksele.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskshel.c deskshel.i
+x C:\BIN\C068.TTP deskshel.i deskshel.1 deskshel.2 deskshel.3 -f
+x C:\BIN\C168.TTP deskshel.1 deskshel.2 deskshel.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskshel.s
+del deskshel.i deskshel.1 deskshel.2 deskshel.3 deskshel.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskshow.c deskshow.i
+x C:\BIN\C068.TTP deskshow.i deskshow.1 deskshow.2 deskshow.3 -f
+x C:\BIN\C168.TTP deskshow.1 deskshow.2 deskshow.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskshow.s
+del deskshow.i deskshow.1 deskshow.2 deskshow.3 deskshow.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskrsc.c deskrsc.i
+x C:\BIN\C068.TTP deskrsc.i deskrsc.1 deskrsc.2 deskrsc.3 -f
+x C:\BIN\C168.TTP deskrsc.1 deskrsc.2 deskrsc.s
+x C:\BIN\OPTIMIZE.TOS deskrsc.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskrsc.s
+del deskrsc.i deskrsc.1 deskrsc.2 deskrsc.3 deskrsc.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskstor.c deskstor.i
+x C:\BIN\C068.TTP deskstor.i deskstor.1 deskstor.2 deskstor.3 -f
+x C:\BIN\C168.TTP deskstor.1 deskstor.2 deskstor.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskstor.s
+del deskstor.i deskstor.1 deskstor.2 deskstor.3 deskstor.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ desktop.c desktop.i
+x C:\BIN\C068.TTP desktop.i desktop.1 desktop.2 desktop.3 -f
+x C:\BIN\C168.TTP desktop.1 desktop.2 desktop.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ desktop.s
+del desktop.i desktop.1 desktop.2 desktop.3 desktop.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskupda.c deskupda.i
+x C:\BIN\C068.TTP deskupda.i deskupda.1 deskupda.2 deskupda.3 -f
+x C:\BIN\C168.TTP deskupda.1 deskupda.2 deskupda.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskupda.s
+del deskupda.i deskupda.1 deskupda.2 deskupda.3 deskupda.s
+x C:\BIN\CP68.TTP -I D:\COMMON\ deskwin.c deskwin.i
+x C:\BIN\C068.TTP deskwin.i deskwin.1 deskwin.2 deskwin.3 -f
+x C:\BIN\C168.TTP deskwin.1 deskwin.2 deskwin.s
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskwin.s
+del deskwin.i deskwin.1 deskwin.2 deskwin.3 deskwin.s
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ deskif.s deskif.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ deskif.i
+del deskif.i
+x C:\BIN\CP68.TTP -P -I D:\COMMON\ osbind.s osbind.i
+x C:\BIN\AS68.TTP -u -l -s M:\ -f M:\ osbind.i
+del osbind.i
+
+echo resource glue: glue.usa from gemusa.rsc, deskusa.rsc, deskusa.inf (2.06 USA)
+cd D:\ROM
+copy D:\AES\RSC\206\GEMUS.RSC D:\ROM\GEMUSA.RSC
+copy D:\DESK\RSC\206\DESKUS.RSC D:\ROM\DESKUSA.RSC
+copy D:\DESK\RSC\206\DESKUS.INF D:\ROM\DESKUSA.INF
+type usa\rexit\r
+x C:\GLUE\NEWGLUE.PRG
+# NEWGLUE never writes these padding bytes; tos207.rom has these values there
+poke D:\ROM\GLUE.USA 5036 0e60
+poke D:\ROM\GLUE.USA 29159 1b
+poke D:\ROM\GLUE.USA 29161 40
+poke D:\ROM\GLUE.USA 29835 01
+poke D:\ROM\GLUE.USA 29837 09ffffffff
+
+echo ROM from the sources
+setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
+cd D:\ROM
+x make
+echo two ROM chips (even and odd bytes), one CRC-16 each, as startup.s checks them
+romimg tos.abs tos.img 262144 2
+
+echo compare with the expected checksums
+check C:\EXPECT.LST

@@ -176,10 +176,10 @@
 3408447450 7754 D:\VDIVTG\VDIVTG.O
 # the stand-alone VDI with the soft blitter: screen.prg of 1993-02-02 14:41:24 (md5 9a576bcc6bfc1e885ac832b85e3f8ef6), the same VDI as this release
 2627028704 317998 D:\PIXVDI\SOURCES\SCREEN.PRG
-# glue.swe for makeprg, against the shipped one (1993-01-14 10:48:30)
-2235983952 33818 D:\AES\GLUE.SWE
+# glue.swe for makeprg, with the look of the other languages (this build's own bytes)
+2162338211 33818 D:\AES\GLUE.SWE
 # stand-alone programs without a surviving copy of this state: the checksums of this build
 # md5 b9f004bd530eacab204d63b972ca0469
 3414373750 239500 D:\PIXVDI\SOURCES\SMSCREEN.PRG
-# md5 cfecb128cdfa74566c79baa9dce1b517
-2185607215 404265 D:\AES\USA.PRG
+# md5 bda275f3a925fd4f6fc7a0e0edda067f
+3341148930 404265 D:\AES\USA.PRG

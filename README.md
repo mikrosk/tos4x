@@ -7,17 +7,31 @@ Part of the repository is a full build harness that recreates byte-exact builds 
 
 | Tag               | Builds
 |-------------------|-------------------------------------------------------------------------
-| build/tos207      | TOS 2.07 (Sparrow)
-| build/tos400      | TOS 4.00, SCREEN.PRG, SMSCREEN.PRG, USA.PRG
-| build/tos401      | TOS 4.01, SCREEN.PRG, SMSCREEN.PRG, USA.PRG
-| build/tos402      | TOS 4.02, SCREEN.PRG, SMSCREEN.PRG, USA.PRG
-| build/gemsys100   | MultiTOS 1.00 GEM.SYS in six languages
-| build/gemsys101   | MultiTOS 1.01 GEM.SYS in six languages
-| build/tos404      | TOS 4.04, SCREEN.PRG, SMSCREEN.PRG, USA.PRG
-| build/tos492      | TOS 4.92 (the RAM TOS of the beta boot floppy), DESK.PRG
-| build/tos492rom   | TOS 4.92 as a ROM (never released), DESK.PRG
-| build/gemsys108   | MultiTOS 1.08 GEM.SYS in five languages, DESK.PRG
+| [build/tos207]    | TOS 2.07 (Sparrow)
+| [build/tos400]    | TOS 4.00, SCREEN.PRG, SMSCREEN.PRG, USA.PRG
+| [build/tos401]    | TOS 4.01, SCREEN.PRG, SMSCREEN.PRG, USA.PRG
+| [build/tos402]    | TOS 4.02, SCREEN.PRG, SMSCREEN.PRG, USA.PRG
+| [build/gemsys100] | MultiTOS 1.00 GEM.SYS in six languages
+| [build/gemsys101] | MultiTOS 1.01 GEM.SYS in six languages
+| [build/tos404]    | TOS 4.04, SCREEN.PRG, SMSCREEN.PRG, USA.PRG
+| [build/tos492]    | TOS 4.92 (the RAM TOS of the beta boot floppy), DESK.PRG
+| [build/tos492rom] | TOS 4.92 as a ROM (never released), DESK.PRG
+| [build/gemsys108] | MultiTOS 1.08 GEM.SYS in five languages, DESK.PRG
 | master            | TOS 4.05, SCREEN.PRG, SMSCREEN.PRG, USA.PRG, TOS 5.00, GEM.SYS 1.09 in five languages, DESK.PRG
+
+[build/tos207]: https://github.com/mikrosk/tos4x/releases/tag/build/tos207
+[build/tos400]: https://github.com/mikrosk/tos4x/releases/tag/build/tos400
+[build/tos401]: https://github.com/mikrosk/tos4x/releases/tag/build/tos401
+[build/tos402]: https://github.com/mikrosk/tos4x/releases/tag/build/tos402
+[build/gemsys100]: https://github.com/mikrosk/tos4x/releases/tag/build/gemsys100
+[build/gemsys101]: https://github.com/mikrosk/tos4x/releases/tag/build/gemsys101
+[build/tos404]: https://github.com/mikrosk/tos4x/releases/tag/build/tos404
+[build/tos492]: https://github.com/mikrosk/tos4x/releases/tag/build/tos492
+[build/tos492rom]: https://github.com/mikrosk/tos4x/releases/tag/build/tos492rom
+[build/gemsys108]: https://github.com/mikrosk/tos4x/releases/tag/build/gemsys108
+
+Each linked release holds what the tag's branch builds with its fixups (the Swedish resources); the ROM images and
+GEM.SYS files that Atari released are byte-identical to Atari's copies.
 
 `SCREEN.PRG`: the VDI as a program, with the blit routines working with and without Blitter
 

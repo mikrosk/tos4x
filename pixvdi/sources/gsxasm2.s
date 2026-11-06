@@ -399,8 +399,8 @@ end_pix_pts:	move.l	44(sp),a0		; a0 -> Xleft
 * 16 bit case
 *-
 check16Left:	move.w	(a2),d1			; d1 <- value of current pix
-		swap	d1			; search_color is a long (upper
-		move.w	(a2),d1			; and lower words are equal)
+		swap	d1			; in both words; search_color
+		move.w	(a2),d1			; holds the pixel in the lower one
 		move.w	d4,d2			; d2 <- x position
 		move.w	_XMN_CLIP(a6),d3	; d3 <- x minimum position
 		move.l	a2,a3			; a3 -> current X position

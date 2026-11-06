@@ -118,7 +118,8 @@ seedfill( VOID )
 	/* move than one resolution.					   */
 
 	search_color = (LONG) (MAP_COL[search_color] & plane_mask[v_planes]);
-	search_color = pal_map[search_color];
+	/* true colour pens hold the pixel twice, end_pts compares one word */
+	search_color = pal_map[search_color] & 0xffffL;
 	seed_type = 0;
     }
 

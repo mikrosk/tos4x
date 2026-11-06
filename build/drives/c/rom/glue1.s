@@ -1,5 +1,5 @@
-; Common blocks of allbios.awu as .bss, in the order aln allocates them, then endos (start of
-; the AES bss). tos492.img has them between the GEMDOS and AES bss.
+; Common blocks of allbios.owu as .bss, in the order aln allocates them, then endos (start of
+; the AES bss), between the GEMDOS and AES bss.
 	.globl	_seed
 	.globl	_PR
 	.globl	_prtbyt

@@ -923,7 +923,6 @@ ck270:		add.w	d1,_DESTY(a6)		; move down by DELX
 
 
 blt_done:	unlk	a5
-		movem.l	(sp)+,a5-a6		; restore pre-saved registers
 		rts				; return to "C"
 
 

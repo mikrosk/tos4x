@@ -56,7 +56,7 @@
 	.globl	_GETBLT
 	.globl	_SETBLT
 	.globl	blink
-	.globl	_jmptb2			; jump table for second set of GDP'S
+	.globl	vdi_tbl			; jump table of the VDI functions
 	.globl	myvq_key_s
 	.globl	_VsetRGB
 
@@ -149,7 +149,7 @@ gin1:	move.l	_vblqueue,a0		; insert the blink routine
 * remember we are not linked in with bios so we must do this
 * because we don't have direct access to var 'kbshift'
 *-
-	move.l	#myvq_key_s,_jmptb2+112	; where adr of old vq_key_s() used to be
+	move.l	#myvq_key_s,vdi_tbl+4*128	; where adr of old vq_key_s() used to be
 
 * Convert the address of the entry point to a string
 

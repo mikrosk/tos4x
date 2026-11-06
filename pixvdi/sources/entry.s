@@ -35,6 +35,7 @@
 	.globl	_pblock
 	.globl	_curWork
 	.globl	_lapblock
+	.globl	vdi_tbl
 
 	.xdef	ptsin_array
 	.xdef	_FLIP_Y

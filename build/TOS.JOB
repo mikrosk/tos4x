@@ -1,10 +1,10 @@
-# TOS 4.04 build, run by C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c).
-# S: is the repository, D: the work copy, M: the RAM disk the makefiles expect.
-# cptree gives every copied file the same time stamp, so make rebuilds only what is missing.
-# Everything is built from the sources, the Lattice C parts with Lattice 5.52; D:\ROM\TOS.IMG
-# must be TOS 4.04 byte for byte (EXPECT.LST).
-# The same sources also give the stand-alone programs: the VDI as SCREEN.PRG and SMSCREEN.PRG, the AES
-# and desktop as USA.PRG (EXPECT.LST).
+# TOS 4.05 as a 512 KB ROM: the single-TOS AES and desktop of aes/ (USA, German, French, Italian and Spanish)
+# with the BIOS (systype rom), GEMDOS and Lattice VDI of TOS 4.92, linked at $E00000 as TOS 4.04; run by
+# C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c). S: is the repository, D: the work copy, M: the
+# RAM disk the makefiles expect. cptree gives every copied file the same time stamp, so make rebuilds only
+# what is missing. Everything is built from the sources, the Lattice C parts with Lattice 5.52. Also built:
+# D:\AES\USA.PRG, the AES and desktop as a program (all six languages), and the VDI as a program with and
+# without the soft blitter, D:\PIXVDI\SOURCES\SCREEN.PRG and SMSCREEN.PRG.
 
 echo copy the sources to D:
 rmtree D:\
@@ -15,21 +15,14 @@ cptree S:\GEMDOS D:\GEMDOS
 cptree S:\PIXVDI D:\PIXVDI
 cptree C:\ROM D:\ROM
 copy C:\SLAV\AS68SYMB.DAT M:\AS68SYMB.DAT
-echo AES resource glue: NEWGLUE.PRG makes glue.XXX from gemXXX.rsc, deskXXX.rsc, deskXXX.inf in one
-echo session fre, grm, ita, spa, usa; the bytes newglue never writes keep the previous country's
+echo AES resource glue: NEWGLUE.PRG makes glue.XXX from gemXXX.rsc, deskXXX.rsc, deskXXX.inf; the bytes
+echo newglue never writes keep the previous country's of the same session
 cd D:\AES
-echo glue.swe, which makeprg links: NEWGLUE.PRG session spa, swe (the shipped glue.swe was made right after
-echo a Spanish glue); the next session makes glue.spa again
+echo glue.swe was made right after a Spanish glue; this session's glue.spa is made again by the next one
 type spa\rswe\rexit\r
 x C:\GLUE\NEWGLUE.PRG
 type fre\rgrm\rita\rspa\rusa\rexit\r
 x C:\GLUE\NEWGLUE.PRG
-# glue.ita was made on 1993-01-19 right after the German resource of that day; NEWGLUE leaves these padding bytes unwritten, so they held its bytes
-poke D:\AES\GLUE.ITA 0x14ce 00000c18
-echo glue.grm again with SIZEGLUE.PRG (newglue.c with its size block on): the shipped glue.grm holds
-echo rsh_rssize bytes of deskgrm.rsc, 2 fewer than the file
-type grm\rexit\r
-x C:\GLUE\SIZEGLUE.PRG
 echo the surviving MAS versions reject clr.l An; the shipped objects hold suba.l An,An
 subst D:\BIOS\STARTUP.S clr.l\ta5 suba.l\ta5,a5
 subst D:\BIOS\STARTUP.S clr.l\ta0 suba.l\ta0,a0
@@ -37,15 +30,11 @@ subst D:\BIOS\XINOUT.S clr.l\ta5 suba.l\ta5,a5
 echo TOS cuts functions.o in the AES link list to function.o; the Hatari drive does not for make
 subst D:\AES\MAKEIMG functions.o function.o
 subst D:\AES\MAKEPRG functions.o function.o
-# Swedish: remove the # of the next three lines to give Swedish its own resources in the ROM
-#subst D:\AES\GEMROM.C /*EXTERN\tBYTE\tSWERSC[];*/ EXTERN\tBYTE\tSWERSC[];
-#subst D:\AES\GEMROM.C USARSC\t\t/*\ssuppose\sto\sbe\sSWEDISH\t*/ SWERSC\t\t/*\sSWEDISH\t*/
-#subst D:\AES\MAKEIMG -i\sglue.ita\s_ITARSC\s-i\sglue.spa -i\sglue.ita\s_ITARSC\s-i\sglue.swe\s_SWERSC\s-i\sglue.spa
 setenv MACPATH=C:\INC\
 setenv INCLUDE=C:\LC\INCLUDE
+setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
 
 echo BIOS (Lattice make)
-setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
 cd D:\BIOS\DSP
 setenv MACPATH=C:\INC\DSP\
 x make dsp.o
@@ -53,10 +42,9 @@ setenv MACPATH=C:\INC\
 cd D:\BIOS\SPSOUND
 x make spsound.o
 cd D:\BIOS
-echo an existing file "version" keeps biosvers from writing today's date into version.s
-touch version
-x make RAM=0 allbios
-echo vdivtg.o for the stand-alone VDI screen.prg: the vdivtg.o rule of the makefile on vdivtg.c, the vtg.c of 1992-08-03
+echo biosvers (C:\UTIL) writes the build date into version.s
+x make RAM=0 MTOS=0 allbios
+echo vdivtg.o for the stand-alone VDI: the vdivtg.o rule of the makefile on vdivtg.c, the vtg.c of 1992-08-03
 cptree S:\BIOS D:\VDIVTG
 copy D:\VDIVTG\VDIVTG.C D:\VDIVTG\VTG.C
 cd D:\VDIVTG
@@ -66,38 +54,118 @@ echo GEMDOS (Lattice make; pasm is Pure C PASM)
 setenv PATH=C:\LC\BIN;C:\PUREC;C:\SLAV;C:\BIN;C:\UTIL
 cd D:\GEMDOS
 x make gemdos.030
-
-echo PIXVDI (Lattice make)
 setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
-echo makevdi moves the objects to ..\objs, a directory without files in the tree
+
+# VDI (smvdi.o): the rules of pixvdi/sources/makefile (Lattice 5.52 -O, MAS -SU3), one make call per
+# module in nosftvdi.aln order, then the makefile's smvdi.o link; asm objects land in ..\objs, C objects stay
 mkdir D:\PIXVDI\OBJS
+# monobj, monout and text give more warnings than the default limit of 50 (no prototypes)
+setenv LC_OPT=-q-
 cd D:\PIXVDI\SOURCES
+x make vdivar.o
+x make escape.o
+x make font6x6.o
+x make font8x8.o
+x make font8x16.o
+x make hard.o
+x make cbssdefs.o
+x make entry.o
+x make line1010.o
+x make gsxasm1.o
+x make blitinit.o
+x make tables.o
+x make isin.o
+x make monobj.o
+x make monout.o
+x make text.o
+x make textblt.o
+x make mono.o
+x make gsxasm2.o
+x make mouse.o
+x make copyrfm.o
+x make blastman.o
+x make seedfill.o
+x make xfrmform.o
+x make devices.o
+x make spxesc.o
+x make allgem.o
+x make pxmouse.o
+x make opnwk.o
+x make palette.o
+x make init.o
+x make blaster.o
+x make hbline.o
+x make hbmono.o
+x make hbtxtblt.o
+x make hbrect.o
+x make hbbitblt.o
+x make hbescape.o
+x make ttcolor.o
+x make routines.o
+x make colorep.o
+x make spxtblit.o
+x make spxoblit.o
+x make spxvline.o
+x make spxhline.o
+x make pxabline.o
+x make pxrectfl.o
+x make spcolor.o
+x make spxmono.o
+x make spxtxtbl.o
+x make trucolor.o
+x make pxtform.o
+x make hpxoblit.o
+x aln -p -s -v -u -y ..\objs -o smvdi.o -c nosftvdi.aln
+echo stand-alone VDI: the makefile's links of screen.prg (vdi.aln, with the soft blitter and the 16x32 font)
+echo and smscreen.prg (nosftvdi.aln), with jin.o, alone.o and vdivtg.o
+x make jin.o
+x make alone.o
+x make fnt16x32.o
+x make sbblit.o
+x make sbfrag.o
+x make sbescape.o
+x make sbhline.o
+x make sbvline.o
+x make sbmono.o
+x make sbtxtblt.o
+x make sbscrn.o
+x make sbsctran.o
+x make sbsctlog.o
+x make sbscolog.o
+x make sbscopaq.o
 copy D:\VDIVTG\VDIVTG.O D:\PIXVDI\SOURCES\VDIVTG.O
-del smscreen.prg
-x make -f makevdi screen.prg
-x make -f makevdi smvdi.o
-x make -f makevdi smscreen.prg
+x aln -l -v -u -y ..\objs -o screen.prg jin.o alone.o vdivtg.o -c vdi.aln
+x aln -l -v -u -y ..\objs -o smscreen.prg jin.o alone.o vdivtg.o -c nosftvdi.aln
+setenv LC_OPT=
 
-echo AES (Lattice make; makeimg with the 1989 MadMac)
-setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
-cd D:\AES
-x make -f makeimg
-echo USA.PRG gives Swedish its own resources: gemrom.c, then gemrom.oo again for makeprg
+echo AES (Lattice make; makeprg with the 1989 MadMac, as the TOS 4.04 objects); USA.PRG gives Swedish its own
+echo resources (gemrom.c)
 subst D:\AES\GEMROM.C /*EXTERN\tBYTE\tSWERSC[];*/ EXTERN\tBYTE\tSWERSC[];
 subst D:\AES\GEMROM.C USARSC\t\t/*\ssuppose\sto\sbe\sSWEDISH\t*/ SWERSC\t\t/*\sSWEDISH\t*/
-del gemrom.oo
-echo the AES and desktop as a program (makeprg, the same objects): all six resource sets are linked in,
-echo COUNTRY only names the file
+cd D:\AES
 x make -f makeprg
-
-echo ROM from the sources
+echo mn_submn.c of 1993-03-15 went through the MadMac of the Alcyon tools in C:\BIN
+del mn_submn.oo
+del usa.prg
+setenv PATH=C:\LC\BIN;C:\BIN;C:\UTIL
+x make -f makeprg
+echo the ROM gives Swedish the USA resources
+subst D:\AES\GEMROM.C SWERSC\t\t/*\sSWEDISH\t*/ USARSC\t\t/*\ssuppose\sto\sbe\sSWEDISH\t*/
+# Swedish: remove the # of the next two lines to give Swedish its own resources in the ROM
+#subst D:\AES\GEMROM.C USARSC\t\t/*\ssuppose\sto\sbe\sSWEDISH\t*/ SWERSC\t\t/*\sSWEDISH\t*/
+#subst D:\AES\MAKEIMG -i\sglue.ita\s_ITARSC\s-i\sglue.spa -i\sglue.ita\s_ITARSC\s-i\sglue.swe\s_SWERSC\s-i\sglue.spa
+del gemrom.oo
+echo ttaesusa.o for the ROM: makeimg on the same objects, linked with the aln of the TOS 4.04 ROM
 setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
+x make -f makeimg
+
+echo ROM
 cd D:\ROM
 copy D:\BIOS\ALLBIOS.OWU D:\ROM\ALLBIOS.OWU
 copy D:\PIXVDI\SOURCES\SMVDI.O D:\ROM\SMVDI.O
 copy D:\GEMDOS\GEMDOS.030 D:\ROM\GEMDOS.030
 copy D:\AES\TTAESUSA.O D:\ROM\TTAESUSA.O
-x make
+x make AES=ttaesusa.o
 romimg tos.abs tos.img 524288
 
 echo compare with the expected checksums

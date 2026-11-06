@@ -399,7 +399,7 @@
 *
 *-
 
-* The switches TT, SPARROW, STPAD, systype, and country are now set
+* The switches TT, SPARROW, STPAD, MTOS, systype, and country are now set
 * on the command line.  switches.s contains rom/ram and country defines
 
 .include "switches.s"
@@ -421,8 +421,13 @@ ONLY_LONGFRAME	equ	TT
 * set the high byte of the version number based on the machine type
 
 .if SPARROW
+.if MTOS
+vershi		equ	$05
+verslo		equ	$00
+.else
 vershi		equ	$04
-verslo		equ	$92
+verslo		equ	$05
+.endif
 .else
 
 .if TT

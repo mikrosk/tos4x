@@ -11,7 +11,7 @@
 # bios is affected by machine and country.
 # flop, dmaread and clock are affected by the machine switch only.
 # rwabs.c is affected by machine, too: for SPARROW it gets USE_DISK_CHANGE.
-# startup is affected by machine and systype.
+# startup is affected by machine, systype and MTOS.
 
 # Look at the `default:' target, or type 'make' for usage information.
 
@@ -122,10 +122,17 @@ else
 R=a
 endif
 
+# MultiTOS AES flag, sets `MTOS' (startup.s: version 5.00 instead of 4.05)
+# -----------------------------------------------------------------------
+
+ifndef MTOS
+MTOS=0		    # default: single-TOS AES
+endif
+
 # Finally, set assembler and compiler flags from the above
 # -----------------------------------------------------------------------
 ASFLAGS = -S38 -D=country=$(CNUM) -D=systype=$(RAM) \
-	-D=TT=$(MTT) -D=SPARROW=$(MSP) -D=STPAD=$(MPD)
+	-D=TT=$(MTT) -D=SPARROW=$(MSP) -D=STPAD=$(MPD) -D=MTOS=$(MTOS)
 
 CDEF = -DUSE_DISK_CHANGE=$(DCHANGE)
 CERR = -cw -j100i
@@ -157,7 +164,7 @@ CFLAGS = $(CDEF) #$(CERR) $(COPT) $(CMOD)
 # =======================================================================
 
 default:
-	@echo	'use: make [C=[abcdfgiknstuw]] [M=[efptw]] [RAM=[01]] allbios'
+	@echo	'use: make [C=[abcdfgiknstuw]] [M=[efptw]] [RAM=[01]] [MTOS=[01]] allbios'
 	@echo	'C sets "country" (default $C):'
 	@echo	'	a swf	f fra	k uk	t tur'
 	@echo	'	b swg	g ger	n nor	u usa'
@@ -170,6 +177,7 @@ default:
 	@echo	'	t TT'
 	@echo	'	w Sparrow (Falcon/030)'
 	@echo	'RAM sets "systype": 0 rom, 1 ram (default $(RAM))'
+	@echo	'MTOS 1 for the MultiTOS AES (default $(MTOS))'
 
 # Objects not affected by country or machine switches
 OBJ = dsp\dsp.o spsound\spsound.o prtblk.o xinout.o memtest.o vtg.o version.o

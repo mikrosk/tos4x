@@ -1,16 +1,16 @@
-# TOS 4.92 as a 512 KB ROM (the BIOS with systype rom, linked at $E00000 as TOS 4.04), run by
-# C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c). S: is the repository, D: the work copy,
-# M: the RAM disk the makefiles expect. cptree gives every copied file the same time stamp, so make
-# rebuilds only what is missing. Everything is built from the sources, the Lattice C parts with
-# Lattice 5.52. 4.92 was released only as a RAM TOS; D:\ROM\TOS.IMG must be this job's own image
-# byte for byte (EXPECT.LST).
+# TOS 5.00 as a 512 KB ROM: the MultiTOS AES and desktop of multitos/ (those of GEM.SYS 1.08, without
+# the Spanish resources) with the BIOS (systype rom), GEMDOS and Lattice VDI of TOS 4.92, linked at
+# $E00000 as TOS 4.04; run by C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c). S: is the
+# repository, D: the work copy, M: the RAM disk the makefiles expect. cptree gives every copied file
+# the same time stamp, so make rebuilds only what is missing. Everything is built from the sources, the
+# Lattice C parts with Lattice 5.52.
 
 echo copy the sources to D:
 rmtree D:\
 rmtree M:\
 cptree S:\BIOS D:\BIOS
 cptree S:\GEMDOS D:\GEMDOS
-cptree C:\ROM492 D:\ROM
+cptree C:\ROM D:\ROM
 copy C:\SLAV\AS68SYMB.DAT M:\AS68SYMB.DAT
 echo the surviving MAS versions reject clr.l An; the shipped objects hold suba.l An,An
 subst D:\BIOS\STARTUP.S clr.l\ta5 suba.l\ta5,a5
@@ -28,9 +28,8 @@ setenv MACPATH=C:\INC\
 cd D:\BIOS\SPSOUND
 x make spsound.o
 cd D:\BIOS
-echo an existing file "version" keeps biosvers from writing today's date into version.s
-touch version
-x make RAM=0 allbios
+echo biosvers (C:\UTIL) writes the build date into version.s
+x make RAM=0 MTOS=1 allbios
 
 echo GEMDOS (Lattice make; pasm is Pure C PASM)
 setenv PATH=C:\LC\BIN;C:\PUREC;C:\SLAV;C:\BIN;C:\UTIL
@@ -102,7 +101,7 @@ x make hpxoblit.o
 x aln -p -s -v -u -y ..\objs -o smvdi.o -c nosftvdi.aln
 setenv LC_OPT=
 
-echo AES (MultiTOS AES of TOS 4.92: makegem with Lattice 5.52, -m3)
+echo AES (MultiTOS AES of GEM.SYS 1.08: makegem with Lattice 5.52)
 cptree S:\MULTITOS D:\MULTITOS
 setenv PATH=C:\UTIL;C:\LC\BIN;C:\SLAV
 echo AES binding library aesbin73: Alcyon C (cp68, c068 -f, c168) and MadMac 1.05 (mac -6) per member;
@@ -721,13 +720,16 @@ x C:\MTOS\SUPERGLU.PRG -c usa
 x C:\MTOS\SUPERGLU.PRG -c grm
 x C:\MTOS\SUPERGLU.PRG -c fre
 x C:\MTOS\SUPERGLU.PRG -c ita
-x C:\MTOS\SUPERGLU.PRG -c spa
-# Swedish: remove the # of the next five lines to give Swedish its own resources
-#x C:\MTOS\SUPERGLU.PRG -c swe
-#subst D:\MULTITOS\MAKEGEM #RSC5 RSC5
-#subst D:\MULTITOS\MAKEGEM $(RSC4)\s$(RSC6) $(RSC4)\s$(RSC5)\s$(RSC6)
-#subst D:\MULTITOS\MAKEGEM -i\s$(RSC4)\s_ITARSC -i\s$(RSC4)\s_ITARSC\s-i\s$(RSC5)\s_SWERSC
-#subst D:\MULTITOS\DESKROM.C USARSC\t\t/*\ssuppose\sto\sbe\sSWEDISH\t*/ SWERSC\t\t/*\sSWEDISH\t*/
+echo Spanish does not fit in the ROM (25140 bytes over): no glue.spa, makegem's aes40usa.o links none
+echo and deskrom.c gives Spanish the USA resources
+subst D:\MULTITOS\MAKEGEM $(RSC4)\s$(RSC6) $(RSC4)
+subst D:\MULTITOS\MAKEGEM \s-i\s$(RSC6)\s_SPARSC
+subst D:\MULTITOS\DESKROM.C *)SPARSC, *)USARSC,
+# Spanish: remove the # of the next four lines to put it back in
+#x C:\MTOS\SUPERGLU.PRG -c spa
+#subst D:\MULTITOS\MAKEGEM $(RSC4)\r\n $(RSC4)\s$(RSC6)\r\n
+#subst D:\MULTITOS\MAKEGEM _ITARSC\r\n _ITARSC\s-i\s$(RSC6)\s_SPARSC\r\n
+#subst D:\MULTITOS\DESKROM.C *)USARSC,\t\t/*\sSPANISH *)SPARSC,\t\t/*\sSPANISH
 x make -f makegem gemstart.o
 x make -f makegem gemctrl.o
 x make -f makegem ctrlbind.o
@@ -816,7 +818,7 @@ copy D:\BIOS\ALLBIOS.OWU D:\ROM\ALLBIOS.OWU
 copy D:\PIXVDI\SOURCES\SMVDI.O D:\ROM\SMVDI.O
 copy D:\GEMDOS\GEMDOS.030 D:\ROM\GEMDOS.030
 copy D:\MULTITOS\AES40USA.O D:\ROM\AES40USA.O
-x make
+x make AES=aes40usa.o
 romimg tos.abs tos.img 524288
 
 echo compare with the expected checksums

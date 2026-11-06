@@ -51,7 +51,8 @@ sb_mono:
 
 	move.l	_FBASE(a5),a0		; a0 -> source form base address
 	move.w	_FWIDTH(a5),d0		; d0 <- source form width
-	move.l	_INTIN(a5),a2		; a2 -> character string
+	move.l	_pblock,a2
+	move.l	PB_INTIN(a2),a2		; a2 -> character string
 	move.w	_v_lin_wr(a5),d1	; d1 <- screen form width
 	move.w	_WRT_MODE(a5),d4	; d4 <- writing mode
 	add.w	d4,d4			; d4 <- writing mode index

@@ -1,7 +1,6 @@
 # MultiTOS GEM.SYS 1.08, run by C:\AUTO\RUNNER.PRG at boot (commands: build/src/runner.c).
 # S: is the repository, D: the work copy. First the AES binding library aesbin73 (+ index) from multitos/aesbind,
-# then makegem with Lattice 5.52, one make call per object (progress), then its gem.sys target;
-# D:\MULTITOS\GEM.SYS must be the 1.08 beta byte for byte (EXPECT.LST).
+# then makegem with Lattice 5.52, one make call per object (progress), then its gem.sys target, D:\MULTITOS\GEM.SYS.
 echo copy the sources to D:
 rmtree D:\
 cptree S:\MULTITOS D:\MULTITOS

@@ -11,7 +11,7 @@
 # HATARI names the emulator binary (default: hatari).  Outputs land in build/drives/d (the ROM
 # in build/drives/d/rom/tos.img, GEM.SYS in build/drives/d/multitos/gem.sys), the log in
 # build/drives/c/build.log.  check C:\EXPECT.LST must find every file identical, the ROM or
-# GEM.SYS among them.
+# GEM.SYS among them; every program the job runs (x) must end with 0 and no step with a negative code.
 case "$1" in
 tos) job=TOS ;;
 gemsys) job=GEMSYS ;;
@@ -64,6 +64,13 @@ rm -f drives/c/headless
 grep -q '^DONE' drives/c/build.log 2>/dev/null || { echo "build did not finish, see build/drives/c/build.log" >&2; exit 1; }
 rc=0
 tr -d '\r' < drives/c/build.log | grep -q '^CHECK C:\\EXPECT.LST identical [0-9]* differs 0 missing 0$' || rc=1
+failed=$(tr -d '\r' < drives/c/build.log | awk '/^B [0-9]+ /{s = $0; sub(/^B [0-9]+ /, "", s); b[$2] = s}
+	/^E [0-9]+ /{if (($3 != 0 && b[$2] ~ /^x /) || $3 < 0) print "  exit " $3 ": " b[$2]}')
+if [ -n "$failed" ]; then
+	echo "steps that ended with an error:" >&2
+	echo "$failed" >&2
+	rc=1
+fi
 if [ -z "$ref" ]; then
 	[ $rc = 0 ] && echo "RESULT ok" || echo "RESULT failed"
 	exit $rc

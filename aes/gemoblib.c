@@ -1928,7 +1928,28 @@ CICONBLK **carray;
  *	index (0-255, but with reversed bits).  The rgb_tab has the correct
  *	RGB settings per index.  Therefore, we substitute indexes (i.e.
  *	reversed indexes) with RGB.
+ * NOTE: not all VDIs do the reversing, so we actually have to test this
+ *       and set the variable "trn_reverse" accordingly: 0x0000 means we
+ *	 don't know (default when we start up), 0x8000 means that that it
+ *	 reverses, 0x0001 means that it doesn't.
  */
+
+MLOCAL UWORD trn_reverse;
+
+MLOCAL UWORD
+check_trnfrm( VOID )
+{
+    UWORD src_form[16], dst_form[16], i;
+
+    src_form[0] = 0xffff;
+    dst_form[0] = 0x0000;
+    for (i = 1; i < 16; i++) {
+	src_form[i] = dst_form[i] = 0;
+    }
+    my_trans((LONG)&src_form[0], 2, (LONG)&dst_form[0], 2, 1, 16);
+    return dst_form[0];
+}
+
 tran_check( saddr, daddr, mask, w, h, nplanes )
 BYTE *saddr, *daddr, *mask;
 int w, h, nplanes;
@@ -1989,7 +2010,13 @@ WORD index;
 {
     WORD rindex;	/* reversed bits of index */
 
-    rindex = reverse( index );
+    if (!trn_reverse)
+        trn_reverse = check_trnfrm();
+
+    if (trn_reverse == 0x8000)
+        rindex = reverse( index );
+    else 
+	rindex = index;
 
     return( rgb_tab[rindex] );
 }

@@ -108,7 +108,7 @@ seedfill( VOID )
 	return;
 
     else if (search_color < 0) {
-	search_color = get_pix();
+	search_color = get_pix() & 0xffffL;
 	seed_type = 1;
     }
     else {

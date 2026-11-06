@@ -37,7 +37,7 @@ subst D:\BIOS\XINOUT.S clr.l\ta5 suba.l\ta5,a5
 echo TOS cuts functions.o in the AES link list to function.o; the Hatari drive does not for make
 subst D:\AES\MAKEIMG functions.o function.o
 subst D:\AES\MAKEPRG functions.o function.o
-# Swedish: remove the # of the next three lines to give Swedish its own resources in the ROM and USA.PRG
+# Swedish: remove the # of the next three lines to give Swedish its own resources in the ROM
 #subst D:\AES\GEMROM.C /*EXTERN\tBYTE\tSWERSC[];*/ EXTERN\tBYTE\tSWERSC[];
 #subst D:\AES\GEMROM.C USARSC\t\t/*\ssuppose\sto\sbe\sSWEDISH\t*/ SWERSC\t\t/*\sSWEDISH\t*/
 #subst D:\AES\MAKEIMG -i\sglue.ita\s_ITARSC\s-i\sglue.spa -i\sglue.ita\s_ITARSC\s-i\sglue.swe\s_SWERSC\s-i\sglue.spa
@@ -82,6 +82,10 @@ echo AES (Lattice make; makeimg with the 1989 MadMac)
 setenv PATH=C:\LC\BIN;C:\SLAV;C:\BIN;C:\UTIL
 cd D:\AES
 x make -f makeimg
+echo USA.PRG gives Swedish its own resources: gemrom.c, then gemrom.oo again for makeprg
+subst D:\AES\GEMROM.C /*EXTERN\tBYTE\tSWERSC[];*/ EXTERN\tBYTE\tSWERSC[];
+subst D:\AES\GEMROM.C USARSC\t\t/*\ssuppose\sto\sbe\sSWEDISH\t*/ SWERSC\t\t/*\sSWEDISH\t*/
+del gemrom.oo
 echo the AES and desktop as a program (makeprg, the same objects): all six resource sets are linked in,
 echo COUNTRY only names the file
 x make -f makeprg
